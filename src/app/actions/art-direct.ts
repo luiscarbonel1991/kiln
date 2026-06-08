@@ -1,9 +1,10 @@
 "use server";
 
 import { z } from "zod";
-import { SEED_BRAND, SEED_RECIPES } from "@/domain/seed";
+import { SEED_BRAND } from "@/domain/seed";
 import { BaseUnderstanding } from "@/domain/understanding";
 import { VariantDirection } from "@/domain/variant-direction";
+import { SEED_RECIPES } from "@/lib/recipes";
 import { getArtDirector } from "@/providers/registry";
 
 const ProposeInput = z.object({

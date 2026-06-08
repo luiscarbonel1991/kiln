@@ -207,62 +207,9 @@ export const SEED_RECIPE_ADS = Recipe.parse({
   },
 });
 
-// Line-art / laser set — black strokes on white (style "line-art"), one motif in
-// five laser-ready treatments. Skips the ArtDirector; the slot purpose drives each.
-export const SEED_RECIPE_LASER = Recipe.parse({
-  id: "recipe-laser-lineart",
-  name: "Laser / line",
-  style: "line-art",
-  directions: [
-    {
-      label: "Cut outline",
-      purpose:
-        "A bold single continuous outline of the whole shape — the clean silhouette to cut.",
-      aspect: "1:1",
-    },
-    {
-      label: "Engrave detail",
-      purpose:
-        "Fine interior line work for engraving — decorative detail, no solid fills.",
-      aspect: "1:1",
-    },
-    {
-      label: "Framed badge",
-      purpose:
-        "The motif inside a circular badge frame — coaster or sign ready.",
-      aspect: "1:1",
-    },
-    {
-      label: "Geometric",
-      purpose:
-        "A geometric, straight-line interpretation of the motif — modern and minimal.",
-      aspect: "1:1",
-    },
-    {
-      label: "Minimal",
-      purpose: "The simplest one- or two-stroke version of the idea.",
-      aspect: "1:1",
-    },
-  ],
-  fieldDefaults: {
-    scene: "the motif centered with a clean margin",
-    composition: "balanced, filling the frame",
-    lighting: "flat (line art, no lighting)",
-  },
-  targets: [{ name: "Laser", aspect: "1:1" }],
-  constraints: {
-    preserve: ["overall silhouette"],
-    negative: [
-      "color",
-      "gradient",
-      "shading",
-      "grey",
-      "photographic",
-      "texture",
-      "background scene",
-    ],
-  },
-});
+// The line-art "Laser / line" recipe (the maker IP) lives in the APP, not here —
+// src/lib/recipes.ts. The OSS engine ships the line-art STYLE capability (recipe
+// `style` + the assemblePrompt branch), not the laser-specific treatments.
 
 // Selector source for Planning. SEED_RECIPE stays the default (index 0).
 export const SEED_RECIPES: Recipe[] = [
@@ -270,5 +217,4 @@ export const SEED_RECIPES: Recipe[] = [
   SEED_RECIPE_MARKETPLACE,
   SEED_RECIPE_SOCIAL,
   SEED_RECIPE_ADS,
-  SEED_RECIPE_LASER,
 ];

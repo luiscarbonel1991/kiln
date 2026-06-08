@@ -19,6 +19,8 @@
       }
     ],
     "paths": {
+      "@/domain/*": ["./packages/engine/src/domain/*"],
+      "@/providers/*": ["./packages/engine/src/providers/*"],
       "@/*": ["./src/*"]
     }
   },

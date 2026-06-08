@@ -1,9 +1,9 @@
-import { env } from "@/lib/env";
 import type {
   StorageProvider,
   StorageProviderId,
 } from "@/providers/storage/interface";
 import { s3StorageProvider } from "@/providers/storage/s3";
+import { env } from "../../env";
 
 // Object storage selection. Kept separate from registry.ts (which pulls the image
 // adapters) so the byte helpers can import it without an import cycle. One provider

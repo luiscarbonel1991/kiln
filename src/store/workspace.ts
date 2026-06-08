@@ -15,9 +15,10 @@ import type {
   PersistedWorkspace,
   PersistedWorkspaceRecord,
 } from "@/domain/persisted-workspace";
-import { SEED_BRAND, SEED_RECIPES } from "@/domain/seed";
+import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
+import { SEED_RECIPES } from "@/lib/recipes";
 
 export type Phase = "upload" | "analysis" | "planning" | "generation";
 

@@ -7,7 +7,8 @@ import {
   resolveField,
 } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
-import { SEED_BRAND, SEED_RECIPE, SEED_RECIPE_LASER } from "@/domain/seed";
+import { Recipe } from "@/domain/recipe";
+import { SEED_BRAND, SEED_RECIPE } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 
 const understanding: BaseUnderstanding = {
@@ -259,19 +260,39 @@ describe("assemblePrompt", () => {
   });
 
   it("uses a line-art prompt (not photographic) for a line-art recipe", () => {
+    // The engine ships the line-art STYLE capability; the laser recipe lives in
+    // the app, so we exercise the branch with a minimal inline line-art recipe.
+    const lineArt = Recipe.parse({
+      id: "test-lineart",
+      name: "Line art",
+      style: "line-art",
+      directions: [
+        {
+          label: "Outline",
+          purpose: "A single clean outline of the subject.",
+          aspect: "1:1",
+        },
+      ],
+      fieldDefaults: {
+        scene: "centered, clean margin",
+        composition: "filling the frame",
+      },
+      targets: [{ name: "Line", aspect: "1:1" }],
+      constraints: { preserve: [], negative: ["color", "shading"] },
+    });
     const { prompt } = assemblePrompt(
       undefined,
       master,
       understanding,
-      SEED_RECIPE_LASER,
+      lineArt,
       SEED_BRAND,
-      "Cut outline",
+      "Outline",
     );
     expect(prompt).toMatch(/line art/i);
     expect(prompt).toMatch(/black/i);
     expect(prompt).not.toMatch(/photorealistic/i);
     expect(prompt).not.toContain("product photograph");
     // The slot's purpose becomes the per-slot treatment.
-    expect(prompt).toContain("single continuous outline");
+    expect(prompt).toContain("single clean outline");
   });
 });

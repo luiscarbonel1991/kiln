@@ -5,12 +5,12 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { env } from "@/lib/env";
 import type {
   PutObjectInput,
   PutObjectResult,
   StorageProvider,
 } from "@/providers/storage/interface";
+import { env } from "../../env";
 
 function createClient(): S3Client {
   return new S3Client({

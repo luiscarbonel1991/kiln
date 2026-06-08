@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { env } from "@/lib/env";
+import { env } from "../../env";
 
 // Lazily-constructed singleton OpenAI client (server-only). hasOpenAIKey lets the
 // adapter fall back to its mock when no key is configured.

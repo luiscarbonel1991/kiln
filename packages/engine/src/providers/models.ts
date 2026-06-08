@@ -1,5 +1,5 @@
 import { DEFAULT_MODEL_IDS } from "@/domain/model-defaults";
-import { env } from "@/lib/env";
+import { env } from "../env";
 
 // Model IDs: client-safe defaults (DEFAULT_MODEL_IDS) with build-time env overrides.
 export const MODELS = {

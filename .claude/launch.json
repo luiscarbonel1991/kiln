@@ -4,9 +4,9 @@
     {
       "name": "kiln-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
-      "port": 3000,
-      "autoPort": true
+      "runtimeArgs": ["dev", "--port", "3009"],
+      "port": 3009,
+      "autoPort": false
     }
   ]
 }

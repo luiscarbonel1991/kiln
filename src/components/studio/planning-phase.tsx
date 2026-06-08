@@ -11,9 +11,9 @@ import { ProvenanceBadge } from "@/components/studio/provenance-badge";
 import { Input } from "@/components/ui/input";
 import type { FieldKey } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
-import { SEED_RECIPES } from "@/domain/seed";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { gradientForPrompt } from "@/lib/gradient";
+import { SEED_RECIPES } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace";
 

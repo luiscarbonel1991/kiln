@@ -1,0 +1,49 @@
+{
+  "name": "@kiln/engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kiln engine — the provenance cascade (brand -> image -> recipe -> local) and multi-provider AI adapters (Gemini / OpenAI / Veo) behind clean interfaces.",
+  "license": "FSL-1.1-Apache-2.0",
+  "type": "module",
+  "main": "./dist/providers/index.js",
+  "module": "./dist/providers/index.js",
+  "types": "./dist/providers/index.d.ts",
+  "exports": {
+    "./domain": {
+      "types": "./dist/domain/index.d.ts",
+      "import": "./dist/domain/index.js"
+    },
+    "./domain/*": {
+      "types": "./dist/domain/*.d.ts",
+      "import": "./dist/domain/*.js"
+    },
+    "./providers": {
+      "types": "./dist/providers/index.d.ts",
+      "import": "./dist/providers/index.js"
+    },
+    "./providers/*": {
+      "types": "./dist/providers/*.d.ts",
+      "import": "./dist/providers/*.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "prepublishOnly": "pnpm run clean && pnpm run build"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1057.0",
+    "@google/genai": "^2.7.0",
+    "openai": "^6.39.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5"
+  }
+}

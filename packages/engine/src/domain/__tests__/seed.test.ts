@@ -5,7 +5,6 @@ import {
   SEED_BRAND,
   SEED_RECIPE,
   SEED_RECIPE_ADS,
-  SEED_RECIPE_LASER,
   SEED_RECIPES,
 } from "@/domain/seed";
 
@@ -48,14 +47,14 @@ describe("seed data", () => {
     expect(SEED_RECIPES.some((r) => r.id === "recipe-ads")).toBe(true);
   });
 
-  it("recipe style defaults to photographic; the laser recipe is line-art", () => {
+  it("style defaults to photographic; the OSS engine ships NO line-art recipe", () => {
     expect(SEED_RECIPE.style).toBe("photographic");
     expect(SEED_RECIPE_ADS.style).toBe("photographic");
-    expect(() => Recipe.parse(SEED_RECIPE_LASER)).not.toThrow();
-    expect(SEED_RECIPE_LASER.style).toBe("line-art");
-    expect(SEED_RECIPE_LASER.directions).toHaveLength(5);
+    // Guardrail: the engine ships the line-art STYLE capability, but the laser
+    // recipe itself is the app's IP — no engine recipe is line-art.
+    expect(SEED_RECIPES.every((r) => r.style === "photographic")).toBe(true);
     expect(SEED_RECIPES.some((r) => r.id === "recipe-laser-lineart")).toBe(
-      true,
+      false,
     );
   });
 });

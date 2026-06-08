@@ -11,10 +11,11 @@ import { CardFieldRow } from "@/components/studio/card-field-row";
 import { RenderCanvas } from "@/components/studio/render-canvas";
 import { assemblePrompt, type FieldKey } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
-import { SEED_BRAND, SEED_RECIPES } from "@/domain/seed";
+import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { assetFilename, downloadAsset } from "@/lib/download";
 import { gradientForSeed } from "@/lib/gradient";
+import { SEED_RECIPES } from "@/lib/recipes";
 import { type StudioCard, useWorkspace } from "@/store/workspace";
 
 const FIELD_ROWS: { key: FieldKey; label: string }[] = [

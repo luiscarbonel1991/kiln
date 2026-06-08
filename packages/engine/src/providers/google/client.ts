@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { env } from "@/lib/env";
+import { env } from "../../env";
 
 // Lazily-constructed singleton GenAI client (server-only — used only by the google
 // adapters behind Server Actions). hasGoogleKey lets adapters fall back to their
