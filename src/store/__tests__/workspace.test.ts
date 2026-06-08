@@ -1,0 +1,318 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { buildPlanningContext } from "@/domain/cascade";
+import type { MasterAsset } from "@/domain/master-asset";
+import { DEFAULT_MODEL_IDS } from "@/domain/model-defaults";
+import type { PersistedWorkspaceRecord } from "@/domain/persisted-workspace";
+import { SEED_BRAND, SEED_RECIPES } from "@/domain/seed";
+import type { BaseUnderstanding } from "@/domain/understanding";
+import { toPersisted, useWorkspace } from "@/store/workspace";
+
+// https URL (not blob:) so reset() never calls URL.revokeObjectURL, which is
+// absent in the node test environment.
+const sampleMaster: MasterAsset = {
+  id: "m-test",
+  origin: "generated",
+  sourcePrompt: "a glazed cream pitcher",
+  assetUrl: "https://stub.local/x.png",
+  mime: "image/png",
+};
+
+const sampleUnderstanding: BaseUnderstanding = {
+  subject: "glazed stoneware pitcher, matte cream finish",
+  materials: "stoneware, reactive glaze",
+  lighting: "soft directional light, upper-left",
+  composition: "centered, slight high angle",
+  mood: "calm, handmade, editorial",
+  palette: ["#c0461f", "#e8a13a"],
+};
+
+afterEach(() => {
+  useWorkspace.getState().reset();
+});
+
+describe("useWorkspace", () => {
+  it("starts on the upload phase with no master or understanding", () => {
+    expect(useWorkspace.getState().phase).toBe("upload");
+    expect(useWorkspace.getState().master).toBeNull();
+    expect(useWorkspace.getState().understanding).toBeNull();
+  });
+
+  it("setMaster stores the master and advances to analysis", () => {
+    useWorkspace.getState().setMaster(sampleMaster);
+    expect(useWorkspace.getState().master).toEqual(sampleMaster);
+    expect(useWorkspace.getState().phase).toBe("analysis");
+  });
+
+  it("setUnderstanding stores the understanding", () => {
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    expect(useWorkspace.getState().understanding).toEqual(sampleUnderstanding);
+  });
+
+  it("setMaster clears any stale understanding", () => {
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    useWorkspace.getState().setMaster(sampleMaster);
+    expect(useWorkspace.getState().understanding).toBeNull();
+  });
+
+  it("reset returns to upload and clears master and understanding", () => {
+    useWorkspace.getState().setMaster(sampleMaster);
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    useWorkspace.getState().reset();
+    expect(useWorkspace.getState().phase).toBe("upload");
+    expect(useWorkspace.getState().master).toBeNull();
+    expect(useWorkspace.getState().understanding).toBeNull();
+  });
+});
+
+describe("useWorkspace planning", () => {
+  it("goToPlanning advances to planning with the default recipe and context", () => {
+    useWorkspace.getState().setMaster(sampleMaster);
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    useWorkspace.getState().goToPlanning();
+
+    const state = useWorkspace.getState();
+    expect(state.phase).toBe("planning");
+    expect(state.recipeId).toBe(SEED_RECIPES[0].id);
+    expect(state.planning).toEqual(
+      buildPlanningContext(sampleUnderstanding, SEED_RECIPES[0], SEED_BRAND),
+    );
+  });
+
+  it("goToPlanning no-ops when understanding is null", () => {
+    useWorkspace.getState().setMaster(sampleMaster);
+    useWorkspace.getState().goToPlanning();
+    expect(useWorkspace.getState().phase).toBe("analysis");
+    expect(useWorkspace.getState().planning).toBeNull();
+  });
+
+  it("selectRecipe rebuilds the planning context for the chosen recipe", () => {
+    useWorkspace.getState().setMaster(sampleMaster);
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    useWorkspace.getState().goToPlanning();
+    useWorkspace.getState().selectRecipe(SEED_RECIPES[1].id);
+
+    const state = useWorkspace.getState();
+    expect(state.recipeId).toBe(SEED_RECIPES[1].id);
+    expect(state.planning?.scene.value).toBe(
+      SEED_RECIPES[1].fieldDefaults.scene,
+    );
+    expect(state.planning?.scene.source).toBe("recipe");
+  });
+
+  it("editPlanningField flips the field to the local layer and unlocks it", () => {
+    useWorkspace.getState().setMaster(sampleMaster);
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    useWorkspace.getState().goToPlanning();
+    useWorkspace.getState().editPlanningField("palette", "just terracotta");
+
+    expect(useWorkspace.getState().planning?.palette).toEqual({
+      value: "just terracotta",
+      source: "local",
+      locked: false,
+    });
+  });
+
+  it("reset and setMaster clear recipeId and planning", () => {
+    useWorkspace.getState().setMaster(sampleMaster);
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    useWorkspace.getState().goToPlanning();
+    useWorkspace.getState().setMaster(sampleMaster);
+
+    const state = useWorkspace.getState();
+    expect(state.recipeId).toBeNull();
+    expect(state.planning).toBeNull();
+    expect(state.phase).toBe("analysis");
+  });
+});
+
+describe("useWorkspace generation", () => {
+  function generate() {
+    useWorkspace.getState().setMaster(sampleMaster);
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    useWorkspace.getState().goToPlanning();
+    useWorkspace.getState().generateVariants();
+  }
+
+  function cardsOf() {
+    const cards = useWorkspace.getState().cards;
+    if (!cards) throw new Error("expected cards to be set");
+    return cards;
+  }
+
+  it("generateVariants builds a draft card per listing slot and enters generation", () => {
+    generate();
+    const state = useWorkspace.getState();
+    expect(state.phase).toBe("generation");
+    expect(state.cards).toHaveLength(6);
+    // Cards start as drafts — generation is manual (cost control), no auto-run.
+    expect(cardsOf()[0].status).toBe("draft");
+  });
+
+  it("editCardField flips a card field to local and unlocks it", () => {
+    generate();
+    const id = cardsOf()[0].id;
+    useWorkspace.getState().editCardField(id, "scene", "studio sweep");
+    expect(cardsOf()[0].fields.scene).toEqual({
+      value: "studio sweep",
+      source: "local",
+      locked: false,
+    });
+  });
+
+  it("toggleCardLock flips a field's locked flag", () => {
+    generate();
+    const id = cardsOf()[0].id;
+    const before = cardsOf()[0].fields.subject.locked;
+    useWorkspace.getState().toggleCardLock(id, "subject");
+    expect(cardsOf()[0].fields.subject.locked).toBe(!before);
+  });
+
+  it("switchCardProvider toggles provider and model id", () => {
+    generate();
+    const id = cardsOf()[0].id;
+    useWorkspace.getState().switchCardProvider(id);
+    const model = cardsOf()[0].model;
+    expect(model.provider).toBe("openai");
+    expect(model.model).toBe(DEFAULT_MODEL_IDS.openai.image);
+  });
+
+  it("regenerateUnlocked skips a fully-locked card", () => {
+    generate();
+    const id = cardsOf()[0].id;
+    // Lock the two recipe fields so card 0 has no unlocked field left.
+    useWorkspace.getState().toggleCardLock(id, "scene");
+    useWorkspace.getState().toggleCardLock(id, "composition");
+    useWorkspace.getState().applyCardResult(id, "https://stub.local/x.png");
+    const seedBefore = cardsOf().find((c) => c.id === id)?.renderSeed;
+    useWorkspace.getState().regenerateUnlocked();
+    const card = cardsOf().find((c) => c.id === id);
+    expect(card?.status).toBe("done");
+    expect(card?.renderSeed).toBe(seedBefore);
+  });
+
+  it("reset clears the cards", () => {
+    generate();
+    useWorkspace.getState().reset();
+    expect(useWorkspace.getState().cards).toBeNull();
+  });
+});
+
+describe("useWorkspace promoteToVideo", () => {
+  function generate() {
+    useWorkspace.getState().setMaster(sampleMaster);
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    useWorkspace.getState().goToPlanning();
+    useWorkspace.getState().generateVariants();
+  }
+
+  function cardsOf() {
+    const cards = useWorkspace.getState().cards;
+    if (!cards) throw new Error("expected cards to be set");
+    return cards;
+  }
+
+  it("appends a video child card adjacent to its source with parentId lineage", () => {
+    generate();
+    const source = cardsOf()[0];
+    const sourceIndex = cardsOf().findIndex((c) => c.id === source.id);
+    useWorkspace.getState().promoteToVideo(source.id);
+
+    const video = cardsOf().find((c) => c.id === `${source.id}-video`);
+    expect(video).toBeDefined();
+    expect(video?.parentId).toBe(source.id);
+    expect(video?.type).toBe("video");
+    expect(video?.status).toBe("draft");
+    expect(cardsOf()[sourceIndex + 1].id).toBe(`${source.id}-video`);
+  });
+
+  it("targets google/Veo and seeds the start frame from the source output", () => {
+    generate();
+    const source = cardsOf()[0];
+    useWorkspace
+      .getState()
+      .applyCardResult(source.id, "https://stub.local/o.png");
+    useWorkspace.getState().promoteToVideo(source.id);
+
+    const video = cardsOf().find((c) => c.id === `${source.id}-video`);
+    expect(video?.model.provider).toBe("google");
+    expect(video?.model.model).toBe(DEFAULT_MODEL_IDS.google.video);
+    expect(video?.video?.startFrameAssetId).toBe("https://stub.local/o.png");
+    expect(video?.video?.durationSec).toBe(5);
+    expect(video?.video?.motion).toBe("subtle push-in");
+  });
+
+  it("falls back to the master asset URL when the source has no output yet", () => {
+    generate();
+    const source = cardsOf()[0];
+    useWorkspace.getState().promoteToVideo(source.id);
+
+    const video = cardsOf().find((c) => c.id === `${source.id}-video`);
+    // The master's URL is a fetchable start frame for image-to-video (a bare
+    // masterAssetId is not), so the fallback prefers it.
+    expect(video?.video?.startFrameAssetId).toBe(sampleMaster.assetUrl);
+  });
+
+  it("promoting twice does not duplicate or re-run the existing video card", () => {
+    generate();
+    const source = cardsOf()[0];
+    useWorkspace.getState().promoteToVideo(source.id);
+    const lenAfterFirst = cardsOf().length;
+    const seedBefore = cardsOf().find(
+      (c) => c.id === `${source.id}-video`,
+    )?.renderSeed;
+    useWorkspace
+      .getState()
+      .applyCardResult(`${source.id}-video`, "https://stub.local/a.mp4");
+    useWorkspace.getState().promoteToVideo(source.id);
+
+    const videos = cardsOf().filter((c) => c.id === `${source.id}-video`);
+    expect(videos).toHaveLength(1);
+    expect(cardsOf().length).toBe(lenAfterFirst);
+    // Re-promoting is a no-op now (manual generation): the card keeps its result.
+    expect(videos[0].status).toBe("done");
+    expect(videos[0].outputs).toEqual(["https://stub.local/a.mp4"]);
+    expect(videos[0].renderSeed).toBe(seedBefore);
+  });
+
+  it("no-ops for an unknown source id", () => {
+    generate();
+    const before = cardsOf().length;
+    useWorkspace.getState().promoteToVideo("does-not-exist");
+    expect(cardsOf().length).toBe(before);
+  });
+});
+
+describe("useWorkspace persistence", () => {
+  function generate() {
+    useWorkspace.getState().setMaster(sampleMaster);
+    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
+    useWorkspace.getState().goToPlanning();
+    useWorkspace.getState().generateVariants();
+  }
+
+  it("toPersisted captures the slice, derives a name, and drops renderSeed", () => {
+    generate();
+    const persisted = toPersisted(useWorkspace.getState());
+    expect(persisted.name).toBe("a glazed cream pitcher");
+    expect(persisted.phase).toBe("generation");
+    expect(persisted.cards).toHaveLength(6);
+    expect("renderSeed" in persisted.cards[0]).toBe(false);
+  });
+
+  it("hydrate restores a saved record with a fresh renderSeed and workspaceId", () => {
+    generate();
+    const persisted = toPersisted(useWorkspace.getState());
+    useWorkspace.getState().reset();
+    expect(useWorkspace.getState().cards).toBeNull();
+
+    const record: PersistedWorkspaceRecord = { id: "ws-9", ...persisted };
+    useWorkspace.getState().hydrate(record);
+
+    const state = useWorkspace.getState();
+    expect(state.workspaceId).toBe("ws-9");
+    expect(state.phase).toBe("generation");
+    expect(state.cards).toHaveLength(6);
+    expect(state.cards?.[0].renderSeed).toBe(5);
+    expect(state.master).toEqual(sampleMaster);
+  });
+});

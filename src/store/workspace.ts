@@ -1,0 +1,364 @@
+"use client";
+
+import { create } from "zustand";
+import type { Card } from "@/domain/card";
+import { buildCards } from "@/domain/cards";
+import {
+  buildPlanningContext,
+  type FieldKey,
+  type PlanningFields,
+} from "@/domain/cascade";
+import type { MasterAsset } from "@/domain/master-asset";
+import type { ModelConfig } from "@/domain/model-config";
+import { DEFAULT_MODEL_IDS } from "@/domain/model-defaults";
+import type {
+  PersistedWorkspace,
+  PersistedWorkspaceRecord,
+} from "@/domain/persisted-workspace";
+import { SEED_BRAND, SEED_RECIPES } from "@/domain/seed";
+import type { BaseUnderstanding } from "@/domain/understanding";
+import type { VariantDirection } from "@/domain/variant-direction";
+
+export type Phase = "upload" | "analysis" | "planning" | "generation";
+
+// A domain Card plus a render seed: the gradient placeholder seed AND the
+// per-card generation trigger (bumped on each re-roll). vectorUrl lives on the
+// domain Card now (persisted), so StudioCard only adds the render seed.
+export type StudioCard = Card & { renderSeed: number };
+
+interface WorkspaceState {
+  phase: Phase;
+  master: MasterAsset | null;
+  understanding: BaseUnderstanding | null;
+  recipeId: string | null;
+  planning: PlanningFields | null;
+  cards: StudioCard[] | null;
+  workspaceId: string | null;
+  setMaster: (master: MasterAsset) => void;
+  setUnderstanding: (understanding: BaseUnderstanding) => void;
+  goToPlanning: () => void;
+  selectRecipe: (recipeId: string) => void;
+  editPlanningField: (key: FieldKey, value: string) => void;
+  generateVariants: (variants?: VariantDirection[]) => void;
+  applyCardResult: (id: string, url: string) => void;
+  applyVector: (id: string, url: string) => void;
+  markCardError: (id: string) => void;
+  regenerateCard: (id: string) => void;
+  regenerateUnlocked: () => void;
+  editCardField: (id: string, key: FieldKey, value: string) => void;
+  editCardModel: (id: string, patch: Partial<ModelConfig>) => void;
+  editCardPrompt: (id: string, prompt: string) => void;
+  toggleCardLock: (id: string, key: FieldKey) => void;
+  switchCardProvider: (id: string) => void;
+  promoteToVideo: (sourceId: string) => void;
+  setWorkspaceId: (id: string | null) => void;
+  hydrate: (record: PersistedWorkspaceRecord) => void;
+  reset: () => void;
+}
+
+const RENDER_BUMP = 13;
+
+export const useWorkspace = create<WorkspaceState>((set, get) => ({
+  phase: "upload",
+  master: null,
+  understanding: null,
+  recipeId: null,
+  planning: null,
+  cards: null,
+  workspaceId: null,
+  // Re-capturing clears everything downstream of the new master.
+  setMaster: (master) =>
+    set({
+      master,
+      understanding: null,
+      phase: "analysis",
+      recipeId: null,
+      planning: null,
+      cards: null,
+    }),
+  setUnderstanding: (understanding) => set({ understanding }),
+  goToPlanning: () => {
+    const understanding = get().understanding;
+    if (!understanding) return;
+    const recipe = SEED_RECIPES[0];
+    set({
+      phase: "planning",
+      recipeId: recipe.id,
+      planning: buildPlanningContext(understanding, recipe, SEED_BRAND),
+      cards: null,
+    });
+  },
+  selectRecipe: (recipeId) => {
+    const understanding = get().understanding;
+    const recipe = SEED_RECIPES.find((r) => r.id === recipeId);
+    if (!understanding || !recipe) return;
+    set({
+      recipeId,
+      planning: buildPlanningContext(understanding, recipe, SEED_BRAND),
+      cards: null,
+    });
+  },
+  editPlanningField: (key, value) => {
+    const planning = get().planning;
+    if (!planning) return;
+    set({
+      planning: {
+        ...planning,
+        [key]: { value, source: "local", locked: false },
+      },
+    });
+  },
+  // Build the variant cards from the planning context + recipe directions. Cards
+  // start in "draft" — generation is manual (a per-card Generate button), so
+  // nothing hits the providers until the user asks for it (cost control).
+  generateVariants: (variants) => {
+    const { understanding, master, recipeId, planning } = get();
+    if (!understanding || !master || !recipeId || !planning) return;
+    const recipe = SEED_RECIPES.find((r) => r.id === recipeId);
+    if (!recipe) return;
+    const cards = buildCards({ master, recipe, planning, variants }).map(
+      (card, i): StudioCard => ({
+        ...card,
+        renderSeed: i * 7 + 5,
+        status: "draft",
+      }),
+    );
+    set({ phase: "generation", cards });
+  },
+  applyCardResult: (id, url) => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map(
+        (c): StudioCard =>
+          c.id === id
+            ? { ...c, status: "done", outputs: [url], vectorUrl: undefined }
+            : c,
+      ),
+    });
+  },
+  applyVector: (id, url) => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map(
+        (c): StudioCard => (c.id === id ? { ...c, vectorUrl: url } : c),
+      ),
+    });
+  },
+  markCardError: (id) => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map(
+        (c): StudioCard => (c.id === id ? { ...c, status: "error" } : c),
+      ),
+    });
+  },
+  regenerateCard: (id) => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map(
+        (c): StudioCard =>
+          c.id === id
+            ? {
+                ...c,
+                status: "rendering",
+                renderSeed: c.renderSeed + RENDER_BUMP,
+              }
+            : c,
+      ),
+    });
+  },
+  // Re-roll only cards that have at least one unlocked field; fully-locked cards
+  // are preserved untouched.
+  regenerateUnlocked: () => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map((c): StudioCard => {
+        const hasUnlocked = Object.values(c.fields).some((f) => !f.locked);
+        return hasUnlocked
+          ? {
+              ...c,
+              status: "rendering",
+              renderSeed: c.renderSeed + RENDER_BUMP,
+            }
+          : c;
+      }),
+    });
+  },
+  editCardField: (id, key, value) => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map(
+        (c): StudioCard =>
+          c.id === id
+            ? {
+                ...c,
+                fields: {
+                  ...c.fields,
+                  [key]: { value, source: "local", locked: false },
+                },
+              }
+            : c,
+      ),
+    });
+  },
+  // Per-card model tuning (provider/model/aspect/guidance/strength). Persisted via
+  // card.model; applied on the next Generate/Re-roll.
+  editCardModel: (id, patch) => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map(
+        (c): StudioCard =>
+          c.id === id ? { ...c, model: { ...c.model, ...patch } } : c,
+      ),
+    });
+  },
+  // Manual prompt override (empty clears it, reverting to the assembled prompt).
+  editCardPrompt: (id, prompt) => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map(
+        (c): StudioCard =>
+          c.id === id
+            ? { ...c, promptOverride: prompt.trim() ? prompt : undefined }
+            : c,
+      ),
+    });
+  },
+  toggleCardLock: (id, key) => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map(
+        (c): StudioCard =>
+          c.id === id
+            ? {
+                ...c,
+                fields: {
+                  ...c.fields,
+                  [key]: { ...c.fields[key], locked: !c.fields[key].locked },
+                },
+              }
+            : c,
+      ),
+    });
+  },
+  switchCardProvider: (id) => {
+    const cards = get().cards;
+    if (!cards) return;
+    set({
+      cards: cards.map((c): StudioCard => {
+        if (c.id !== id) return c;
+        const provider = c.model.provider === "google" ? "openai" : "google";
+        return {
+          ...c,
+          model: {
+            ...c.model,
+            provider,
+            model: DEFAULT_MODEL_IDS[provider].image,
+          },
+        };
+      }),
+    });
+  },
+  // Promote a card to a NEW image-to-video child card (parentId lineage), in
+  // "draft" — Veo only runs when the user clicks Generate on it (it's the most
+  // expensive call). Idempotent: re-promoting is a no-op once the card exists.
+  // Video is single-provider google/Veo; inserted right after its source.
+  promoteToVideo: (sourceId) => {
+    const cards = get().cards;
+    if (!cards) return;
+    const sourceIndex = cards.findIndex((c) => c.id === sourceId);
+    if (sourceIndex === -1) return;
+    const source = cards[sourceIndex];
+    const videoId = `${source.id}-video`;
+    // Already promoted — the video card exists and generates via its own button.
+    if (cards.some((c) => c.id === videoId)) return;
+    const videoCard: StudioCard = {
+      ...source,
+      id: videoId,
+      parentId: source.id,
+      type: "video",
+      model: {
+        ...source.model,
+        provider: "google",
+        model: DEFAULT_MODEL_IDS.google.video,
+      },
+      video: {
+        durationSec: 5,
+        motion: "subtle push-in",
+        startFrameAssetId:
+          source.outputs[0] ?? get().master?.assetUrl ?? source.masterAssetId,
+      },
+      outputs: [],
+      status: "draft",
+      renderSeed: source.renderSeed + 1,
+    };
+    const next = [...cards];
+    next.splice(sourceIndex + 1, 0, videoCard);
+    set({ cards: next });
+  },
+  setWorkspaceId: (id) => set({ workspaceId: id }),
+  // Load a saved workspace into the store: set the persisted slices + rebuild
+  // cards as StudioCards with a fresh renderSeed (UI state, not persisted), using
+  // the same index formula as generateVariants. Revokes a stale blob: master.
+  hydrate: (record) => {
+    const current = get().master;
+    if (current?.assetUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(current.assetUrl);
+    }
+    set({
+      workspaceId: record.id,
+      phase: record.phase,
+      master: record.master,
+      understanding: record.understanding,
+      recipeId: record.recipeId,
+      planning: record.planning,
+      cards: record.cards.map(
+        (card, i): StudioCard => ({ ...card, renderSeed: i * 7 + 5 }),
+      ),
+    });
+  },
+  reset: () => {
+    const current = get().master;
+    // Only blob: URLs from URL.createObjectURL (uploads) need revoking.
+    if (current?.assetUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(current.assetUrl);
+    }
+    set({
+      master: null,
+      understanding: null,
+      phase: "upload",
+      recipeId: null,
+      planning: null,
+      cards: null,
+      workspaceId: null,
+    });
+  },
+}));
+
+// Store -> PersistedWorkspace: the persistable slice. `name` is derived from the
+// master prompt, but it only seeds the name at CREATE time — afterwards autosave
+// leaves the name column untouched (see saveWorkspace) so a user rename sticks.
+// renderSeed and the action functions are dropped by PersistedWorkspace.parse at
+// the Server Action boundary.
+export function toPersisted(state: WorkspaceState): PersistedWorkspace {
+  return {
+    name: state.master?.sourcePrompt?.slice(0, 60) || "Untitled workspace",
+    phase: state.phase,
+    master: state.master,
+    understanding: state.understanding,
+    recipeId: state.recipeId,
+    planning: state.planning,
+    cards: (state.cards ?? []).map(
+      ({ renderSeed: _renderSeed, ...card }) => card,
+    ),
+  };
+}

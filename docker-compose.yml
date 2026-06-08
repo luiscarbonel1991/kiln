@@ -1,0 +1,47 @@
+# Local infra for Kiln. Isolated by container + volume name so it never collides
+# with the user's other local stacks. Host ports avoid taken ones (5432/5433/55432
+# Postgres, 4566 LocalStack, etc.). S3 is MinIO (free, tokenless, S3-compatible) —
+# the storage adapter is the same @aws-sdk/client-s3 regardless of backend.
+services:
+  db:
+    image: postgres:17
+    container_name: kiln-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kiln
+      POSTGRES_PASSWORD: kiln
+      POSTGRES_DB: kiln
+    ports:
+      - "5444:5432"
+    volumes:
+      - kiln-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kiln -d kiln"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  s3:
+    image: minio/minio:latest
+    container_name: kiln-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: kiln
+      MINIO_ROOT_PASSWORD: kiln-secret-key
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    volumes:
+      - kiln-minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  kiln-pgdata:
+    name: kiln-pgdata
+  kiln-minio:
+    name: kiln-minio

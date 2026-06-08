@@ -1,26 +1,249 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Kiln — Studio design system. docs/app-idea/DESIGN.md is the binding visual spec.
+ * shadcn (radix-nova) semantic tokens are mapped to DESIGN tokens (hex). --primary and
+ * --prov-local are runtime-tinted from BrandProfile.palette[0]. Light-only: DESIGN.md
+ * defines no dark palette, so there is no .dark block and no prefers-color-scheme switch.
+ */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* DESIGN tokens beyond the shadcn contract */
+  --color-surface-soft: var(--surface-soft);
+  --color-on-surface-mid: var(--on-surface-mid);
+  --color-on-surface-dim: var(--on-surface-dim);
+  --color-border-soft: var(--border-soft);
+
+  /* provenance cascade hues */
+  --color-prov-brand: var(--prov-brand);
+  --color-prov-image: var(--prov-image);
+  --color-prov-recipe: var(--prov-recipe);
+  --color-prov-local: var(--prov-local);
+
+  /* fonts — next/font var names are distinct from theme keys (no circular self-ref) */
+  --font-sans: var(--font-hanken);
+  --font-serif: var(--font-fraunces);
+  --font-heading: var(--font-fraunces);
+  --font-mono: var(--font-jetbrains-mono);
+
+  /* shadcn (Nova) radius scale, rebased on DESIGN --radius */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* named DESIGN radii -> rounded-badge / rounded-field / rounded-render / rounded-card / ... */
+  --radius-badge: 6px;
+  --radius-swatch: 10px;
+  --radius-field: 13px;
+  --radius-thumb: 13px;
+  --radius-render: 17px;
+  --radius-card: 24px;
+  --radius-pill: 999px;
+
+  /* warm long shadows -> shadow-card / shadow-render / shadow-button */
+  --shadow-card:
+    0 1px 2px rgba(60, 40, 25, 0.04), 0 16px 44px -10px rgba(70, 46, 28, 0.12);
+  --shadow-render: 0 6px 22px -5px rgba(50, 32, 18, 0.26);
+  --shadow-button: 0 8px 20px -6px rgba(192, 70, 31, 0.45);
+
+  /* analysis scan line -> animate-scan (Phase 3) */
+  --animate-scan: scan 1.4s ease-in-out infinite;
+
+  /* landing "firing" hero -> animate-hero-rise (staggered reveal) + animate-ember */
+  --animate-hero-rise: hero-rise 0.75s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  --animate-ember: ember-pulse 7s ease-in-out infinite;
+  --animate-drift: ember-drift 9s ease-in-out infinite;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes scan {
+  from {
+    top: 0;
+  }
+  to {
+    top: 100%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Hero entrance: a single orchestrated reveal, staggered via animation-delay. */
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The kiln's heat: a slow, breathing ember glow behind the anchor. */
+@keyframes ember-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.82;
+    transform: scale(1.05);
+  }
+}
+
+/* The fanned output frames float gently, so the stage feels alive on load (the
+   cursor parallax lives on a parent layer; this only nudges translateY). */
+@keyframes ember-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+/* Respect reduced motion: no entrance animation, no breathing glow, no parallax
+   (the parallax handler also checks this). */
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-rise {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .animate-ember,
+  .animate-drift {
+    animation: none;
+  }
+}
+
+:root {
+  /* shadcn semantic contract -> DESIGN tokens */
+  --background: #f6f1e8; /* neutral (cream canvas, never white) */
+  --foreground: #241f18; /* on-surface */
+  --card: #fffdf9; /* surface */
+  --card-foreground: #241f18;
+  --popover: #fffdf9; /* surface */
+  --popover-foreground: #241f18;
+  --primary: #c0461f; /* terracotta — runtime-tinted from brand */
+  --primary-foreground: #ffffff; /* on-primary */
+  --secondary: #faf5ec; /* surface-soft */
+  --secondary-foreground: #6f6657; /* on-surface-mid */
+  --muted: #faf5ec; /* surface-soft */
+  --muted-foreground: #6f6657; /* on-surface-mid */
+  --accent: #faf5ec; /* surface-soft */
+  --accent-foreground: #241f18; /* on-surface */
+  --destructive: #b3401a; /* warm red (not in DESIGN; terracotta family) */
+  --border: #ebe2d2; /* strong divider */
+  --input: #f0e8da; /* soft divider */
+  --ring: #c0461f; /* primary */
+  --radius: 0.8rem; /* base; named DESIGN radii live in @theme */
+
+  /* chart palette — derived from DESIGN hues (not defined in DESIGN.md) */
+  --chart-1: #c0461f; /* terracotta */
+  --chart-2: #8a6310; /* amber */
+  --chart-3: #2c6a51; /* pine */
+  --chart-4: #3f5f84; /* slate */
+  --chart-5: #a89e8c; /* warm taupe */
+
+  /* sidebar -> surface/cream family */
+  --sidebar: #fffdf9;
+  --sidebar-foreground: #241f18;
+  --sidebar-primary: #c0461f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #faf5ec;
+  --sidebar-accent-foreground: #241f18;
+  --sidebar-border: #ebe2d2;
+  --sidebar-ring: #c0461f;
+
+  /* DESIGN tokens beyond the shadcn contract */
+  --surface-soft: #faf5ec;
+  --on-surface-mid: #6f6657;
+  --on-surface-dim: #a89e8c;
+  --border-soft: #f0e8da;
+
+  /* provenance hues (runtime-themeable; prov-local tracks --primary) */
+  --prov-brand: #8a6310; /* amber  — inherited from brand */
+  --prov-image: #3f5f84; /* slate  — extracted from master asset */
+  --prov-recipe: #2c6a51; /* pine   — set by recipe */
+  --prov-local: #c0461f; /* terracotta — locally edited (== primary) */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(
+        900px 480px at 0% 0%,
+        rgba(192, 70, 31, 0.05),
+        transparent 70%
+      ),
+      radial-gradient(
+        820px 460px at 100% 0%,
+        rgba(138, 99, 16, 0.05),
+        transparent 70%
+      );
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+  /*
+   * Fixed paper-grain overlay — feTurbulence fractalNoise, baseFrequency 0.85,
+   * opacity 0.05, mix-blend multiply. pointer-events:none so it never blocks clicks.
+   */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
 }

@@ -16,6 +16,19 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## System dependencies (laser "Centerline" vectorize)
+
+The line-art **Centerline** trace — single cut paths for laser cutting — shells out to two
+native binaries. Install them on any machine or deploy image that runs the app:
+
+- **autotrace** — centerline tracing (`brew install autotrace` · `apt-get install autotrace`)
+- **ImageMagick** (`magick`) — flattens the raster to a clean B&W bitmap first
+  (`brew install imagemagick` · `apt-get install imagemagick`)
+
+The **Outline** trace (and everything else) is pure-npm via `@neplex/vectorizer` and needs
+nothing extra; if the binaries are missing, only the Centerline button fails (it's caught,
+so the card stays usable).
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

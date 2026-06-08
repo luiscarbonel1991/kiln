@@ -1,0 +1,67 @@
+// Kiln persistence. Hybrid: relational top-level (Workspace, MasterAsset, Card)
+// with Zod-validated JSON for the nested blobs. Lineage is a plain, workspace-
+// scoped `parentCardId` column (domain card ids are unique only within a
+// workspace, so the Card PK is composite [workspaceId, cardId]). Generated/
+// uploaded asset bytes live in object storage; the DB holds only metadata + URLs.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// The save/load unit. recipeId resolves from SEED_RECIPES on load; the brand is a
+// code seed (not stored). understanding/planning are Zod JSON snapshots.
+model Workspace {
+  id            String       @id @default(cuid())
+  name          String
+  phase         String
+  recipeId      String?
+  understanding Json?
+  planning      Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  master        MasterAsset?
+  cards         Card[]
+}
+
+// The anchor image — exactly one per workspace (1:1). PK = workspaceId, so it is
+// collision-free regardless of the domain asset id. assetUrl points at object
+// storage (uploads) or a provider/stub URL (generated).
+model MasterAsset {
+  workspaceId  String    @id
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assetId      String
+  origin       String
+  sourcePrompt String?
+  assetUrl     String
+  mime         String
+}
+
+// One domain Card. PK = composite [workspaceId, cardId] (cardId is unique only per
+// workspace). parentCardId carries the image->video lineage (same workspace); kept
+// as a plain column, not a self-relation FK — v1 traverses lineage in memory.
+model Card {
+  workspaceId   String
+  cardId        String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parentCardId  String?
+  masterAssetId String
+  recipeId      String
+  type          String
+  direction     String
+  fields        Json
+  references    Json
+  model          Json
+  video          Json?
+  promptOverride String?
+  vectorUrl      String?
+  outputs        Json
+  status        String
+  sortOrder     Int
+
+  @@id([workspaceId, cardId])
+  @@index([workspaceId])
+}
