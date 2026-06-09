@@ -3,6 +3,7 @@
 import { Flame } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ChatGenerate } from "@/components/studio/chat-generate";
+import { HowItWorks } from "@/components/studio/how-it-works";
 import { RecentWorkspaces } from "@/components/studio/recent-workspaces";
 import { UploadDropzone } from "@/components/studio/upload-dropzone";
 import { cn } from "@/lib/utils";
@@ -34,11 +35,11 @@ const GHOST_GRAD = {
   moss: "radial-gradient(120% 120% at 32% 28%, #a8ac7d 0%, transparent 55%), radial-gradient(100% 100% at 70% 62%, #86894f 0%, transparent 50%), linear-gradient(150deg, #dcd6bc 0%, #ece9d6 96%)",
 } as const;
 
-// Ghost output frames fanned behind the anchor — a preview of the listing set one
+// Ghost output frames fanned behind the anchor — a wordless preview of the set one
 // master becomes. They drift with the cursor (depth) while the anchor stays put.
-// One warm clay note + three green/natural tones keep them varied and calming.
+// Pure shapes, no labels: one warm clay note + three green/natural tones, calming.
 const STAGE_FRAMES: {
-  label: string;
+  key: string;
   grad: string;
   pos: string;
   rot: number;
@@ -48,51 +49,66 @@ const STAGE_FRAMES: {
   delay: number;
 }[] = [
   {
-    label: "hero",
+    key: "f1",
     grad: GHOST_GRAD.clay,
     pos: "left-[1%] top-[5%]",
     rot: -8,
     depth: 22,
     w: 130,
     h: 130,
-    delay: 440,
+    delay: 300,
   }, // prettier-ignore
   {
-    label: "in-use",
+    key: "f2",
     grad: GHOST_GRAD.sage,
     pos: "right-[-3%] top-[14%]",
     rot: 7,
     depth: 14,
     w: 116,
     h: 146,
-    delay: 560,
+    delay: 360,
   }, // prettier-ignore
   {
-    label: "lifestyle",
+    key: "f3",
     grad: GHOST_GRAD.eucalyptus,
     pos: "left-[-4%] bottom-[7%]",
     rot: -6,
     depth: 18,
     w: 124,
     h: 152,
-    delay: 640,
+    delay: 420,
   }, // prettier-ignore
   {
-    label: "gift",
+    key: "f4",
     grad: GHOST_GRAD.moss,
     pos: "right-[5%] bottom-[-3%]",
     rot: 10,
     depth: 11,
     w: 110,
     h: 110,
-    delay: 700,
+    delay: 480,
   }, // prettier-ignore
 ];
+
+// Animate the hero entrance only the FIRST time it mounts this session — not on
+// every return to the landing (Start over re-mounts UploadPhase, which turned a
+// one-time delight into a per-return tax). A full page reload resets it, so the
+// genuine first impression always plays.
+let heroAnimatedThisSession = false;
 
 export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
   const [mode, setMode] = useState<UploadMode>("upload");
   const stageRef = useRef<HTMLDivElement>(null);
   const reduced = useRef(false);
+
+  // First-mount-only reveal flag (see heroAnimatedThisSession above).
+  const [animate] = useState(() => {
+    const first = !heroAnimatedThisSession;
+    heroAnimatedThisSession = true;
+    return first;
+  });
+  // Apply the rise animation + its stagger delay only on that first reveal.
+  const rise = (delay: string) => (animate ? `animate-hero-rise ${delay}` : "");
 
   useEffect(() => {
     reduced.current = window.matchMedia(
@@ -125,12 +141,20 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
       <div className="mx-auto grid max-w-[1180px] grid-cols-1 items-center gap-12 px-6 py-16 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:py-24">
         {/* Editorial masthead */}
         <div>
-          <span className="animate-hero-rise inline-flex items-center gap-2 rounded-pill border border-primary/20 bg-primary/[0.06] px-3 py-1.5 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-primary [animation-delay:40ms]">
+          <span
+            className={cn(
+              rise("[animation-delay:0ms]"),
+              "inline-flex items-center gap-2 rounded-pill border border-primary/20 bg-primary/[0.06] px-3 py-1.5 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-primary",
+            )}
+          >
             <Flame className="size-3" /> Image-first · fired to a set
           </span>
 
           <h1
-            className="animate-hero-rise mt-6 font-serif font-semibold text-[clamp(2.875rem,6vw,4.875rem)] leading-[0.9] tracking-[-0.03em] text-foreground [animation-delay:120ms]"
+            className={cn(
+              rise("[animation-delay:60ms]"),
+              "mt-6 font-serif font-semibold text-[clamp(2.875rem,6vw,4.875rem)] leading-[0.9] tracking-[-0.03em] text-foreground",
+            )}
             style={{ fontVariationSettings: "'opsz' 144" }}
           >
             Fire one image
@@ -140,13 +164,23 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
             on-brand <span className="text-primary italic">set.</span>
           </h1>
 
-          <p className="animate-hero-rise mt-5 max-w-[464px] font-sans text-[0.9375rem] leading-relaxed text-on-surface-mid [animation-delay:220ms]">
+          <p
+            className={cn(
+              rise("[animation-delay:130ms]"),
+              "mt-5 max-w-[472px] font-sans text-[0.9375rem] leading-relaxed text-on-surface-mid",
+            )}
+          >
             Upload or generate a single master. Kiln reads its DNA — subject,
             palette, light — and carries it, locked, through every variation.
             The anchor never drifts.
           </p>
 
-          <div className="animate-hero-rise mt-8 flex flex-wrap items-center gap-x-2.5 gap-y-2 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-on-surface-dim [animation-delay:320ms]">
+          <div
+            className={cn(
+              rise("[animation-delay:200ms]"),
+              "mt-8 flex flex-wrap items-center gap-x-2.5 gap-y-2 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-on-surface-dim",
+            )}
+          >
             {CASCADE.map((layer, i) => (
               <Fragment key={layer.label}>
                 {i > 0 ? (
@@ -197,16 +231,18 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
             </div>
           </div>
 
-          {/* fanned output ghosts (hidden on the smallest screens) */}
+          {/* fanned output ghosts — pure shapes, no labels (hidden on the smallest
+              screens). Entrance animates only on the first reveal. */}
           {STAGE_FRAMES.map((f, i) => (
             <div
-              key={f.label}
+              key={f.key}
               aria-hidden
               className={cn(
-                "animate-hero-rise pointer-events-none absolute hidden sm:block",
+                animate && "animate-hero-rise",
+                "pointer-events-none absolute hidden sm:block",
                 f.pos,
               )}
-              style={{ animationDelay: `${f.delay}ms` }}
+              style={animate ? { animationDelay: `${f.delay}ms` } : undefined}
             >
               <div
                 style={{
@@ -226,16 +262,18 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
                       backgroundImage: f.grad,
                     }}
                   />
-                  <span className="absolute top-1.5 left-1.5 rounded-badge bg-card/95 px-[6px] py-0.5 font-mono text-[0.5625rem] text-on-surface-mid shadow-render">
-                    {f.label}
-                  </span>
                 </div>
               </div>
             </div>
           ))}
 
           {/* the anchor — the actual upload / generate entry */}
-          <div className="animate-hero-rise relative z-10 w-full max-w-[416px] [animation-delay:360ms]">
+          <div
+            className={cn(
+              rise("[animation-delay:240ms]"),
+              "relative z-10 w-full max-w-[416px]",
+            )}
+          >
             <div className="mx-auto mb-3.5 flex w-fit gap-1 rounded-pill bg-card p-1 shadow-card ring-1 ring-primary/10">
               {MODES.map((m) => (
                 <button
@@ -259,11 +297,12 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
             </div>
 
             <p className="mt-3 text-center font-mono text-[0.625rem] text-on-surface-dim">
-              one anchor in &rarr; a full on-brand set out
+              one master in &rarr; a production-ready set out
             </p>
           </div>
         </div>
       </div>
+      <HowItWorks />
       <RecentWorkspaces onViewAll={onViewAll} />
     </>
   );

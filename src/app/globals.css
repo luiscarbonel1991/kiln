@@ -92,7 +92,7 @@
   --animate-scan: scan 1.4s ease-in-out infinite;
 
   /* landing "firing" hero -> animate-hero-rise (staggered reveal) + animate-ember */
-  --animate-hero-rise: hero-rise 0.75s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  --animate-hero-rise: hero-rise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
   --animate-ember: ember-pulse 7s ease-in-out infinite;
   --animate-drift: ember-drift 9s ease-in-out infinite;
 }
