@@ -40,6 +40,15 @@ model MasterAsset {
   mime         String
 }
 
+// The maker's saved laser-pricing defaults. A singleton (this is a single local
+// shop, no auth): one row, id "default". `data` is a Zod MakerProfileData snapshot
+// (selected machine/material preset names + the shop rates), hardened on read.
+model MakerProfile {
+  id        String   @id @default("default")
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
 // One domain Card. PK = composite [workspaceId, cardId] (cardId is unique only per
 // workspace). parentCardId carries the image->video lineage (same workspace); kept
 // as a plain column, not a self-relation FK — v1 traverses lineage in memory.

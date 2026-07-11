@@ -8,6 +8,7 @@ import { vectorizeCardAction } from "@/app/actions/vectorize";
 import { AssembledPromptTray } from "@/components/studio/assembled-prompt-tray";
 import { CardActions } from "@/components/studio/card-actions";
 import { CardFieldRow } from "@/components/studio/card-field-row";
+import { CostPanel } from "@/components/studio/cost-panel";
 import { RenderCanvas } from "@/components/studio/render-canvas";
 import { assemblePrompt, type FieldKey } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
@@ -162,6 +163,7 @@ export function GenerationCard({
         prompt={assembled.prompt}
         promptOverride={card.promptOverride}
         model={card.model}
+        refs={card.references.length}
         onEditModel={(patch) => editCardModel(card.id, patch)}
         onEditPrompt={(value) => editCardPrompt(card.id, value)}
         onSwitchProvider={
@@ -220,6 +222,9 @@ export function GenerationCard({
             >
               <Download className="size-3" /> Download .svg
             </button>
+          ) : null}
+          {card.vectorUrl && !vectorizing ? (
+            <CostPanel vectorUrl={card.vectorUrl} />
           ) : null}
         </>
       ) : null}
