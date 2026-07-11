@@ -17,6 +17,7 @@ export function AssembledPromptTray({
   prompt,
   promptOverride,
   model,
+  refs = 0,
   onEditModel,
   onEditPrompt,
   onSwitchProvider,
@@ -27,12 +28,17 @@ export function AssembledPromptTray({
   prompt: string;
   promptOverride?: string;
   model: ModelConfig;
+  refs?: number;
   onEditModel: (patch: Partial<ModelConfig>) => void;
   onEditPrompt: (value: string) => void;
   onSwitchProvider?: () => void;
   video?: { durationSec: number; motion: string };
 }) {
-  const canCompose = canUse(PROVIDER_CAPABILITIES[model.provider], "compose");
+  // Cards only ever `edit` (never `compose`), so the sole provider limit that can
+  // actually break generation is maxRefs. Warn only when this card exceeds it —
+  // otherwise stay quiet instead of showing an always-on, irrelevant note.
+  const caps = PROVIDER_CAPABILITIES[model.provider];
+  const tooManyRefs = !canUse(caps, "edit", refs);
   return (
     <div className="border-border-soft border-t">
       <button
@@ -88,11 +94,13 @@ export function AssembledPromptTray({
               </div>
             </div>
           ) : null}
-          {canCompose ? null : (
+          {tooManyRefs ? (
             <p className="font-sans text-[0.6875rem] text-prov-brand">
-              compose unavailable on this provider
+              {model.provider} accepts {caps.maxRefs} reference image
+              {caps.maxRefs === 1 ? "" : "s"}; this card has {refs}. Remove some
+              or switch providers.
             </p>
-          )}
+          ) : null}
         </div>
       ) : null}
     </div>

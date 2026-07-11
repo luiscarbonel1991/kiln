@@ -28,9 +28,14 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
   const goToPlanning = useWorkspace((s) => s.goToPlanning);
   const [analysisStep, setAnalysisStep] = useState(0);
   const [error, setError] = useState(false);
+  // Bumped by "Try again" so the fetch effect re-runs on a transient failure
+  // (network/DNS blip). Without it, clearing `error` alone never re-fetches
+  // because the effect's other deps are unchanged.
+  const [attempt, setAttempt] = useState(0);
 
   // Run the vision action once per master (guard on understanding null). The
   // server action is the only path into @/providers.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: attempt is a deliberate retry trigger (not read in the body); bumping it re-runs the fetch after a transient failure
   useEffect(() => {
     if (understanding) return;
     let active = true;
@@ -45,7 +50,7 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
     return () => {
       active = false;
     };
-  }, [master.assetUrl, understanding, setUnderstanding]);
+  }, [master.assetUrl, understanding, setUnderstanding, attempt]);
 
   // Independent staggered reveal. Runs once per mount; the shell keys this
   // component on master.id, so a re-capture remounts and restarts the stagger.
@@ -87,7 +92,7 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
             </p>
             <button
               type="button"
-              onClick={() => setError(false)}
+              onClick={() => setAttempt((n) => n + 1)}
               className="mt-3 inline-flex items-center gap-2 rounded-field bg-primary px-4 py-2 font-sans text-sm font-semibold text-primary-foreground shadow-button"
             >
               Try again

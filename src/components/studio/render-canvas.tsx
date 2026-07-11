@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Film, Play } from "lucide-react";
+import { AlertTriangle, Download, Film, Play } from "lucide-react";
 import { ZoomableImage } from "@/components/studio/zoomable-image";
 import type { Card } from "@/domain/card";
 import { isRenderableUrl } from "@/lib/asset-url";
@@ -24,6 +24,7 @@ export function RenderCanvas({
   outputUrl?: string;
 }) {
   const rendering = status === "rendering";
+  const failed = status === "error";
   const showOutput = status === "done" && isRenderableUrl(outputUrl);
   return (
     <div
@@ -57,10 +58,20 @@ export function RenderCanvas({
           <Film className="size-2.5" /> Video 5s
         </span>
       ) : null}
-      {type === "video" && !rendering && !showOutput ? (
+      {type === "video" && !rendering && !showOutput && !failed ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span className="flex size-11 items-center justify-center rounded-pill bg-card/90 shadow-render">
             <Play className="size-[18px] fill-foreground text-foreground" />
+          </span>
+        </div>
+      ) : null}
+      {failed ? (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/70 px-4 text-center">
+          <span className="flex items-center gap-1.5 font-mono text-[0.6875rem] text-prov-local">
+            <AlertTriangle className="size-3" /> generation failed
+          </span>
+          <span className="font-sans text-[0.625rem] text-on-surface-mid">
+            Re-roll to retry
           </span>
         </div>
       ) : null}
