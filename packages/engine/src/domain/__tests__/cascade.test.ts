@@ -13,6 +13,9 @@ import type { BaseUnderstanding } from "@/domain/understanding";
 
 const understanding: BaseUnderstanding = {
   subject: "glazed stoneware pitcher, matte cream finish",
+  productType: "ceramic pitcher",
+  useContext: "sits on a kitchen counter or shelf",
+  sceneProps: "",
   materials: "stoneware, reactive glaze",
   lighting: "soft directional light, upper-left",
   composition: "centered, slight high angle",
@@ -257,6 +260,40 @@ describe("assemblePrompt", () => {
       SEED_BRAND,
     );
     expect(negative).toBe("text overlay, watermark");
+  });
+
+  it("excludes a photographed mount/prop (sceneProps) from the product", () => {
+    const withProp: BaseUnderstanding = {
+      ...understanding,
+      productType: "wooden door hanger sign",
+      sceneProps: "a hammered metal door handle",
+    };
+    const { prompt, negative } = assemblePrompt(
+      undefined,
+      master,
+      withProp,
+      SEED_RECIPE,
+      SEED_BRAND,
+    );
+    // names the product, names the prop, and orders the exclusion to remove it
+    expect(prompt).toContain("The product is ONLY the wooden door hanger sign");
+    expect(prompt).toContain("a hammered metal door handle");
+    expect(prompt).toMatch(/remove it entirely/i);
+    // the prop is also pushed into the negative
+    expect(negative).toContain("a hammered metal door handle");
+  });
+
+  it("adds no exclusion when the product was shot alone (empty sceneProps)", () => {
+    const { prompt } = assemblePrompt(
+      undefined,
+      master, // fixture understanding has sceneProps ""
+      understanding,
+      SEED_RECIPE,
+      SEED_BRAND,
+    );
+    expect(prompt).not.toMatch(
+      /a prop\/mount that is NOT part of the product/i,
+    );
   });
 
   it("uses a line-art prompt (not photographic) for a line-art recipe", () => {

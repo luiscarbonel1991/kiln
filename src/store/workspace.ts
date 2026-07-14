@@ -37,6 +37,10 @@ interface WorkspaceState {
   workspaceId: string | null;
   setMaster: (master: MasterAsset) => void;
   setUnderstanding: (understanding: BaseUnderstanding) => void;
+  editUnderstandingField: (
+    key: "productType" | "useContext" | "sceneProps",
+    value: string,
+  ) => void;
   goToPlanning: () => void;
   selectRecipe: (recipeId: string) => void;
   editPlanningField: (key: FieldKey, value: string) => void;
@@ -78,6 +82,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       cards: null,
     }),
   setUnderstanding: (understanding) => set({ understanding }),
+  editUnderstandingField: (key, value) =>
+    set((s) =>
+      s.understanding
+        ? { understanding: { ...s.understanding, [key]: value } }
+        : {},
+    ),
   goToPlanning: () => {
     const understanding = get().understanding;
     if (!understanding) return;

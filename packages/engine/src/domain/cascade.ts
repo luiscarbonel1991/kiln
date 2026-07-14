@@ -154,6 +154,14 @@ export function assemblePrompt(
   // product — that's what moves the product into the in-use/hero/packaging scenes.
   // The direction (slot) leads so each variant is genuinely different.
   const slot = direction ? ` — "${direction}"` : "";
+  // When the analysis flagged a mount/hand/stand in the reference photo (sceneProps),
+  // name it so the edit removes it — "keep ONLY the product" alone leaves an attached
+  // prop (e.g. the door handle a hanger was photographed on) riding into the result.
+  const props = understanding.sceneProps.trim();
+  const ptype = understanding.productType.trim() || value("subject");
+  const exclusion = props
+    ? `The product is ONLY the ${ptype}. Also in the reference is ${props} — a prop/mount that is NOT part of the product; remove it entirely and do not reproduce it.`
+    : "";
   let prompt: string;
   if (recipe.style === "line-art") {
     // Line-art / laser style: redraw the subject as flat black strokes on white —
@@ -165,6 +173,9 @@ export function assemblePrompt(
     prompt = [
       `Black-and-white line art for laser cutting and engraving${slot}.`,
       `Subject: ${value("subject")}. Redraw it as clean, single-weight solid black strokes on a pure white background — closed continuous outlines, high contrast. NO shading, NO gradients, NO grey, NO color, no background scenery, no photographic detail.`,
+      props
+        ? `Draw ONLY the ${ptype}; exclude ${props} — it is not part of the product.`
+        : "",
       treatment ? `Treatment: ${treatment}.` : "",
       `Framing: ${value("scene")}; ${value("composition")}.`,
       "Crisp, vector-ready line work. No text, captions or watermarks.",
@@ -175,17 +186,23 @@ export function assemblePrompt(
     prompt = [
       `Professional e-commerce product photograph${slot}.`,
       "Take the EXACT product from the reference image — identical shape, engraving, text, label, finish and color — and place it in a completely NEW scene. Replace the original background, surface and setting ENTIRELY; keep ONLY the product unchanged.",
+      exclusion,
       `Product: ${value("subject")}; ${value("materials")}.`,
       `Scene: ${value("scene")}.`,
       `Composition: ${value("composition")}.`,
       `Lighting: ${value("lighting")}.`,
       `Mood: ${value("mood")}. Color palette: ${value("palette")}.`,
       "Photorealistic, sharp, high detail. No text, captions, watermarks or graphic overlays.",
-    ].join(" ");
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
   return {
     prompt,
     imageInputs: [master.assetUrl, ...(current?.references ?? [])],
-    negative: recipe.constraints.negative.join(", "),
+    // The mount/prop is also a negative so providers that honor one drop it too.
+    negative: [recipe.constraints.negative.join(", "), props]
+      .filter(Boolean)
+      .join(", "),
   };
 }

@@ -72,6 +72,9 @@ const sample: PersistedWorkspace = {
   },
   understanding: {
     subject: "glazed stoneware pitcher",
+    productType: "ceramic pitcher",
+    useContext: "sits on a kitchen counter or shelf",
+    sceneProps: "",
     materials: "stoneware",
     lighting: "soft directional light",
     composition: "centered",

@@ -50,11 +50,39 @@ function ContextThumb({ master }: { master: MasterAsset }) {
   );
 }
 
+// One editable product-context row (product-level understanding, not a card field).
+function ContextRow({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 border-border-soft border-b py-3 last:border-b-0">
+      <div className="w-[104px] flex-shrink-0 font-sans text-[0.59375rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
+        {label}
+      </div>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-9 flex-1 rounded-field border-border bg-secondary font-sans text-sm text-foreground"
+      />
+    </div>
+  );
+}
+
 export function PlanningPhase({ master }: { master: MasterAsset }) {
   const recipeId = useWorkspace((s) => s.recipeId);
   const planning = useWorkspace((s) => s.planning);
   const selectRecipe = useWorkspace((s) => s.selectRecipe);
   const editPlanningField = useWorkspace((s) => s.editPlanningField);
+  const editUnderstandingField = useWorkspace((s) => s.editUnderstandingField);
   const generateVariants = useWorkspace((s) => s.generateVariants);
   const understanding = useWorkspace((s) => s.understanding);
   const [busy, setBusy] = useState(false);
@@ -122,6 +150,39 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
           );
         })}
       </div>
+
+      {understanding ? (
+        <div className="mb-5 rounded-card bg-card p-6 shadow-card">
+          <div className="font-sans text-sm font-semibold text-foreground">
+            Product context
+          </div>
+          <p className="mt-1 mb-4 max-w-[560px] font-sans text-[0.78125rem] leading-relaxed text-on-surface-mid">
+            How Kiln reads your product — this drives the lifestyle scenes and
+            keeps any mount or prop out of the hero. Fix anything the analysis
+            got wrong.
+          </p>
+          <div className="flex flex-col">
+            <ContextRow
+              label="Product type"
+              value={understanding.productType}
+              onChange={(v) => editUnderstandingField("productType", v)}
+              placeholder="e.g. door hanger sign"
+            />
+            <ContextRow
+              label="Where it's used"
+              value={understanding.useContext}
+              onChange={(v) => editUnderstandingField("useContext", v)}
+              placeholder="e.g. hangs on a door handle or knob"
+            />
+            <ContextRow
+              label="Props in photo"
+              value={understanding.sceneProps}
+              onChange={(v) => editUnderstandingField("sceneProps", v)}
+              placeholder="what's NOT the product — e.g. hooked over a door handle; empty if shot alone"
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-card bg-card p-6 shadow-card">
         <div className="mb-5 flex items-center gap-3">

@@ -19,6 +19,9 @@ const sampleMaster: MasterAsset = {
 
 const sampleUnderstanding: BaseUnderstanding = {
   subject: "glazed stoneware pitcher, matte cream finish",
+  productType: "ceramic pitcher",
+  useContext: "sits on a kitchen counter or shelf",
+  sceneProps: "",
   materials: "stoneware, reactive glaze",
   lighting: "soft directional light, upper-left",
   composition: "centered, slight high angle",
