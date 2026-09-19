@@ -2,7 +2,7 @@
 
 import { ChevronDown, RotateCcw } from "lucide-react";
 import { ModelParams } from "@/components/studio/model-params";
-import { ProviderSwitch } from "@/components/studio/provider-switch";
+import { ModelPicker } from "@/components/studio/model-picker";
 import { canUse, PROVIDER_CAPABILITIES } from "@/domain/capabilities";
 import type { ModelConfig } from "@/domain/model-config";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,6 @@ export function AssembledPromptTray({
   refs = 0,
   onEditModel,
   onEditPrompt,
-  onSwitchProvider,
   video,
 }: {
   open: boolean;
@@ -31,7 +30,6 @@ export function AssembledPromptTray({
   refs?: number;
   onEditModel: (patch: Partial<ModelConfig>) => void;
   onEditPrompt: (value: string) => void;
-  onSwitchProvider?: () => void;
   video?: { durationSec: number; motion: string };
 }) {
   // Cards only ever `edit` (never `compose`), so the sole provider limit that can
@@ -71,12 +69,11 @@ export function AssembledPromptTray({
               </button>
             ) : null}
           </div>
-          {onSwitchProvider ? (
-            <ProviderSwitch
-              provider={model.provider}
-              onSwitch={onSwitchProvider}
-            />
-          ) : null}
+          <ModelPicker
+            model={model}
+            onEdit={onEditModel}
+            kind={video ? "video" : "image"}
+          />
           <ModelParams model={model} onEdit={onEditModel} />
           {video ? (
             <div className="font-mono text-[0.6875rem]">

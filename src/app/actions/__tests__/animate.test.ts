@@ -7,13 +7,29 @@ const sampleInput: AnimateInput = {
   prompt: "edit(master) -> subject",
   motion: "subtle push-in",
   durationSec: 5,
+  model: {
+    provider: "google",
+    model: "veo-3.1-generate-preview",
+    aspect: "9:16",
+    guidance: 7.5,
+    strength: 0.65,
+  },
 };
 
 describe("animateVideo", () => {
-  it("returns a video GenerationResult from the google provider", async () => {
+  it("returns a video GenerationResult from the card's provider (google)", async () => {
     const result = await animateVideo(sampleInput);
     expect(result.provider).toBe("google");
     expect(result.assets).toHaveLength(1);
+    expect(result.assets[0].mime).toBe("video/mp4");
+  });
+
+  it("routes an openai card to the Sora provider (mock without a key)", async () => {
+    const result = await animateVideo({
+      ...sampleInput,
+      model: { ...sampleInput.model, provider: "openai", model: "sora-2" },
+    });
+    expect(result.provider).toBe("openai");
     expect(result.assets[0].mime).toBe("video/mp4");
   });
 

@@ -42,7 +42,6 @@ export function GenerationCard({
   const markCardError = useWorkspace((s) => s.markCardError);
   const editCardField = useWorkspace((s) => s.editCardField);
   const toggleCardLock = useWorkspace((s) => s.toggleCardLock);
-  const switchCardProvider = useWorkspace((s) => s.switchCardProvider);
   const regenerateCard = useWorkspace((s) => s.regenerateCard);
   const promoteToVideo = useWorkspace((s) => s.promoteToVideo);
   const editCardModel = useWorkspace((s) => s.editCardModel);
@@ -80,7 +79,8 @@ export function GenerationCard({
             startFrameAssetId: card.video?.startFrameAssetId ?? master.assetUrl,
             prompt,
             motion: card.video?.motion ?? "",
-            durationSec: card.video?.durationSec ?? 5,
+            durationSec: card.video?.durationSec ?? 8, // 8 s: Etsy needs 5-15 s and Sora snaps 5 → 4 s (2026-09-16)
+            model: card.model,
           })
         : editImage({
             masterAssetUrl: master.assetUrl,
@@ -166,9 +166,6 @@ export function GenerationCard({
         refs={card.references.length}
         onEditModel={(patch) => editCardModel(card.id, patch)}
         onEditPrompt={(value) => editCardPrompt(card.id, value)}
-        onSwitchProvider={
-          card.type === "image" ? () => switchCardProvider(card.id) : undefined
-        }
         video={card.type === "video" ? card.video : undefined}
       />
 

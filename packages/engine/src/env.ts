@@ -14,6 +14,7 @@ const EnvSchema = z.object({
   GOOGLE_VISION_MODEL: z.string().min(1).optional(),
   OPENAI_IMAGE_MODEL: z.string().min(1).optional(),
   GOOGLE_VIDEO_MODEL: z.string().min(1).optional(),
+  OPENAI_VIDEO_MODEL: z.string().min(1).optional(),
 
   // Object storage — selectable provider (S3 / S3-compatible like MinIO). Optional
   // with local defaults; the storage adapter asserts what it needs at runtime.

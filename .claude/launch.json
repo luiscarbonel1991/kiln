@@ -7,6 +7,11 @@
       "runtimeArgs": ["dev", "--port", "3009"],
       "port": 3009,
       "autoPort": false
+    },
+    {
+      "name": "kiln-attach",
+      "url": "http://localhost:3009",
+      "port": 3009
     }
   ]
 }

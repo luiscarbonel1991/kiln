@@ -1,4 +1,5 @@
 import type { BrandProfile } from "@/domain/brand";
+import type { PlateRequest, PlateResult, Product } from "@/domain/product";
 import type { Recipe } from "@/domain/recipe";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
@@ -46,5 +47,37 @@ export interface VideoProvider {
     prompt: string;
     motion: string;
     durationSec: number;
+    model: ModelConfigLike;
   }): Promise<GenerationResult>;
+}
+
+// Structural mirror of ModelConfig's fields the video adapters read — keeps this
+// interfaces module free of a schema import.
+export interface ModelConfigLike {
+  provider: ProviderId;
+  model: string;
+  aspect: string;
+}
+
+// (e) Plate renderer: (product, request) -> an exact reference image of the real
+// product with the buyer's wording, plus the QC hints the verifier needs. Must be
+// deterministic for the same input, opaque, and render the wording verbatim
+// (fonts from the product spec, never drawn by an image model).
+export interface PlateRenderer {
+  readonly id: string;
+  readonly version: string;
+  render(input: {
+    product: Product;
+    request: PlateRequest;
+  }): Promise<PlateResult>;
+}
+
+// (f) Product catalog adapter: where a maker's products come from. maker #1's code
+// catalog is the first implementation; a maker without a catalog gets one built
+// from the product form or from a traced SVG (source.kind = "vector").
+export interface ProductCatalogAdapter {
+  readonly id: string;
+  list(): Promise<Product[]>;
+  get(ref: string): Promise<Product | null>;
+  renderer(): PlateRenderer;
 }

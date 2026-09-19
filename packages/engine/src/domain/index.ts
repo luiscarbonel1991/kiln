@@ -25,6 +25,24 @@ export {
   PersistedWorkspace,
   PersistedWorkspaceRecord,
 } from "@/domain/persisted-workspace";
+export {
+  ColourOption,
+  colourOf,
+  Dimensions,
+  dimensionsLabel,
+  PlatePiece,
+  PlateRequest,
+  PlateResult,
+  Product,
+  ProductIcon,
+  ProductSource,
+  productPromptFields,
+  Treatment,
+  Typography,
+  VariantAxis,
+  validateWording,
+  WordingLine,
+} from "@/domain/product";
 export { ListingSlot, Recipe } from "@/domain/recipe";
 export {
   SEED_BRAND,

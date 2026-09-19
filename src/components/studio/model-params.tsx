@@ -9,8 +9,9 @@ const rowClass =
 const fieldClass =
   "min-w-0 bg-transparent text-right font-medium text-foreground outline-none focus:text-primary";
 
-// Editable model parameters (model id, aspect, guidance, strength). Persisted via
-// the card's model; applied on the next Generate/Re-roll.
+// Editable model parameters (aspect, guidance, strength). The model itself is
+// chosen via ModelPicker (image cards) or fixed (video). Persisted via the card's
+// model; applied on the next Generate/Re-roll.
 export function ModelParams({
   model,
   onEdit,
@@ -20,14 +21,6 @@ export function ModelParams({
 }) {
   return (
     <div className="font-mono text-[0.6875rem]">
-      <div className={rowClass}>
-        <span className="text-on-surface-dim">model</span>
-        <input
-          value={model.model}
-          onChange={(e) => onEdit({ model: e.target.value })}
-          className={`${fieldClass} flex-1`}
-        />
-      </div>
       <div className={rowClass}>
         <span className="text-on-surface-dim">aspect</span>
         <select

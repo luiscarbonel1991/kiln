@@ -170,13 +170,15 @@ describe("useWorkspace generation", () => {
     expect(cardsOf()[0].fields.subject.locked).toBe(!before);
   });
 
-  it("switchCardProvider toggles provider and model id", () => {
+  it("editCardModel applies a model choice (provider + model together)", () => {
     generate();
     const id = cardsOf()[0].id;
-    useWorkspace.getState().switchCardProvider(id);
+    useWorkspace
+      .getState()
+      .editCardModel(id, { provider: "openai", model: "gpt-image-1.5" });
     const model = cardsOf()[0].model;
     expect(model.provider).toBe("openai");
-    expect(model.model).toBe(DEFAULT_MODEL_IDS.openai.image);
+    expect(model.model).toBe("gpt-image-1.5");
   });
 
   it("regenerateUnlocked skips a fully-locked card", () => {
@@ -240,7 +242,7 @@ describe("useWorkspace promoteToVideo", () => {
     expect(video?.model.provider).toBe("google");
     expect(video?.model.model).toBe(DEFAULT_MODEL_IDS.google.video);
     expect(video?.video?.startFrameAssetId).toBe("https://stub.local/o.png");
-    expect(video?.video?.durationSec).toBe(5);
+    expect(video?.video?.durationSec).toBe(8);
     expect(video?.video?.motion).toBe("subtle push-in");
   });
 

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { getGenAI, hasGoogleKey } from "@/providers/google/client";
 import type { VideoProvider } from "@/providers/interfaces";
-import { MODELS } from "@/providers/models";
+import { MODELS, resolveVideoModel } from "@/providers/models";
 import { type AnimateInput, GenerationResult } from "@/providers/types";
 
 // Mock fallback when GOOGLE_API_KEY is absent.
@@ -35,6 +35,7 @@ export const googleVideoProvider: VideoProvider = {
   async animate(input: AnimateInput) {
     if (!hasGoogleKey()) return mockResult();
     const ai = getGenAI();
+    const model = resolveVideoModel("google", input.model.model);
 
     let image: { imageBytes: string; mimeType: string } | undefined;
     if (isFetchable(input.startFrameAssetId)) {
@@ -43,7 +44,7 @@ export const googleVideoProvider: VideoProvider = {
     }
 
     let op = await ai.models.generateVideos({
-      model: MODELS.google.video,
+      model,
       prompt: `${input.prompt}. Motion: ${input.motion}.`,
       ...(image ? { image } : {}),
     });
@@ -67,7 +68,7 @@ export const googleVideoProvider: VideoProvider = {
     return GenerationResult.parse({
       assets: [{ id: randomUUID(), url, mime: "video/mp4" }],
       provider: "google",
-      model: MODELS.google.video,
+      model,
     });
   },
 };

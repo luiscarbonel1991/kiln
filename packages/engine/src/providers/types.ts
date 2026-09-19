@@ -45,11 +45,13 @@ export const ImageComposeInput = z.object({
 });
 export type ImageComposeInput = z.infer<typeof ImageComposeInput>;
 
-// start frame + prompt -> video (image-to-video / promote-to-video)
+// start frame + prompt -> video (image-to-video / promote-to-video). `model`
+// carries the card's provider + video model choice (Veo variants / Sora).
 export const AnimateInput = z.object({
   startFrameAssetId: z.string(),
   prompt: z.string(),
   motion: z.string(),
   durationSec: z.number(),
+  model: ModelConfig,
 });
 export type AnimateInput = z.infer<typeof AnimateInput>;

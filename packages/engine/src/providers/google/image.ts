@@ -4,7 +4,7 @@ import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { assertCapability, GOOGLE_CAPS } from "@/providers/capabilities";
 import { getGenAI, hasGoogleKey } from "@/providers/google/client";
 import type { ImageProvider } from "@/providers/interfaces";
-import { MODELS } from "@/providers/models";
+import { MODELS, resolveImageModel } from "@/providers/models";
 import {
   GenerationResult,
   type ImageComposeInput,
@@ -49,15 +49,17 @@ export function aspectFor(aspect: string): string {
   return "1:1";
 }
 
-// Call the Gemini image model, store the first returned image to object storage,
+// Call a Gemini image model, store the first returned image to object storage,
 // return a durable public URL. Image bytes are base64 inlineData parts. The
 // optional aspect pins the output frame (the model ignores it when absent).
+// `model` is the per-card choice, already vetted by resolveImageModel.
 async function runGemini(
   contents: string | Part[],
+  model: string,
   aspect?: string,
 ): Promise<GenerationResult> {
   const res = await getGenAI().models.generateContent({
-    model: MODELS.google.image,
+    model,
     contents,
     config: {
       responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -76,7 +78,7 @@ async function runGemini(
       return GenerationResult.parse({
         assets: [{ id: randomUUID(), url, mime }],
         provider: "google",
-        model: MODELS.google.image,
+        model,
       });
     }
   }
@@ -95,7 +97,8 @@ export const googleImageProvider: ImageProvider = {
   async generate(input: ImageGenInput) {
     assertCapability(this, "generate");
     if (!hasGoogleKey()) return mockResult("generate");
-    return runGemini(input.prompt, input.model.aspect);
+    const model = resolveImageModel("google", input.model.model);
+    return runGemini(input.prompt, model, input.model.aspect);
   },
   async edit(input: ImageEditInput) {
     assertCapability(this, "edit", input.imageInputs.length);
@@ -109,7 +112,8 @@ export const googleImageProvider: ImageProvider = {
         inlineData: { mimeType: r.mime, data: r.base64 },
       })),
     ];
-    return runGemini(contents, input.model.aspect);
+    const model = resolveImageModel("google", input.model.model);
+    return runGemini(contents, model, input.model.aspect);
   },
   async compose(input: ImageComposeInput) {
     assertCapability(this, "compose", input.imageInputs.length);
@@ -121,6 +125,7 @@ export const googleImageProvider: ImageProvider = {
         inlineData: { mimeType: i.mime, data: i.base64 },
       })),
     ];
-    return runGemini(contents, input.model.aspect);
+    const model = resolveImageModel("google", input.model.model);
+    return runGemini(contents, model, input.model.aspect);
   },
 };

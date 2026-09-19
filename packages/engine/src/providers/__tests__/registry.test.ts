@@ -34,8 +34,8 @@ describe("registry", () => {
     expect(getImageProvider(cardWith("google")).id).toBe("google");
   });
 
-  it("exposes a google video provider and no openai video provider", () => {
+  it("exposes video providers for both ids (Veo and Sora)", () => {
     expect(getVideoProvider("google")?.id).toBe("google");
-    expect(getVideoProvider("openai")).toBeUndefined();
+    expect(getVideoProvider("openai")?.id).toBe("openai");
   });
 });

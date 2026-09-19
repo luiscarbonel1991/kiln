@@ -54,7 +54,6 @@ interface WorkspaceState {
   editCardModel: (id: string, patch: Partial<ModelConfig>) => void;
   editCardPrompt: (id: string, prompt: string) => void;
   toggleCardLock: (id: string, key: FieldKey) => void;
-  switchCardProvider: (id: string) => void;
   promoteToVideo: (sourceId: string) => void;
   setWorkspaceId: (id: string | null) => void;
   hydrate: (record: PersistedWorkspaceRecord) => void;
@@ -261,24 +260,6 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       ),
     });
   },
-  switchCardProvider: (id) => {
-    const cards = get().cards;
-    if (!cards) return;
-    set({
-      cards: cards.map((c): StudioCard => {
-        if (c.id !== id) return c;
-        const provider = c.model.provider === "google" ? "openai" : "google";
-        return {
-          ...c,
-          model: {
-            ...c.model,
-            provider,
-            model: DEFAULT_MODEL_IDS[provider].image,
-          },
-        };
-      }),
-    });
-  },
   // Promote a card to a NEW image-to-video child card (parentId lineage), in
   // "draft" — Veo only runs when the user clicks Generate on it (it's the most
   // expensive call). Idempotent: re-promoting is a no-op once the card exists.
@@ -303,7 +284,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         model: DEFAULT_MODEL_IDS.google.video,
       },
       video: {
-        durationSec: 5,
+        durationSec: 8, // Etsy accepts 5-15 s; Sora snaps 5 to 4 s (2026-09-16)
         motion: "subtle push-in",
         startFrameAssetId:
           source.outputs[0] ?? get().master?.assetUrl ?? source.masterAssetId,
