@@ -3,7 +3,7 @@ import type { PlanningFields } from "@/domain/cascade";
 import type { Field } from "@/domain/field";
 import { lockByDefault } from "@/domain/locks";
 import type { MasterAsset } from "@/domain/master-asset";
-import { DEFAULT_MODEL_IDS } from "@/domain/model-defaults";
+import { defaultImageModel } from "@/domain/model-defaults";
 import type { Recipe } from "@/domain/recipe";
 import type { VariantDirection } from "@/domain/variant-direction";
 
@@ -67,8 +67,7 @@ export function buildCards({
       },
       references: [],
       model: {
-        provider: "google",
-        model: DEFAULT_MODEL_IDS.google.image,
+        ...defaultImageModel(),
         aspect: recipe.directions[i]?.aspect ?? "4:5",
         guidance: 7.5,
         strength: 0.65,

@@ -10,7 +10,7 @@ import {
 } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
 import type { ModelConfig } from "@/domain/model-config";
-import { DEFAULT_MODEL_IDS } from "@/domain/model-defaults";
+import { defaultVideoModel } from "@/domain/model-defaults";
 import type {
   PersistedWorkspace,
   PersistedWorkspaceRecord,
@@ -280,8 +280,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       type: "video",
       model: {
         ...source.model,
-        provider: "google",
-        model: DEFAULT_MODEL_IDS.google.video,
+        ...defaultVideoModel(),
       },
       video: {
         durationSec: 8, // Etsy accepts 5-15 s; Sora snaps 5 to 4 s (2026-09-16)

@@ -12,6 +12,19 @@ export const DEFAULT_MODEL_IDS = {
   openai: { image: "gpt-image-2", video: "sora-2" },
 } as const;
 
+// The provider a NEW card starts on (image and video). One switch: cards,
+// promoted video cards and the bare generate action all read it. OpenAI since
+// 2026-09-18 while the Google spend cap is exhausted; the picker still offers both.
+export const DEFAULT_PROVIDER: "google" | "openai" = "openai";
+export const defaultImageModel = () => ({
+  provider: DEFAULT_PROVIDER,
+  model: DEFAULT_MODEL_IDS[DEFAULT_PROVIDER].image,
+});
+export const defaultVideoModel = () => ({
+  provider: DEFAULT_PROVIDER,
+  model: DEFAULT_MODEL_IDS[DEFAULT_PROVIDER].video,
+});
+
 // The models a card may switch between — the UI pickers' source of truth AND the
 // adapters' allowlist (a card's model id is client-supplied; anything outside the
 // catalog falls back to the provider default). IDs verified live against both

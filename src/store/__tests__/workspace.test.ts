@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { buildPlanningContext } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
-import { DEFAULT_MODEL_IDS } from "@/domain/model-defaults";
+import {
+  DEFAULT_MODEL_IDS,
+  DEFAULT_PROVIDER,
+  defaultVideoModel,
+} from "@/domain/model-defaults";
 import type { PersistedWorkspaceRecord } from "@/domain/persisted-workspace";
 import { SEED_BRAND, SEED_RECIPES } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
@@ -230,7 +234,7 @@ describe("useWorkspace promoteToVideo", () => {
     expect(cardsOf()[sourceIndex + 1].id).toBe(`${source.id}-video`);
   });
 
-  it("targets google/Veo and seeds the start frame from the source output", () => {
+  it("targets the default provider's video model and seeds the start frame from the source output", () => {
     generate();
     const source = cardsOf()[0];
     useWorkspace
@@ -239,8 +243,9 @@ describe("useWorkspace promoteToVideo", () => {
     useWorkspace.getState().promoteToVideo(source.id);
 
     const video = cardsOf().find((c) => c.id === `${source.id}-video`);
-    expect(video?.model.provider).toBe("google");
-    expect(video?.model.model).toBe(DEFAULT_MODEL_IDS.google.video);
+    expect(video?.model).toMatchObject(defaultVideoModel());
+    expect(video?.model.provider).toBe(DEFAULT_PROVIDER);
+    expect(video?.model.model).toBe(DEFAULT_MODEL_IDS[DEFAULT_PROVIDER].video);
     expect(video?.video?.startFrameAssetId).toBe("https://stub.local/o.png");
     expect(video?.video?.durationSec).toBe(8);
     expect(video?.video?.motion).toBe("subtle push-in");

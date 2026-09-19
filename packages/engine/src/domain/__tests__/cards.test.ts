@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { buildCards } from "@/domain/cards";
 import { buildPlanningContext } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
-import { DEFAULT_MODEL_IDS } from "@/domain/model-defaults";
+import {
+  DEFAULT_MODEL_IDS,
+  DEFAULT_PROVIDER,
+  defaultImageModel,
+} from "@/domain/model-defaults";
 import { SEED_BRAND, SEED_RECIPE, SEED_RECIPE_ADS } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 
@@ -54,10 +58,16 @@ describe("buildCards", () => {
     expect(card.fields.scene.locked).toBe(false);
   });
 
-  it("defaults to the google provider with the pinned model id", () => {
+  it("starts on the default provider with its pinned image model id", () => {
     const card = cards[0];
-    expect(card.model.provider).toBe("google");
-    expect(card.model.model).toBe(DEFAULT_MODEL_IDS.google.image);
+    expect(card.model).toMatchObject(defaultImageModel());
+    expect(card.model.provider).toBe(DEFAULT_PROVIDER);
+    expect(card.model.model).toBe(DEFAULT_MODEL_IDS[DEFAULT_PROVIDER].image);
+  });
+
+  it("starts on OpenAI while the Google spend cap is exhausted (2026-09-18)", () => {
+    expect(DEFAULT_PROVIDER).toBe("openai");
+    expect(cards[0].model.model).toBe("gpt-image-2");
   });
 
   it("respects an explicit n", () => {

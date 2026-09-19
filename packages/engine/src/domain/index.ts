@@ -20,7 +20,12 @@ export { Field, FieldSource } from "@/domain/field";
 export { lockByDefault } from "@/domain/locks";
 export { MasterAsset } from "@/domain/master-asset";
 export { ModelConfig } from "@/domain/model-config";
-export { DEFAULT_MODEL_IDS } from "@/domain/model-defaults";
+export {
+  DEFAULT_MODEL_IDS,
+  DEFAULT_PROVIDER,
+  defaultImageModel,
+  defaultVideoModel,
+} from "@/domain/model-defaults";
 export {
   PersistedWorkspace,
   PersistedWorkspaceRecord,

@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { ModelConfig } from "@/domain/model-config";
+import { DEFAULT_PROVIDER } from "@/domain/model-defaults";
 import { MODELS } from "@/providers/models";
 import { getImageProvider } from "@/providers/registry";
 import { GenerationResult, ImageGenInput } from "@/providers/types";
@@ -15,10 +16,10 @@ export async function generateImage(prompt: string): Promise<GenerationResult> {
   const input = ImageGenInput.parse({
     prompt: safePrompt,
     model: ModelConfig.parse({
-      provider: "google",
-      model: MODELS.google.image,
+      provider: DEFAULT_PROVIDER,
+      model: MODELS[DEFAULT_PROVIDER].image,
     }),
   });
-  const result = await getImageProvider("google").generate(input);
+  const result = await getImageProvider(DEFAULT_PROVIDER).generate(input);
   return GenerationResult.parse(result);
 }
