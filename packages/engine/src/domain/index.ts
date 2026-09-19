@@ -48,6 +48,18 @@ export {
   validateWording,
   WordingLine,
 } from "@/domain/product";
+export {
+  checkExpectedText,
+  type ExpectedText,
+  lenientKey,
+  normalizeText,
+  type OcrBox,
+  type OcrLine,
+  type OcrResult,
+  type TextCheck,
+  type TextCheckOptions,
+  type TextLineFinding,
+} from "@/domain/qc";
 export { ListingSlot, Recipe } from "@/domain/recipe";
 export {
   SEED_BRAND,

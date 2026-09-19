@@ -47,3 +47,6 @@ next-env.d.ts
 # package build output (@kiln/engine dist is built on publish, never committed)
 packages/*/dist
 out/
+
+# compiled local OCR helper (scripts/ocr.mjs builds it on first use)
+scripts/ocr/.bin/
