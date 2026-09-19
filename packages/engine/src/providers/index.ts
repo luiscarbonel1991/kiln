@@ -16,6 +16,12 @@ export { mockArtDirector } from "@/providers/mock/art-director";
 export { mockVisionProvider } from "@/providers/mock/vision";
 export { MODELS } from "@/providers/models";
 export {
+  composePlateSvg,
+  rasterize,
+  svgBox,
+  svgPlateRenderer,
+} from "@/providers/plates/svg";
+export {
   CAPABILITY_MAP,
   getArtDirector,
   getCapabilities,

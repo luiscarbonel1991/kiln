@@ -133,7 +133,8 @@ describe("productPromptFields", () => {
     expect(subject).toContain("keep every letter");
     expect(subject).toContain("exactly one piece");
     expect(subject).toContain("no other text");
-    expect(materials).toContain("black matte matte cast acrylic, zero gloss");
+    expect(materials).toContain("black matte cast acrylic, zero gloss");
+    expect(subject).toContain("unit number sign of black matte cast acrylic");
     expect(materials).toContain("raised 1/8 inch");
   });
 

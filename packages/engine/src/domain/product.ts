@@ -224,6 +224,17 @@ const TREATMENT_TEXT: Record<Treatment, string> = {
   cut: "cut through the panel as a silhouette",
 };
 
+// "black matte" + "matte cast acrylic" reads as "black matte cast acrylic": words the
+// colour name already carries are dropped from the material.
+function colourMaterial(colour: ColourOption, material: string): string {
+  const said = colour.name.toLowerCase().split(/\s+/);
+  const rest = material
+    .split(/\s+/)
+    .filter((w) => !said.includes(w.toLowerCase()))
+    .join(" ");
+  return `${colour.name.toLowerCase()} ${rest}`.trim();
+}
+
 const placementText = (p: z.infer<typeof IconPlacement> | undefined) =>
   p === "left"
     ? "before the words"
@@ -261,9 +272,9 @@ export function productPromptFields(
   };
   const what =
     n === 1
-      ? `a ${dimensionsLabel(product.dimensions)} ${product.shape} ${product.name.toLowerCase()} of ${colour.name.toLowerCase()} ${product.material}`
-      : `${n} identical ${dimensionsLabel(product.dimensions)} ${product.shape} ${product.family.toLowerCase()} pieces of ${colour.name.toLowerCase()} ${product.material}`;
+      ? `a ${dimensionsLabel(product.dimensions)} ${product.shape} ${product.family.toLowerCase()} sign of ${colourMaterial(colour, product.material)}`
+      : `${n} identical ${dimensionsLabel(product.dimensions)} ${product.shape} ${product.family.toLowerCase()} pieces of ${colourMaterial(colour, product.material)}`;
   const subject = `${what}, ${request.pieces.map(piece).join("; ")}; keep every letter, letter spacing, mark and proportion exactly as in the master image, exactly ${n === 1 ? "one piece" : `${n} pieces`}, no ${product.forbidden.join(", no ")}`;
-  const materials = `${colour.name.toLowerCase()} ${product.material}, zero gloss; ${inlay}acrylic letters ${TREATMENT_TEXT[product.treatment]}`;
+  const materials = `${colourMaterial(colour, product.material)}, zero gloss; ${inlay}acrylic letters ${TREATMENT_TEXT[product.treatment]}`;
   return { subject, materials };
 }
