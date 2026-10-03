@@ -6,6 +6,7 @@ import {
   loadProjectAction,
   saveProjectAction,
 } from "@/app/actions/project";
+import { createDebouncedTask } from "@/lib/debounce";
 import { toPersisted, useProject } from "@/store/project";
 
 export type PersistenceStatus = "idle" | "restoring" | "saving" | "saved";
@@ -46,37 +47,40 @@ export function useProjectPersistence(): { status: PersistenceStatus } {
   }, []);
 
   // Debounced autosave on any store change, once there is a master to persist.
+  // On unmount a pending save is flushed, not dropped, so leaving the editor
+  // right after an edit (or a generation result) still persists it.
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
     let active = true;
 
-    const schedule = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(async () => {
-        const state = useProject.getState();
-        if (!state.master) return;
-        setStatus("saving");
-        try {
-          const { id } = await saveProjectAction(
-            toPersisted(state),
-            state.projectId ?? undefined,
-          );
-          if (!active) return;
-          if (!useProject.getState().projectId) {
-            useProject.getState().setProjectId(id);
-          }
-          setStatus("saved");
-        } catch {
-          if (active) setStatus("idle");
+    const save = async () => {
+      const state = useProject.getState();
+      if (!state.master) return;
+      if (active) setStatus("saving");
+      try {
+        const { id } = await saveProjectAction(
+          toPersisted(state),
+          state.projectId ?? undefined,
+        );
+        // Adopt the new id only if the store still holds the project just saved
+        // (it may have been reset or switched while the save was in flight).
+        const now = useProject.getState();
+        if (!now.projectId && now.master?.id === state.master.id) {
+          now.setProjectId(id);
         }
-      }, AUTOSAVE_DEBOUNCE_MS);
+        if (active) setStatus("saved");
+      } catch {
+        if (active) setStatus("idle");
+      }
     };
 
-    const unsubscribe = useProject.subscribe(schedule);
+    const autosave = createDebouncedTask(() => {
+      void save();
+    }, AUTOSAVE_DEBOUNCE_MS);
+    const unsubscribe = useProject.subscribe(autosave.schedule);
     return () => {
       active = false;
-      if (timer) clearTimeout(timer);
       unsubscribe();
+      autosave.flush();
     };
   }, []);
 

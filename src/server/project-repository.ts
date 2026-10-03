@@ -196,3 +196,21 @@ export async function renameProject(id: string, name: string): Promise<void> {
   const maker = await getCurrentMaker();
   await db.project.update({ where: { id, makerId: maker.id }, data: { name } });
 }
+
+// Persist one generation result straight to its card, outside the editor's
+// autosave: a paid result is kept even when the editor that asked for it is
+// gone (another project opened, the page left). updateMany never throws if a
+// concurrent autosave is replacing the card rows; that autosave then carries the
+// result from the store.
+export async function saveCardOutput(
+  projectId: string,
+  cardId: string,
+  url: string,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.card.updateMany({
+    where: { projectId, cardId, project: { makerId: maker.id } },
+    data: { outputs: [url], status: "done", vectorUrl: null },
+  });
+}

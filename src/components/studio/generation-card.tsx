@@ -2,8 +2,6 @@
 
 import { Download, RefreshCw, Scissors, Spline } from "lucide-react";
 import { useEffect, useState } from "react";
-import { animateVideo } from "@/app/actions/animate";
-import { editImage } from "@/app/actions/edit";
 import { vectorizeCardAction } from "@/app/actions/vectorize";
 import { AssembledPromptTray } from "@/components/studio/assembled-prompt-tray";
 import { CardActions } from "@/components/studio/card-actions";
@@ -17,6 +15,7 @@ import type { BaseUnderstanding } from "@/domain/understanding";
 import { assetFilename, downloadAsset } from "@/lib/download";
 import { gradientForSeed } from "@/lib/gradient";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
+import { startCardGeneration } from "@/store/generation-runner";
 import { type StudioCard, useProject } from "@/store/project";
 
 const FIELD_ROWS: { key: FieldKey; label: string }[] = [
@@ -38,8 +37,6 @@ export function GenerationCard({
   master: MasterAsset;
   understanding: BaseUnderstanding;
 }) {
-  const applyCardResult = useProject((s) => s.applyCardResult);
-  const markCardError = useProject((s) => s.markCardError);
   const editCardField = useProject((s) => s.editCardField);
   const toggleCardLock = useProject((s) => s.toggleCardLock);
   const regenerateCard = useProject((s) => s.regenerateCard);
@@ -63,41 +60,20 @@ export function GenerationCard({
     card.direction,
   );
 
-  // Generate whenever the card enters "rendering" — on mount and on each re-roll
+  // Generate whenever the card enters "rendering" — on each Generate / re-roll
   // (renderSeed is the explicit trigger). Image cards edit; video cards animate
-  // (image-to-video). Both are server actions — the only path into @/providers;
-  // the rendering overlay masks the gradient swap.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: renderSeed is the deliberate re-roll trigger; assembled/master/setters are not re-run signals
+  // (image-to-video). The request runs outside the component (generation-runner):
+  // a remount never re-sends it and an unmount never discards a paid result.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: renderSeed is the deliberate re-roll trigger; assembled/master are not re-run signals
   useEffect(() => {
     if (card.status !== "rendering") return;
-    let active = true;
-    const prompt = card.promptOverride ?? assembled.prompt;
-    const request =
-      card.type === "video"
-        ? animateVideo({
-            startFrameAssetId: card.video?.startFrameAssetId ?? master.assetUrl,
-            prompt,
-            motion: card.video?.motion ?? "",
-            durationSec: card.video?.durationSec ?? 8, // 8 s: Etsy needs 5-15 s and Sora snaps 5 → 4 s (2026-09-16)
-            model: card.model,
-          })
-        : editImage({
-            masterAssetUrl: master.assetUrl,
-            prompt,
-            imageInputs: card.references,
-            negative: assembled.negative,
-            model: card.model,
-          });
-    request
-      .then((result) => {
-        if (active) applyCardResult(card.id, result.assets[0]?.url ?? "");
-      })
-      .catch(() => {
-        if (active) markCardError(card.id);
-      });
-    return () => {
-      active = false;
-    };
+    startCardGeneration({
+      projectId: useProject.getState().projectId,
+      card,
+      masterAssetUrl: master.assetUrl,
+      prompt: card.promptOverride ?? assembled.prompt,
+      negative: assembled.negative,
+    });
   }, [card.renderSeed]);
 
   // Vectorize: trace the rendered line-art into a REAL SVG. Only exposed for

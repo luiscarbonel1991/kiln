@@ -312,8 +312,14 @@ export const useProject = create<ProjectState>((set, get) => ({
       understanding: record.understanding,
       recipeId: record.recipeId,
       planning: record.planning,
+      // A card saved mid-generation comes back as a draft: hydrating never
+      // re-fires a paid generation (GenerationCard starts one on "rendering").
       cards: record.cards.map(
-        (card, i): StudioCard => ({ ...card, renderSeed: i * 7 + 5 }),
+        (card, i): StudioCard => ({
+          ...card,
+          status: card.status === "rendering" ? "draft" : card.status,
+          renderSeed: i * 7 + 5,
+        }),
       ),
     });
   },

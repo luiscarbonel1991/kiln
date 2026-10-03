@@ -326,3 +326,19 @@ describe("useProject persistence", () => {
     expect(state.master).toEqual(sampleMaster);
   });
 });
+
+describe("useProject hydrate safety", () => {
+  it("restores a card saved mid-generation as a draft, so nothing re-fires", () => {
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
+    useProject.getState().generateVariants();
+    const persisted = toPersisted(useProject.getState());
+    const cards = persisted.cards.map((c, i) =>
+      i === 0 ? { ...c, status: "rendering" as const } : c,
+    );
+    useProject.getState().reset();
+    useProject.getState().hydrate({ id: "p-2", ...persisted, cards });
+    expect(useProject.getState().cards?.[0].status).toBe("draft");
+  });
+});

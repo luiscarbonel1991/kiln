@@ -7,6 +7,7 @@ import {
   listProjects,
   loadProject,
   renameProject,
+  saveCardOutput,
   saveProject,
 } from "@/server/project-repository";
 
@@ -42,4 +43,15 @@ export async function renameProjectAction(
   const parsedId = z.string().min(1).parse(id);
   const parsedName = z.string().trim().min(1).max(80).parse(name);
   await renameProject(parsedId, parsedName);
+}
+
+const CardOutput = z.object({
+  projectId: z.string().min(1),
+  cardId: z.string().min(1),
+  url: z.string().min(1),
+});
+
+export async function saveCardOutputAction(input: unknown): Promise<void> {
+  const { projectId, cardId, url } = CardOutput.parse(input);
+  await saveCardOutput(projectId, cardId, url);
 }
