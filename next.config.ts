@@ -2,10 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
-  // The vectorizer is a native NAPI addon (used only in the vectorize Server
-  // Action) — keep it an external runtime require instead of bundling, which
-  // Turbopack can't do for the non-ECMAScript .node binding.
-  serverExternalPackages: ["@neplex/vectorizer"],
+  // Native NAPI addons stay external runtime requires instead of bundled, which
+  // Turbopack can't do for the non-ECMAScript .node binding: the vectorizer
+  // (vectorize Server Action) and resvg (the local SVG plate renderer).
+  serverExternalPackages: ["@neplex/vectorizer", "@resvg/resvg-js"],
   experimental: {
     // Master-image uploads POST through a Server Action (uploadMasterImage); the
     // default body cap is 1 MB. Lift it to cover the 15 MB the upload dropzone

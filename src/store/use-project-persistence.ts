@@ -17,7 +17,11 @@ const AUTOSAVE_DEBOUNCE_MS = 1000;
 // mount (only from a fresh store, so it never clobbers an in-progress session),
 // then debounced-saves every change to that project. Imports only the project
 // Server Actions — never the repository/db/SDK — so the client boundary stays clean.
-export function useProjectPersistence(): { status: PersistenceStatus } {
+export function useProjectPersistence({
+  fresh = false,
+}: {
+  fresh?: boolean;
+} = {}): { status: PersistenceStatus } {
   const [status, setStatus] = useState<PersistenceStatus>("idle");
   const restored = useRef(false);
 
@@ -25,6 +29,12 @@ export function useProjectPersistence(): { status: PersistenceStatus } {
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
+    // A fresh start: whatever the store still holds was saved when its page
+    // unmounted; begin empty and restore nothing.
+    if (fresh) {
+      useProject.getState().reset();
+      return;
+    }
     const state = useProject.getState();
     if (state.phase !== "upload" || state.master || state.projectId) return;
 
@@ -46,7 +56,7 @@ export function useProjectPersistence(): { status: PersistenceStatus } {
     return () => {
       active = false;
     };
-  }, []);
+  }, [fresh]);
 
   // Debounced autosave on any store change, once there is a master to persist.
   // On unmount a pending save is flushed, not dropped, so leaving the editor

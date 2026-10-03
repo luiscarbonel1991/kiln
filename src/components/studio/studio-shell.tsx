@@ -10,11 +10,11 @@ import { UploadPhase } from "@/components/studio/upload-phase";
 import { useProject } from "@/store/project";
 import { useProjectPersistence } from "@/store/use-project-persistence";
 
-export function StudioShell() {
+export function StudioShell({ fresh = false }: { fresh?: boolean }) {
   const phase = useProject((s) => s.phase);
   const master = useProject((s) => s.master);
   const reset = useProject((s) => s.reset);
-  const { status } = useProjectPersistence();
+  const { status } = useProjectPersistence({ fresh });
   const [galleryOpen, setGalleryOpen] = useState(false);
 
   return (
