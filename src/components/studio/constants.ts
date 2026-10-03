@@ -1,4 +1,4 @@
-import type { Phase } from "@/store/workspace";
+import type { Phase } from "@/store/project";
 
 export const STEPS = ["Upload", "Analysis", "Planning", "Generation"] as const;
 

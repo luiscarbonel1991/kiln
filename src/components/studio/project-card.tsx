@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import type { Phase, ProjectSummary } from "@/domain/persisted-project";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { gradientForSeed, hashSeed } from "@/lib/gradient";
+import { displayName } from "@/lib/project-summary";
 import { formatRelativeTime } from "@/lib/relative-time";
-import { displayName } from "@/lib/workspace-summary";
 
 // Phase pill — copies ProvenanceBadge's class string for visual consistency, but
 // keyed by phase (the provenance badge is keyed by Field.source).
@@ -21,7 +21,7 @@ const PHASE_BADGE: Record<Phase, { label: string; cls: string }> = {
   },
 };
 
-export function WorkspaceCard({
+export function ProjectCard({
   summary,
   onOpen,
   onDelete,

@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Cloud, RefreshCw } from "lucide-react";
-import type { PersistenceStatus } from "@/store/use-workspace-persistence";
+import type { PersistenceStatus } from "@/store/use-project-persistence";
 
 const LABEL: Record<PersistenceStatus, string> = {
   idle: "Autosave on",

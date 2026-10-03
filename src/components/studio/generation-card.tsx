@@ -17,7 +17,7 @@ import type { BaseUnderstanding } from "@/domain/understanding";
 import { assetFilename, downloadAsset } from "@/lib/download";
 import { gradientForSeed } from "@/lib/gradient";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
-import { type StudioCard, useWorkspace } from "@/store/workspace";
+import { type StudioCard, useProject } from "@/store/project";
 
 const FIELD_ROWS: { key: FieldKey; label: string }[] = [
   { key: "subject", label: "Subject" },
@@ -38,15 +38,15 @@ export function GenerationCard({
   master: MasterAsset;
   understanding: BaseUnderstanding;
 }) {
-  const applyCardResult = useWorkspace((s) => s.applyCardResult);
-  const markCardError = useWorkspace((s) => s.markCardError);
-  const editCardField = useWorkspace((s) => s.editCardField);
-  const toggleCardLock = useWorkspace((s) => s.toggleCardLock);
-  const regenerateCard = useWorkspace((s) => s.regenerateCard);
-  const promoteToVideo = useWorkspace((s) => s.promoteToVideo);
-  const editCardModel = useWorkspace((s) => s.editCardModel);
-  const editCardPrompt = useWorkspace((s) => s.editCardPrompt);
-  const applyVector = useWorkspace((s) => s.applyVector);
+  const applyCardResult = useProject((s) => s.applyCardResult);
+  const markCardError = useProject((s) => s.markCardError);
+  const editCardField = useProject((s) => s.editCardField);
+  const toggleCardLock = useProject((s) => s.toggleCardLock);
+  const regenerateCard = useProject((s) => s.regenerateCard);
+  const promoteToVideo = useProject((s) => s.promoteToVideo);
+  const editCardModel = useProject((s) => s.editCardModel);
+  const editCardPrompt = useProject((s) => s.editCardPrompt);
+  const applyVector = useProject((s) => s.applyVector);
   const [open, setOpen] = useState(false);
   const [vectorizing, setVectorizing] = useState(false);
 

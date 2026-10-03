@@ -2,7 +2,7 @@ import type { ProjectSummary } from "@/domain/persisted-project";
 
 const UNTITLED = "Untitled workspace";
 
-// The label shown on a workspace card. The stored `name` is usually the master
+// The label shown on a project card. The stored `name` is usually the master
 // prompt (sliced), but an uploaded master with no prompt persists the literal
 // "Untitled workspace" — fall back to the source prompt, then to "Untitled".
 export function displayName(

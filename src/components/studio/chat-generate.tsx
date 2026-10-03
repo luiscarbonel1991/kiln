@@ -10,14 +10,14 @@ import { isRenderableUrl } from "@/lib/asset-url";
 import { gradientForPrompt } from "@/lib/gradient";
 import { masterAssetFromGeneration } from "@/lib/master-asset";
 import type { GenerationResult } from "@/providers/types";
-import { useWorkspace } from "@/store/workspace";
+import { useProject } from "@/store/project";
 
 type ChatMessage =
   | { id: string; role: "user"; text: string }
   | { id: string; role: "image"; prompt: string; result: GenerationResult };
 
 export function ChatGenerate() {
-  const setMaster = useWorkspace((s) => s.setMaster);
+  const setMaster = useProject((s) => s.setMaster);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayName } from "@/lib/workspace-summary";
+import { displayName } from "@/lib/project-summary";
 
 describe("displayName", () => {
   it("uses a meaningful stored name", () => {

@@ -9,10 +9,10 @@ import {
   saveProjectAction,
 } from "@/app/actions/project";
 import type { ProjectSummary } from "@/domain/persisted-project";
-import { toPersisted, useWorkspace } from "@/store/workspace";
+import { toPersisted, useProject } from "@/store/project";
 
-export interface WorkspaceBrowser {
-  workspaces: ProjectSummary[];
+export interface ProjectBrowser {
+  projects: ProjectSummary[];
   loading: boolean;
   busy: boolean;
   error: boolean;
@@ -23,28 +23,28 @@ export interface WorkspaceBrowser {
   rename: (id: string, name: string) => Promise<void>;
 }
 
-// Flush the CURRENT workspace before navigating away. Autosave is debounced 1s,
+// Flush the CURRENT project before navigating away. Autosave is debounced 1s,
 // so an edit made just before switching would otherwise be lost: its pending save
-// would fire AFTER we hydrate the next workspace and write to the wrong id. This
-// is best-effort — a failed save must not trap the user on the current workspace
+// would fire AFTER we hydrate the next project and write to the wrong id. This
+// is best-effort — a failed save must not trap the user on the current project
 // (the debounced autosave is the fallback).
 async function flushCurrent(): Promise<void> {
-  const s = useWorkspace.getState();
-  if (s.master && s.workspaceId) {
+  const s = useProject.getState();
+  if (s.master && s.projectId) {
     try {
-      await saveProjectAction(toPersisted(s), s.workspaceId);
+      await saveProjectAction(toPersisted(s), s.projectId);
     } catch {
       // swallow — navigation must proceed
     }
   }
 }
 
-// The workspace gallery's data + navigation hook — a sibling to
-// useWorkspacePersistence (the autosave/restore engine). They cooperate through
+// The project gallery's data + navigation hook — a sibling to
+// useProjectPersistence (the autosave/restore engine). They cooperate through
 // the shared Zustand store; this hook owns the list and the open/new/delete
 // flows. Imports only Server Actions + the store — never the repository/db/SDK.
-export function useWorkspaceBrowser(): WorkspaceBrowser {
-  const [workspaces, setWorkspaces] = useState<ProjectSummary[]>([]);
+export function useProjectBrowser(): ProjectBrowser {
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -62,7 +62,7 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
     setError(false);
     try {
       const rows = await listProjectsAction();
-      if (active.current) setWorkspaces(rows);
+      if (active.current) setProjects(rows);
     } catch {
       if (active.current) setError(true);
     } finally {
@@ -71,12 +71,12 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
   }, []);
 
   const open = useCallback(async (id: string) => {
-    if (useWorkspace.getState().workspaceId === id) return; // already open
+    if (useProject.getState().projectId === id) return; // already open
     setBusy(true);
     try {
       await flushCurrent();
       const record = await loadProjectAction(id);
-      if (record) useWorkspace.getState().hydrate(record);
+      if (record) useProject.getState().hydrate(record);
     } finally {
       if (active.current) setBusy(false);
     }
@@ -86,7 +86,7 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
     setBusy(true);
     try {
       await flushCurrent();
-      useWorkspace.getState().reset();
+      useProject.getState().reset();
     } finally {
       if (active.current) setBusy(false);
     }
@@ -97,8 +97,8 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
       setBusy(true);
       try {
         await deleteProjectAction(id);
-        if (useWorkspace.getState().workspaceId === id) {
-          useWorkspace.getState().reset();
+        if (useProject.getState().projectId === id) {
+          useProject.getState().reset();
         }
         await refresh();
       } finally {
@@ -112,7 +112,7 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
     async (id: string, name: string) => {
       setBusy(true);
       try {
-        // DB-only: the workspace name lives in the row, not the store, and autosave
+        // DB-only: the project name lives in the row, not the store, and autosave
         // no longer writes it — so this sticks whether or not it is the open one.
         await renameProjectAction(id, name);
         await refresh();
@@ -124,7 +124,7 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
   );
 
   return {
-    workspaces,
+    projects,
     loading,
     busy,
     error,

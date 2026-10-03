@@ -3,16 +3,16 @@
 import { Plus, RefreshCw, X } from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { WorkspaceCard } from "@/components/studio/workspace-card";
+import { ProjectCard } from "@/components/studio/project-card";
 import { Button } from "@/components/ui/button";
-import { useWorkspaceBrowser } from "@/store/use-workspace-browser";
+import { useProjectBrowser } from "@/store/use-project-browser";
 
-// Full-screen gallery of saved workspaces (portaled to body, like the image
+// Full-screen gallery of saved projects (portaled to body, like the image
 // lightbox). Click a card to open/resume it, "New workspace" to start fresh, or
 // the hover trash to delete. Esc / the dark margin / the X close it.
-export function WorkspaceGallery({ onClose }: { onClose: () => void }) {
+export function ProjectGallery({ onClose }: { onClose: () => void }) {
   const {
-    workspaces,
+    projects,
     loading,
     busy,
     error,
@@ -21,7 +21,7 @@ export function WorkspaceGallery({ onClose }: { onClose: () => void }) {
     startNew,
     remove,
     rename,
-  } = useWorkspaceBrowser();
+  } = useProjectBrowser();
 
   // Fetch the list only when the overlay mounts (lazy; the landing stays query-free).
   useEffect(() => {
@@ -42,7 +42,7 @@ export function WorkspaceGallery({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
-  const newWorkspace = () => {
+  const newProject = () => {
     void startNew().then(onClose);
   };
 
@@ -71,7 +71,7 @@ export function WorkspaceGallery({ onClose }: { onClose: () => void }) {
               variant="default"
               size="sm"
               disabled={busy}
-              onClick={newWorkspace}
+              onClick={newProject}
             >
               <Plus /> New workspace
             </Button>
@@ -86,7 +86,7 @@ export function WorkspaceGallery({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {loading && workspaces.length === 0 ? (
+        {loading && projects.length === 0 ? (
           <div className="flex items-center justify-center gap-2 py-24 font-mono text-sm text-card/80">
             <RefreshCw className="size-4 animate-spin" /> Loading…
           </div>
@@ -103,7 +103,7 @@ export function WorkspaceGallery({ onClose }: { onClose: () => void }) {
               Retry
             </Button>
           </div>
-        ) : workspaces.length === 0 ? (
+        ) : projects.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-24 text-center">
             <p className="font-serif text-lg italic text-card">
               No saved workspaces yet.
@@ -111,14 +111,14 @@ export function WorkspaceGallery({ onClose }: { onClose: () => void }) {
             <p className="font-mono text-[0.6875rem] text-card/70">
               Start one and it'll show up here.
             </p>
-            <Button variant="default" size="sm" onClick={newWorkspace}>
+            <Button variant="default" size="sm" onClick={newProject}>
               <Plus /> New workspace
             </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 pb-6 sm:grid-cols-2 lg:grid-cols-3">
-            {workspaces.map((w) => (
-              <WorkspaceCard
+            {projects.map((w) => (
+              <ProjectCard
                 key={w.id}
                 summary={w}
                 disabled={busy}

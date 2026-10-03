@@ -4,7 +4,7 @@ import { Flame } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ChatGenerate } from "@/components/studio/chat-generate";
 import { HowItWorks } from "@/components/studio/how-it-works";
-import { RecentWorkspaces } from "@/components/studio/recent-workspaces";
+import { RecentProjects } from "@/components/studio/recent-projects";
 import { UploadDropzone } from "@/components/studio/upload-dropzone";
 import { cn } from "@/lib/utils";
 
@@ -303,7 +303,7 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
         </div>
       </div>
       <HowItWorks />
-      <RecentWorkspaces onViewAll={onViewAll} />
+      <RecentProjects onViewAll={onViewAll} />
     </>
   );
 }

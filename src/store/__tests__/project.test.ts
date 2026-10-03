@@ -9,7 +9,7 @@ import {
 import type { PersistedProjectRecord } from "@/domain/persisted-project";
 import { SEED_BRAND, SEED_RECIPES } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
-import { toPersisted, useWorkspace } from "@/store/workspace";
+import { toPersisted, useProject } from "@/store/project";
 
 // https URL (not blob:) so reset() never calls URL.revokeObjectURL, which is
 // absent in the node test environment.
@@ -34,50 +34,50 @@ const sampleUnderstanding: BaseUnderstanding = {
 };
 
 afterEach(() => {
-  useWorkspace.getState().reset();
+  useProject.getState().reset();
 });
 
-describe("useWorkspace", () => {
+describe("useProject", () => {
   it("starts on the upload phase with no master or understanding", () => {
-    expect(useWorkspace.getState().phase).toBe("upload");
-    expect(useWorkspace.getState().master).toBeNull();
-    expect(useWorkspace.getState().understanding).toBeNull();
+    expect(useProject.getState().phase).toBe("upload");
+    expect(useProject.getState().master).toBeNull();
+    expect(useProject.getState().understanding).toBeNull();
   });
 
   it("setMaster stores the master and advances to analysis", () => {
-    useWorkspace.getState().setMaster(sampleMaster);
-    expect(useWorkspace.getState().master).toEqual(sampleMaster);
-    expect(useWorkspace.getState().phase).toBe("analysis");
+    useProject.getState().setMaster(sampleMaster);
+    expect(useProject.getState().master).toEqual(sampleMaster);
+    expect(useProject.getState().phase).toBe("analysis");
   });
 
   it("setUnderstanding stores the understanding", () => {
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    expect(useWorkspace.getState().understanding).toEqual(sampleUnderstanding);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    expect(useProject.getState().understanding).toEqual(sampleUnderstanding);
   });
 
   it("setMaster clears any stale understanding", () => {
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    useWorkspace.getState().setMaster(sampleMaster);
-    expect(useWorkspace.getState().understanding).toBeNull();
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().setMaster(sampleMaster);
+    expect(useProject.getState().understanding).toBeNull();
   });
 
   it("reset returns to upload and clears master and understanding", () => {
-    useWorkspace.getState().setMaster(sampleMaster);
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    useWorkspace.getState().reset();
-    expect(useWorkspace.getState().phase).toBe("upload");
-    expect(useWorkspace.getState().master).toBeNull();
-    expect(useWorkspace.getState().understanding).toBeNull();
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().reset();
+    expect(useProject.getState().phase).toBe("upload");
+    expect(useProject.getState().master).toBeNull();
+    expect(useProject.getState().understanding).toBeNull();
   });
 });
 
-describe("useWorkspace planning", () => {
+describe("useProject planning", () => {
   it("goToPlanning advances to planning with the default recipe and context", () => {
-    useWorkspace.getState().setMaster(sampleMaster);
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    useWorkspace.getState().goToPlanning();
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
 
-    const state = useWorkspace.getState();
+    const state = useProject.getState();
     expect(state.phase).toBe("planning");
     expect(state.recipeId).toBe(SEED_RECIPES[0].id);
     expect(state.planning).toEqual(
@@ -86,19 +86,19 @@ describe("useWorkspace planning", () => {
   });
 
   it("goToPlanning no-ops when understanding is null", () => {
-    useWorkspace.getState().setMaster(sampleMaster);
-    useWorkspace.getState().goToPlanning();
-    expect(useWorkspace.getState().phase).toBe("analysis");
-    expect(useWorkspace.getState().planning).toBeNull();
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().goToPlanning();
+    expect(useProject.getState().phase).toBe("analysis");
+    expect(useProject.getState().planning).toBeNull();
   });
 
   it("selectRecipe rebuilds the planning context for the chosen recipe", () => {
-    useWorkspace.getState().setMaster(sampleMaster);
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    useWorkspace.getState().goToPlanning();
-    useWorkspace.getState().selectRecipe(SEED_RECIPES[1].id);
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
+    useProject.getState().selectRecipe(SEED_RECIPES[1].id);
 
-    const state = useWorkspace.getState();
+    const state = useProject.getState();
     expect(state.recipeId).toBe(SEED_RECIPES[1].id);
     expect(state.planning?.scene.value).toBe(
       SEED_RECIPES[1].fieldDefaults.scene,
@@ -107,12 +107,12 @@ describe("useWorkspace planning", () => {
   });
 
   it("editPlanningField flips the field to the local layer and unlocks it", () => {
-    useWorkspace.getState().setMaster(sampleMaster);
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    useWorkspace.getState().goToPlanning();
-    useWorkspace.getState().editPlanningField("palette", "just terracotta");
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
+    useProject.getState().editPlanningField("palette", "just terracotta");
 
-    expect(useWorkspace.getState().planning?.palette).toEqual({
+    expect(useProject.getState().planning?.palette).toEqual({
       value: "just terracotta",
       source: "local",
       locked: false,
@@ -120,35 +120,35 @@ describe("useWorkspace planning", () => {
   });
 
   it("reset and setMaster clear recipeId and planning", () => {
-    useWorkspace.getState().setMaster(sampleMaster);
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    useWorkspace.getState().goToPlanning();
-    useWorkspace.getState().setMaster(sampleMaster);
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
+    useProject.getState().setMaster(sampleMaster);
 
-    const state = useWorkspace.getState();
+    const state = useProject.getState();
     expect(state.recipeId).toBeNull();
     expect(state.planning).toBeNull();
     expect(state.phase).toBe("analysis");
   });
 });
 
-describe("useWorkspace generation", () => {
+describe("useProject generation", () => {
   function generate() {
-    useWorkspace.getState().setMaster(sampleMaster);
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    useWorkspace.getState().goToPlanning();
-    useWorkspace.getState().generateVariants();
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
+    useProject.getState().generateVariants();
   }
 
   function cardsOf() {
-    const cards = useWorkspace.getState().cards;
+    const cards = useProject.getState().cards;
     if (!cards) throw new Error("expected cards to be set");
     return cards;
   }
 
   it("generateVariants builds a draft card per listing slot and enters generation", () => {
     generate();
-    const state = useWorkspace.getState();
+    const state = useProject.getState();
     expect(state.phase).toBe("generation");
     expect(state.cards).toHaveLength(6);
     // Cards start as drafts — generation is manual (cost control), no auto-run.
@@ -158,7 +158,7 @@ describe("useWorkspace generation", () => {
   it("editCardField flips a card field to local and unlocks it", () => {
     generate();
     const id = cardsOf()[0].id;
-    useWorkspace.getState().editCardField(id, "scene", "studio sweep");
+    useProject.getState().editCardField(id, "scene", "studio sweep");
     expect(cardsOf()[0].fields.scene).toEqual({
       value: "studio sweep",
       source: "local",
@@ -170,14 +170,14 @@ describe("useWorkspace generation", () => {
     generate();
     const id = cardsOf()[0].id;
     const before = cardsOf()[0].fields.subject.locked;
-    useWorkspace.getState().toggleCardLock(id, "subject");
+    useProject.getState().toggleCardLock(id, "subject");
     expect(cardsOf()[0].fields.subject.locked).toBe(!before);
   });
 
   it("editCardModel applies a model choice (provider + model together)", () => {
     generate();
     const id = cardsOf()[0].id;
-    useWorkspace
+    useProject
       .getState()
       .editCardModel(id, { provider: "openai", model: "gpt-image-1.5" });
     const model = cardsOf()[0].model;
@@ -189,11 +189,11 @@ describe("useWorkspace generation", () => {
     generate();
     const id = cardsOf()[0].id;
     // Lock the two recipe fields so card 0 has no unlocked field left.
-    useWorkspace.getState().toggleCardLock(id, "scene");
-    useWorkspace.getState().toggleCardLock(id, "composition");
-    useWorkspace.getState().applyCardResult(id, "https://stub.local/x.png");
+    useProject.getState().toggleCardLock(id, "scene");
+    useProject.getState().toggleCardLock(id, "composition");
+    useProject.getState().applyCardResult(id, "https://stub.local/x.png");
     const seedBefore = cardsOf().find((c) => c.id === id)?.renderSeed;
-    useWorkspace.getState().regenerateUnlocked();
+    useProject.getState().regenerateUnlocked();
     const card = cardsOf().find((c) => c.id === id);
     expect(card?.status).toBe("done");
     expect(card?.renderSeed).toBe(seedBefore);
@@ -201,21 +201,21 @@ describe("useWorkspace generation", () => {
 
   it("reset clears the cards", () => {
     generate();
-    useWorkspace.getState().reset();
-    expect(useWorkspace.getState().cards).toBeNull();
+    useProject.getState().reset();
+    expect(useProject.getState().cards).toBeNull();
   });
 });
 
-describe("useWorkspace promoteToVideo", () => {
+describe("useProject promoteToVideo", () => {
   function generate() {
-    useWorkspace.getState().setMaster(sampleMaster);
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    useWorkspace.getState().goToPlanning();
-    useWorkspace.getState().generateVariants();
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
+    useProject.getState().generateVariants();
   }
 
   function cardsOf() {
-    const cards = useWorkspace.getState().cards;
+    const cards = useProject.getState().cards;
     if (!cards) throw new Error("expected cards to be set");
     return cards;
   }
@@ -224,7 +224,7 @@ describe("useWorkspace promoteToVideo", () => {
     generate();
     const source = cardsOf()[0];
     const sourceIndex = cardsOf().findIndex((c) => c.id === source.id);
-    useWorkspace.getState().promoteToVideo(source.id);
+    useProject.getState().promoteToVideo(source.id);
 
     const video = cardsOf().find((c) => c.id === `${source.id}-video`);
     expect(video).toBeDefined();
@@ -237,10 +237,10 @@ describe("useWorkspace promoteToVideo", () => {
   it("targets the default provider's video model and seeds the start frame from the source output", () => {
     generate();
     const source = cardsOf()[0];
-    useWorkspace
+    useProject
       .getState()
       .applyCardResult(source.id, "https://stub.local/o.png");
-    useWorkspace.getState().promoteToVideo(source.id);
+    useProject.getState().promoteToVideo(source.id);
 
     const video = cardsOf().find((c) => c.id === `${source.id}-video`);
     expect(video?.model).toMatchObject(defaultVideoModel());
@@ -254,7 +254,7 @@ describe("useWorkspace promoteToVideo", () => {
   it("falls back to the master asset URL when the source has no output yet", () => {
     generate();
     const source = cardsOf()[0];
-    useWorkspace.getState().promoteToVideo(source.id);
+    useProject.getState().promoteToVideo(source.id);
 
     const video = cardsOf().find((c) => c.id === `${source.id}-video`);
     // The master's URL is a fetchable start frame for image-to-video (a bare
@@ -265,15 +265,15 @@ describe("useWorkspace promoteToVideo", () => {
   it("promoting twice does not duplicate or re-run the existing video card", () => {
     generate();
     const source = cardsOf()[0];
-    useWorkspace.getState().promoteToVideo(source.id);
+    useProject.getState().promoteToVideo(source.id);
     const lenAfterFirst = cardsOf().length;
     const seedBefore = cardsOf().find(
       (c) => c.id === `${source.id}-video`,
     )?.renderSeed;
-    useWorkspace
+    useProject
       .getState()
       .applyCardResult(`${source.id}-video`, "https://stub.local/a.mp4");
-    useWorkspace.getState().promoteToVideo(source.id);
+    useProject.getState().promoteToVideo(source.id);
 
     const videos = cardsOf().filter((c) => c.id === `${source.id}-video`);
     expect(videos).toHaveLength(1);
@@ -287,39 +287,39 @@ describe("useWorkspace promoteToVideo", () => {
   it("no-ops for an unknown source id", () => {
     generate();
     const before = cardsOf().length;
-    useWorkspace.getState().promoteToVideo("does-not-exist");
+    useProject.getState().promoteToVideo("does-not-exist");
     expect(cardsOf().length).toBe(before);
   });
 });
 
-describe("useWorkspace persistence", () => {
+describe("useProject persistence", () => {
   function generate() {
-    useWorkspace.getState().setMaster(sampleMaster);
-    useWorkspace.getState().setUnderstanding(sampleUnderstanding);
-    useWorkspace.getState().goToPlanning();
-    useWorkspace.getState().generateVariants();
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
+    useProject.getState().generateVariants();
   }
 
   it("toPersisted captures the slice, derives a name, and drops renderSeed", () => {
     generate();
-    const persisted = toPersisted(useWorkspace.getState());
+    const persisted = toPersisted(useProject.getState());
     expect(persisted.name).toBe("a glazed cream pitcher");
     expect(persisted.phase).toBe("generation");
     expect(persisted.cards).toHaveLength(6);
     expect("renderSeed" in persisted.cards[0]).toBe(false);
   });
 
-  it("hydrate restores a saved record with a fresh renderSeed and workspaceId", () => {
+  it("hydrate restores a saved record with a fresh renderSeed and projectId", () => {
     generate();
-    const persisted = toPersisted(useWorkspace.getState());
-    useWorkspace.getState().reset();
-    expect(useWorkspace.getState().cards).toBeNull();
+    const persisted = toPersisted(useProject.getState());
+    useProject.getState().reset();
+    expect(useProject.getState().cards).toBeNull();
 
     const record: PersistedProjectRecord = { id: "ws-9", ...persisted };
-    useWorkspace.getState().hydrate(record);
+    useProject.getState().hydrate(record);
 
-    const state = useWorkspace.getState();
-    expect(state.workspaceId).toBe("ws-9");
+    const state = useProject.getState();
+    expect(state.projectId).toBe("ws-9");
     expect(state.phase).toBe("generation");
     expect(state.cards).toHaveLength(6);
     expect(state.cards?.[0].renderSeed).toBe(5);

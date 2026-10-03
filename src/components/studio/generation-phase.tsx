@@ -2,13 +2,13 @@
 
 import { RefreshCw } from "lucide-react";
 import { GenerationCard } from "@/components/studio/generation-card";
-import { useWorkspace } from "@/store/workspace";
+import { useProject } from "@/store/project";
 
 export function GenerationPhase() {
-  const cards = useWorkspace((s) => s.cards);
-  const master = useWorkspace((s) => s.master);
-  const understanding = useWorkspace((s) => s.understanding);
-  const regenerateUnlocked = useWorkspace((s) => s.regenerateUnlocked);
+  const cards = useProject((s) => s.cards);
+  const master = useProject((s) => s.master);
+  const understanding = useProject((s) => s.understanding);
+  const regenerateUnlocked = useProject((s) => s.regenerateUnlocked);
 
   if (!cards || !master || !understanding) return null;
 

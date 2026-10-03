@@ -1,4 +1,4 @@
-// Compact relative-time label for the workspace gallery ("just now", "5m ago",
+// Compact relative-time label for the project gallery ("just now", "5m ago",
 // "3h ago", "2d ago", "3w ago"); older than ~4 weeks falls back to a short date.
 // `now` is injectable so the formatting is deterministic in tests.
 

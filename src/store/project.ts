@@ -27,14 +27,14 @@ export type Phase = "upload" | "analysis" | "planning" | "generation";
 // domain Card now (persisted), so StudioCard only adds the render seed.
 export type StudioCard = Card & { renderSeed: number };
 
-interface WorkspaceState {
+interface ProjectState {
   phase: Phase;
   master: MasterAsset | null;
   understanding: BaseUnderstanding | null;
   recipeId: string | null;
   planning: PlanningFields | null;
   cards: StudioCard[] | null;
-  workspaceId: string | null;
+  projectId: string | null;
   setMaster: (master: MasterAsset) => void;
   setUnderstanding: (understanding: BaseUnderstanding) => void;
   editUnderstandingField: (
@@ -55,21 +55,21 @@ interface WorkspaceState {
   editCardPrompt: (id: string, prompt: string) => void;
   toggleCardLock: (id: string, key: FieldKey) => void;
   promoteToVideo: (sourceId: string) => void;
-  setWorkspaceId: (id: string | null) => void;
+  setProjectId: (id: string | null) => void;
   hydrate: (record: PersistedProjectRecord) => void;
   reset: () => void;
 }
 
 const RENDER_BUMP = 13;
 
-export const useWorkspace = create<WorkspaceState>((set, get) => ({
+export const useProject = create<ProjectState>((set, get) => ({
   phase: "upload",
   master: null,
   understanding: null,
   recipeId: null,
   planning: null,
   cards: null,
-  workspaceId: null,
+  projectId: null,
   // Re-capturing clears everything downstream of the new master.
   setMaster: (master) =>
     set({
@@ -296,8 +296,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     next.splice(sourceIndex + 1, 0, videoCard);
     set({ cards: next });
   },
-  setWorkspaceId: (id) => set({ workspaceId: id }),
-  // Load a saved workspace into the store: set the persisted slices + rebuild
+  setProjectId: (id) => set({ projectId: id }),
+  // Load a saved project into the store: set the persisted slices + rebuild
   // cards as StudioCards with a fresh renderSeed (UI state, not persisted), using
   // the same index formula as generateVariants. Revokes a stale blob: master.
   hydrate: (record) => {
@@ -306,7 +306,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       URL.revokeObjectURL(current.assetUrl);
     }
     set({
-      workspaceId: record.id,
+      projectId: record.id,
       phase: record.phase,
       master: record.master,
       understanding: record.understanding,
@@ -330,17 +330,17 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       recipeId: null,
       planning: null,
       cards: null,
-      workspaceId: null,
+      projectId: null,
     });
   },
 }));
 
 // Store -> PersistedProject: the persistable slice. `name` is derived from the
 // master prompt, but it only seeds the name at CREATE time — afterwards autosave
-// leaves the name column untouched (see saveWorkspace) so a user rename sticks.
+// leaves the name column untouched (see saveProject) so a user rename sticks.
 // renderSeed and the action functions are dropped by PersistedProject.parse at
 // the Server Action boundary.
-export function toPersisted(state: WorkspaceState): PersistedProject {
+export function toPersisted(state: ProjectState): PersistedProject {
   return {
     name: state.master?.sourcePrompt?.slice(0, 60) || "Untitled workspace",
     phase: state.phase,

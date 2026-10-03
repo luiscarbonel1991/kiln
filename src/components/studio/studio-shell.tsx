@@ -4,17 +4,17 @@ import { useState } from "react";
 import { AnalysisPhase } from "@/components/studio/analysis-phase";
 import { GenerationPhase } from "@/components/studio/generation-phase";
 import { PlanningPhase } from "@/components/studio/planning-phase";
+import { ProjectGallery } from "@/components/studio/project-gallery";
 import { StudioHeader } from "@/components/studio/studio-header";
 import { UploadPhase } from "@/components/studio/upload-phase";
-import { WorkspaceGallery } from "@/components/studio/workspace-gallery";
-import { useWorkspacePersistence } from "@/store/use-workspace-persistence";
-import { useWorkspace } from "@/store/workspace";
+import { useProject } from "@/store/project";
+import { useProjectPersistence } from "@/store/use-project-persistence";
 
 export function StudioShell() {
-  const phase = useWorkspace((s) => s.phase);
-  const master = useWorkspace((s) => s.master);
-  const reset = useWorkspace((s) => s.reset);
-  const { status } = useWorkspacePersistence();
+  const phase = useProject((s) => s.phase);
+  const master = useProject((s) => s.master);
+  const reset = useProject((s) => s.reset);
+  const { status } = useProjectPersistence();
   const [galleryOpen, setGalleryOpen] = useState(false);
 
   return (
@@ -36,7 +36,7 @@ export function StudioShell() {
         <AnalysisPhase key={master.id} master={master} />
       )}
       {galleryOpen ? (
-        <WorkspaceGallery onClose={() => setGalleryOpen(false)} />
+        <ProjectGallery onClose={() => setGalleryOpen(false)} />
       ) : null}
     </div>
   );

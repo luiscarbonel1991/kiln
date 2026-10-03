@@ -15,7 +15,7 @@ import { isRenderableUrl } from "@/lib/asset-url";
 import { gradientForPrompt } from "@/lib/gradient";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
-import { useWorkspace } from "@/store/workspace";
+import { useProject } from "@/store/project";
 
 // The five editable rows, in cascade/prompt order, with their UI labels.
 const ROWS: { key: FieldKey; label: string }[] = [
@@ -78,13 +78,13 @@ function ContextRow({
 }
 
 export function PlanningPhase({ master }: { master: MasterAsset }) {
-  const recipeId = useWorkspace((s) => s.recipeId);
-  const planning = useWorkspace((s) => s.planning);
-  const selectRecipe = useWorkspace((s) => s.selectRecipe);
-  const editPlanningField = useWorkspace((s) => s.editPlanningField);
-  const editUnderstandingField = useWorkspace((s) => s.editUnderstandingField);
-  const generateVariants = useWorkspace((s) => s.generateVariants);
-  const understanding = useWorkspace((s) => s.understanding);
+  const recipeId = useProject((s) => s.recipeId);
+  const planning = useProject((s) => s.planning);
+  const selectRecipe = useProject((s) => s.selectRecipe);
+  const editPlanningField = useProject((s) => s.editPlanningField);
+  const editUnderstandingField = useProject((s) => s.editUnderstandingField);
+  const generateVariants = useProject((s) => s.generateVariants);
+  const understanding = useProject((s) => s.understanding);
   const [busy, setBusy] = useState(false);
 
   // Guard: planning is always set on entry (goToPlanning), but stay defensive.

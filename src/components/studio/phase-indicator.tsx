@@ -1,6 +1,6 @@
 import { PHASE_INDEX, STEPS } from "@/components/studio/constants";
 import { cn } from "@/lib/utils";
-import type { Phase } from "@/store/workspace";
+import type { Phase } from "@/store/project";
 
 // Quiet, header-integrated phase indicator — four small dots + the current phase
 // name in mono. Replaces the full-width top stepper (same pine/terracotta/line

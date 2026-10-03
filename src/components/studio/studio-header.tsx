@@ -3,10 +3,10 @@
 import { ArrowLeft } from "lucide-react";
 import { AutosaveStatus } from "@/components/studio/autosave-status";
 import { PhaseIndicator } from "@/components/studio/phase-indicator";
-import { WorkspacesButton } from "@/components/studio/workspaces-button";
+import { ProjectsButton } from "@/components/studio/projects-button";
 import { Button } from "@/components/ui/button";
-import type { PersistenceStatus } from "@/store/use-workspace-persistence";
-import type { Phase } from "@/store/workspace";
+import type { Phase } from "@/store/project";
+import type { PersistenceStatus } from "@/store/use-project-persistence";
 
 export function StudioHeader({
   phase,
@@ -30,14 +30,14 @@ export function StudioHeader({
         >
           kiln<span className="text-primary">.</span>
         </div>
-        {/* Quiet phase indicator — only once a workspace is active. */}
+        {/* Quiet phase indicator — only once a project is active. */}
         {showStartOver ? <PhaseIndicator phase={phase} /> : null}
       </div>
-      {/* Workspaces is always available; autosave status + Start over only once a
-          workspace is in progress. */}
+      {/* The gallery is always available; autosave status + Start over only once a
+          project is in progress. */}
       <div className="flex items-center gap-3">
         {showStartOver ? <AutosaveStatus status={saveStatus} /> : null}
-        <WorkspacesButton onOpen={onOpenGallery} />
+        <ProjectsButton onOpen={onOpenGallery} />
         {showStartOver ? (
           <Button variant="ghost" size="sm" onClick={onStartOver}>
             <ArrowLeft /> Start over

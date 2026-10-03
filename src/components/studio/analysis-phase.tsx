@@ -9,7 +9,7 @@ import { ProvenanceBadge } from "@/components/studio/provenance-badge";
 import type { MasterAsset } from "@/domain/master-asset";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { cn } from "@/lib/utils";
-import { useWorkspace } from "@/store/workspace";
+import { useProject } from "@/store/project";
 
 // Drives the attribute rows: each reads understanding[key]; palette is special-
 // cased to swatches. Order matches the mockup ATTRS (subject … palette).
@@ -23,9 +23,9 @@ const ATTRS: { key: keyof BaseUnderstanding; label: string }[] = [
 ];
 
 export function AnalysisPhase({ master }: { master: MasterAsset }) {
-  const understanding = useWorkspace((s) => s.understanding);
-  const setUnderstanding = useWorkspace((s) => s.setUnderstanding);
-  const goToPlanning = useWorkspace((s) => s.goToPlanning);
+  const understanding = useProject((s) => s.understanding);
+  const setUnderstanding = useProject((s) => s.setUnderstanding);
+  const goToPlanning = useProject((s) => s.goToPlanning);
   const [analysisStep, setAnalysisStep] = useState(0);
   const [error, setError] = useState(false);
   // Bumped by "Try again" so the fetch effect re-runs on a transient failure

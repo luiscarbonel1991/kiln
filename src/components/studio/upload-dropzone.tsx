@@ -9,7 +9,7 @@ import {
 } from "@/components/studio/constants";
 import { masterAssetFromUpload } from "@/lib/master-asset";
 import { cn } from "@/lib/utils";
-import { useWorkspace } from "@/store/workspace";
+import { useProject } from "@/store/project";
 
 type AcceptedMime = (typeof ACCEPTED_IMAGE_MIME)[number];
 
@@ -24,7 +24,7 @@ function validateFile(file: File): string | null {
 }
 
 export function UploadDropzone() {
-  const setMaster = useWorkspace((s) => s.setMaster);
+  const setMaster = useProject((s) => s.setMaster);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
