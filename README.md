@@ -16,6 +16,23 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Database (Prisma Migrate)
+
+Local Postgres runs in Docker (`pnpm db:up`). The schema changes only through
+migrations in `prisma/migrations/` — never `prisma db push`, which would drop
+renamed tables and their rows.
+
+```bash
+pnpm db:up                                            # Postgres + MinIO
+docker exec kiln-postgres createdb -U kiln kiln_shadow  # once: Prisma's shadow DB
+pnpm db:deploy                                        # apply pending migrations
+pnpm db:status                                        # what is applied
+pnpm db:migrate --create-only --name <change>         # draft a new migration, review/edit, then db:deploy
+```
+
+Never edit a migration that has been applied; add a new one. Restart the dev
+server after migrating (the Prisma client is cached across hot reloads).
+
 ## System dependencies (laser "Centerline" vectorize)
 
 The line-art **Centerline** trace — single cut paths for laser cutting — shells out to two
