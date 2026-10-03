@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { SlotFrame } from "@/components/projects/slot-frame";
+import { SlotFrame, SlotGrid } from "@/components/projects/slot-frame";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -282,7 +282,7 @@ export default function Preview() {
       </Section>
 
       <Section eyebrow="Slot states · project board">
-        <div className="flex flex-wrap gap-5">
+        <SlotGrid>
           {SLOT_STATES.map(({ label, view }) => (
             <SlotFrame
               key={label}
@@ -298,7 +298,7 @@ export default function Preview() {
               />
             </SlotFrame>
           ))}
-        </div>
+        </SlotGrid>
       </Section>
     </main>
   );

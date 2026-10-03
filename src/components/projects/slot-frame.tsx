@@ -2,6 +2,20 @@ import type { ReactNode } from "react";
 import { SlotStateBadge } from "@/components/projects/slot-state-badge";
 import type { SlotView } from "@/domain/plan";
 
+const css = (aspect?: string) => (aspect ?? "1:1").replace(":", " / ");
+
+// A destination's frames as a wrapping grid: the whole deliverable visible at
+// once, no sideways scrolling. Each frame spans two rows (render, caption) on a
+// subgrid, so in every visual row the renders rest on one baseline — a 1:1 next
+// to a 4:5 sits at the bottom of the taller cell — and the captions line up.
+export function SlotGrid({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))] sm:gap-x-5">
+      {children}
+    </div>
+  );
+}
+
 // One frame of the storyboard: the render at the slot's real aspect (render
 // radius + render shadow, DESIGN.md), the position label ("Etsy photo 1"), the
 // slot's job as a serif caption, and its state.
@@ -22,16 +36,15 @@ export function SlotFrame({
   children: ReactNode;
   actions?: ReactNode;
 }) {
-  const [w, h] = (aspect ?? "1:1").split(":");
   return (
-    <figure className="flex w-[208px] flex-shrink-0 flex-col gap-2">
+    <figure className="row-span-2 grid min-w-0 grid-rows-subgrid gap-y-2">
       <div
-        className="overflow-hidden rounded-render bg-surface-soft shadow-render"
-        style={{ aspectRatio: `${w} / ${h}` }}
+        className="self-end overflow-hidden rounded-render bg-surface-soft shadow-render"
+        style={{ aspectRatio: css(aspect) }}
       >
         {children}
       </div>
-      <figcaption className="flex flex-col gap-1 px-0.5">
+      <figcaption className="flex flex-col gap-1 self-start px-0.5">
         <div className="flex items-center justify-between gap-2">
           <span className="font-mono text-[0.625rem] text-on-surface-dim">
             {position}

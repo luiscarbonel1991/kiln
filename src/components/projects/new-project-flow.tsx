@@ -6,7 +6,11 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { createProjectAction } from "@/app/actions/new-project";
 import { importProductsAction } from "@/app/actions/products";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
-import { SlotFrame, slotPosition } from "@/components/projects/slot-frame";
+import {
+  SlotFrame,
+  SlotGrid,
+  slotPosition,
+} from "@/components/projects/slot-frame";
 import { Button } from "@/components/ui/button";
 import { exactView } from "@/domain/exact";
 import { estimateScenes } from "@/domain/generation-cost";
@@ -305,7 +309,7 @@ export function NewProjectFlow({
                   <h3 className="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
                     {destination.name} · {d.slots.length} frames
                   </h3>
-                  <div className="flex gap-5 overflow-x-auto pb-3">
+                  <SlotGrid>
                     {d.slots.map((slot, i) => (
                       <SlotFrame
                         key={slot.key}
@@ -343,7 +347,7 @@ export function NewProjectFlow({
                         )}
                       </SlotFrame>
                     ))}
-                  </div>
+                  </SlotGrid>
                 </section>
               );
             })}

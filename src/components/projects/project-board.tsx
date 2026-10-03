@@ -5,7 +5,11 @@ import {
   ReferenceUpload,
 } from "@/components/projects/board-actions";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
-import { SlotFrame, slotPosition } from "@/components/projects/slot-frame";
+import {
+  SlotFrame,
+  SlotGrid,
+  slotPosition,
+} from "@/components/projects/slot-frame";
 import type { Card } from "@/domain/card";
 import { exactView, renderTextTemplate } from "@/domain/exact";
 import { estimateScenes } from "@/domain/generation-cost";
@@ -98,7 +102,7 @@ export function ProjectBoard({
                   {destination.formats.map((f) => f.aspect).join(" / ")}
                 </span>
               </h2>
-              <div className="flex gap-5 overflow-x-auto pb-4">
+              <SlotGrid>
                 {slots.map(({ slot, cardId, card, view }, i) => (
                   <SlotFrame
                     key={slot.key}
@@ -136,7 +140,7 @@ export function ProjectBoard({
                     )}
                   </SlotFrame>
                 ))}
-              </div>
+              </SlotGrid>
             </section>
           ) : (
             <p
