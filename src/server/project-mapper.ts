@@ -7,6 +7,7 @@ import {
   type Phase,
   type ProjectSummary,
 } from "@/domain/persisted-project";
+import { ProjectPlan } from "@/domain/plan";
 import { ProjectType } from "@/domain/project";
 import { BaseUnderstanding } from "@/domain/understanding";
 
@@ -63,6 +64,7 @@ export interface ProjectSummaryRow {
   id: string;
   name: string;
   type: string;
+  plan: unknown;
   phase: string;
   updatedAt: Date;
   master: { assetUrl: string; sourcePrompt: string | null } | null;
@@ -81,20 +83,25 @@ export function studioProjectType(recipeId: string | null): ProjectType {
 }
 
 // The columns the editor's autosave writes. `name` is set once at create and
-// changed only by rename; `makerId` and the products are server-owned. Neither
-// is here, so an autosave can never overwrite them.
+// changed only by rename; `makerId`, the products, the plan and the type of a
+// planned project are server-owned. None is here, so an autosave can never
+// overwrite them. (A studio project's type follows its recipe: the repository
+// re-derives it only where there is no plan.)
 export function projectUpdateData(rows: ProjectRows) {
   return {
     phase: rows.phase,
     recipeId: rows.recipeId,
     understanding: rows.understanding,
     planning: rows.planning,
-    type: studioProjectType(rows.recipeId),
   };
 }
 
 export function projectCreateData(rows: ProjectRows) {
-  return { name: rows.name, ...projectUpdateData(rows) };
+  return {
+    name: rows.name,
+    type: studioProjectType(rows.recipeId),
+    ...projectUpdateData(rows),
+  };
 }
 
 // Narrow the DB's free `String` columns to their unions; unknown/legacy values
@@ -118,6 +125,7 @@ export function toProjectSummary(row: ProjectSummaryRow): ProjectSummary {
     id: row.id,
     name: row.name,
     type: toProjectType(row.type),
+    planned: row.plan !== null,
     phase: toPhase(row.phase),
     updatedAt: row.updatedAt,
     thumbnailUrl: row.master?.assetUrl ?? null,
@@ -218,4 +226,48 @@ export function rowsToProject(record: ProjectRecord): PersistedProjectRecord {
       record.planning === null ? null : PlanningFields.parse(record.planning),
     cards,
   });
+}
+
+// The board's read model: the project, its plan and product, the anchor image
+// and the editor's cards (the scene slots' candidates).
+export interface ProjectBoard {
+  id: string;
+  name: string;
+  type: ProjectType;
+  plan: ProjectPlan | null;
+  master: MasterAsset | null;
+  cards: Card[];
+}
+
+export interface ProjectBoardRecord {
+  id: string;
+  name: string;
+  type: string;
+  plan: unknown;
+  master: MasterAssetRow | null;
+  cards: CardRow[];
+}
+
+// A plan that no longer parses reads as null (the board then offers the editor
+// only), like the tolerant card decode.
+export function rowsToBoard(record: ProjectBoardRecord): ProjectBoard {
+  const plan = ProjectPlan.safeParse(record.plan);
+  const restored = rowsToProject({
+    id: record.id,
+    name: record.name,
+    phase: "generation",
+    recipeId: null,
+    understanding: null,
+    planning: null,
+    master: record.master,
+    cards: record.cards,
+  });
+  return {
+    id: record.id,
+    name: record.name,
+    type: toProjectType(record.type),
+    plan: record.plan !== null && plan.success ? plan.data : null,
+    master: restored.master,
+    cards: restored.cards,
+  };
 }

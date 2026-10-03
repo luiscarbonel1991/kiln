@@ -1,17 +1,33 @@
 import { Prisma } from "@prisma/client";
+import { Card } from "@/domain/card";
 import type {
   PersistedProject,
   PersistedProjectRecord,
   ProjectSummary,
 } from "@/domain/persisted-project";
+import {
+  approveSlot,
+  ProjectPlan,
+  type SlotRef,
+  slotCardId,
+  unapproveSlot,
+} from "@/domain/plan";
+import type { Product } from "@/domain/product";
+import type { ProjectType } from "@/domain/project";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { getCurrentMaker } from "@/server/maker-repository";
+import { rowToProduct } from "@/server/product-mapper";
 import {
+  type CardRow,
+  type MasterAssetRow,
+  type ProjectBoard,
   type ProjectRecord,
   projectCreateData,
   projectToRows,
   projectUpdateData,
+  rowsToBoard,
   rowsToProject,
+  studioProjectType,
   toProjectSummary,
 } from "@/server/project-mapper";
 
@@ -32,12 +48,44 @@ function withJsonNulls<T extends { understanding: unknown; planning: unknown }>(
   };
 }
 
+function masterData(projectId: string, master: MasterAssetRow) {
+  return {
+    projectId,
+    assetId: master.assetId,
+    origin: master.origin,
+    sourcePrompt: master.sourcePrompt,
+    assetUrl: master.assetUrl,
+    mime: master.mime,
+  };
+}
+
+function cardData(projectId: string, cards: CardRow[]) {
+  return cards.map((card) => ({
+    projectId,
+    cardId: card.cardId,
+    parentCardId: card.parentCardId,
+    masterAssetId: card.masterAssetId,
+    recipeId: card.recipeId,
+    type: card.type,
+    direction: card.direction,
+    fields: card.fields as Prisma.InputJsonValue,
+    references: card.references as Prisma.InputJsonValue,
+    model: card.model as Prisma.InputJsonValue,
+    video: nullableJson(card.video),
+    promptOverride: card.promptOverride,
+    vectorUrl: card.vectorUrl,
+    outputs: card.outputs as Prisma.InputJsonValue,
+    status: card.status,
+    sortOrder: card.sortOrder,
+  }));
+}
+
 // Every query is scoped to the current maker: a project id from another maker
 // reads as not found.
 
 // Create (no id) or overwrite (id passed). Cards + master are replaced wholesale
 // inside one transaction: simplest correct strategy for a mutable project. The
-// update writes only projectUpdateData (never name, maker or products).
+// update writes only projectUpdateData (never name, maker, products or plan).
 export async function saveProject(
   input: PersistedProject,
   id?: string,
@@ -59,45 +107,60 @@ export async function saveProject(
           },
         });
 
+    // A studio project's type follows its recipe; a planned project's type was
+    // chosen in the New project flow and is left alone.
+    if (id) {
+      await tx.project.updateMany({
+        where: { id, makerId: maker.id, plan: { equals: Prisma.DbNull } },
+        data: { type: studioProjectType(rows.recipeId) },
+      });
+    }
+
     await tx.card.deleteMany({ where: { projectId: project.id } });
     await tx.masterAsset.deleteMany({ where: { projectId: project.id } });
-
     if (rows.master) {
       await tx.masterAsset.create({
-        data: {
-          projectId: project.id,
-          assetId: rows.master.assetId,
-          origin: rows.master.origin,
-          sourcePrompt: rows.master.sourcePrompt,
-          assetUrl: rows.master.assetUrl,
-          mime: rows.master.mime,
-        },
+        data: masterData(project.id, rows.master),
       });
     }
-
     if (rows.cards.length > 0) {
-      await tx.card.createMany({
-        data: rows.cards.map((card) => ({
-          projectId: project.id,
-          cardId: card.cardId,
-          parentCardId: card.parentCardId,
-          masterAssetId: card.masterAssetId,
-          recipeId: card.recipeId,
-          type: card.type,
-          direction: card.direction,
-          fields: card.fields as Prisma.InputJsonValue,
-          references: card.references as Prisma.InputJsonValue,
-          model: card.model as Prisma.InputJsonValue,
-          video: nullableJson(card.video),
-          promptOverride: card.promptOverride,
-          vectorUrl: card.vectorUrl,
-          outputs: card.outputs as Prisma.InputJsonValue,
-          status: card.status,
-          sortOrder: card.sortOrder,
-        })),
+      await tx.card.createMany({ data: cardData(project.id, rows.cards) });
+    }
+    return project.id;
+  });
+}
+
+// A project started from the New project flow: its type, product and plan are
+// fixed here, with the editor state (understanding, cards, master) the start
+// produced. One transaction.
+export async function createProject(input: {
+  type: ProjectType;
+  productId: string;
+  plan: ProjectPlan;
+  editor: PersistedProject;
+}): Promise<string> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  const rows = projectToRows(input.editor);
+  return db.$transaction(async (tx) => {
+    const project = await tx.project.create({
+      data: {
+        ...withJsonNulls(projectUpdateData(rows)),
+        name: rows.name,
+        type: input.type,
+        plan: input.plan as unknown as Prisma.InputJsonValue,
+        makerId: maker.id,
+        products: { create: { productId: input.productId, position: 0 } },
+      },
+    });
+    if (rows.master) {
+      await tx.masterAsset.create({
+        data: masterData(project.id, rows.master),
       });
     }
-
+    if (rows.cards.length > 0) {
+      await tx.card.createMany({ data: cardData(project.id, rows.cards) });
+    }
     return project.id;
   });
 }
@@ -171,6 +234,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
       id: true,
       name: true,
       type: true,
+      plan: true,
       phase: true,
       updatedAt: true,
       master: { select: { assetUrl: true, sourcePrompt: true } },
@@ -212,5 +276,115 @@ export async function saveCardOutput(
   await db.card.updateMany({
     where: { projectId, cardId, project: { makerId: maker.id } },
     data: { outputs: [url], status: "done", vectorUrl: null },
+  });
+}
+
+const CARD_COLUMNS = {
+  cardId: true,
+  parentCardId: true,
+  masterAssetId: true,
+  recipeId: true,
+  type: true,
+  direction: true,
+  fields: true,
+  references: true,
+  model: true,
+  video: true,
+  promptOverride: true,
+  vectorUrl: true,
+  outputs: true,
+  status: true,
+  sortOrder: true,
+} as const;
+
+// The board's read: project + plan + product + anchor + cards, or null.
+export async function loadProjectBoard(
+  id: string,
+): Promise<{ board: ProjectBoard; product: Product | null } | null> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  const record = await db.project.findFirst({
+    where: { id, makerId: maker.id },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      plan: true,
+      master: {
+        select: {
+          assetId: true,
+          origin: true,
+          sourcePrompt: true,
+          assetUrl: true,
+          mime: true,
+        },
+      },
+      cards: { select: CARD_COLUMNS, orderBy: { sortOrder: "asc" } },
+      products: {
+        orderBy: { position: "asc" },
+        take: 1,
+        select: {
+          product: {
+            select: {
+              id: true,
+              sku: true,
+              name: true,
+              spec: true,
+              source: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!record) return null;
+  const productRow = record.products[0]?.product;
+  return {
+    board: rowsToBoard(record),
+    product: productRow ? rowToProduct(productRow) : null,
+  };
+}
+
+const CardState = Card.pick({ status: true, outputs: true });
+
+// Approve (or withdraw approval of) a scene slot's current output. The project
+// row is locked for the read-modify-write of the plan, so two quick approvals
+// on different slots both land. The card is read from the database, never
+// trusted from the client.
+export async function setSlotApproval(
+  projectId: string,
+  ref: SlotRef,
+  approved: boolean,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true },
+    });
+    const plan = ProjectPlan.parse(project.plan);
+    const row = await tx.card.findUnique({
+      where: {
+        projectId_cardId: {
+          projectId,
+          cardId: slotCardId(ref.destinationId, ref.slotKey),
+        },
+      },
+      select: { status: true, outputs: true },
+    });
+    const card = row ? CardState.safeParse(row) : undefined;
+    const next = approved
+      ? approveSlot(plan, ref, card?.success ? card.data : undefined)
+      : unapproveSlot(plan, ref);
+    await tx.project.update({
+      where: { id: projectId },
+      data: { plan: next as unknown as Prisma.InputJsonValue },
+    });
   });
 }

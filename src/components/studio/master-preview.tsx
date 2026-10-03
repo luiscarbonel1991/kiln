@@ -33,7 +33,12 @@ export function MasterPreview({
       ) : null}
       <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-pill bg-card/90 px-2.5 py-1 font-mono text-[0.6875rem] text-foreground">
         <ImageIcon className="size-3" />
-        {master.origin === "upload" ? "uploaded" : "generated"} · {master.mime}
+        {master.origin === "upload"
+          ? "uploaded"
+          : master.origin === "product"
+            ? "product reference"
+            : "generated"}{" "}
+        · {master.mime}
       </span>
     </div>
   );

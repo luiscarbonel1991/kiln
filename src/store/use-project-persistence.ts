@@ -32,8 +32,10 @@ export function useProjectPersistence(): { status: PersistenceStatus } {
     setStatus("restoring");
     listProjectsAction()
       .then(async (rows) => {
-        if (active && rows.length > 0) {
-          const record = await loadProjectAction(rows[0].id);
+        // Planned projects open on their board, not in the studio.
+        const latest = rows.find((row) => !row.planned);
+        if (active && latest) {
+          const record = await loadProjectAction(latest.id);
           if (active && record) useProject.getState().hydrate(record);
         }
         if (active) setStatus("idle");

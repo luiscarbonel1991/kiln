@@ -7,6 +7,7 @@ import {
   projectCreateData,
   projectToRows,
   projectUpdateData,
+  rowsToBoard,
   rowsToProject,
   studioProjectType,
   toProjectSummary,
@@ -195,6 +196,7 @@ describe("toProjectSummary", () => {
     id: "ws-1",
     name: "Clay pitcher",
     type: "listing-kit",
+    plan: null,
     phase: "generation",
     updatedAt: new Date("2026-06-01T00:00:00.000Z"),
     master: { assetUrl: "https://stub.local/m.png", sourcePrompt: "a pitcher" },
@@ -206,6 +208,7 @@ describe("toProjectSummary", () => {
       id: "ws-1",
       name: "Clay pitcher",
       type: "listing-kit",
+      planned: false,
       phase: "generation",
       updatedAt: base.updatedAt,
       thumbnailUrl: "https://stub.local/m.png",
@@ -233,6 +236,7 @@ describe("toProjectSummary type", () => {
     id: "p-1",
     name: "Laser motif",
     type: "design",
+    plan: null,
     phase: "generation",
     updatedAt: new Date("2026-10-02T00:00:00.000Z"),
     master: null,
@@ -261,20 +265,66 @@ describe("studioProjectType", () => {
 });
 
 describe("autosave payload", () => {
-  it("writes only editor-owned columns: never name, maker or products", () => {
+  it("writes only editor-owned columns: never name, maker, products, plan or type", () => {
     const data = projectUpdateData(projectToRows(sample));
     expect(Object.keys(data).sort()).toEqual([
       "phase",
       "planning",
       "recipeId",
-      "type",
       "understanding",
     ]);
   });
 
-  it("the create payload adds the name, still without the maker", () => {
+  it("the studio create payload adds the name and the recipe's type, not the maker", () => {
     const data = projectCreateData(projectToRows(sample));
     expect(data.name).toBe(sample.name);
+    expect(data.type).toBe("listing-kit");
     expect("makerId" in data).toBe(false);
+  });
+});
+
+describe("planned summary and board", () => {
+  const plan = {
+    destinations: [
+      {
+        destinationId: "etsy",
+        shotListId: "etsy-listing",
+        slots: [{ key: "hero", label: "Hero", purpose: "Win.", fill: "scene" }],
+      },
+    ],
+  };
+
+  it("a project with a plan is listed as planned", () => {
+    const row: ProjectSummaryRow = {
+      id: "p",
+      name: "Board",
+      type: "launch",
+      plan,
+      phase: "generation",
+      updatedAt: new Date(),
+      master: null,
+      _count: { cards: 0 },
+    };
+    expect(toProjectSummary(row).planned).toBe(true);
+  });
+
+  it("rowsToBoard parses the plan and the cards; a stale plan reads as null", () => {
+    const rows = projectToRows(sample);
+    const record = {
+      id: "p",
+      name: "Board",
+      type: "launch",
+      plan,
+      master: rows.master,
+      cards: rows.cards,
+    };
+    const board = rowsToBoard(record);
+    expect(board.type).toBe("launch");
+    expect(board.plan?.destinations[0].slots[0].key).toBe("hero");
+    expect(board.cards).toHaveLength(2);
+    expect(rowsToBoard({ ...record, plan: { destinations: [] } }).plan).toBe(
+      null,
+    );
+    expect(rowsToBoard({ ...record, plan: null }).plan).toBeNull();
   });
 });

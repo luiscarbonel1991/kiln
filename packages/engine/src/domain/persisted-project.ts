@@ -36,6 +36,8 @@ export type ProjectSummary = {
   id: string;
   name: string;
   type: ProjectType;
+  // Started from the New project flow (has a plan): opens on the board.
+  planned: boolean;
   phase: Phase;
   updatedAt: Date;
   thumbnailUrl: string | null;

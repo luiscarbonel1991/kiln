@@ -42,6 +42,9 @@ model Project {
   recipeId      String?
   understanding Json?
   planning      Json?
+  // Domain ProjectPlan for projects started from the New project flow; null for
+  // studio-only projects. Owned by the board, never written by the autosave.
+  plan          Json?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   master        MasterAsset?
