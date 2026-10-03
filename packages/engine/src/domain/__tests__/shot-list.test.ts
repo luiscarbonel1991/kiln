@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Aspect, DestinationProfile } from "@/domain/destination";
+import { offeredDestinations } from "@/domain/plan";
 import {
   SEED_DESTINATIONS,
   SEED_RECIPE_PRESETS,
@@ -81,5 +82,48 @@ describe("seed catalog integrity", () => {
     }
     const ids = SEED_RECIPE_PRESETS.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("board seeds", () => {
+  const catalog = {
+    destinations: SEED_DESTINATIONS,
+    shotLists: SEED_SHOT_LISTS,
+  };
+
+  it("offers Etsy for listing kits, Instagram for content, both for a launch", () => {
+    const ids = (type: "listing-kit" | "content" | "launch") =>
+      offeredDestinations(type, catalog).map((d) => d.id);
+    expect(ids("listing-kit")).toEqual(["etsy"]);
+    expect(ids("content")).toEqual(["instagram"]);
+    expect(ids("launch")).toEqual(["etsy", "instagram"]);
+  });
+
+  it("the Etsy listing interleaves three exact slots among its six scenes", () => {
+    const etsy = SEED_SHOT_LISTS.find((l) => l.id === "etsy-listing");
+    expect(etsy?.slots.map((s) => s.fill)).toEqual([
+      "scene",
+      "scene",
+      "exact",
+      "exact",
+      "exact",
+      "scene",
+      "scene",
+      "scene",
+      "scene",
+    ]);
+  });
+
+  it("the Instagram carousel is a fixed six-slide sequence at 4:5", () => {
+    const carousel = SEED_SHOT_LISTS.find((l) => l.id === "instagram-carousel");
+    expect(carousel?.slots.map((s) => s.key)).toEqual([
+      "hook",
+      "in-place",
+      "detail",
+      "colours",
+      "personalize",
+      "cta",
+    ]);
+    expect(carousel?.slots.every((s) => s.aspect === "4:5")).toBe(true);
   });
 });

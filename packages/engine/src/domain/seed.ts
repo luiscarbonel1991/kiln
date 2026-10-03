@@ -102,6 +102,33 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         aspect: "4:5",
       },
       {
+        key: "colours",
+        label: "Colour options",
+        purpose:
+          "Every colour side by side, named, so the buyer picks without asking.",
+        aspect: "1:1",
+        fill: "exact",
+        exact: "colour-grid",
+      },
+      {
+        key: "size",
+        label: "Size & spec",
+        purpose:
+          "The real dimensions, material and finish, drawn to scale from the spec.",
+        aspect: "1:1",
+        fill: "exact",
+        exact: "size-spec",
+      },
+      {
+        key: "personalize",
+        label: "How to personalize",
+        purpose:
+          "What the buyer types and how much fits, before they message the shop.",
+        aspect: "1:1",
+        fill: "exact",
+        exact: "personalize",
+      },
+      {
         key: "scale",
         label: "Scale & size",
         purpose:
@@ -210,6 +237,69 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         key: "cta",
         label: "Call to action",
         purpose: "Point clearly to the next step.",
+      },
+    ],
+  },
+  // An Instagram carousel is a sequence, not loose images (ROADMAP "Domain
+  // model"): hook -> product in place -> detail -> colours -> how to
+  // personalize -> call to action, one style across slides. Text is drawn by
+  // templates, never by the image model.
+  {
+    id: "instagram-carousel",
+    name: "Instagram carousel",
+    destinationId: "instagram",
+    projectTypes: ["content", "launch"],
+    fieldDefaults: {
+      scene: "a warm, softly lit interior that suits the product",
+      composition: "the product centered with clean space for a short headline",
+    },
+    preserve: ["product shape", "label"],
+    negative: ["clutter", "busy background"],
+    slots: [
+      {
+        key: "hook",
+        label: "Hook",
+        purpose:
+          "Stop the scroll in the first second; the headline sits on it.",
+        aspect: "4:5",
+        textTemplate: "{product.name}",
+      },
+      {
+        key: "in-place",
+        label: "Product in place",
+        purpose: "Show it where it lives, product still the hero.",
+        aspect: "4:5",
+      },
+      {
+        key: "detail",
+        label: "Detail",
+        purpose: "A close look at the finish that proves the craft.",
+        aspect: "4:5",
+      },
+      {
+        key: "colours",
+        label: "Colours",
+        purpose: "Every colour on one slide.",
+        aspect: "4:5",
+        fill: "exact",
+        exact: "colour-grid",
+      },
+      {
+        key: "personalize",
+        label: "How to personalize",
+        purpose: "What the buyer chooses, in one glance.",
+        aspect: "4:5",
+        fill: "exact",
+        exact: "personalize",
+      },
+      {
+        key: "cta",
+        label: "Call to action",
+        purpose: "Point to the shop.",
+        aspect: "4:5",
+        fill: "exact",
+        exact: "text-card",
+        textTemplate: "Personalize yours",
       },
     ],
   },

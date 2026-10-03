@@ -76,6 +76,17 @@ export function shotListFor(
   );
 }
 
+// The destinations the New project flow offers for a type: the right kind and
+// a shot list for that type on it.
+export function offeredDestinations(
+  type: ProjectType,
+  catalog: Catalog,
+): DestinationProfile[] {
+  return destinationsFor(type, catalog.destinations).filter((d) =>
+    shotListFor(d.id, type, catalog.shotLists),
+  );
+}
+
 // An exact slot that has nothing to show for this product is left out of the
 // plan (e.g. "how to personalize" for a product with no wording lines).
 function exactApplies(slot: ShotList["slots"][number], product: Product) {

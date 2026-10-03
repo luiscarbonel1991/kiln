@@ -55,6 +55,7 @@ export {
   approveSlot,
   type Catalog,
   destinationsFor,
+  offeredDestinations,
   PlanDestination,
   PlanSlot,
   ProjectPlan,
