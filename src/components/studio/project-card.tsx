@@ -7,6 +7,7 @@ import type { Phase, ProjectSummary } from "@/domain/persisted-project";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { gradientForSeed, hashSeed } from "@/lib/gradient";
 import { displayName } from "@/lib/project-summary";
+import { projectTypeLabel } from "@/lib/project-types";
 import { formatRelativeTime } from "@/lib/relative-time";
 
 // Phase pill — copies ProvenanceBadge's class string for visual consistency, but
@@ -41,7 +42,10 @@ export function ProjectCard({
   const inputRef = useRef<HTMLInputElement>(null);
   const name = displayName(summary);
   const renderable = isRenderableUrl(summary.thumbnailUrl) && !imgError;
-  const phase = PHASE_BADGE[summary.phase];
+  // A planned project lives on its board; a studio project shows its phase.
+  const phase = summary.planned
+    ? { label: "Board", cls: "text-prov-recipe bg-prov-recipe/10" }
+    : PHASE_BADGE[summary.phase];
 
   // Focus + select the name when the inline editor opens, so typing replaces it.
   useEffect(() => {
@@ -94,6 +98,7 @@ export function ProjectCard({
             {name}
           </p>
           <p className="pt-1 font-mono text-[0.625rem] text-on-surface-dim">
+            {projectTypeLabel(summary.type)} ·{" "}
             {formatRelativeTime(summary.updatedAt)} · {summary.cardCount} card
             {summary.cardCount === 1 ? "" : "s"}
           </p>
@@ -107,7 +112,7 @@ export function ProjectCard({
             setDraft(name);
             setRenaming(true);
           }}
-          aria-label="Rename workspace"
+          aria-label="Rename project"
           className="flex size-7 items-center justify-center rounded-pill bg-card/90 text-on-surface-mid shadow-render transition hover:text-foreground"
         >
           <Pencil className="size-3.5" />
@@ -115,7 +120,7 @@ export function ProjectCard({
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          aria-label="Delete workspace"
+          aria-label="Delete project"
           className="flex size-7 items-center justify-center rounded-pill bg-card/90 text-on-surface-mid shadow-render transition hover:text-destructive"
         >
           <Trash2 className="size-3.5" />
@@ -133,7 +138,7 @@ export function ProjectCard({
               if (e.key === "Enter") saveRename();
               if (e.key === "Escape") setRenaming(false);
             }}
-            aria-label="Workspace name"
+            aria-label="Project name"
             className="w-full rounded-field border border-border-soft bg-background px-3 py-1.5 font-sans text-sm text-foreground outline-none focus:border-primary"
           />
           <div className="flex gap-2 pt-1">
@@ -159,7 +164,7 @@ export function ProjectCard({
       {confirming ? (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-card bg-card/95 p-4 text-center backdrop-blur-sm">
           <p className="font-sans text-sm text-foreground">
-            Delete this workspace?
+            Delete this project?
           </p>
           <p className="font-mono text-[0.625rem] text-on-surface-dim">
             This can't be undone.

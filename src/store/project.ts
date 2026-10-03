@@ -18,6 +18,7 @@ import type {
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
+import { UNTITLED } from "@/lib/project-summary";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 
 export type Phase = "upload" | "analysis" | "planning" | "generation";
@@ -352,7 +353,7 @@ export const useProject = create<ProjectState>((set, get) => ({
 // the Server Action boundary.
 export function toPersisted(state: ProjectState): PersistedProject {
   return {
-    name: state.master?.sourcePrompt?.slice(0, 60) || "Untitled workspace",
+    name: state.master?.sourcePrompt?.slice(0, 60) || UNTITLED,
     phase: state.phase,
     master: state.master,
     understanding: state.understanding,

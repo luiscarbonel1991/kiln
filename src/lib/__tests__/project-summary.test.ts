@@ -17,13 +17,19 @@ describe("displayName", () => {
     ).toBe("a matte black room sign");
   });
 
-  it("returns 'Untitled workspace' when both are empty or null", () => {
+  it("returns 'Untitled project' when both are empty or null", () => {
+    expect(displayName({ name: "Untitled project", sourcePrompt: null })).toBe(
+      "Untitled project",
+    );
+    expect(displayName({ name: "", sourcePrompt: null })).toBe(
+      "Untitled project",
+    );
+  });
+
+  it("treats the legacy 'Untitled workspace' name as untitled", () => {
     expect(
       displayName({ name: "Untitled workspace", sourcePrompt: null }),
-    ).toBe("Untitled workspace");
-    expect(displayName({ name: "", sourcePrompt: null })).toBe(
-      "Untitled workspace",
-    );
+    ).toBe("Untitled project");
   });
 
   it("truncates a long source-prompt fallback to 60 chars", () => {

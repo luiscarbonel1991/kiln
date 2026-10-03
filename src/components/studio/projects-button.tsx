@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 export function ProjectsButton({ onOpen }: { onOpen: () => void }) {
   return (
     <Button variant="ghost" size="sm" onClick={onOpen}>
-      <Layers /> Workspaces
+      <Layers /> Projects
     </Button>
   );
 }

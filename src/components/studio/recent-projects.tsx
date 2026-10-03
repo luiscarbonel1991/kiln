@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ProjectCard } from "@/components/studio/project-card";
 import { useProjectBrowser } from "@/store/use-project-browser";
@@ -7,12 +8,13 @@ import { useProjectBrowser } from "@/store/use-project-browser";
 const MAX_RECENT = 4;
 
 // Shown on the landing once there are saved projects — quick-resume the latest
-// few without opening the full gallery (the header "Workspaces" button shows all).
+// few without opening the full gallery (the header "Projects" button shows all).
 // Reuses the same browser hook + card, so open/delete/rename behave identically.
 // `onViewAll` opens the full gallery; the count becomes that affordance when there
 // are more saved than the preview shows (so "N saved" never sits next to fewer cards).
 export function RecentProjects({ onViewAll }: { onViewAll?: () => void }) {
   const { projects, busy, refresh, open, remove, rename } = useProjectBrowser();
+  const router = useRouter();
 
   useEffect(() => {
     void refresh();
@@ -52,7 +54,8 @@ export function RecentProjects({ onViewAll }: { onViewAll?: () => void }) {
             summary={w}
             disabled={busy}
             onOpen={() => {
-              void open(w.id);
+              if (w.planned) router.push(`/projects/${w.id}`);
+              else void open(w.id);
             }}
             onDelete={() => {
               void remove(w.id);

@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, RefreshCw, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ProjectCard } from "@/components/studio/project-card";
@@ -8,20 +9,12 @@ import { Button } from "@/components/ui/button";
 import { useProjectBrowser } from "@/store/use-project-browser";
 
 // Full-screen gallery of saved projects (portaled to body, like the image
-// lightbox). Click a card to open/resume it, "New workspace" to start fresh, or
-// the hover trash to delete. Esc / the dark margin / the X close it.
+// lightbox). Click a card to open it (a planned project on its board, a studio
+// project in place), "New project" for the New project flow, or the hover trash
+// to delete. Esc / the dark margin / the X close it.
 export function ProjectGallery({ onClose }: { onClose: () => void }) {
-  const {
-    projects,
-    loading,
-    busy,
-    error,
-    refresh,
-    open,
-    startNew,
-    remove,
-    rename,
-  } = useProjectBrowser();
+  const { projects, loading, busy, error, refresh, open, remove, rename } =
+    useProjectBrowser();
 
   // Fetch the list only when the overlay mounts (lazy; the landing stays query-free).
   useEffect(() => {
@@ -42,8 +35,10 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
+  const router = useRouter();
   const newProject = () => {
-    void startNew().then(onClose);
+    onClose();
+    router.push("/projects/new");
   };
 
   return createPortal(
@@ -52,7 +47,7 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
           content scrolls, behind the relative content layer. */}
       <button
         type="button"
-        aria-label="Close workspaces"
+        aria-label="Close projects"
         onClick={() => {
           if (!busy) onClose();
         }}
@@ -64,7 +59,7 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
             className="font-serif text-2xl italic text-card"
             style={{ fontVariationSettings: "'opsz' 144" }}
           >
-            Workspaces
+            Projects
           </h2>
           <div className="flex items-center gap-2">
             <Button
@@ -73,12 +68,12 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
               disabled={busy}
               onClick={newProject}
             >
-              <Plus /> New workspace
+              <Plus /> New project
             </Button>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close workspaces"
+              aria-label="Close projects"
               className="flex size-9 items-center justify-center rounded-pill bg-card/90 text-foreground shadow-render transition-colors hover:bg-card"
             >
               <X className="size-5" />
@@ -93,7 +88,7 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
         ) : error ? (
           <div className="flex flex-col items-center gap-3 py-24 text-center">
             <p className="font-sans text-sm text-card">
-              Couldn't load workspaces.
+              Couldn't load projects.
             </p>
             <Button
               variant="secondary"
@@ -106,13 +101,13 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
         ) : projects.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-24 text-center">
             <p className="font-serif text-lg italic text-card">
-              No saved workspaces yet.
+              No saved projects yet.
             </p>
             <p className="font-mono text-[0.6875rem] text-card/70">
               Start one and it'll show up here.
             </p>
             <Button variant="default" size="sm" onClick={newProject}>
-              <Plus /> New workspace
+              <Plus /> New project
             </Button>
           </div>
         ) : (
@@ -123,7 +118,12 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
                 summary={w}
                 disabled={busy}
                 onOpen={() => {
-                  void open(w.id).then(onClose);
+                  if (w.planned) {
+                    onClose();
+                    router.push(`/projects/${w.id}`);
+                  } else {
+                    void open(w.id).then(onClose);
+                  }
                 }}
                 onDelete={() => {
                   void remove(w.id);

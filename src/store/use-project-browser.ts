@@ -18,7 +18,6 @@ export interface ProjectBrowser {
   error: boolean;
   refresh: () => Promise<void>;
   open: (id: string) => Promise<void>;
-  startNew: () => Promise<void>;
   remove: (id: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<void>;
 }
@@ -82,16 +81,6 @@ export function useProjectBrowser(): ProjectBrowser {
     }
   }, []);
 
-  const startNew = useCallback(async () => {
-    setBusy(true);
-    try {
-      await flushCurrent();
-      useProject.getState().reset();
-    } finally {
-      if (active.current) setBusy(false);
-    }
-  }, []);
-
   const remove = useCallback(
     async (id: string) => {
       setBusy(true);
@@ -130,7 +119,6 @@ export function useProjectBrowser(): ProjectBrowser {
     error,
     refresh,
     open,
-    startNew,
     remove,
     rename,
   };
