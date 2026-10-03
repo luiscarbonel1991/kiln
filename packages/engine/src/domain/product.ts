@@ -79,9 +79,10 @@ export const VariantAxis = z.object({
 });
 export type VariantAxis = z.infer<typeof VariantAxis>;
 
-// Where the product definition comes from. `catalog` = a code catalog behind an
-// adapter (maker #1 today); `vector` = a traced or drawn SVG (the maker on-ramp,
-// see PRODUCT-MODEL.md); `photo` = only a photo exists (weakest guarantees).
+// Where the product definition comes from. `catalog` = a maker's code catalog,
+// exported as a product package (maker #1 today); `vector` = a traced or drawn SVG
+// (the maker on-ramp, see PRODUCT-MODEL.md); `photo` = only a photo exists
+// (weakest guarantees); `form` = typed in by the maker.
 export const ProductSource = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("catalog"),
@@ -94,6 +95,7 @@ export const ProductSource = z.discriminatedUnion("kind", [
     scalePxPerUnit: z.number().positive().optional(),
   }),
   z.object({ kind: z.literal("photo"), assetUrl: z.string().min(1) }),
+  z.object({ kind: z.literal("form") }),
 ]);
 export type ProductSource = z.infer<typeof ProductSource>;
 
