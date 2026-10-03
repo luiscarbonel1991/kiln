@@ -1,0 +1,102 @@
+{
+  "products": [
+    {
+      "id": "northwind:CB-01",
+      "sku": "CB-01",
+      "name": "Engraved family cutting board",
+      "family": "Kitchen",
+      "description": "Solid hardwood board with the family name engraved.",
+      "dimensions": {
+        "w": 16,
+        "h": 10,
+        "d": 0.75,
+        "unit": "in"
+      },
+      "shape": "rounded rectangle board",
+      "material": "solid hardwood",
+      "treatment": "engraved",
+      "colours": [
+        {
+          "key": "maple",
+          "name": "Maple",
+          "face": "#E8D2A6",
+          "inlay": "#3B2A1E"
+        },
+        {
+          "key": "walnut",
+          "name": "Walnut",
+          "face": "#5B3A29",
+          "inlay": "#F2E6D0"
+        },
+        {
+          "key": "cherry",
+          "name": "Cherry",
+          "face": "#9A4A2F",
+          "inlay": "#F2E6D0",
+          "inStock": false
+        }
+      ],
+      "defaultColour": "maple",
+      "typography": {
+        "family": "Fraunces",
+        "weight": 600,
+        "case": "title"
+      },
+      "wording": [
+        {
+          "label": "Family name",
+          "maxChars": 14,
+          "required": true,
+          "example": "The Riveras"
+        },
+        {
+          "label": "Year",
+          "maxChars": 4,
+          "required": false,
+          "example": "2026"
+        }
+      ],
+      "source": {
+        "kind": "form"
+      }
+    },
+    {
+      "id": "northwind:CO-02",
+      "sku": "CO-02",
+      "name": "Botanical coaster",
+      "family": "Home",
+      "dimensions": {
+        "w": 4,
+        "h": 4,
+        "d": 0.25,
+        "unit": "in"
+      },
+      "shape": "round coaster",
+      "material": "cork-backed birch",
+      "treatment": "engraved",
+      "colours": [
+        {
+          "key": "natural",
+          "name": "Natural",
+          "face": "#D9B98C"
+        },
+        {
+          "key": "smoked",
+          "name": "Smoked",
+          "face": "#6E5A45"
+        }
+      ],
+      "defaultColour": "natural",
+      "typography": {
+        "family": "Hanken Grotesk",
+        "weight": 500,
+        "case": "free"
+      },
+      "wording": [],
+      "source": {
+        "kind": "vector",
+        "svgUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48Y2lyY2xlIGN4PSc1MCcgY3k9JzUwJyByPSc0NicgZmlsbD0nI0Q5Qjk4Qycgc3Ryb2tlPScjNUIzQTI5JyBzdHJva2Utd2lkdGg9JzMnLz48cGF0aCBkPSdNNTAgMjAgQzY3IDMzIDcxIDU3IDUwIDgwIEMyOSA1NyAzMyAzMyA1MCAyMCBaJyBmaWxsPScjM0Y1RjNBJy8+PHBhdGggZD0nTTUwIDI4IEw1MCA3NiBNNTAgNDQgTDYwIDM2IE01MCA1NiBMNDAgNDggTTUwIDY2IEw2MCA1OCcgc3Ryb2tlPScjRDlCOThDJyBzdHJva2Utd2lkdGg9JzIuMicgZmlsbD0nbm9uZScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJy8+PC9zdmc+"
+      }
+    }
+  ]
+}
