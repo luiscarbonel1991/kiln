@@ -1,0 +1,203 @@
+[
+  {
+    "id": "recipe-etsy-hero",
+    "name": "Etsy listing",
+    "style": "photographic",
+    "directions": [
+      {
+        "label": "Marketplace hero",
+        "purpose": "Win the click: clean seamless background, soft contact shadow, no props.",
+        "aspect": "1:1"
+      },
+      {
+        "label": "In-use mockup",
+        "purpose": "Show it where the customer actually uses it, product still the hero.",
+        "aspect": "4:5"
+      },
+      {
+        "label": "Scale & size",
+        "purpose": "Give a believable size cue so buyers know exactly what they get.",
+        "aspect": "1:1"
+      },
+      {
+        "label": "Lifestyle scene",
+        "purpose": "Place it in an aspirational styled setting that sells the feeling.",
+        "aspect": "4:5"
+      },
+      {
+        "label": "Material detail",
+        "purpose": "Macro on texture and finish to prove craft and justify the price.",
+        "aspect": "4:5"
+      },
+      {
+        "label": "Packaging / gift",
+        "purpose": "Show it gift-ready to trigger Etsy gift-buying.",
+        "aspect": "4:5"
+      }
+    ],
+    "fieldDefaults": {
+      "scene": "soft neutral sweep",
+      "composition": "centered top-down"
+    },
+    "targets": [
+      {
+        "name": "Etsy",
+        "aspect": "1:1"
+      },
+      {
+        "name": "Pinterest",
+        "aspect": "2:3"
+      }
+    ],
+    "constraints": {
+      "preserve": ["product shape", "label"],
+      "negative": ["text overlay", "watermark"]
+    }
+  },
+  {
+    "id": "recipe-marketplace",
+    "name": "Marketplace stack",
+    "style": "photographic",
+    "directions": [
+      {
+        "label": "Marketplace hero",
+        "purpose": "Pure clean hero that wins the search-grid click.",
+        "aspect": "1:1"
+      },
+      {
+        "label": "Alternate angle",
+        "purpose": "Show the back/side so nothing is hidden.",
+        "aspect": "1:1"
+      },
+      {
+        "label": "Scale & size",
+        "purpose": "Anchor true size against a familiar object.",
+        "aspect": "1:1"
+      },
+      {
+        "label": "In-use mockup",
+        "purpose": "The product working in its real-use context.",
+        "aspect": "4:5"
+      },
+      {
+        "label": "Material detail",
+        "purpose": "Close-up proof of quality and finish.",
+        "aspect": "4:5"
+      },
+      {
+        "label": "Lifestyle scene",
+        "purpose": "Aspirational context that builds desire.",
+        "aspect": "4:5"
+      }
+    ],
+    "fieldDefaults": {
+      "scene": "clean seamless studio sweep",
+      "composition": "centered, eye-level"
+    },
+    "targets": [
+      {
+        "name": "Amazon",
+        "aspect": "1:1"
+      },
+      {
+        "name": "Shopify",
+        "aspect": "4:5"
+      }
+    ],
+    "constraints": {
+      "preserve": ["product shape", "label"],
+      "negative": ["text overlay", "watermark", "props in hero"]
+    }
+  },
+  {
+    "id": "recipe-social-launch",
+    "name": "Social launch",
+    "style": "photographic",
+    "directions": [
+      {
+        "label": "Hook frame",
+        "purpose": "Stop the scroll in the first second."
+      },
+      {
+        "label": "Benefit",
+        "purpose": "Show the one reason to want it."
+      },
+      {
+        "label": "Social proof",
+        "purpose": "Make it feel loved and trusted."
+      },
+      {
+        "label": "Call to action",
+        "purpose": "Point clearly to the next step."
+      }
+    ],
+    "fieldDefaults": {
+      "scene": "gradient brand backdrop",
+      "composition": "centered hero"
+    },
+    "targets": [
+      {
+        "name": "Stories",
+        "aspect": "9:16"
+      },
+      {
+        "name": "Feed",
+        "aspect": "1:1"
+      }
+    ],
+    "constraints": {
+      "preserve": ["product shape"],
+      "negative": ["clutter", "busy background"]
+    }
+  },
+  {
+    "id": "recipe-ads",
+    "name": "Paid ads",
+    "style": "photographic",
+    "directions": [
+      {
+        "label": "Scroll-stopper",
+        "purpose": "Stop the thumb in the first second: one bold focal point, high contrast, strong brand backdrop.",
+        "aspect": "9:16"
+      },
+      {
+        "label": "UGC hook",
+        "purpose": "Authentic phone-shot feel — in-hand or casual — the native look that wins paid social.",
+        "aspect": "4:5"
+      },
+      {
+        "label": "Benefit in action",
+        "purpose": "Show the product solving the pain, instantly legible with the sound off.",
+        "aspect": "1:1"
+      },
+      {
+        "label": "Offer / copy space",
+        "purpose": "Product to one side, the other half clean for the headline and price.",
+        "aspect": "1:1"
+      },
+      {
+        "label": "Vertical demo",
+        "purpose": "A quick 'what it's for', framed for Reels and Stories.",
+        "aspect": "9:16"
+      }
+    ],
+    "fieldDefaults": {
+      "scene": "bold brand-color backdrop",
+      "composition": "single hero focus with generous copy space"
+    },
+    "targets": [
+      {
+        "name": "Meta feed",
+        "aspect": "1:1"
+      },
+      {
+        "name": "Reels / Stories",
+        "aspect": "9:16"
+      }
+    ],
+    "constraints": {
+      "preserve": ["product shape", "label"],
+      "negative": ["text overlay", "watermark", "busy clutter"]
+    }
+  }
+]

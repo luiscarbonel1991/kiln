@@ -1,0 +1,55 @@
+{
+  "id": "recipe-laser-lineart",
+  "name": "Laser / line",
+  "style": "line-art",
+  "directions": [
+    {
+      "label": "Cut outline",
+      "purpose": "A bold single continuous outline of the whole shape — the clean silhouette to cut.",
+      "aspect": "1:1"
+    },
+    {
+      "label": "Engrave detail",
+      "purpose": "Fine interior line work for engraving — decorative detail, no solid fills.",
+      "aspect": "1:1"
+    },
+    {
+      "label": "Framed badge",
+      "purpose": "The motif inside a circular badge frame — coaster or sign ready.",
+      "aspect": "1:1"
+    },
+    {
+      "label": "Geometric",
+      "purpose": "A geometric, straight-line interpretation of the motif — modern and minimal.",
+      "aspect": "1:1"
+    },
+    {
+      "label": "Minimal",
+      "purpose": "The simplest one- or two-stroke version of the idea.",
+      "aspect": "1:1"
+    }
+  ],
+  "fieldDefaults": {
+    "scene": "the motif centered with a clean margin",
+    "composition": "balanced, filling the frame",
+    "lighting": "flat (line art, no lighting)"
+  },
+  "targets": [
+    {
+      "name": "Laser",
+      "aspect": "1:1"
+    }
+  ],
+  "constraints": {
+    "preserve": ["overall silhouette"],
+    "negative": [
+      "color",
+      "gradient",
+      "shading",
+      "grey",
+      "photographic",
+      "texture",
+      "background scene"
+    ]
+  }
+}
