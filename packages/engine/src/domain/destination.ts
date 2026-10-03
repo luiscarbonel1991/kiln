@@ -1,0 +1,43 @@
+import { z } from "zod";
+
+// Where a deliverable lands (ROADMAP "Domain model"): a sale destination (Etsy,
+// Shopify, the maker's website) or a content destination (Instagram, Pinterest).
+// A profile is data, not code: formats with pixel targets, the rules an output
+// must follow, and how it is delivered. A human always publishes.
+export const DestinationKind = z.enum(["sale", "content"]);
+export type DestinationKind = z.infer<typeof DestinationKind>;
+
+export const Aspect = z.string().regex(/^\d+:\d+$/, "aspect like 4:5");
+
+export const DestinationFormat = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  aspect: Aspect,
+  minPx: z.number().int().positive().optional(),
+});
+export type DestinationFormat = z.infer<typeof DestinationFormat>;
+
+// `textOnImage` is the default text policy for the destination's scene slots
+// (Etsy hero: forbidden; a carousel slide: expected). Text is always drawn by a
+// template, never by the image model. `negative` lists what must never appear.
+export const DestinationRules = z.object({
+  textOnImage: z.enum(["forbidden", "allowed", "expected"]),
+  negative: z.array(z.string()).default([]),
+});
+export type DestinationRules = z.infer<typeof DestinationRules>;
+
+// "draft-api" = a draft pushed through the destination's API; "export" = a
+// folder the maker posts by hand.
+export const Delivery = z.object({
+  mode: z.enum(["export", "draft-api"]),
+});
+
+export const DestinationProfile = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  kind: DestinationKind,
+  formats: z.array(DestinationFormat).min(1),
+  rules: DestinationRules,
+  delivery: Delivery,
+});
+export type DestinationProfile = z.infer<typeof DestinationProfile>;

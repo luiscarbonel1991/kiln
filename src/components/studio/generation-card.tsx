@@ -16,7 +16,7 @@ import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { assetFilename, downloadAsset } from "@/lib/download";
 import { gradientForSeed } from "@/lib/gradient";
-import { SEED_RECIPES } from "@/lib/recipes";
+import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { type StudioCard, useWorkspace } from "@/store/workspace";
 
 const FIELD_ROWS: { key: FieldKey; label: string }[] = [
@@ -50,8 +50,7 @@ export function GenerationCard({
   const [open, setOpen] = useState(false);
   const [vectorizing, setVectorizing] = useState(false);
 
-  const recipe =
-    SEED_RECIPES.find((r) => r.id === card.recipeId) ?? SEED_RECIPES[0];
+  const recipe = findRecipe(card.recipeId) ?? SEED_RECIPES[0];
   const purpose = recipe.directions.find(
     (s) => s.label === card.direction,
   )?.purpose;

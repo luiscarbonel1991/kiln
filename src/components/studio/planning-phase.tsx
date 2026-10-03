@@ -13,7 +13,7 @@ import type { FieldKey } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { gradientForPrompt } from "@/lib/gradient";
-import { SEED_RECIPES } from "@/lib/recipes";
+import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace";
 
@@ -94,7 +94,7 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
   // the cards. Line-art recipes skip it (its photographic scenes don't apply — the
   // slot purpose drives each variant). Falls back to shared planning on no key/error.
   async function handleGenerate() {
-    const recipe = SEED_RECIPES.find((r) => r.id === recipeId);
+    const recipe = recipeId ? findRecipe(recipeId) : undefined;
     if (!recipeId || !understanding || recipe?.style === "line-art") {
       generateVariants();
       return;

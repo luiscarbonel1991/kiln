@@ -4,7 +4,7 @@ import { z } from "zod";
 import { SEED_BRAND } from "@/domain/seed";
 import { BaseUnderstanding } from "@/domain/understanding";
 import { VariantDirection } from "@/domain/variant-direction";
-import { SEED_RECIPES } from "@/lib/recipes";
+import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { getArtDirector } from "@/providers/registry";
 
 const ProposeInput = z.object({
@@ -20,7 +20,7 @@ export async function proposeVariants(
   input: unknown,
 ): Promise<VariantDirection[]> {
   const { understanding, recipeId } = ProposeInput.parse(input);
-  const recipe = SEED_RECIPES.find((r) => r.id === recipeId) ?? SEED_RECIPES[0];
+  const recipe = findRecipe(recipeId) ?? SEED_RECIPES[0];
   const variants = await getArtDirector().proposeDirections({
     understanding,
     recipe,

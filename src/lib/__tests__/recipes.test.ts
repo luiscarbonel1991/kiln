@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { Recipe } from "@/domain/recipe";
-import { SEED_RECIPE_LASER, SEED_RECIPES } from "@/lib/recipes";
+import {
+  findRecipe,
+  RECIPE_PRESETS,
+  SEED_RECIPE_LASER,
+  SEED_RECIPES,
+  SHOT_LIST_LASER,
+} from "@/lib/recipes";
 
 describe("app recipes", () => {
   it("the laser recipe parses, is line-art, and has five treatments", () => {
@@ -19,5 +25,23 @@ describe("app recipes", () => {
       true,
     );
     expect(SEED_RECIPES.filter((r) => r.style === "line-art")).toHaveLength(1);
+  });
+});
+
+describe("findRecipe", () => {
+  it("resolves every saved recipe id, including the app laser preset", () => {
+    for (const r of SEED_RECIPES) expect(findRecipe(r.id)).toBe(r);
+  });
+
+  it("returns undefined for an unknown id (call sites keep their fallback)", () => {
+    expect(findRecipe("recipe-nope")).toBeUndefined();
+  });
+});
+
+describe("laser shot list", () => {
+  it("is a Design brief with no destination", () => {
+    expect(SHOT_LIST_LASER.destinationId).toBeNull();
+    expect(SHOT_LIST_LASER.projectTypes).toEqual(["design"]);
+    expect(RECIPE_PRESETS.at(-1)?.id).toBe("recipe-laser-lineart");
   });
 });

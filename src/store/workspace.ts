@@ -18,7 +18,7 @@ import type {
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
-import { SEED_RECIPES } from "@/lib/recipes";
+import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 
 export type Phase = "upload" | "analysis" | "planning" | "generation";
 
@@ -100,7 +100,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   selectRecipe: (recipeId) => {
     const understanding = get().understanding;
-    const recipe = SEED_RECIPES.find((r) => r.id === recipeId);
+    const recipe = findRecipe(recipeId);
     if (!understanding || !recipe) return;
     set({
       recipeId,
@@ -124,7 +124,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   generateVariants: (variants) => {
     const { understanding, master, recipeId, planning } = get();
     if (!understanding || !master || !recipeId || !planning) return;
-    const recipe = SEED_RECIPES.find((r) => r.id === recipeId);
+    const recipe = findRecipe(recipeId);
     if (!recipe) return;
     const cards = buildCards({ master, recipe, planning, variants }).map(
       (card, i): StudioCard => ({
