@@ -24,7 +24,20 @@ export {
   DestinationProfile,
   DestinationRules,
 } from "@/domain/destination";
+export {
+  type ExactView,
+  exactView,
+  renderTextTemplate,
+} from "@/domain/exact";
 export { Field, FieldSource } from "@/domain/field";
+export {
+  estimateScenes,
+  IMAGE_PRICES,
+  type ImagePrice,
+  imagePrice,
+  PRICES_AS_OF,
+  type SceneEstimate,
+} from "@/domain/generation-cost";
 export { lockByDefault } from "@/domain/locks";
 export { MasterAsset } from "@/domain/master-asset";
 export { ModelConfig } from "@/domain/model-config";
@@ -38,6 +51,25 @@ export {
   PersistedProject,
   PersistedProjectRecord,
 } from "@/domain/persisted-project";
+export {
+  approveSlot,
+  type Catalog,
+  destinationsFor,
+  PlanDestination,
+  PlanSlot,
+  ProjectPlan,
+  parseSlotRecipeId,
+  planCounts,
+  planProject,
+  type SlotRef,
+  SlotState,
+  type SlotView,
+  shotListFor,
+  slotCardId,
+  slotRecipeId,
+  slotState,
+  unapproveSlot,
+} from "@/domain/plan";
 export {
   ColourOption,
   colourOf,
@@ -56,6 +88,7 @@ export {
   validateWording,
   WordingLine,
 } from "@/domain/product";
+export { productUnderstanding } from "@/domain/product-understanding";
 export { ProjectType } from "@/domain/project";
 export {
   checkExpectedText,
@@ -89,9 +122,11 @@ export {
 } from "@/domain/seed";
 export {
   ExactKind,
+  exactKindMatchesFill,
   RenderStyle,
   ShotList,
   ShotSlot,
+  ShotSlotFields,
   SlotFill,
   sceneSlots,
 } from "@/domain/shot-list";

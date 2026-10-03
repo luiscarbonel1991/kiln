@@ -23,19 +23,25 @@ export type ExactKind = z.infer<typeof ExactKind>;
 // One frame of a deliverable: a buyer-decision job, not a photo style. `purpose`
 // drives the ArtDirector and is shown to the maker; `textTemplate` is text a
 // template draws on the frame (e.g. "{product.name}"), never the image model.
-export const ShotSlot = z
-  .object({
-    key: z.string().regex(/^[a-z0-9-]+$/, "kebab-case slot key"),
-    label: z.string().min(1),
-    purpose: z.string().min(1),
-    aspect: Aspect.optional(),
-    fill: SlotFill.default("scene"),
-    exact: ExactKind.optional(),
-    textTemplate: z.string().optional(),
-  })
-  .refine((s) => (s.fill === "exact") === (s.exact !== undefined), {
-    message: "an exact slot names its exact kind; a scene slot does not",
-  });
+export const ShotSlotFields = z.object({
+  key: z.string().regex(/^[a-z0-9-]+$/, "kebab-case slot key"),
+  label: z.string().min(1),
+  purpose: z.string().min(1),
+  aspect: Aspect.optional(),
+  fill: SlotFill.default("scene"),
+  exact: ExactKind.optional(),
+  textTemplate: z.string().optional(),
+});
+
+export const exactKindMatchesFill = {
+  check: (s: { fill: SlotFill; exact?: ExactKind }) =>
+    (s.fill === "exact") === (s.exact !== undefined),
+  message: "an exact slot names its exact kind; a scene slot does not",
+};
+
+export const ShotSlot = ShotSlotFields.refine(exactKindMatchesFill.check, {
+  message: exactKindMatchesFill.message,
+});
 export type ShotSlot = z.infer<typeof ShotSlot>;
 
 // An ordered list of slots for one destination (or none: a Design brief), plus
