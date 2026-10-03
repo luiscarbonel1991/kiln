@@ -12,9 +12,9 @@ import type { MasterAsset } from "@/domain/master-asset";
 import type { ModelConfig } from "@/domain/model-config";
 import { defaultVideoModel } from "@/domain/model-defaults";
 import type {
-  PersistedWorkspace,
-  PersistedWorkspaceRecord,
-} from "@/domain/persisted-workspace";
+  PersistedProject,
+  PersistedProjectRecord,
+} from "@/domain/persisted-project";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
@@ -56,7 +56,7 @@ interface WorkspaceState {
   toggleCardLock: (id: string, key: FieldKey) => void;
   promoteToVideo: (sourceId: string) => void;
   setWorkspaceId: (id: string | null) => void;
-  hydrate: (record: PersistedWorkspaceRecord) => void;
+  hydrate: (record: PersistedProjectRecord) => void;
   reset: () => void;
 }
 
@@ -335,12 +335,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 }));
 
-// Store -> PersistedWorkspace: the persistable slice. `name` is derived from the
+// Store -> PersistedProject: the persistable slice. `name` is derived from the
 // master prompt, but it only seeds the name at CREATE time — afterwards autosave
 // leaves the name column untouched (see saveWorkspace) so a user rename sticks.
-// renderSeed and the action functions are dropped by PersistedWorkspace.parse at
+// renderSeed and the action functions are dropped by PersistedProject.parse at
 // the Server Action boundary.
-export function toPersisted(state: WorkspaceState): PersistedWorkspace {
+export function toPersisted(state: WorkspaceState): PersistedProject {
   return {
     name: state.master?.sourcePrompt?.slice(0, 60) || "Untitled workspace",
     phase: state.phase,

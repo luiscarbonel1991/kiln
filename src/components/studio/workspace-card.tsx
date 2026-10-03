@@ -3,7 +3,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { Phase, WorkspaceSummary } from "@/domain/persisted-workspace";
+import type { Phase, ProjectSummary } from "@/domain/persisted-project";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { gradientForSeed, hashSeed } from "@/lib/gradient";
 import { formatRelativeTime } from "@/lib/relative-time";
@@ -28,7 +28,7 @@ export function WorkspaceCard({
   onRename,
   disabled,
 }: {
-  summary: WorkspaceSummary;
+  summary: ProjectSummary;
   onOpen: () => void;
   onDelete: () => void;
   onRename: (name: string) => void;

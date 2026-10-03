@@ -35,9 +35,9 @@ export {
   defaultVideoModel,
 } from "@/domain/model-defaults";
 export {
-  PersistedWorkspace,
-  PersistedWorkspaceRecord,
-} from "@/domain/persisted-workspace";
+  PersistedProject,
+  PersistedProjectRecord,
+} from "@/domain/persisted-project";
 export {
   ColourOption,
   colourOf,

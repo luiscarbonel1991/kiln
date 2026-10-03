@@ -11,8 +11,11 @@ const EnvSchema = z.object({
   GOOGLE_VIDEO_MODEL: z.string().min(1).optional(),
 
   // Persistence — local Postgres (docker-compose). Optional so DB-free build/test
-  // never throw; the workspace repository asserts it at runtime.
+  // never throw; the repositories assert it at runtime.
   DATABASE_URL: z.string().url().optional(),
+  // The maker this app instance works for (Maker.slug). One maker per instance
+  // until accounts exist; headless runs pick theirs the same way.
+  KILN_MAKER: z.string().min(1).default("default"),
 
   // Object storage — selectable provider (LocalStack S3 for local dev). Optional
   // with local defaults; the storage adapter asserts what it needs at runtime.

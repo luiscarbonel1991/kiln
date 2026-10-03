@@ -2,17 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  deleteWorkspaceAction,
-  listWorkspacesAction,
-  loadWorkspaceAction,
-  renameWorkspaceAction,
-  saveWorkspaceAction,
-} from "@/app/actions/workspace";
-import type { WorkspaceSummary } from "@/domain/persisted-workspace";
+  deleteProjectAction,
+  listProjectsAction,
+  loadProjectAction,
+  renameProjectAction,
+  saveProjectAction,
+} from "@/app/actions/project";
+import type { ProjectSummary } from "@/domain/persisted-project";
 import { toPersisted, useWorkspace } from "@/store/workspace";
 
 export interface WorkspaceBrowser {
-  workspaces: WorkspaceSummary[];
+  workspaces: ProjectSummary[];
   loading: boolean;
   busy: boolean;
   error: boolean;
@@ -32,7 +32,7 @@ async function flushCurrent(): Promise<void> {
   const s = useWorkspace.getState();
   if (s.master && s.workspaceId) {
     try {
-      await saveWorkspaceAction(toPersisted(s), s.workspaceId);
+      await saveProjectAction(toPersisted(s), s.workspaceId);
     } catch {
       // swallow — navigation must proceed
     }
@@ -44,7 +44,7 @@ async function flushCurrent(): Promise<void> {
 // the shared Zustand store; this hook owns the list and the open/new/delete
 // flows. Imports only Server Actions + the store — never the repository/db/SDK.
 export function useWorkspaceBrowser(): WorkspaceBrowser {
-  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
+  const [workspaces, setWorkspaces] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -61,7 +61,7 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
     setLoading(true);
     setError(false);
     try {
-      const rows = await listWorkspacesAction();
+      const rows = await listProjectsAction();
       if (active.current) setWorkspaces(rows);
     } catch {
       if (active.current) setError(true);
@@ -75,7 +75,7 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
     setBusy(true);
     try {
       await flushCurrent();
-      const record = await loadWorkspaceAction(id);
+      const record = await loadProjectAction(id);
       if (record) useWorkspace.getState().hydrate(record);
     } finally {
       if (active.current) setBusy(false);
@@ -96,7 +96,7 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
     async (id: string) => {
       setBusy(true);
       try {
-        await deleteWorkspaceAction(id);
+        await deleteProjectAction(id);
         if (useWorkspace.getState().workspaceId === id) {
           useWorkspace.getState().reset();
         }
@@ -114,7 +114,7 @@ export function useWorkspaceBrowser(): WorkspaceBrowser {
       try {
         // DB-only: the workspace name lives in the row, not the store, and autosave
         // no longer writes it — so this sticks whether or not it is the open one.
-        await renameWorkspaceAction(id, name);
+        await renameProjectAction(id, name);
         await refresh();
       } finally {
         if (active.current) setBusy(false);

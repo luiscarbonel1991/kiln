@@ -1,27 +1,19 @@
 import { Prisma } from "@prisma/client";
 import type {
-  PersistedWorkspace,
-  PersistedWorkspaceRecord,
-  WorkspaceSummary,
-} from "@/domain/persisted-workspace";
-import { db } from "@/lib/db";
-import { env } from "@/lib/env";
+  PersistedProject,
+  PersistedProjectRecord,
+  ProjectSummary,
+} from "@/domain/persisted-project";
+import { assertDatabaseUrl, db } from "@/lib/db";
+import { getCurrentMaker } from "@/server/maker-repository";
 import {
-  rowsToWorkspace,
-  toWorkspaceSummary,
-  type WorkspaceRecord,
-  workspaceToRows,
-} from "@/server/workspace-mapper";
-
-// DATABASE_URL is optional in env.ts (so DB-free build/test never throw). The
-// repository is the runtime assertion point, with an actionable message.
-function assertDatabaseUrl(): void {
-  if (!env.DATABASE_URL) {
-    throw new Error(
-      "DATABASE_URL is not set. Copy .env.example to .env and run `pnpm db:up`.",
-    );
-  }
-}
+  type ProjectRecord,
+  projectCreateData,
+  projectToRows,
+  projectUpdateData,
+  rowsToProject,
+  toProjectSummary,
+} from "@/server/project-mapper";
 
 // Nullable Json columns need Prisma.DbNull for SQL NULL (JS null is a type error).
 function nullableJson(value: unknown) {
@@ -30,46 +22,50 @@ function nullableJson(value: unknown) {
     : (value as Prisma.InputJsonValue);
 }
 
+function withJsonNulls<T extends { understanding: unknown; planning: unknown }>(
+  data: T,
+) {
+  return {
+    ...data,
+    understanding: nullableJson(data.understanding),
+    planning: nullableJson(data.planning),
+  };
+}
+
+// Every query is scoped to the current maker: a project id from another maker
+// reads as not found.
+
 // Create (no id) or overwrite (id passed). Cards + master are replaced wholesale
-// inside one transaction: simplest correct strategy for a mutable workspace.
-export async function saveWorkspace(
-  input: PersistedWorkspace,
+// inside one transaction: simplest correct strategy for a mutable project. The
+// update writes only projectUpdateData (never name, maker or products).
+export async function saveProject(
+  input: PersistedProject,
   id?: string,
 ): Promise<string> {
   assertDatabaseUrl();
-  const rows = workspaceToRows(input);
+  const maker = await getCurrentMaker();
+  const rows = projectToRows(input);
 
   return db.$transaction(async (tx) => {
-    const workspace = id
-      ? await tx.workspace.update({
-          where: { id },
-          // `name` is intentionally NOT updated here: it is set once at create
-          // (derived from the prompt) and changed only via renameWorkspace, so a
-          // user's rename survives the next autosave.
-          data: {
-            phase: rows.phase,
-            recipeId: rows.recipeId,
-            understanding: nullableJson(rows.understanding),
-            planning: nullableJson(rows.planning),
-          },
+    const project = id
+      ? await tx.project.update({
+          where: { id, makerId: maker.id },
+          data: withJsonNulls(projectUpdateData(rows)),
         })
-      : await tx.workspace.create({
+      : await tx.project.create({
           data: {
-            name: rows.name,
-            phase: rows.phase,
-            recipeId: rows.recipeId,
-            understanding: nullableJson(rows.understanding),
-            planning: nullableJson(rows.planning),
+            ...withJsonNulls(projectCreateData(rows)),
+            makerId: maker.id,
           },
         });
 
-    await tx.card.deleteMany({ where: { workspaceId: workspace.id } });
-    await tx.masterAsset.deleteMany({ where: { workspaceId: workspace.id } });
+    await tx.card.deleteMany({ where: { projectId: project.id } });
+    await tx.masterAsset.deleteMany({ where: { projectId: project.id } });
 
     if (rows.master) {
       await tx.masterAsset.create({
         data: {
-          workspaceId: workspace.id,
+          projectId: project.id,
           assetId: rows.master.assetId,
           origin: rows.master.origin,
           sourcePrompt: rows.master.sourcePrompt,
@@ -82,7 +78,7 @@ export async function saveWorkspace(
     if (rows.cards.length > 0) {
       await tx.card.createMany({
         data: rows.cards.map((card) => ({
-          workspaceId: workspace.id,
+          projectId: project.id,
           cardId: card.cardId,
           parentCardId: card.parentCardId,
           masterAssetId: card.masterAssetId,
@@ -102,21 +98,22 @@ export async function saveWorkspace(
       });
     }
 
-    return workspace.id;
+    return project.id;
   });
 }
 
-export async function loadWorkspace(
+export async function loadProject(
   id: string,
-): Promise<PersistedWorkspaceRecord | null> {
+): Promise<PersistedProjectRecord | null> {
   assertDatabaseUrl();
-  const record = await db.workspace.findUnique({
-    where: { id },
+  const maker = await getCurrentMaker();
+  const record = await db.project.findFirst({
+    where: { id, makerId: maker.id },
     include: { master: true, cards: { orderBy: { sortOrder: "asc" } } },
   });
   if (!record) return null;
 
-  const mapped: WorkspaceRecord = {
+  const mapped: ProjectRecord = {
     id: record.id,
     name: record.name,
     phase: record.phase,
@@ -151,25 +148,29 @@ export async function loadWorkspace(
     })),
   };
   try {
-    return rowsToWorkspace(mapped);
+    return rowsToProject(mapped);
   } catch (error) {
-    // A workspace persisted before a domain-schema change (e.g. understanding or
+    // A project persisted before a domain-schema change (e.g. understanding or
     // planning predating the materials/mood fields) can't be mapped to current
     // types. Degrade gracefully — treat it as unrestorable rather than throwing a
     // 500 down the restore path. The store stays on a fresh session.
-    console.warn(`Skipping unrestorable workspace ${id}:`, error);
+    console.warn(`Skipping unrestorable project ${id}:`, error);
     return null;
   }
 }
 
-// Gallery list: every workspace as a lightweight summary (thumbnail + phase +
-// card count), newest first. One query via a nested select + relation _count.
-export async function listWorkspaces(): Promise<WorkspaceSummary[]> {
+// Gallery list: every project of the current maker as a lightweight summary
+// (thumbnail + type + phase + card count), newest first. One query via a nested
+// select + relation _count.
+export async function listProjects(): Promise<ProjectSummary[]> {
   assertDatabaseUrl();
-  const rows = await db.workspace.findMany({
+  const maker = await getCurrentMaker();
+  const rows = await db.project.findMany({
+    where: { makerId: maker.id },
     select: {
       id: true,
       name: true,
+      type: true,
       phase: true,
       updatedAt: true,
       master: { select: { assetUrl: true, sourcePrompt: true } },
@@ -177,19 +178,21 @@ export async function listWorkspaces(): Promise<WorkspaceSummary[]> {
     },
     orderBy: { updatedAt: "desc" },
   });
-  return rows.map(toWorkspaceSummary);
+  return rows.map(toProjectSummary);
 }
 
-// Delete a workspace; MasterAsset + Card both declare onDelete: Cascade, so this
-// single delete removes the thumbnail row + all cards with it.
-export async function deleteWorkspace(id: string): Promise<void> {
+// Delete a project; MasterAsset, Card and ProjectProduct all declare onDelete:
+// Cascade, so this single delete removes the thumbnail row + all cards with it.
+export async function deleteProject(id: string): Promise<void> {
   assertDatabaseUrl();
-  await db.workspace.delete({ where: { id } });
+  const maker = await getCurrentMaker();
+  await db.project.delete({ where: { id, makerId: maker.id } });
 }
 
-// Rename a workspace. The only writer of `name` after create — autosave leaves it
-// alone (see saveWorkspace), so the new name persists.
-export async function renameWorkspace(id: string, name: string): Promise<void> {
+// Rename a project. The only writer of `name` after create — autosave leaves it
+// alone (see saveProject), so the new name persists.
+export async function renameProject(id: string, name: string): Promise<void> {
   assertDatabaseUrl();
-  await db.workspace.update({ where: { id }, data: { name } });
+  const maker = await getCurrentMaker();
+  await db.project.update({ where: { id, makerId: maker.id }, data: { name } });
 }

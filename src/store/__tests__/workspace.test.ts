@@ -6,7 +6,7 @@ import {
   DEFAULT_PROVIDER,
   defaultVideoModel,
 } from "@/domain/model-defaults";
-import type { PersistedWorkspaceRecord } from "@/domain/persisted-workspace";
+import type { PersistedProjectRecord } from "@/domain/persisted-project";
 import { SEED_BRAND, SEED_RECIPES } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { toPersisted, useWorkspace } from "@/store/workspace";
@@ -315,7 +315,7 @@ describe("useWorkspace persistence", () => {
     useWorkspace.getState().reset();
     expect(useWorkspace.getState().cards).toBeNull();
 
-    const record: PersistedWorkspaceRecord = { id: "ws-9", ...persisted };
+    const record: PersistedProjectRecord = { id: "ws-9", ...persisted };
     useWorkspace.getState().hydrate(record);
 
     const state = useWorkspace.getState();

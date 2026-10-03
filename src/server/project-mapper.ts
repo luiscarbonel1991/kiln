@@ -2,11 +2,12 @@ import { Card } from "@/domain/card";
 import { PlanningFields } from "@/domain/cascade";
 import { MasterAsset } from "@/domain/master-asset";
 import {
-  type PersistedWorkspace,
-  PersistedWorkspaceRecord,
+  type PersistedProject,
+  PersistedProjectRecord,
   type Phase,
-  type WorkspaceSummary,
-} from "@/domain/persisted-workspace";
+  type ProjectSummary,
+} from "@/domain/persisted-project";
+import { ProjectType } from "@/domain/project";
 import { BaseUnderstanding } from "@/domain/understanding";
 
 // Plain row shapes — structurally compatible with the Prisma models, but defined
@@ -41,7 +42,7 @@ export interface CardRow {
   sortOrder: number;
 }
 
-export interface WorkspaceRows {
+export interface ProjectRows {
   name: string;
   phase: string;
   recipeId: string | null;
@@ -51,24 +52,53 @@ export interface WorkspaceRows {
   cards: CardRow[];
 }
 
-export interface WorkspaceRecord extends WorkspaceRows {
+export interface ProjectRecord extends ProjectRows {
   id: string;
 }
 
 // Row shape for the gallery list projection (Prisma-free, so it stays unit-
 // testable). The repository feeds it Prisma `findMany` rows with a master
 // thumbnail + a card `_count`.
-export interface WorkspaceSummaryRow {
+export interface ProjectSummaryRow {
   id: string;
   name: string;
+  type: string;
   phase: string;
   updatedAt: Date;
   master: { assetUrl: string; sourcePrompt: string | null } | null;
   _count: { cards: number };
 }
 
-// Narrow the DB's free `String` phase column to the Phase union; unknown/legacy
-// values fall back to "upload" so the gallery never renders a broken badge.
+// The project type of a studio-driven project follows its recipe. The SQL CASE
+// in prisma/migrations/20261002230000_maker_project_product mirrors this for the
+// workspaces that existed before projects.
+export function studioProjectType(recipeId: string | null): ProjectType {
+  if (recipeId === "recipe-laser-lineart") return "design";
+  if (recipeId === "recipe-social-launch" || recipeId === "recipe-ads") {
+    return "content";
+  }
+  return "listing-kit";
+}
+
+// The columns the editor's autosave writes. `name` is set once at create and
+// changed only by rename; `makerId` and the products are server-owned. Neither
+// is here, so an autosave can never overwrite them.
+export function projectUpdateData(rows: ProjectRows) {
+  return {
+    phase: rows.phase,
+    recipeId: rows.recipeId,
+    understanding: rows.understanding,
+    planning: rows.planning,
+    type: studioProjectType(rows.recipeId),
+  };
+}
+
+export function projectCreateData(rows: ProjectRows) {
+  return { name: rows.name, ...projectUpdateData(rows) };
+}
+
+// Narrow the DB's free `String` columns to their unions; unknown/legacy values
+// fall back so the gallery never renders a broken badge.
 const PHASES = ["upload", "analysis", "planning", "generation"] as const;
 function toPhase(value: string): Phase {
   return (PHASES as readonly string[]).includes(value)
@@ -76,12 +106,18 @@ function toPhase(value: string): Phase {
     : "upload";
 }
 
-// A list row -> WorkspaceSummary: flattens the master thumbnail + card count and
-// narrows the phase. Pure (no Prisma, no db) — see workspace-mapper.test.ts.
-export function toWorkspaceSummary(row: WorkspaceSummaryRow): WorkspaceSummary {
+function toProjectType(value: string): ProjectType {
+  const parsed = ProjectType.safeParse(value);
+  return parsed.success ? parsed.data : "listing-kit";
+}
+
+// A list row -> ProjectSummary: flattens the master thumbnail + card count and
+// narrows phase and type. Pure (no Prisma, no db) — see project-mapper.test.ts.
+export function toProjectSummary(row: ProjectSummaryRow): ProjectSummary {
   return {
     id: row.id,
     name: row.name,
+    type: toProjectType(row.type),
     phase: toPhase(row.phase),
     updatedAt: row.updatedAt,
     thumbnailUrl: row.master?.assetUrl ?? null,
@@ -90,9 +126,9 @@ export function toWorkspaceSummary(row: WorkspaceSummaryRow): WorkspaceSummary {
   };
 }
 
-// PersistedWorkspace -> row shapes for the repository to persist. sortOrder is the
+// PersistedProject -> row shapes for the repository to persist. sortOrder is the
 // array index (restored order); video is normalized to null for the DB column.
-export function workspaceToRows(state: PersistedWorkspace): WorkspaceRows {
+export function projectToRows(state: PersistedProject): ProjectRows {
   return {
     name: state.name,
     phase: state.phase,
@@ -128,19 +164,17 @@ export function workspaceToRows(state: PersistedWorkspace): WorkspaceRows {
   };
 }
 
-// Rows -> a validated PersistedWorkspaceRecord. Cards are re-sorted by sortOrder
+// Rows -> a validated PersistedProjectRecord. Cards are re-sorted by sortOrder
 // and `parentId` comes straight from `parentCardId`. Every JSON blob is re-parsed
 // through its domain schema (never trust the DB column type). renderSeed is NOT
 // here — the store rebuilds it on hydrate.
-export function rowsToWorkspace(
-  record: WorkspaceRecord,
-): PersistedWorkspaceRecord {
+export function rowsToProject(record: ProjectRecord): PersistedProjectRecord {
   const cards = [...record.cards]
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .flatMap((row) => {
       // Tolerant per-card decode: a card persisted before a schema change (e.g.
       // an old card missing the materials/mood fields) is skipped, not fatal —
-      // the rest of the workspace still restores. flatMap([]/[data]) = filter+map.
+      // the rest of the project still restores. flatMap([]/[data]) = filter+map.
       const parsed = Card.safeParse({
         id: row.cardId,
         parentId: row.parentCardId,
@@ -170,7 +204,7 @@ export function rowsToWorkspace(
       })
     : null;
 
-  return PersistedWorkspaceRecord.parse({
+  return PersistedProjectRecord.parse({
     id: record.id,
     name: record.name,
     phase: record.phase,

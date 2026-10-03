@@ -1,8 +1,11 @@
-// Kiln persistence. Hybrid: relational top-level (Workspace, MasterAsset, Card)
-// with Zod-validated JSON for the nested blobs. Lineage is a plain, workspace-
+// Kiln persistence. Hybrid: relational top level (Maker, Project, Product,
+// MasterAsset, Card) with Zod-validated JSON for the nested blobs. A maker owns
+// products and projects (ROADMAP "Domain model"). Lineage is a plain, project-
 // scoped `parentCardId` column (domain card ids are unique only within a
-// workspace, so the Card PK is composite [workspaceId, cardId]). Generated/
-// uploaded asset bytes live in object storage; the DB holds only metadata + URLs.
+// project, so the Card PK is composite [projectId, cardId]). Generated/uploaded
+// asset bytes live in object storage; the DB holds only metadata + URLs.
+// Change it only through migrations (`pnpm db:migrate --create-only`), never
+// `prisma db push`.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,27 +15,77 @@ datasource db {
   provider = "postgresql"
 }
 
-// The save/load unit. recipeId resolves from SEED_RECIPES on load; the brand is a
-// code seed (not stored). understanding/planning are Zod JSON snapshots.
-model Workspace {
-  id            String       @id @default(cuid())
+// The account. `slug` names the maker for the app and headless runs (KILN_MAKER,
+// default "default"). `pricing` is the optional laser cost calculator's saved
+// defaults (Zod MakerProfileData), hardened on read.
+model Maker {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  name      String
+  pricing   Json?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  projects  Project[]
+  products  Product[]
+}
+
+// One piece of work with a deliverable. `type` is a domain ProjectType. The
+// studio editor's state rides on it: recipeId resolves from the app recipe
+// presets on load; understanding/planning are Zod JSON snapshots.
+model Project {
+  id            String           @id @default(cuid())
+  makerId       String
+  maker         Maker            @relation(fields: [makerId], references: [id])
   name          String
+  type          String
   phase         String
   recipeId      String?
   understanding Json?
   planning      Json?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
   master        MasterAsset?
   cards         Card[]
+  products      ProjectProduct[]
+
+  @@index([makerId])
 }
 
-// The anchor image — exactly one per workspace (1:1). PK = workspaceId, so it is
+// A product spec (domain Product without `source`) plus where it came from
+// (domain ProductSource). Re-importing a package upserts on [makerId, sku].
+model Product {
+  id        String           @id @default(cuid())
+  makerId   String
+  maker     Maker            @relation(fields: [makerId], references: [id])
+  sku       String
+  name      String
+  spec      Json
+  source    Json
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  projects  ProjectProduct[]
+
+  @@unique([makerId, sku])
+}
+
+// The products a project uses, in order. A product in use cannot be deleted.
+model ProjectProduct {
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  position  Int     @default(0)
+
+  @@id([projectId, productId])
+  @@index([productId])
+}
+
+// The anchor image — at most one per project (1:1). PK = projectId, so it is
 // collision-free regardless of the domain asset id. assetUrl points at object
 // storage (uploads) or a provider/stub URL (generated).
 model MasterAsset {
-  workspaceId  String    @id
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId    String  @id
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assetId      String
   origin       String
   sourcePrompt String?
@@ -40,37 +93,28 @@ model MasterAsset {
   mime         String
 }
 
-// The maker's saved laser-pricing defaults. A singleton (this is a single local
-// shop, no auth): one row, id "default". `data` is a Zod MakerProfileData snapshot
-// (selected machine/material preset names + the shop rates), hardened on read.
-model MakerProfile {
-  id        String   @id @default("default")
-  data      Json
-  updatedAt DateTime @updatedAt
-}
-
-// One domain Card. PK = composite [workspaceId, cardId] (cardId is unique only per
-// workspace). parentCardId carries the image->video lineage (same workspace); kept
+// One domain Card. PK = composite [projectId, cardId] (cardId is unique only per
+// project). parentCardId carries the image->video lineage (same project); kept
 // as a plain column, not a self-relation FK — v1 traverses lineage in memory.
 model Card {
-  workspaceId   String
-  cardId        String
-  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  parentCardId  String?
-  masterAssetId String
-  recipeId      String
-  type          String
-  direction     String
-  fields        Json
-  references    Json
+  projectId      String
+  cardId         String
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentCardId   String?
+  masterAssetId  String
+  recipeId       String
+  type           String
+  direction      String
+  fields         Json
+  references     Json
   model          Json
   video          Json?
   promptOverride String?
   vectorUrl      String?
   outputs        Json
-  status        String
-  sortOrder     Int
+  status         String
+  sortOrder      Int
 
-  @@id([workspaceId, cardId])
-  @@index([workspaceId])
+  @@id([projectId, cardId])
+  @@index([projectId])
 }

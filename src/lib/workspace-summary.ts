@@ -1,4 +1,4 @@
-import type { WorkspaceSummary } from "@/domain/persisted-workspace";
+import type { ProjectSummary } from "@/domain/persisted-project";
 
 const UNTITLED = "Untitled workspace";
 
@@ -6,7 +6,7 @@ const UNTITLED = "Untitled workspace";
 // prompt (sliced), but an uploaded master with no prompt persists the literal
 // "Untitled workspace" — fall back to the source prompt, then to "Untitled".
 export function displayName(
-  summary: Pick<WorkspaceSummary, "name" | "sourcePrompt">,
+  summary: Pick<ProjectSummary, "name" | "sourcePrompt">,
 ): string {
   const name = summary.name?.trim();
   if (name && name !== UNTITLED) return name;

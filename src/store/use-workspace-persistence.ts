@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  listWorkspacesAction,
-  loadWorkspaceAction,
-  saveWorkspaceAction,
-} from "@/app/actions/workspace";
+  listProjectsAction,
+  loadProjectAction,
+  saveProjectAction,
+} from "@/app/actions/project";
 import { toPersisted, useWorkspace } from "@/store/workspace";
 
 export type PersistenceStatus = "idle" | "restoring" | "saving" | "saved";
@@ -29,10 +29,10 @@ export function useWorkspacePersistence(): { status: PersistenceStatus } {
 
     let active = true;
     setStatus("restoring");
-    listWorkspacesAction()
+    listProjectsAction()
       .then(async (rows) => {
         if (active && rows.length > 0) {
-          const record = await loadWorkspaceAction(rows[0].id);
+          const record = await loadProjectAction(rows[0].id);
           if (active && record) useWorkspace.getState().hydrate(record);
         }
         if (active) setStatus("idle");
@@ -57,7 +57,7 @@ export function useWorkspacePersistence(): { status: PersistenceStatus } {
         if (!state.master) return;
         setStatus("saving");
         try {
-          const { id } = await saveWorkspaceAction(
+          const { id } = await saveProjectAction(
             toPersisted(state),
             state.workspaceId ?? undefined,
           );

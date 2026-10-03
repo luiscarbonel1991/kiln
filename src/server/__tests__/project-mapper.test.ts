@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "@/domain/card";
-import type { PersistedWorkspace } from "@/domain/persisted-workspace";
+import type { PersistedProject } from "@/domain/persisted-project";
 import {
-  rowsToWorkspace,
-  toWorkspaceSummary,
-  type WorkspaceRecord,
-  type WorkspaceSummaryRow,
-  workspaceToRows,
-} from "@/server/workspace-mapper";
+  type ProjectRecord,
+  type ProjectSummaryRow,
+  projectCreateData,
+  projectToRows,
+  projectUpdateData,
+  rowsToProject,
+  studioProjectType,
+  toProjectSummary,
+} from "@/server/project-mapper";
 
 function field(value: string) {
   return { value, source: "recipe" as const, locked: false };
@@ -60,7 +63,7 @@ const videoChild: Card = {
   status: "rendering",
 };
 
-const sample: PersistedWorkspace = {
+const sample: PersistedProject = {
   name: "Clay pitcher launch",
   phase: "generation",
   master: {
@@ -88,14 +91,14 @@ const sample: PersistedWorkspace = {
 
 // Mimic what the repository reads back: rows + a db id, cards intentionally
 // reversed to prove sortOrder re-sorts them.
-function asRecord(state: PersistedWorkspace, id = "ws-1"): WorkspaceRecord {
-  const rows = workspaceToRows(state);
+function asRecord(state: PersistedProject, id = "ws-1"): ProjectRecord {
+  const rows = projectToRows(state);
   return { id, ...rows, cards: [...rows.cards].reverse() };
 }
 
-describe("workspace mapper round-trip", () => {
+describe("project mapper round-trip", () => {
   it("preserves name, phase, recipeId, master, understanding, planning", () => {
-    const out = rowsToWorkspace(asRecord(sample));
+    const out = rowsToProject(asRecord(sample));
     expect(out.id).toBe("ws-1");
     expect(out.name).toBe(sample.name);
     expect(out.phase).toBe(sample.phase);
@@ -106,7 +109,7 @@ describe("workspace mapper round-trip", () => {
   });
 
   it("re-sorts cards by sortOrder and reconstructs the video parentId lineage", () => {
-    const out = rowsToWorkspace(asRecord(sample));
+    const out = rowsToProject(asRecord(sample));
     expect(out.cards.map((c) => c.id)).toEqual([
       "recipe-etsy-hero-0",
       "recipe-etsy-hero-0-video",
@@ -118,28 +121,26 @@ describe("workspace mapper round-trip", () => {
   });
 
   it("re-validates nested JSON through the domain schema", () => {
-    const out = rowsToWorkspace(asRecord(sample));
+    const out = rowsToProject(asRecord(sample));
     expect(out.cards[0].fields.palette.value).toBe("#c0461f, #e8a13a");
     expect(out.cards[0].model.provider).toBe("google");
   });
 
   it("does not carry renderSeed (UI state, rebuilt on hydrate)", () => {
-    const out = rowsToWorkspace(asRecord(sample));
+    const out = rowsToProject(asRecord(sample));
     expect("renderSeed" in out.cards[0]).toBe(false);
   });
 
   it("round-trips a vectorized card's vectorUrl; leaves it undefined otherwise", () => {
-    const vectorized: PersistedWorkspace = {
+    const vectorized: PersistedProject = {
       ...sample,
       cards: [{ ...imageCard, vectorUrl: "https://stub.local/trace.svg" }],
     };
-    expect(rowsToWorkspace(asRecord(vectorized)).cards[0].vectorUrl).toBe(
+    expect(rowsToProject(asRecord(vectorized)).cards[0].vectorUrl).toBe(
       "https://stub.local/trace.svg",
     );
     // A never-vectorized card persists null and restores as undefined.
-    expect(
-      rowsToWorkspace(asRecord(sample)).cards[0].vectorUrl,
-    ).toBeUndefined();
+    expect(rowsToProject(asRecord(sample)).cards[0].vectorUrl).toBeUndefined();
   });
 
   it("skips a legacy card that predates the materials/mood fields, keeping valid cards", () => {
@@ -164,7 +165,7 @@ describe("workspace mapper round-trip", () => {
       sortOrder: 99,
     } as (typeof record.cards)[number]);
 
-    const out = rowsToWorkspace(record);
+    const out = rowsToProject(record);
     // The malformed legacy card is dropped; the two valid cards still restore.
     expect(out.cards.map((c) => c.id)).toEqual([
       "recipe-etsy-hero-0",
@@ -173,7 +174,7 @@ describe("workspace mapper round-trip", () => {
   });
 
   it("handles a null master and empty cards (pre-generation save)", () => {
-    const minimal: PersistedWorkspace = {
+    const minimal: PersistedProject = {
       name: "Draft",
       phase: "analysis",
       master: null,
@@ -182,17 +183,18 @@ describe("workspace mapper round-trip", () => {
       planning: null,
       cards: [],
     };
-    const out = rowsToWorkspace(asRecord(minimal, "ws-2"));
+    const out = rowsToProject(asRecord(minimal, "ws-2"));
     expect(out.id).toBe("ws-2");
     expect(out.master).toBeNull();
     expect(out.cards).toEqual([]);
   });
 });
 
-describe("toWorkspaceSummary", () => {
-  const base: WorkspaceSummaryRow = {
+describe("toProjectSummary", () => {
+  const base: ProjectSummaryRow = {
     id: "ws-1",
     name: "Clay pitcher",
+    type: "listing-kit",
     phase: "generation",
     updatedAt: new Date("2026-06-01T00:00:00.000Z"),
     master: { assetUrl: "https://stub.local/m.png", sourcePrompt: "a pitcher" },
@@ -200,9 +202,10 @@ describe("toWorkspaceSummary", () => {
   };
 
   it("flattens the master thumbnail, source prompt, and card count", () => {
-    expect(toWorkspaceSummary(base)).toEqual({
+    expect(toProjectSummary(base)).toEqual({
       id: "ws-1",
       name: "Clay pitcher",
+      type: "listing-kit",
       phase: "generation",
       updatedAt: base.updatedAt,
       thumbnailUrl: "https://stub.local/m.png",
@@ -212,17 +215,66 @@ describe("toWorkspaceSummary", () => {
   });
 
   it("maps a null master to null thumbnail + prompt", () => {
-    const out = toWorkspaceSummary({ ...base, master: null });
+    const out = toProjectSummary({ ...base, master: null });
     expect(out.thumbnailUrl).toBeNull();
     expect(out.sourcePrompt).toBeNull();
   });
 
   it("passes a valid phase through and narrows an unknown one to 'upload'", () => {
-    expect(toWorkspaceSummary({ ...base, phase: "planning" }).phase).toBe(
+    expect(toProjectSummary({ ...base, phase: "planning" }).phase).toBe(
       "planning",
     );
-    expect(toWorkspaceSummary({ ...base, phase: "bogus" }).phase).toBe(
-      "upload",
+    expect(toProjectSummary({ ...base, phase: "bogus" }).phase).toBe("upload");
+  });
+});
+
+describe("toProjectSummary type", () => {
+  const row: ProjectSummaryRow = {
+    id: "p-1",
+    name: "Laser motif",
+    type: "design",
+    phase: "generation",
+    updatedAt: new Date("2026-10-02T00:00:00.000Z"),
+    master: null,
+    _count: { cards: 5 },
+  };
+
+  it("passes a known project type through and narrows an unknown one", () => {
+    expect(toProjectSummary(row).type).toBe("design");
+    expect(toProjectSummary({ ...row, type: "bogus" }).type).toBe(
+      "listing-kit",
     );
+  });
+});
+
+describe("studioProjectType", () => {
+  it.each([
+    ["recipe-laser-lineart", "design"],
+    ["recipe-social-launch", "content"],
+    ["recipe-ads", "content"],
+    ["recipe-etsy-hero", "listing-kit"],
+    ["recipe-marketplace", "listing-kit"],
+    [null, "listing-kit"],
+  ] as const)("%s -> %s (mirrors the migration's CASE)", (recipeId, type) => {
+    expect(studioProjectType(recipeId)).toBe(type);
+  });
+});
+
+describe("autosave payload", () => {
+  it("writes only editor-owned columns: never name, maker or products", () => {
+    const data = projectUpdateData(projectToRows(sample));
+    expect(Object.keys(data).sort()).toEqual([
+      "phase",
+      "planning",
+      "recipeId",
+      "type",
+      "understanding",
+    ]);
+  });
+
+  it("the create payload adds the name, still without the maker", () => {
+    const data = projectCreateData(projectToRows(sample));
+    expect(data.name).toBe(sample.name);
+    expect("makerId" in data).toBe(false);
   });
 });

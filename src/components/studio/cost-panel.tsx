@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { analyzeSvgGeometryAction } from "@/app/actions/analyze-geometry";
+import {
+  getMakerPricingAction,
+  saveMakerPricingAction,
+} from "@/app/actions/maker";
 import { estimatePrice } from "@/lib/pricing/estimate";
 import {
   DEFAULT_JOB,
@@ -18,10 +22,6 @@ import {
 } from "@/lib/pricing/presets";
 import type { Operation, ShopProfile, SvgGeometry } from "@/lib/pricing/types";
 import { cn } from "@/lib/utils";
-import {
-  getMakerProfile,
-  saveMakerProfile,
-} from "@/server/maker-profile-repository";
 
 const OPS: Operation[] = ["cut", "score", "engrave"];
 // Outline-only SVGs (no closed subpaths) estimate a 0 fill, which would price an
@@ -79,7 +79,7 @@ export function CostPanel({ vectorUrl }: { vectorUrl: string }) {
 
   async function loadProfile() {
     try {
-      const p = await getMakerProfile();
+      const p = await getMakerPricingAction();
       if (p) {
         const mi = MACHINE_PRESETS.findIndex((m) => m.name === p.machineName);
         const xi = MATERIAL_PRESETS.findIndex((m) => m.name === p.materialName);
@@ -110,7 +110,7 @@ export function CostPanel({ vectorUrl }: { vectorUrl: string }) {
   async function saveDefaults() {
     setSaveState("saving");
     try {
-      await saveMakerProfile({
+      await saveMakerPricingAction({
         machineName: machine.name,
         materialName: material.name,
         shop,
