@@ -342,3 +342,24 @@ describe("useProject hydrate safety", () => {
     expect(useProject.getState().cards?.[0].status).toBe("draft");
   });
 });
+
+describe("useProject generation policy", () => {
+  it("a card saved on Google moves to OpenAI when it generates again", () => {
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
+    useProject.getState().generateVariants();
+    const id = useProject.getState().cards?.[0].id ?? "";
+    useProject.getState().editCardModel(id, {
+      provider: "google",
+      model: "gemini-3.1-flash-image",
+    });
+    useProject.getState().regenerateCard(id);
+    const card = useProject.getState().cards?.find((c) => c.id === id);
+    expect(card?.model).toMatchObject({
+      provider: "openai",
+      model: "gpt-image-2",
+    });
+    expect(card?.status).toBe("rendering");
+  });
+});

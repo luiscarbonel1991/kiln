@@ -46,6 +46,9 @@ export {
   DEFAULT_PROVIDER,
   defaultImageModel,
   defaultVideoModel,
+  GENERATION_PROVIDERS,
+  generationCatalog,
+  generationModel,
 } from "@/domain/model-defaults";
 export {
   PersistedProject,

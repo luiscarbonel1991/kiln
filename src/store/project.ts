@@ -10,7 +10,7 @@ import {
 } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
 import type { ModelConfig } from "@/domain/model-config";
-import { defaultVideoModel } from "@/domain/model-defaults";
+import { defaultVideoModel, generationModel } from "@/domain/model-defaults";
 import type {
   PersistedProject,
   PersistedProjectRecord,
@@ -165,6 +165,8 @@ export const useProject = create<ProjectState>((set, get) => ({
       ),
     });
   },
+  // Generate / re-roll one card. The card moves to the model that will really
+  // run (generation policy: OpenAI only) before the request starts.
   regenerateCard: (id) => {
     const cards = get().cards;
     if (!cards) return;
@@ -174,6 +176,7 @@ export const useProject = create<ProjectState>((set, get) => ({
           c.id === id
             ? {
                 ...c,
+                model: generationModel(c.model, c.type),
                 status: "rendering",
                 renderSeed: c.renderSeed + RENDER_BUMP,
               }
@@ -192,6 +195,7 @@ export const useProject = create<ProjectState>((set, get) => ({
         return hasUnlocked
           ? {
               ...c,
+              model: generationModel(c.model, c.type),
               status: "rendering",
               renderSeed: c.renderSeed + RENDER_BUMP,
             }

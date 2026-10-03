@@ -71,3 +71,26 @@ export const VIDEO_MODEL_CATALOG: ModelChoice[] = [
   { provider: "openai", id: "sora-2", label: "Sora 2" },
   { provider: "openai", id: "sora-2-pro", label: "Sora 2 Pro" },
 ];
+
+// Generation policy (Luis, 2026-10-02: "always use the OpenAI API, not Google's,
+// to generate"). The Google adapters stay in the engine — the architecture is
+// multiprovider — but no image or video generation is sent to them: new cards
+// start on OpenAI, the pickers list OpenAI models only, and a card saved on
+// Google moves to the OpenAI default the moment it generates again (its current
+// output keeps the model that made it). The generation actions enforce it too.
+export const GENERATION_PROVIDERS: readonly ("google" | "openai")[] = [
+  "openai",
+];
+
+export function generationModel<
+  T extends { provider: "google" | "openai"; model: string },
+>(model: T, kind: "image" | "video"): T {
+  if (GENERATION_PROVIDERS.includes(model.provider)) return model;
+  const fallback = kind === "video" ? defaultVideoModel() : defaultImageModel();
+  return { ...model, provider: fallback.provider, model: fallback.model };
+}
+
+export function generationCatalog(kind: "image" | "video"): ModelChoice[] {
+  const catalog = kind === "video" ? VIDEO_MODEL_CATALOG : IMAGE_MODEL_CATALOG;
+  return catalog.filter((m) => GENERATION_PROVIDERS.includes(m.provider));
+}

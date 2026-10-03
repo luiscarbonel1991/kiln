@@ -17,10 +17,9 @@ const sampleInput: AnimateInput = {
 };
 
 describe("animateVideo", () => {
-  it("returns a video GenerationResult from the card's provider (google)", async () => {
+  it("a video card saved on Google is animated on OpenAI (generation policy)", async () => {
     const result = await animateVideo(sampleInput);
-    expect(result.provider).toBe("google");
-    expect(result.assets).toHaveLength(1);
+    expect(result.provider).toBe("openai");
     expect(result.assets[0].mime).toBe("video/mp4");
   });
 

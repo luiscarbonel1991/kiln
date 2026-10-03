@@ -19,9 +19,9 @@ function editInput(provider: "google" | "openai"): ImageEditInput {
 }
 
 describe("editImage", () => {
-  it("returns a GenerationResult from the google provider", async () => {
+  it("a card saved on Google is generated on OpenAI (generation policy)", async () => {
     const result = await editImage(editInput("google"));
-    expect(result.provider).toBe("google");
+    expect(result.provider).toBe("openai");
     expect(result.assets).toHaveLength(1);
     expect(result.assets[0].mime).toBe("image/png");
   });
