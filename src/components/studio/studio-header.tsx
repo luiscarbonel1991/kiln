@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, LayoutGrid } from "lucide-react";
+import Link from "next/link";
 import { AutosaveStatus } from "@/components/studio/autosave-status";
 import { PhaseIndicator } from "@/components/studio/phase-indicator";
 import { ProjectsButton } from "@/components/studio/projects-button";
@@ -14,12 +15,16 @@ export function StudioHeader({
   onStartOver,
   onOpenGallery,
   saveStatus,
+  boardHref,
 }: {
   phase: Phase;
   showStartOver: boolean;
   onStartOver: () => void;
   onOpenGallery: () => void;
   saveStatus: PersistenceStatus;
+  // Set when editing a planned project: the header leads back to its board
+  // instead of offering the gallery and Start over.
+  boardHref?: string;
 }) {
   return (
     <header className="flex items-center justify-between border-b border-border-soft bg-card/70 px-6 py-4 backdrop-blur-md sm:px-8">
@@ -36,9 +41,19 @@ export function StudioHeader({
       {/* The gallery is always available; autosave status + Start over only once a
           project is in progress. */}
       <div className="flex items-center gap-3">
-        {showStartOver ? <AutosaveStatus status={saveStatus} /> : null}
-        <ProjectsButton onOpen={onOpenGallery} />
-        {showStartOver ? (
+        {showStartOver || boardHref ? (
+          <AutosaveStatus status={saveStatus} />
+        ) : null}
+        {boardHref ? (
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={boardHref}>
+              <LayoutGrid /> Board
+            </Link>
+          </Button>
+        ) : (
+          <ProjectsButton onOpen={onOpenGallery} />
+        )}
+        {showStartOver && !boardHref ? (
           <Button variant="ghost" size="sm" onClick={onStartOver}>
             <ArrowLeft /> Start over
           </Button>
