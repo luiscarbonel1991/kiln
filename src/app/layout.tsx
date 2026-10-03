@@ -21,7 +21,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Kiln",
-  description: "Image-first AI content-generation studio.",
+  description:
+    "Product-first studio for makers: listing kits and content for every destination.",
 };
 
 export default function RootLayout({
