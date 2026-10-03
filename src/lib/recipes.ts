@@ -1,4 +1,10 @@
-import { composePreset, type Recipe, RecipePreset } from "@/domain/recipe";
+import { type Catalog, parseSlotRecipeId } from "@/domain/plan";
+import {
+  composePreset,
+  composeRecipe,
+  type Recipe,
+  RecipePreset,
+} from "@/domain/recipe";
 import {
   SEED_RECIPES as ENGINE_RECIPES,
   SEED_DESTINATIONS,
@@ -98,8 +104,38 @@ export const SEED_RECIPE_LASER = composePreset(PRESET_LASER, {
 // in Planning and resolves on restore.
 export const SEED_RECIPES: Recipe[] = [...ENGINE_RECIPES, SEED_RECIPE_LASER];
 
-// The one lookup for a saved recipe id. Unknown ids return undefined; each call
-// site keeps its own fallback.
+export const CATALOG: Catalog = {
+  destinations: DESTINATIONS,
+  shotLists: SHOT_LISTS,
+};
+
+const composed = new Map<string, Recipe>();
+
+// A planned project's card carries `shotListId@destinationId`: its recipe is
+// that shot list composed on that destination (scene slots only).
+function composedRecipe(id: string): Recipe | undefined {
+  const ref = parseSlotRecipeId(id);
+  if (!ref) return undefined;
+  const cached = composed.get(id);
+  if (cached) return cached;
+  const shotList = SHOT_LISTS.find((l) => l.id === ref.shotListId);
+  const destination = DESTINATIONS.find((d) => d.id === ref.destinationId);
+  if (!shotList || !destination || shotList.destinationId !== destination.id) {
+    return undefined;
+  }
+  const recipe = composeRecipe({
+    id,
+    name: shotList.name,
+    shotList,
+    destination,
+  });
+  composed.set(id, recipe);
+  return recipe;
+}
+
+// The one lookup for a saved recipe id: an editor preset or a planned slot's
+// composed recipe. Unknown ids return undefined; each call site keeps its own
+// fallback.
 export function findRecipe(id: string): Recipe | undefined {
-  return SEED_RECIPES.find((r) => r.id === id);
+  return SEED_RECIPES.find((r) => r.id === id) ?? composedRecipe(id);
 }
