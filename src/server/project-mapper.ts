@@ -134,8 +134,39 @@ export function toProjectSummary(row: ProjectSummaryRow): ProjectSummary {
   };
 }
 
-// PersistedProject -> row shapes for the repository to persist. sortOrder is the
-// array index (restored order); video is normalized to null for the DB column.
+export function masterToRow(master: MasterAsset): MasterAssetRow {
+  return {
+    assetId: master.id,
+    origin: master.origin,
+    sourcePrompt: master.sourcePrompt,
+    assetUrl: master.assetUrl,
+    mime: master.mime,
+  };
+}
+
+// sortOrder is the array index (restored order); video is normalized to null
+// for the DB column.
+export function cardsToRows(cards: Card[]): CardRow[] {
+  return cards.map((card, index) => ({
+    cardId: card.id,
+    parentCardId: card.parentId,
+    masterAssetId: card.masterAssetId,
+    recipeId: card.recipeId,
+    type: card.type,
+    direction: card.direction,
+    fields: card.fields,
+    references: card.references,
+    model: card.model,
+    video: card.video ?? null,
+    promptOverride: card.promptOverride ?? null,
+    vectorUrl: card.vectorUrl ?? null,
+    outputs: card.outputs,
+    status: card.status,
+    sortOrder: index,
+  }));
+}
+
+// PersistedProject -> row shapes for the repository to persist.
 export function projectToRows(state: PersistedProject): ProjectRows {
   return {
     name: state.name,
@@ -143,32 +174,8 @@ export function projectToRows(state: PersistedProject): ProjectRows {
     recipeId: state.recipeId,
     understanding: state.understanding,
     planning: state.planning,
-    master: state.master
-      ? {
-          assetId: state.master.id,
-          origin: state.master.origin,
-          sourcePrompt: state.master.sourcePrompt,
-          assetUrl: state.master.assetUrl,
-          mime: state.master.mime,
-        }
-      : null,
-    cards: state.cards.map((card, index) => ({
-      cardId: card.id,
-      parentCardId: card.parentId,
-      masterAssetId: card.masterAssetId,
-      recipeId: card.recipeId,
-      type: card.type,
-      direction: card.direction,
-      fields: card.fields,
-      references: card.references,
-      model: card.model,
-      video: card.video ?? null,
-      promptOverride: card.promptOverride ?? null,
-      vectorUrl: card.vectorUrl ?? null,
-      outputs: card.outputs,
-      status: card.status,
-      sortOrder: index,
-    })),
+    master: state.master ? masterToRow(state.master) : null,
+    cards: cardsToRows(state.cards),
   };
 }
 

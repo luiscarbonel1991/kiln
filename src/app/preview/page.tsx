@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SlotFrame } from "@/components/projects/slot-frame";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +10,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import type { SlotView } from "@/domain/plan";
+import { gradientForPrompt } from "@/lib/gradient";
+
+// Every state a board slot can show (ROADMAP "Experience design"), plus a
+// failed generation.
+const SLOT_STATES: { label: string; view: SlotView }[] = [
+  { label: "exact", view: { state: "exact", failed: false } },
+  { label: "queued", view: { state: "queued", failed: false } },
+  { label: "generating", view: { state: "generating", failed: false } },
+  { label: "retrying", view: { state: "retrying", failed: false } },
+  { label: "to review", view: { state: "to-review", failed: false } },
+  { label: "approved", view: { state: "approved", failed: false } },
+  { label: "delivered", view: { state: "delivered", failed: false } },
+  { label: "failed", view: { state: "queued", failed: true } },
+];
 
 const swatches = [
   { name: "canvas", hex: "#f6f1e8", className: "bg-background" },
@@ -262,6 +278,26 @@ export default function Preview() {
               </CardContent>
             </Card>
           </div>
+        </div>
+      </Section>
+
+      <Section eyebrow="Slot states · project board">
+        <div className="flex flex-wrap gap-5">
+          {SLOT_STATES.map(({ label, view }) => (
+            <SlotFrame
+              key={label}
+              position={label}
+              label="Marketplace hero"
+              purpose="Win the click: clean background, no props."
+              aspect="1:1"
+              view={view}
+            >
+              <div
+                className="h-full w-full"
+                style={{ backgroundImage: gradientForPrompt(label) }}
+              />
+            </SlotFrame>
+          ))}
         </div>
       </Section>
     </main>

@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { Card } from "@/domain/card";
+import type { MasterAsset } from "@/domain/master-asset";
 import type {
   PersistedProject,
   PersistedProjectRecord,
@@ -19,7 +20,9 @@ import { getCurrentMaker } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
 import {
   type CardRow,
+  cardsToRows,
   type MasterAssetRow,
+  masterToRow,
   type ProjectBoard,
   type ProjectRecord,
   projectCreateData,
@@ -385,6 +388,46 @@ export async function setSlotApproval(
     await tx.project.update({
       where: { id: projectId },
       data: { plan: next as unknown as Prisma.InputJsonValue },
+    });
+  });
+}
+
+// Set a planned project's reference image (the anchor every scene edits). The
+// first reference also creates the scene slots' draft cards; a later one only
+// re-points the existing cards at it. Locked like approvals.
+export async function setProjectReference(
+  projectId: string,
+  master: MasterAsset,
+  firstCards: Card[],
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    await tx.masterAsset.deleteMany({ where: { projectId } });
+    await tx.masterAsset.create({
+      data: masterData(projectId, masterToRow(master)),
+    });
+    const existing = await tx.card.count({ where: { projectId } });
+    if (existing === 0) {
+      if (firstCards.length > 0) {
+        await tx.card.createMany({
+          data: cardData(projectId, cardsToRows(firstCards)),
+        });
+      }
+    } else {
+      await tx.card.updateMany({
+        where: { projectId },
+        data: { masterAssetId: master.id },
+      });
+    }
+    await tx.project.update({
+      where: { id: projectId },
+      data: { phase: "generation" },
     });
   });
 }
