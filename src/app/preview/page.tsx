@@ -17,7 +17,11 @@ import { gradientForPrompt } from "@/lib/gradient";
 // failed generation.
 const SLOT_STATES: { label: string; view: SlotView }[] = [
   { label: "exact", view: { state: "exact", failed: false } },
-  { label: "queued", view: { state: "queued", failed: false } },
+  { label: "waiting", view: { state: "queued", failed: false } },
+  {
+    label: "queued (batch)",
+    view: { state: "queued", failed: false, inBatch: true },
+  },
   { label: "generating", view: { state: "generating", failed: false } },
   { label: "retrying", view: { state: "retrying", failed: false } },
   { label: "to review", view: { state: "to-review", failed: false } },

@@ -12,6 +12,13 @@
       "name": "kiln-attach",
       "url": "http://localhost:3009",
       "port": 3009
+    },
+    {
+      "name": "kiln-dev-mock",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:mock", "--port", "3010"],
+      "port": 3010,
+      "autoPort": false
     }
   ]
 }

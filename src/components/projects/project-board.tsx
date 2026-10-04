@@ -5,6 +5,11 @@ import {
   ReferenceUpload,
 } from "@/components/projects/board-actions";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
+import {
+  type BatchEstimate,
+  GenerationPanel,
+} from "@/components/projects/generation-panel";
+import { GenerationPoller } from "@/components/projects/generation-poller";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
   SlotFrame,
@@ -13,8 +18,6 @@ import {
 } from "@/components/projects/slot-frame";
 import type { Card } from "@/domain/card";
 import { exactView, renderTextTemplate } from "@/domain/exact";
-import { estimateScenes } from "@/domain/generation-cost";
-import { defaultImageModel } from "@/domain/model-defaults";
 import {
   type PlanSlot,
   type ProjectPlan,
@@ -23,9 +26,11 @@ import {
   slotState,
 } from "@/domain/plan";
 import { dimensionsLabel, type Product } from "@/domain/product";
+import type { JobView } from "@/domain/queue";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { projectTypeLabel } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
+import type { BatchProgress, Budget } from "@/server/generation-repository";
 import type { ProjectBoard as Board } from "@/server/project-mapper";
 
 interface BoardSlot {
@@ -35,41 +40,63 @@ interface BoardSlot {
   view: SlotView;
 }
 
-function money(n: number): string {
-  return `$${n.toFixed(2)}`;
-}
-
-// The storyboard (ROADMAP "Experience design"): one row per destination, one
-// frame per slot, the deliverable visible from minute one. Exact frames are
-// drawn from the spec; scene frames show their card's candidate. The side panel
-// carries the reference image, each destination's checklist and the cost of
-// what is left. A server component: only approvals and the reference upload
-// are client islands.
-export function ProjectBoard({
-  projectId,
-  board,
-  product,
-}: {
-  projectId: string;
-  board: Board & { plan: ProjectPlan };
-  product: Product;
-}) {
+// Each destination's slots with their card, latest job and board state.
+export function boardRows(
+  board: Board & { plan: ProjectPlan },
+  jobs: Record<string, JobView>,
+) {
   const cards = new Map(board.cards.map((c) => [c.id, c]));
-  const rows = board.plan.destinations.map((d) => ({
+  return board.plan.destinations.map((d) => ({
     plan: d,
     destination: CATALOG.destinations.find((x) => x.id === d.destinationId),
     slots: d.slots.map((slot): BoardSlot => {
       const cardId = slotCardId(d.destinationId, slot.key);
       const card = cards.get(cardId);
-      return { slot, cardId, card, view: slotState(slot, card) };
+      return {
+        slot,
+        cardId,
+        card,
+        view: slotState(slot, card, jobs[cardId]),
+      };
     }),
   }));
-  const pending = rows
+}
+
+// The scene slots a batch would generate: a card exists, nothing is queued or
+// running for it, and it has no output yet (a failed one counts).
+export function waitingCardIds(rows: ReturnType<typeof boardRows>): string[] {
+  return rows
     .flatMap((r) => r.slots)
-    .filter((s) => s.view.state === "queued")
-    .map((s) => s.slot);
-  const model = defaultImageModel();
-  const estimate = estimateScenes(pending, model);
+    .filter((s) => s.card && s.view.state === "queued" && !s.view.inBatch)
+    .map((s) => s.cardId);
+}
+
+// The storyboard (ROADMAP "Experience design"): one row per destination, one
+// frame per slot, the deliverable visible from minute one. Exact frames are
+// drawn from the spec; scene frames show their card's candidate and their job's
+// progress. The side panel carries the reference image, the generate panel
+// (one approval per batch, background queue), and each destination's
+// checklist. A server component: approvals, the reference upload, the generate
+// panel and the poller are client islands.
+export function ProjectBoard({
+  projectId,
+  board,
+  product,
+  jobs,
+  generation,
+  estimate,
+  mode,
+}: {
+  projectId: string;
+  board: Board & { plan: ProjectPlan };
+  product: Product;
+  jobs: Record<string, JobView>;
+  generation: { version: string; batch: BatchProgress | null; budget: Budget };
+  estimate: BatchEstimate | null;
+  mode: "live" | "mock";
+}) {
+  const rows = boardRows(board, jobs);
+  const waiting = waitingCardIds(rows);
 
   return (
     <main className="mx-auto flex w-full max-w-[1320px] flex-col gap-8 px-6 py-8 sm:px-8 lg:flex-row">
@@ -187,6 +214,17 @@ export function ProjectBoard({
           )}
         </div>
 
+        {board.master ? (
+          <GenerationPanel
+            projectId={projectId}
+            cardIds={waiting}
+            estimate={estimate}
+            batch={generation.batch}
+            budget={generation.budget}
+            mode={mode}
+          />
+        ) : null}
+
         {rows.map(({ plan, destination, slots }) => {
           if (!destination) return null;
           const count = (state: SlotView["state"]) =>
@@ -218,29 +256,20 @@ export function ProjectBoard({
                   {count("approved")} of {scenes} scenes approved
                 </li>
                 <li>{count("to-review")} to review</li>
-                <li>{count("queued") + count("generating")} waiting</li>
+                <li>
+                  {count("queued") + count("generating") + count("retrying")}{" "}
+                  waiting or in progress
+                </li>
               </ul>
             </div>
           );
         })}
-
-        <div className="flex flex-col gap-1.5 rounded-card bg-card p-5 shadow-card">
-          <h2 className="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
-            Cost
-          </h2>
-          <p className="font-sans text-sm text-foreground">
-            {pending.length === 0
-              ? "No scene is waiting."
-              : estimate
-                ? `≈ ${money(estimate.typical)}–${money(estimate.max)} to generate the ${pending.length} waiting scenes once`
-                : `${pending.length} scenes waiting; no pinned price for ${model.model}`}
-          </p>
-          <p className="font-sans text-[0.72rem] leading-snug text-on-surface-mid">
-            Scenes are generated one at a time from the editor, only when you
-            press Generate.
-          </p>
-        </div>
       </aside>
+      <GenerationPoller
+        projectId={projectId}
+        version={generation.version}
+        active={generation.batch !== null}
+      />
     </main>
   );
 }
