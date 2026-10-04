@@ -6,13 +6,14 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { createProjectAction } from "@/app/actions/new-project";
 import { importProductsAction } from "@/app/actions/products";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
+import { SceneArt } from "@/components/projects/scene-art";
 import {
   SlotFrame,
   SlotGrid,
   slotPosition,
 } from "@/components/projects/slot-frame";
 import { Button } from "@/components/ui/button";
-import { exactView } from "@/domain/exact";
+import { exactView, renderTextTemplate } from "@/domain/exact";
 import { estimateScenes } from "@/domain/generation-cost";
 import { defaultImageModel } from "@/domain/model-defaults";
 import {
@@ -22,7 +23,6 @@ import {
 } from "@/domain/plan";
 import { dimensionsLabel, type Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
-import { gradientForPrompt } from "@/lib/gradient";
 import { PROJECT_TYPES } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
@@ -332,18 +332,15 @@ export function NewProjectFlow({
                             aspect={slot.aspect}
                           />
                         ) : (
-                          <div
-                            className="flex h-full w-full items-end p-3"
-                            style={{
-                              backgroundImage: gradientForPrompt(
-                                `${d.destinationId}.${slot.key}`,
-                              ),
-                            }}
-                          >
-                            <span className="rounded-pill bg-card/85 px-2 py-0.5 font-mono text-[0.59rem] text-on-surface-mid">
-                              scene
-                            </span>
-                          </div>
+                          <SceneArt
+                            seed={`${d.destinationId}.${slot.key}`}
+                            text={
+                              slot.textTemplate
+                                ? renderTextTemplate(slot.textTemplate, product)
+                                : undefined
+                            }
+                            badge="scene"
+                          />
                         )}
                       </SlotFrame>
                     ))}

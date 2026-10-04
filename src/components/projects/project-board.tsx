@@ -5,6 +5,7 @@ import {
   ReferenceUpload,
 } from "@/components/projects/board-actions";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
+import { SceneArt } from "@/components/projects/scene-art";
 import {
   SlotFrame,
   SlotGrid,
@@ -23,7 +24,6 @@ import {
 } from "@/domain/plan";
 import { dimensionsLabel, type Product } from "@/domain/product";
 import { isRenderableUrl } from "@/lib/asset-url";
-import { gradientForPrompt } from "@/lib/gradient";
 import { projectTypeLabel } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
 import type { ProjectBoard as Board } from "@/server/project-mapper";
@@ -128,7 +128,7 @@ export function ProjectBoard({
                         aspect={slot.aspect}
                       />
                     ) : (
-                      <SceneContent
+                      <SceneArt
                         seed={cardId}
                         output={card?.outputs[0]}
                         text={
@@ -242,40 +242,6 @@ export function ProjectBoard({
         </div>
       </aside>
     </main>
-  );
-}
-
-function SceneContent({
-  seed,
-  output,
-  text,
-}: {
-  seed: string;
-  output?: string;
-  text?: string;
-}) {
-  return (
-    <div
-      className="relative h-full w-full"
-      style={
-        isRenderableUrl(output)
-          ? undefined
-          : { backgroundImage: gradientForPrompt(seed) }
-      }
-    >
-      {isRenderableUrl(output) ? (
-        // biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio
-        <img src={output} alt="" className="h-full w-full object-cover" />
-      ) : null}
-      {text ? (
-        <span
-          className="absolute inset-x-3 top-3 rounded-field bg-card/85 px-2.5 py-1.5 font-serif text-[0.95rem] italic leading-tight text-foreground"
-          title="Text layer drawn by a template, never by the image model"
-        >
-          {text}
-        </span>
-      ) : null}
-    </div>
   );
 }
 
