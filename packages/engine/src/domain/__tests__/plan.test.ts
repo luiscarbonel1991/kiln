@@ -211,3 +211,72 @@ describe("slotState", () => {
     ).toThrow();
   });
 });
+
+describe("slotState with the queue", () => {
+  const plan = planProject({
+    product: CUTTING_BOARD,
+    type: "listing-kit",
+    destinationIds: ["shop"],
+    catalog,
+  });
+  const [hero] = plan.destinations[0].slots;
+  const draft = { status: "draft" as const, outputs: [] };
+  const done = { status: "done" as const, outputs: ["https://x/1.png"] };
+
+  it.each([
+    [
+      "queued, first attempt",
+      { status: "queued" as const, attempt: 0 },
+      "queued",
+    ],
+    [
+      "running, first attempt",
+      { status: "running" as const, attempt: 1 },
+      "generating",
+    ],
+    [
+      "queued for its retry",
+      { status: "queued" as const, attempt: 1 },
+      "retrying",
+    ],
+    [
+      "running its retry",
+      { status: "running" as const, attempt: 2 },
+      "retrying",
+    ],
+  ])("%s -> %s, in the batch", (_name, job, state) => {
+    expect(slotState(hero, draft, job)).toEqual({
+      state,
+      failed: false,
+      inBatch: true,
+    });
+  });
+
+  it("a failed job flags a slot without output", () => {
+    expect(slotState(hero, draft, { status: "failed", attempt: 2 })).toEqual({
+      state: "queued",
+      failed: true,
+    });
+  });
+
+  it("a failed re-roll leaves an approved output approved", () => {
+    const approved = approveSlot(
+      plan,
+      { destinationId: "shop", slotKey: "hero" },
+      done,
+    ).destinations[0].slots[0];
+    expect(
+      slotState(approved, done, { status: "failed", attempt: 2 }).state,
+    ).toBe("approved");
+  });
+
+  it("a done or canceled job defers to the card", () => {
+    expect(slotState(hero, done, { status: "done", attempt: 1 }).state).toBe(
+      "to-review",
+    );
+    expect(slotState(hero, draft, { status: "canceled", attempt: 0 })).toEqual({
+      state: "queued",
+      failed: false,
+    });
+  });
+});

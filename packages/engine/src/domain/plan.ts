@@ -146,21 +146,52 @@ interface CardLike {
 export interface SlotView {
   state: SlotState;
   failed: boolean;
+  // Queued or running in the background generation queue.
+  inBatch?: boolean;
 }
 
-// The state the board shows for a slot. "retrying" belongs to the QC gate and
-// is not produced until it exists; "delivered" needs Deliver.
-export function slotState(slot: PlanSlot, card?: CardLike): SlotView {
+interface JobLike {
+  status: "queued" | "running" | "done" | "failed" | "canceled";
+  attempt: number;
+}
+
+// The state the board shows for a slot, from its card and its latest job. A
+// job in the queue drives the state (queued / generating, and retrying on its
+// second attempt); a failed job only flags the slot when there is no usable
+// output, so a failed re-roll leaves an approved or reviewable output as it
+// was. "delivered" needs Deliver.
+export function slotState(
+  slot: PlanSlot,
+  card?: CardLike,
+  job?: JobLike,
+): SlotView {
   if (slot.fill === "exact") {
     return { state: slot.deliveredAt ? "delivered" : "exact", failed: false };
   }
-  if (!card || card.status === "draft")
-    return { state: "queued", failed: false };
+  if (job?.status === "running") {
+    return {
+      state: job.attempt >= 2 ? "retrying" : "generating",
+      failed: false,
+      inBatch: true,
+    };
+  }
+  if (job?.status === "queued") {
+    return {
+      state: job.attempt >= 1 ? "retrying" : "queued",
+      failed: false,
+      inBatch: true,
+    };
+  }
+  const jobFailed = job?.status === "failed";
+  if (!card || card.status === "draft") {
+    return { state: "queued", failed: jobFailed };
+  }
   if (card.status === "rendering")
     return { state: "generating", failed: false };
-  if (card.status === "error") return { state: "queued", failed: true };
   const output = card.outputs[0];
-  if (!output) return { state: "queued", failed: true };
+  if (card.status === "error" || !output) {
+    return { state: "queued", failed: true };
+  }
   if (slot.approvedOutput !== output) {
     return { state: "to-review", failed: false };
   }

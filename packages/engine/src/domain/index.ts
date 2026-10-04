@@ -31,13 +31,23 @@ export {
 } from "@/domain/exact";
 export { Field, FieldSource } from "@/domain/field";
 export {
+  canAfford,
+  costFromUsage,
+  estimateGeneration,
   estimateScenes,
+  fromMicros,
+  type GenerationUsage,
   IMAGE_PRICES,
   type ImagePrice,
   imagePrice,
   PRICES_AS_OF,
   type SceneEstimate,
+  toMicros,
 } from "@/domain/generation-cost";
+export {
+  buildGenerationRequest,
+  GenerationRequest,
+} from "@/domain/generation-request";
 export { lockByDefault } from "@/domain/locks";
 export { MasterAsset } from "@/domain/master-asset";
 export { ModelConfig } from "@/domain/model-config";
@@ -106,6 +116,17 @@ export {
   type TextCheckOptions,
   type TextLineFinding,
 } from "@/domain/qc";
+export {
+  ACTIVE_JOB_STATUSES,
+  classifyGenerationError,
+  errorMessage,
+  isActiveJob,
+  JobStatus,
+  type JobView,
+  MAX_ATTEMPTS,
+  RETRY_BACKOFF_MS,
+  retryDecision,
+} from "@/domain/queue";
 export {
   composePreset,
   composeRecipe,

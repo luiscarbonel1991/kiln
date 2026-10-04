@@ -11,12 +11,16 @@
 //   at 1024x1024 (medium $0.053, high $0.211) are the image cost calculator's,
 //   as reported by third parties; the other two are scaled by their token price
 //   ("derived"). Portrait/landscape sizes (1024x1536) use 1.5x the tokens.
+//   An edit also pays its input (the reference image and the prompt), which
+//   the per-image figures leave out: `input` is a provisional allowance until
+//   the queue has measured real usage.
 
 export interface ImagePrice {
   provider: "google" | "openai";
   model: string;
   typical: number;
   max: number;
+  input: { typical: number; max: number };
   nonSquareFactor: number;
   confidence: "official" | "derived";
 }
@@ -28,6 +32,7 @@ const openai = (model: string, perMillionTokens: number): ImagePrice => ({
   model,
   typical: round((0.053 * perMillionTokens) / 30),
   max: round((0.211 * perMillionTokens) / 30),
+  input: { typical: 0.01, max: 0.02 },
   nonSquareFactor: 1.5,
   confidence: model === "gpt-image-2" ? "official" : "derived",
 });
@@ -37,6 +42,7 @@ const google = (model: string, perImage: number): ImagePrice => ({
   model,
   typical: perImage,
   max: perImage,
+  input: { typical: 0, max: 0.001 },
   nonSquareFactor: 1,
   confidence: "official",
 });
@@ -70,6 +76,21 @@ export interface SceneEstimate {
   confidence: ImagePrice["confidence"];
 }
 
+// What one generation at this model and aspect costs: output plus the edit's
+// input allowance. null when the model has no pinned price.
+export function estimateGeneration(
+  model: { provider: string; model: string },
+  aspect?: string,
+): { typical: number; max: number } | null {
+  const price = imagePrice(model);
+  if (!price) return null;
+  const factor = !aspect || aspect === "1:1" ? 1 : price.nonSquareFactor;
+  return {
+    typical: round(price.typical * factor + price.input.typical),
+    max: round(price.max * factor + price.input.max),
+  };
+}
+
 // One generation per scene slot, at each slot's aspect. null when the model has
 // no pinned price (the UI says so instead of guessing).
 export function estimateScenes(
@@ -78,14 +99,63 @@ export function estimateScenes(
 ): SceneEstimate | null {
   const price = imagePrice(model);
   if (!price) return null;
-  const factor = (aspect?: string) =>
-    !aspect || aspect === "1:1" ? 1 : price.nonSquareFactor;
-  const sum = (per: number) =>
-    round(slots.reduce((t, s) => t + per * factor(s.aspect), 0));
+  const each = slots.map((s) => estimateGeneration(model, s.aspect));
+  const sum = (pick: (e: { typical: number; max: number }) => number) =>
+    round(each.reduce((t, e) => t + (e ? pick(e) : 0), 0));
   return {
     count: slots.length,
-    typical: sum(price.typical),
-    max: sum(price.max),
+    typical: sum((e) => e.typical),
+    max: sum((e) => e.max),
     confidence: price.confidence,
   };
+}
+
+// Official token prices, $ per 1M tokens (https://developers.openai.com/api/
+// docs/pricing, 2026-10-02): what a finished generation actually cost, from the
+// usage the API returns.
+const TOKEN_PRICES: Record<
+  string,
+  { textIn: number; imageIn: number; imageOut: number }
+> = {
+  "gpt-image-2": { textIn: 5, imageIn: 8, imageOut: 30 },
+  "gpt-image-1.5": { textIn: 5, imageIn: 8, imageOut: 32 },
+  "gpt-image-1-mini": { textIn: 2, imageIn: 2.5, imageOut: 8 },
+};
+
+export interface GenerationUsage {
+  inputTextTokens: number;
+  inputImageTokens: number;
+  outputTokens: number;
+}
+
+export function costFromUsage(
+  model: string,
+  usage: GenerationUsage,
+): number | null {
+  const p = TOKEN_PRICES[model];
+  if (!p) return null;
+  return (
+    (usage.inputTextTokens * p.textIn +
+      usage.inputImageTokens * p.imageIn +
+      usage.outputTokens * p.imageOut) /
+    1_000_000
+  );
+}
+
+// Money in whole micro-dollars (no float drift in sums and comparisons).
+export const toMicros = (usd: number): number => Math.round(usd * 1_000_000);
+export const fromMicros = (micros: number): number => micros / 1_000_000;
+
+// The monthly cap check: what was spent this month, what is already queued or
+// running (reserved at its estimated max), and the new request must fit.
+export function canAfford(input: {
+  spentMicros: number;
+  reservedMicros: number;
+  requestMicros: number;
+  capMicros: number;
+}): boolean {
+  return (
+    input.spentMicros + input.reservedMicros + input.requestMicros <=
+    input.capMicros
+  );
 }
