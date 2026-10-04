@@ -33,6 +33,18 @@ pnpm db:migrate --create-only --name <change>         # draft a new migration, r
 Never edit a migration that has been applied; add a new one. Restart the dev
 server after migrating (the Prisma client is cached across hot reloads).
 
+## Generation queue
+
+Planned projects generate in the background: the board's "Generate N scenes"
+(one confirmation with the estimate and the month's budget) and the slot
+editor's Generate both queue jobs that a worker in the server process runs
+(started from `src/instrumentation.ts`). Every paid call counts against the
+maker's monthly cap (`Maker.monthlyCapCents`, $25 by default).
+
+```bash
+pnpm dev:mock   # stubs only (no paid calls, nothing counted), 4 s per stub
+```
+
 ## System dependencies (laser "Centerline" vectorize)
 
 The line-art **Centerline** trace — single cut paths for laser cutting — shells out to two
