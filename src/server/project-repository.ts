@@ -288,7 +288,8 @@ export async function renameProject(id: string, name: string): Promise<void> {
 
 // Persist one generation result straight to its card, outside the editor's
 // autosave: a paid result is kept even when the editor that asked for it is
-// gone (another project opened, the page left). updateMany never throws if a
+// gone (another project opened, the page left). Studio projects only: a
+// planned project's results are written by the queue. updateMany never throws if a
 // concurrent autosave is replacing the card rows; that autosave then carries the
 // result from the store.
 export async function saveCardOutput(
@@ -299,7 +300,11 @@ export async function saveCardOutput(
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
   await db.card.updateMany({
-    where: { projectId, cardId, project: { makerId: maker.id } },
+    where: {
+      projectId,
+      cardId,
+      project: { makerId: maker.id, plan: { equals: Prisma.DbNull } },
+    },
     data: { outputs: [url], status: "done", vectorUrl: null },
   });
 }

@@ -9,6 +9,7 @@ import { ProjectGallery } from "@/components/studio/project-gallery";
 import { StudioHeader } from "@/components/studio/studio-header";
 import { UploadPhase } from "@/components/studio/upload-phase";
 import { useProject } from "@/store/project";
+import { useGenerationSync } from "@/store/use-generation-sync";
 import { useProjectPersistence } from "@/store/use-project-persistence";
 
 // The studio. With `projectId` it is the advanced view of a planned project
@@ -27,6 +28,7 @@ export function StudioShell({
   const loadedId = useProject((s) => s.projectId);
   const reset = useProject((s) => s.reset);
   const { status, missing } = useProjectPersistence({ fresh, projectId });
+  useGenerationSync(projectId, loadedId === projectId);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const boardHref = projectId ? `/projects/${projectId}` : undefined;
 

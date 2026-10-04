@@ -2,6 +2,8 @@
 
 import { Download, RefreshCw, Scissors, Spline } from "lucide-react";
 import { useEffect, useState } from "react";
+import { enqueueGenerationAction } from "@/app/actions/generation";
+import { saveProjectAction } from "@/app/actions/project";
 import { vectorizeCardAction } from "@/app/actions/vectorize";
 import { AssembledPromptTray } from "@/components/studio/assembled-prompt-tray";
 import { CardActions } from "@/components/studio/card-actions";
@@ -9,14 +11,17 @@ import { CardFieldRow } from "@/components/studio/card-field-row";
 import { CostPanel } from "@/components/studio/cost-panel";
 import { RenderCanvas } from "@/components/studio/render-canvas";
 import { assemblePrompt, type FieldKey } from "@/domain/cascade";
+import { estimateGeneration } from "@/domain/generation-cost";
 import type { MasterAsset } from "@/domain/master-asset";
+import { generationModel } from "@/domain/model-defaults";
+import { isActiveJob } from "@/domain/queue";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { assetFilename, downloadAsset } from "@/lib/download";
 import { gradientForSeed } from "@/lib/gradient";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { startCardGeneration } from "@/store/generation-runner";
-import { type StudioCard, useProject } from "@/store/project";
+import { type StudioCard, toPersisted, useProject } from "@/store/project";
 
 const FIELD_ROWS: { key: FieldKey; label: string }[] = [
   { key: "subject", label: "Subject" },
@@ -28,14 +33,20 @@ const FIELD_ROWS: { key: FieldKey; label: string }[] = [
   { key: "palette", label: "Palette" },
 ];
 
+// `projectMode`: a planned project's card. Generate / Re-roll queue the card
+// in the background queue (the same path as the board's batch) instead of
+// calling the provider from here; the card shows its job's state, the
+// estimated cost of one generation, and no "To video".
 export function GenerationCard({
   card,
   master,
   understanding,
+  projectMode = false,
 }: {
   card: StudioCard;
   master: MasterAsset;
   understanding: BaseUnderstanding;
+  projectMode?: boolean;
 }) {
   const editCardField = useProject((s) => s.editCardField);
   const toggleCardLock = useProject((s) => s.toggleCardLock);
@@ -44,8 +55,11 @@ export function GenerationCard({
   const editCardModel = useProject((s) => s.editCardModel);
   const editCardPrompt = useProject((s) => s.editCardPrompt);
   const applyVector = useProject((s) => s.applyVector);
+  const job = useProject((s) => s.jobs[card.id]);
   const [open, setOpen] = useState(false);
   const [vectorizing, setVectorizing] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const inQueue = projectMode && isActiveJob(job);
 
   const recipe = findRecipe(card.recipeId) ?? SEED_RECIPES[0];
   const purpose = recipe.directions.find(
@@ -66,7 +80,7 @@ export function GenerationCard({
   // a remount never re-sends it and an unmount never discards a paid result.
   // biome-ignore lint/correctness/useExhaustiveDependencies: renderSeed is the deliberate re-roll trigger; assembled/master are not re-run signals
   useEffect(() => {
-    if (card.status !== "rendering") return;
+    if (projectMode || card.status !== "rendering") return;
     startCardGeneration({
       projectId: useProject.getState().projectId,
       card,
@@ -75,6 +89,42 @@ export function GenerationCard({
       negative: assembled.negative,
     });
   }, [card.renderSeed]);
+
+  // Queue this card (planned projects): save pending edits first, so the queue
+  // builds the request from what the maker sees, then enqueue. Optimistic
+  // "queued" until the next poll.
+  async function enqueue() {
+    const state = useProject.getState();
+    const projectId = state.projectId;
+    if (!projectId) return;
+    setQueueError(null);
+    state.markQueued([card.id]);
+    try {
+      await saveProjectAction(toPersisted(state), projectId);
+      const result = await enqueueGenerationAction({
+        projectId,
+        cardIds: [card.id],
+      });
+      if ("error" in result) setQueueError(result.error);
+    } catch {
+      setQueueError("Could not queue this generation.");
+    }
+  }
+
+  const estimate = estimateGeneration(
+    generationModel(card.model, "image"),
+    card.model.aspect,
+  );
+  const busyLabel =
+    job?.status === "queued"
+      ? job.attempt >= 1
+        ? "Retrying…"
+        : "Queued…"
+      : job && job.attempt >= 2
+        ? "Retrying…"
+        : "Generating…";
+  const failure =
+    projectMode && job?.status === "failed" ? (job.error ?? "failed") : null;
 
   // Vectorize: trace the rendered line-art into a REAL SVG. Only exposed for
   // line-art recipes (tracing a photo produces a bloated, posterized file).
@@ -99,7 +149,7 @@ export function GenerationCard({
       <div className="p-4 pb-0">
         <RenderCanvas
           seed={card.renderSeed}
-          status={card.status}
+          status={inQueue ? "rendering" : card.status}
           type={card.type}
           direction={card.direction}
           outputUrl={card.outputs[0]}
@@ -146,11 +196,32 @@ export function GenerationCard({
 
       <CardActions
         type={card.type}
-        status={card.status}
-        onGenerate={() => regenerateCard(card.id)}
-        onReroll={() => regenerateCard(card.id)}
+        status={inQueue ? "rendering" : card.status}
+        onGenerate={() =>
+          projectMode ? void enqueue() : regenerateCard(card.id)
+        }
+        onReroll={() =>
+          projectMode ? void enqueue() : regenerateCard(card.id)
+        }
         onPromote={() => promoteToVideo(card.id)}
+        busyLabel={projectMode ? busyLabel : undefined}
+        generateHint={
+          projectMode && estimate
+            ? `≈ $${estimate.typical.toFixed(2)}–${estimate.max.toFixed(2)}`
+            : undefined
+        }
+        canPromote={!projectMode}
+        disabledReason={
+          projectMode && card.type === "video"
+            ? "Video is not in the queue yet."
+            : undefined
+        }
       />
+      {queueError || failure ? (
+        <p className="px-4 pb-3 font-mono text-[0.625rem] leading-snug text-prov-local">
+          {queueError ?? `Last try failed: ${failure}`}
+        </p>
+      ) : null}
 
       {recipe.style === "line-art" &&
       card.type === "image" &&

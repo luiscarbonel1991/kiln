@@ -7,7 +7,7 @@ import {
   saveProjectAction,
 } from "@/app/actions/project";
 import { createDebouncedTask } from "@/lib/debounce";
-import { toPersisted, useProject } from "@/store/project";
+import { shouldAutosave, toPersisted, useProject } from "@/store/project";
 
 export type PersistenceStatus = "idle" | "restoring" | "saving" | "saved";
 
@@ -119,7 +119,9 @@ export function useProjectPersistence({
     const autosave = createDebouncedTask(() => {
       void save();
     }, AUTOSAVE_DEBOUNCE_MS);
-    const unsubscribe = useProject.subscribe(autosave.schedule);
+    const unsubscribe = useProject.subscribe((state, prev) => {
+      if (shouldAutosave(state, prev)) autosave.schedule();
+    });
     return () => {
       active = false;
       unsubscribe();

@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { Card } from "@/domain/card";
+import { Card } from "@/domain/card";
 import { buildCards } from "@/domain/cards";
 import {
   buildPlanningContext,
@@ -15,6 +15,7 @@ import type {
   PersistedProject,
   PersistedProjectRecord,
 } from "@/domain/persisted-project";
+import type { JobView } from "@/domain/queue";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
@@ -28,6 +29,16 @@ export type Phase = "upload" | "analysis" | "planning" | "generation";
 // domain Card now (persisted), so StudioCard only adds the render seed.
 export type StudioCard = Card & { renderSeed: number };
 
+// What the server reports about a planned project's generations (polled):
+// each card's latest job, and the cards' server-owned state.
+export interface ServerGenerationState {
+  jobs: Record<string, JobView>;
+  cards: Record<
+    string,
+    { status: string; outputs: string[]; vectorUrl: string | null }
+  >;
+}
+
 interface ProjectState {
   phase: Phase;
   master: MasterAsset | null;
@@ -36,6 +47,12 @@ interface ProjectState {
   planning: PlanningFields | null;
   cards: StudioCard[] | null;
   projectId: string | null;
+  // Planned projects only: each card's latest job (from the queue), when the
+  // editor last queued something, and a stamp that marks server merges (so
+  // they never trigger an autosave).
+  jobs: Record<string, JobView>;
+  lastEnqueueAt: number;
+  serverMergeStamp: number;
   setMaster: (master: MasterAsset) => void;
   setUnderstanding: (understanding: BaseUnderstanding) => void;
   editUnderstandingField: (
@@ -57,6 +74,8 @@ interface ProjectState {
   toggleCardLock: (id: string, key: FieldKey) => void;
   promoteToVideo: (sourceId: string) => void;
   setProjectId: (id: string | null) => void;
+  markQueued: (cardIds: string[]) => void;
+  mergeGenerationState: (state: ServerGenerationState) => void;
   hydrate: (record: PersistedProjectRecord) => void;
   reset: () => void;
 }
@@ -71,6 +90,9 @@ export const useProject = create<ProjectState>((set, get) => ({
   planning: null,
   cards: null,
   projectId: null,
+  jobs: {},
+  lastEnqueueAt: 0,
+  serverMergeStamp: 0,
   // Re-capturing clears everything downstream of the new master.
   setMaster: (master) =>
     set({
@@ -302,6 +324,37 @@ export const useProject = create<ProjectState>((set, get) => ({
     set({ cards: next });
   },
   setProjectId: (id) => set({ projectId: id }),
+  // Optimistic: the cards just queued show as queued until the next poll.
+  markQueued: (cardIds) =>
+    set((s) => ({
+      lastEnqueueAt: Date.now(),
+      jobs: {
+        ...s.jobs,
+        ...Object.fromEntries(
+          cardIds.map((id) => [id, { status: "queued" as const, attempt: 0 }]),
+        ),
+      },
+    })),
+  // Server-owned state in: jobs, and each card's status / outputs / vectorUrl
+  // (the worker writes them). renderSeed and every editor-owned field are left
+  // as they are; the merge stamp lets the autosave ignore this change.
+  mergeGenerationState: (state) =>
+    set((s) => ({
+      jobs: state.jobs,
+      serverMergeStamp: s.serverMergeStamp + 1,
+      cards:
+        s.cards?.map((c): StudioCard => {
+          const server = state.cards[c.id];
+          if (!server) return c;
+          const status = Card.shape.status.safeParse(server.status);
+          return {
+            ...c,
+            status: status.success ? status.data : c.status,
+            outputs: server.outputs,
+            vectorUrl: server.vectorUrl ?? undefined,
+          };
+        }) ?? null,
+    })),
   // Load a saved project into the store: set the persisted slices + rebuild
   // cards as StudioCards with a fresh renderSeed (UI state, not persisted), using
   // the same index formula as generateVariants. Revokes a stale blob: master.
@@ -312,6 +365,8 @@ export const useProject = create<ProjectState>((set, get) => ({
     }
     set({
       projectId: record.id,
+      jobs: {},
+      lastEnqueueAt: 0,
       phase: record.phase,
       master: record.master,
       understanding: record.understanding,
@@ -342,9 +397,21 @@ export const useProject = create<ProjectState>((set, get) => ({
       planning: null,
       cards: null,
       projectId: null,
+      jobs: {},
+      lastEnqueueAt: 0,
     });
   },
 }));
+
+// Whether a store change should be autosaved: not when it only brought in the
+// server's generation state (that is server-owned, and saving it back would be
+// a pointless write).
+export function shouldAutosave(
+  state: ProjectState,
+  prev: ProjectState,
+): boolean {
+  return state.serverMergeStamp === prev.serverMergeStamp;
+}
 
 // Store -> PersistedProject: the persistable slice. `name` is derived from the
 // master prompt, but it only seeds the name at CREATE time — afterwards autosave

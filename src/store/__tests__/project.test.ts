@@ -9,7 +9,7 @@ import {
 import type { PersistedProjectRecord } from "@/domain/persisted-project";
 import { SEED_BRAND, SEED_RECIPES } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
-import { toPersisted, useProject } from "@/store/project";
+import { shouldAutosave, toPersisted, useProject } from "@/store/project";
 
 // https URL (not blob:) so reset() never calls URL.revokeObjectURL, which is
 // absent in the node test environment.
@@ -361,5 +361,60 @@ describe("useProject generation policy", () => {
       model: "gpt-image-2",
     });
     expect(card?.status).toBe("rendering");
+  });
+});
+
+describe("useProject server generation state (planned projects)", () => {
+  function generate() {
+    useProject.getState().setMaster(sampleMaster);
+    useProject.getState().setUnderstanding(sampleUnderstanding);
+    useProject.getState().goToPlanning();
+    useProject.getState().generateVariants();
+    useProject.getState().setProjectId("p-1");
+  }
+
+  it("markQueued shows a card as queued at once and stamps the enqueue", () => {
+    generate();
+    const id = useProject.getState().cards?.[0].id ?? "";
+    useProject.getState().markQueued([id]);
+    expect(useProject.getState().jobs[id]).toEqual({
+      status: "queued",
+      attempt: 0,
+    });
+    expect(useProject.getState().lastEnqueueAt).toBeGreaterThan(0);
+  });
+
+  it("a merge brings in outputs, status, vectorUrl and jobs, never renderSeed", () => {
+    generate();
+    const before = useProject.getState().cards?.[0];
+    if (!before) throw new Error("no card");
+    useProject.getState().mergeGenerationState({
+      jobs: { [before.id]: { status: "done", attempt: 1 } },
+      cards: {
+        [before.id]: {
+          status: "done",
+          outputs: ["https://x/out.png"],
+          vectorUrl: null,
+        },
+      },
+    });
+    const after = useProject.getState().cards?.[0];
+    expect(after?.outputs).toEqual(["https://x/out.png"]);
+    expect(after?.status).toBe("done");
+    expect(after?.vectorUrl).toBeUndefined();
+    expect(after?.renderSeed).toBe(before.renderSeed);
+    expect(after?.fields).toEqual(before.fields);
+    expect(useProject.getState().jobs[before.id].status).toBe("done");
+  });
+
+  it("a merge never triggers an autosave; an edit does", () => {
+    generate();
+    const id = useProject.getState().cards?.[0].id ?? "";
+    const prev = useProject.getState();
+    useProject.getState().mergeGenerationState({ jobs: {}, cards: {} });
+    expect(shouldAutosave(useProject.getState(), prev)).toBe(false);
+    const beforeEdit = useProject.getState();
+    useProject.getState().editCardField(id, "scene", "a garden");
+    expect(shouldAutosave(useProject.getState(), beforeEdit)).toBe(true);
   });
 });

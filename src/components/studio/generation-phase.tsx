@@ -72,6 +72,7 @@ export function GenerationPhase({
               card={card}
               master={master}
               understanding={understanding}
+              projectMode={projectMode}
             />
           </div>
         ))}

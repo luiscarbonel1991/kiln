@@ -190,6 +190,19 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     expect(anchor.assetUrl).toBe(master.assetUrl);
   });
 
+  it("the editor's direct output write does not apply to a planned project", async () => {
+    const id = created[0];
+    await repo.saveCardOutput(
+      id,
+      "etsy.in-use",
+      "https://stub.local/direct.png",
+    );
+    const card = await db.card.findUniqueOrThrow({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
+    });
+    expect(card.outputs).not.toEqual(["https://stub.local/direct.png"]);
+  });
+
   it("two approvals at once on different slots both persist", async () => {
     const id = created[0];
     await Promise.all([
