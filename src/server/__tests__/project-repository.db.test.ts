@@ -91,7 +91,17 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     name: "DB test launch",
     phase: "generation" as const,
     master,
-    understanding: null,
+    understanding: {
+      subject: "test board",
+      productType: "board",
+      useContext: "",
+      sceneProps: "",
+      materials: "hardwood",
+      lighting: "soft",
+      composition: "centered",
+      mood: "calm",
+      palette: ["#C8A165"],
+    },
     recipeId: "etsy-listing@etsy",
     planning: null,
     cards: [
@@ -102,6 +112,12 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   const created: string[] = [];
 
   afterAll(async () => {
+    await db.generationJob.deleteMany({
+      where: { projectId: { in: created } },
+    });
+    await db.generationBatch.deleteMany({
+      where: { projectId: { in: created } },
+    });
     await db.project.deleteMany({ where: { id: { in: created } } });
     await db.product.deleteMany({ where: { sku: product.sku } });
   });
@@ -195,6 +211,65 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       "https://stub.local/worker.png",
       "https://stub.local/in-use.png",
     ]);
+  });
+
+  it("queue end to end: estimate, enqueue, a worker run puts the output on the card", async () => {
+    const { estimateProjectCards } = await import("@/server/generation-queue");
+    const queueRepo = await import("@/server/generation-repository");
+    const { createWorker } = await import("@/server/generation-worker");
+    const { getCurrentMaker } = await import("@/server/maker-repository");
+    const id = created[0];
+    const { cards, model } = await estimateProjectCards(id, ["etsy.in-use"]);
+    expect(cards[0].request.masterAssetUrl).toBe(master.assetUrl);
+    expect(cards[0].request.model.provider).toBe("openai");
+    const maker = await getCurrentMaker();
+    await queueRepo.enqueueBatch({
+      makerId: maker.id,
+      projectId: id,
+      mode: "mock",
+      model,
+      jobs: cards.map((c) => ({
+        cardId: c.cardId,
+        request: c.request,
+        estimateMicros: c.maxMicros,
+      })),
+    });
+    const worker = createWorker({
+      mode: "mock",
+      concurrency: 2,
+      leaseSec: 60,
+      renewMs: 60_000,
+      sweepMs: 60_000,
+      callTimeoutMs: 10_000,
+      claimJobs: queueRepo.claimJobs,
+      renewLease: queueRepo.renewLease,
+      recordCost: queueRepo.recordCost,
+      completeJob: queueRepo.completeJob,
+      failJob: queueRepo.failJob,
+      requeueExpired: queueRepo.requeueExpired,
+      overCap: async () => false,
+      provider: () =>
+        ({
+          id: "openai",
+          editBytes: async () => ({
+            bytes: new Uint8Array([1]),
+            mime: "image/png",
+            model: "gpt-image-2",
+            usage: { inputTextTokens: 1, inputImageTokens: 1, outputTokens: 1 },
+          }),
+        }) as never,
+      storeAsset: async () => "https://stub.local/queued.png",
+      log: () => {},
+    });
+    worker.wake();
+    await worker.idle();
+    worker.stop();
+    const card = await db.card.findUniqueOrThrow({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
+    });
+    expect(card.outputs).toEqual(["https://stub.local/queued.png"]);
+    const state = await queueRepo.projectGenerationState(maker.id, id);
+    expect(state.jobs["etsy.in-use"].status).toBe("done");
   });
 
   it("a studio project still follows its recipe's type on autosave", async () => {

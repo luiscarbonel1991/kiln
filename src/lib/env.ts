@@ -16,6 +16,8 @@ const EnvSchema = z.object({
   // The maker this app instance works for (Maker.slug). One maker per instance
   // until accounts exist; headless runs pick theirs the same way.
   KILN_MAKER: z.string().min(1).default("default"),
+  // How many queued generations a server process runs at once.
+  KILN_GENERATION_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
 
   // Object storage — selectable provider (LocalStack S3 for local dev). Optional
   // with local defaults; the storage adapter asserts what it needs at runtime.
