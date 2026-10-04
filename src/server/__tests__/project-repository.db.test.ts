@@ -135,6 +135,45 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     expect(row.plan).not.toBeNull();
   });
 
+  it("a stale autosave never reverts a worker's result, the reference or the card set", async () => {
+    const id = created[0];
+    // The queue finishes etsy.hero after the editor last loaded the project.
+    await db.card.update({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.hero" } },
+      data: { outputs: ["https://stub.local/worker.png"], status: "done" },
+    });
+    // The stale editor still has the old output, another master and only one
+    // card, plus one real edit (a prompt override) that must land.
+    const [hero] = editor.cards;
+    await repo.saveProject(
+      {
+        ...editor,
+        master: {
+          ...master,
+          id: "m-2",
+          assetUrl: "https://stub.local/other.png",
+        },
+        cards: [
+          { ...hero, status: "draft", outputs: [], promptOverride: "closer" },
+        ],
+      },
+      id,
+    );
+    const cards = await db.card.findMany({
+      where: { projectId: id },
+      orderBy: { cardId: "asc" },
+    });
+    expect(cards.map((c) => c.cardId)).toEqual(["etsy.hero", "etsy.in-use"]);
+    const saved = cards.find((c) => c.cardId === "etsy.hero");
+    expect(saved?.outputs).toEqual(["https://stub.local/worker.png"]);
+    expect(saved?.status).toBe("done");
+    expect(saved?.promptOverride).toBe("closer");
+    const anchor = await db.masterAsset.findUniqueOrThrow({
+      where: { projectId: id },
+    });
+    expect(anchor.assetUrl).toBe(master.assetUrl);
+  });
+
   it("two approvals at once on different slots both persist", async () => {
     const id = created[0];
     await Promise.all([
@@ -152,7 +191,10 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const loaded = await repo.loadProjectBoard(id);
     expect(
       loaded?.board.plan?.destinations[0].slots.map((s) => s.approvedOutput),
-    ).toEqual(["https://stub.local/hero.png", "https://stub.local/in-use.png"]);
+    ).toEqual([
+      "https://stub.local/worker.png",
+      "https://stub.local/in-use.png",
+    ]);
   });
 
   it("a studio project still follows its recipe's type on autosave", async () => {

@@ -21,6 +21,7 @@ import { rowToProduct } from "@/server/product-mapper";
 import {
   type CardRow,
   cardsToRows,
+  editorCardColumns,
   type MasterAssetRow,
   masterToRow,
   type ProjectBoard,
@@ -86,9 +87,13 @@ function cardData(projectId: string, cards: CardRow[]) {
 // Every query is scoped to the current maker: a project id from another maker
 // reads as not found.
 
-// Create (no id) or overwrite (id passed). Cards + master are replaced wholesale
-// inside one transaction: simplest correct strategy for a mutable project. The
-// update writes only projectUpdateData (never name, maker, products or plan).
+// Create (no id) or overwrite (id passed), in one transaction. The update writes
+// only projectUpdateData (never name, maker, products or plan). A studio
+// project's master and cards are then replaced wholesale (no worker writes
+// there). A planned project's are not: its cards and reference are created by
+// the server and its generation state is written by the queue, so the editor
+// only updates the columns it owns on cards that exist (editorCardColumns) —
+// a stale editor tab can never revert a result, the reference or the card set.
 export async function saveProject(
   input: PersistedProject,
   id?: string,
@@ -110,11 +115,28 @@ export async function saveProject(
           },
         });
 
+    if (project.plan !== null) {
+      for (const card of rows.cards) {
+        const columns = editorCardColumns(card);
+        await tx.card.updateMany({
+          where: { projectId: project.id, cardId: card.cardId },
+          data: {
+            ...columns,
+            fields: columns.fields as Prisma.InputJsonValue,
+            references: columns.references as Prisma.InputJsonValue,
+            model: columns.model as Prisma.InputJsonValue,
+            video: nullableJson(columns.video),
+          },
+        });
+      }
+      return project.id;
+    }
+
     // A studio project's type follows its recipe; a planned project's type was
     // chosen in the New project flow and is left alone.
     if (id) {
-      await tx.project.updateMany({
-        where: { id, makerId: maker.id, plan: { equals: Prisma.DbNull } },
+      await tx.project.update({
+        where: { id: project.id },
         data: { type: studioProjectType(rows.recipeId) },
       });
     }

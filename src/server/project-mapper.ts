@@ -96,6 +96,23 @@ export function projectUpdateData(rows: ProjectRows) {
   };
 }
 
+// The card columns the editor owns in a planned project. Generation state
+// (status, outputs) belongs to the server there — the queue writes it — and the
+// card set and its anchor (type, parent, recipe, master) are fixed by the
+// server too. An editor autosave on a planned project writes only these.
+export function editorCardColumns(card: CardRow) {
+  return {
+    direction: card.direction,
+    fields: card.fields,
+    references: card.references,
+    model: card.model,
+    video: card.video,
+    promptOverride: card.promptOverride,
+    vectorUrl: card.vectorUrl,
+    sortOrder: card.sortOrder,
+  };
+}
+
 export function projectCreateData(rows: ProjectRows) {
   return {
     name: rows.name,

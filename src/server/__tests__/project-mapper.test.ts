@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Card } from "@/domain/card";
 import type { PersistedProject } from "@/domain/persisted-project";
 import {
+  editorCardColumns,
   type ProjectRecord,
   type ProjectSummaryRow,
   projectCreateData,
@@ -326,5 +327,21 @@ describe("planned summary and board", () => {
       null,
     );
     expect(rowsToBoard({ ...record, plan: null }).plan).toBeNull();
+  });
+});
+
+describe("editorCardColumns", () => {
+  it("never carries generation state or the card's structure", () => {
+    const [row] = projectToRows(sample).cards;
+    expect(Object.keys(editorCardColumns(row)).sort()).toEqual([
+      "direction",
+      "fields",
+      "model",
+      "promptOverride",
+      "references",
+      "sortOrder",
+      "vectorUrl",
+      "video",
+    ]);
   });
 });
