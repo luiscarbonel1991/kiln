@@ -7,7 +7,7 @@ import { env } from "../../env";
 let client: GoogleGenAI | null = null;
 
 export function hasGoogleKey(): boolean {
-  return Boolean(env.GOOGLE_API_KEY);
+  return env.KILN_PROVIDERS !== "mock" && Boolean(env.GOOGLE_API_KEY);
 }
 
 export function getGenAI(): GoogleGenAI {

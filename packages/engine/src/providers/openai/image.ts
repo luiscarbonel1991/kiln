@@ -2,23 +2,26 @@ import { randomUUID } from "node:crypto";
 import { toFile } from "openai";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { assertCapability, OPENAI_CAPS } from "@/providers/capabilities";
-import type { ImageProvider } from "@/providers/interfaces";
+import type { EditBytesResult, ImageProvider } from "@/providers/interfaces";
+import { mockDelay, providerMode } from "@/providers/mode";
 import { MODELS, resolveImageModel } from "@/providers/models";
 import { getOpenAI, hasOpenAIKey } from "@/providers/openai/client";
 import {
   GenerationResult,
+  type GenerationUsage,
   type ImageComposeInput,
   type ImageEditInput,
   type ImageGenInput,
 } from "@/providers/types";
 
-// Mock fallback when OPENAI_API_KEY is absent.
+// Mock fallback when OPENAI_API_KEY is absent or KILN_PROVIDERS=mock. Each stub
+// URL is unique, so a re-roll is a new output (approvals compare URLs).
 function mockResult(label: string): GenerationResult {
   return GenerationResult.parse({
     assets: [
       {
         id: `openai-${label}-mock`,
-        url: `https://stub.local/openai/${label}.png`,
+        url: `https://stub.local/openai/${label}-${randomUUID()}.png`,
         mime: "image/png",
       },
     ],
@@ -27,6 +30,14 @@ function mockResult(label: string): GenerationResult {
   });
 }
 
+// Plausible usage for mock runs, so costs show up in mock mode (mock jobs never
+// count as spend).
+const MOCK_USAGE: GenerationUsage = {
+  inputTextTokens: 250,
+  inputImageTokens: 1100,
+  outputTokens: 1800,
+};
+
 // Map our aspect ratios to gpt-image supported sizes.
 function sizeFor(aspect: string): "1024x1024" | "1024x1536" | "1536x1024" {
   if (["4:5", "2:3", "9:16", "3:4"].includes(aspect)) return "1024x1536";
@@ -34,10 +45,39 @@ function sizeFor(aspect: string): "1024x1024" | "1024x1536" | "1536x1024" {
   return "1024x1024";
 }
 
+// The API's usage block (input split into text and image tokens) as ours.
+function usageOf(usage: unknown): GenerationUsage | undefined {
+  const u = usage as {
+    input_tokens?: number;
+    output_tokens?: number;
+    input_tokens_details?: { image_tokens?: number; text_tokens?: number };
+  } | null;
+  if (!u || typeof u.output_tokens !== "number") return undefined;
+  const image = u.input_tokens_details?.image_tokens ?? 0;
+  const text =
+    u.input_tokens_details?.text_tokens ?? (u.input_tokens ?? 0) - image;
+  return {
+    inputTextTokens: Math.max(0, text),
+    inputImageTokens: Math.max(0, image),
+    outputTokens: u.output_tokens,
+  };
+}
+
+function editParams(input: ImageEditInput, model: string) {
+  return {
+    model,
+    prompt: input.negative
+      ? `${input.prompt}\nAvoid: ${input.negative}`
+      : input.prompt,
+    size: sizeFor(input.model.aspect),
+  };
+}
+
 // gpt-image always returns base64 (b64_json); store it and return a durable URL.
 async function storeB64(
   b64: string | undefined,
   model: string,
+  usage: GenerationUsage | undefined,
 ): Promise<GenerationResult> {
   if (!b64) throw new Error("OpenAI returned no image");
   const url = await storeAsset(
@@ -49,6 +89,7 @@ async function storeB64(
     assets: [{ id: randomUUID(), url, mime: "image/png" }],
     provider: "openai",
     model,
+    usage,
   });
 }
 
@@ -57,32 +98,68 @@ export const openaiImageProvider: ImageProvider = {
   capabilities: OPENAI_CAPS,
   async generate(input: ImageGenInput) {
     assertCapability(this, "generate");
-    if (!hasOpenAIKey()) return mockResult("generate");
+    if (!hasOpenAIKey()) {
+      await mockDelay();
+      return mockResult("generate");
+    }
     const model = resolveImageModel("openai", input.model.model);
     const r = await getOpenAI().images.generate({
       model,
       prompt: input.prompt,
       size: sizeFor(input.model.aspect),
     });
-    return storeB64(r.data?.[0]?.b64_json, model);
+    return storeB64(r.data?.[0]?.b64_json, model, usageOf(r.usage));
   },
   async edit(input: ImageEditInput) {
     assertCapability(this, "edit", input.imageInputs.length);
-    if (!hasOpenAIKey()) return mockResult("edit");
+    if (!hasOpenAIKey()) {
+      await mockDelay();
+      return mockResult("edit");
+    }
     const model = resolveImageModel("openai", input.model.model);
     const master = await fetchAsset(input.masterAssetUrl);
     const image = await toFile(master.bytes, "master.png", {
       type: master.mime,
     });
     const r = await getOpenAI().images.edit({
-      model,
+      ...editParams(input, model),
       image,
-      prompt: input.negative
-        ? `${input.prompt}\nAvoid: ${input.negative}`
-        : input.prompt,
-      size: sizeFor(input.model.aspect),
     });
-    return storeB64(r.data?.[0]?.b64_json, model);
+    return storeB64(r.data?.[0]?.b64_json, model, usageOf(r.usage));
+  },
+  async editBytes(
+    input: ImageEditInput,
+    options: { timeoutMs: number },
+  ): Promise<EditBytesResult> {
+    assertCapability(this, "edit", input.imageInputs.length);
+    const model = resolveImageModel("openai", input.model.model);
+    const master = await fetchAsset(input.masterAssetUrl);
+    if (!hasOpenAIKey()) {
+      // The stub "edit" returns the reference itself: a real, storable image,
+      // so mock runs fill the board with something to look at.
+      await mockDelay();
+      return {
+        bytes: new Uint8Array(master.bytes),
+        mime: master.mime,
+        model,
+        usage: providerMode() === "mock" ? MOCK_USAGE : undefined,
+      };
+    }
+    const image = await toFile(master.bytes, "master.png", {
+      type: master.mime,
+    });
+    const r = await getOpenAI().images.edit(
+      { ...editParams(input, model), image },
+      { timeout: options.timeoutMs, maxRetries: 0 },
+    );
+    const b64 = r.data?.[0]?.b64_json;
+    if (!b64) throw new Error("OpenAI returned no image");
+    return {
+      bytes: new Uint8Array(Buffer.from(b64, "base64")),
+      mime: "image/png",
+      model,
+      usage: usageOf(r.usage),
+    };
   },
   async compose(input: ImageComposeInput) {
     // Gated: OPENAI_CAPS.compose === false -> assertCapability throws CapabilityError.

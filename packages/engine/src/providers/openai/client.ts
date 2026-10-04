@@ -6,7 +6,7 @@ import { env } from "../../env";
 let client: OpenAI | null = null;
 
 export function hasOpenAIKey(): boolean {
-  return Boolean(env.OPENAI_API_KEY);
+  return env.KILN_PROVIDERS !== "mock" && Boolean(env.OPENAI_API_KEY);
 }
 
 export function getOpenAI(): OpenAI {

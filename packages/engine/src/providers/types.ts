@@ -12,10 +12,20 @@ export const GeneratedAsset = z.object({
 });
 export type GeneratedAsset = z.infer<typeof GeneratedAsset>;
 
+// Token usage reported by the provider (OpenAI image models): what a finished
+// generation actually cost (domain costFromUsage).
+export const GenerationUsage = z.object({
+  inputTextTokens: z.number().int().min(0),
+  inputImageTokens: z.number().int().min(0),
+  outputTokens: z.number().int().min(0),
+});
+export type GenerationUsage = z.infer<typeof GenerationUsage>;
+
 export const GenerationResult = z.object({
   assets: z.array(GeneratedAsset),
   provider: z.string(),
   model: z.string(),
+  usage: GenerationUsage.optional(),
 });
 export type GenerationResult = z.infer<typeof GenerationResult>;
 

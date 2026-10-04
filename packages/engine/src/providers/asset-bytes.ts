@@ -7,9 +7,14 @@ export interface FetchedAsset {
   mime: string;
 }
 
+const FETCH_TIMEOUT_MS = 30_000;
+
 // Fetch image/video bytes from a URL (S3, http, data:) for use as model input.
+// Bounded, so a stalled storage read never holds a paid job open.
 export async function fetchAsset(url: string): Promise<FetchedAsset> {
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch asset (${res.status}): ${url}`);
   }

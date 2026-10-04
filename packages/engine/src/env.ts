@@ -5,6 +5,9 @@ import { z } from "zod";
 // builds and tests never throw (adapters assert what they need at call time and
 // fall back to mocks when a key is absent). NO DATABASE_URL — persistence is the
 // host app's concern, not the engine's.
+// An empty value in .env (`KEY=`) means "not set", not an invalid value.
+const blankAsUnset = (v: unknown) => (v === "" ? undefined : v);
+
 const EnvSchema = z.object({
   GOOGLE_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
@@ -15,6 +18,17 @@ const EnvSchema = z.object({
   OPENAI_IMAGE_MODEL: z.string().min(1).optional(),
   GOOGLE_VIDEO_MODEL: z.string().min(1).optional(),
   OPENAI_VIDEO_MODEL: z.string().min(1).optional(),
+
+  // "mock" forces every adapter onto its stub, even with keys set (UI work and
+  // demos without paid calls); KILN_MOCK_DELAY_MS makes stubs take that long.
+  KILN_PROVIDERS: z.preprocess(
+    blankAsUnset,
+    z.enum(["live", "mock"]).default("live"),
+  ),
+  KILN_MOCK_DELAY_MS: z.preprocess(
+    blankAsUnset,
+    z.coerce.number().int().min(0).default(0),
+  ),
 
   // Object storage — selectable provider (S3 / S3-compatible like MinIO). Optional
   // with local defaults; the storage adapter asserts what it needs at runtime.
