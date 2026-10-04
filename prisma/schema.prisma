@@ -17,16 +17,18 @@ datasource db {
 
 // The account. `slug` names the maker for the app and headless runs (KILN_MAKER,
 // default "default"). `pricing` is the optional laser cost calculator's saved
-// defaults (Zod MakerProfileData), hardened on read.
+// defaults (Zod MakerProfileData), hardened on read. `monthlyCapCents` caps what
+// Kiln may spend on paid generations per calendar month (UTC).
 model Maker {
-  id        String    @id @default(cuid())
-  slug      String    @unique
-  name      String
-  pricing   Json?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  projects  Project[]
-  products  Product[]
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  name            String
+  pricing         Json?
+  monthlyCapCents Int       @default(2500)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  projects        Project[]
+  products        Product[]
 }
 
 // One piece of work with a deliverable. `type` is a domain ProjectType. The
@@ -50,6 +52,8 @@ model Project {
   master        MasterAsset?
   cards         Card[]
   products      ProjectProduct[]
+  batches       GenerationBatch[]
+  jobs          GenerationJob[]
 
   @@index([makerId])
 }
@@ -120,4 +124,61 @@ model Card {
 
   @@id([projectId, cardId])
   @@index([projectId])
+}
+
+// One approved batch of paid generations (the board's "Generate N scenes").
+// `mode` is the provider mode it was queued under (live / mock): a process only
+// runs jobs of its own mode, and mock batches never count as spend. Money in
+// micro-dollars. A deleted project keeps its batches (projectId set null), so
+// the month's spend survives.
+model GenerationBatch {
+  id             String          @id @default(cuid())
+  makerId        String
+  projectId      String?
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  mode           String
+  count          Int
+  estimateMicros Int
+  model          String
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  canceledAt     DateTime?       @db.Timestamptz(3)
+  jobs           GenerationJob[]
+
+  @@index([projectId])
+}
+
+// One paid generation, in the queue or done. `request` is the exact request
+// that is paid for (domain GenerationRequest), reused by its retry. A worker
+// holds a job with a lease (leaseUntil, renewed) and a leaseToken that every
+// closing write must match. A job with no batch records a direct studio call's
+// spend. cardId is a plain column (no FK): the spend outlives the card.
+model GenerationJob {
+  id             String           @id @default(cuid())
+  batchId        String?
+  batch          GenerationBatch? @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  makerId        String
+  projectId      String?
+  project        Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  cardId         String
+  mode           String
+  position       Int              @default(0)
+  status         String
+  attempt        Int              @default(0)
+  maxAttempts    Int
+  availableAt    DateTime         @default(now()) @db.Timestamptz(3)
+  leaseUntil     DateTime?        @db.Timestamptz(3)
+  leaseToken     String?
+  request        Json?
+  estimateMicros Int
+  actualMicros   Int?
+  usage          Json?
+  outputUrl      String?
+  error          String?
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  startedAt      DateTime?        @db.Timestamptz(3)
+  finishedAt     DateTime?        @db.Timestamptz(3)
+
+  @@index([status, mode, availableAt])
+  @@index([projectId, cardId])
+  @@index([makerId, createdAt])
 }
