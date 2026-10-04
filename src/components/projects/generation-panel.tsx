@@ -17,6 +17,7 @@ export interface BatchEstimate {
   typicalMicros: number;
   maxMicros: number;
   model: string;
+  quality: string | null;
 }
 
 // The board's generate panel (ROADMAP principle 8, "cost before spend, one
@@ -150,7 +151,8 @@ export function GenerationPanel({
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 font-sans text-sm">
               <dt className="text-on-surface-mid">Model</dt>
               <dd className="font-mono text-[0.8rem] text-foreground">
-                {estimate.model}, quality auto
+                {estimate.model}
+                {estimate.quality ? `, quality ${estimate.quality}` : ""}
               </dd>
               <dt className="text-on-surface-mid">Estimated</dt>
               <dd className="text-foreground">

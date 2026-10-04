@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { toFile } from "openai";
+import { OPENAI_IMAGE_QUALITY } from "@/domain/model-defaults";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { assertCapability, OPENAI_CAPS } from "@/providers/capabilities";
 import type { EditBytesResult, ImageProvider } from "@/providers/interfaces";
@@ -70,6 +71,7 @@ function editParams(input: ImageEditInput, model: string) {
       ? `${input.prompt}\nAvoid: ${input.negative}`
       : input.prompt,
     size: sizeFor(input.model.aspect),
+    quality: OPENAI_IMAGE_QUALITY,
   };
 }
 
@@ -107,6 +109,7 @@ export const openaiImageProvider: ImageProvider = {
       model,
       prompt: input.prompt,
       size: sizeFor(input.model.aspect),
+      quality: OPENAI_IMAGE_QUALITY,
     });
     return storeB64(r.data?.[0]?.b64_json, model, usageOf(r.usage));
   },

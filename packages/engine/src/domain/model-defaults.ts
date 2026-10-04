@@ -25,6 +25,13 @@ export const defaultVideoModel = () => ({
   model: DEFAULT_MODEL_IDS[DEFAULT_PROVIDER].video,
 });
 
+// The quality every OpenAI image request is sent with (generate, edit and the
+// queue). Pinned so a scene's cost is known before it is paid: with "auto" the
+// model picks per image (medium chosen by Luis, 2026-10-04). The cost estimate
+// reads the same constant.
+export type ImageQuality = "low" | "medium" | "high";
+export const OPENAI_IMAGE_QUALITY: ImageQuality = "medium";
+
 // The models a card may switch between — the UI pickers' source of truth AND the
 // adapters' allowlist (a card's model id is client-supplied; anything outside the
 // catalog falls back to the provider default). IDs verified live against both

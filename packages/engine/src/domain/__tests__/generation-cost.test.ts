@@ -7,7 +7,10 @@ import {
   imagePrice,
   toMicros,
 } from "@/domain/generation-cost";
-import { DEFAULT_MODEL_IDS } from "@/domain/model-defaults";
+import {
+  DEFAULT_MODEL_IDS,
+  OPENAI_IMAGE_QUALITY,
+} from "@/domain/model-defaults";
 
 describe("generation cost", () => {
   it("prices every catalog default image model", () => {
@@ -18,17 +21,37 @@ describe("generation cost", () => {
     }
   });
 
-  it("sums one generation per scene; non-square OpenAI sizes cost 1.5x, plus the edit's input allowance", () => {
+  it("sums one generation per scene at the pinned quality, by size, plus the edit's input allowance", () => {
+    // gpt-image-2 medium: $0.053 square, $0.041 portrait (cheaper, per the
+    // official table); the max allows 1.25x output and a $0.02 input.
     const e = estimateScenes([{ aspect: "1:1" }, { aspect: "4:5" }], {
       provider: "openai",
       model: "gpt-image-2",
     });
     expect(e).toEqual({
       count: 2,
-      typical: 0.1525,
-      max: 0.5675,
+      typical: 0.114,
+      max: 0.1576,
+      quality: "medium",
       confidence: "official",
     });
+  });
+
+  it("reads the row of the quality the requests are sent with", () => {
+    expect(OPENAI_IMAGE_QUALITY).toBe("medium");
+    expect(
+      imagePrice({ provider: "openai", model: "gpt-image-2" }),
+    ).toMatchObject({
+      quality: OPENAI_IMAGE_QUALITY,
+      output: { square: 0.053, nonSquare: 0.041 },
+    });
+    // The older models spend a fixed token count per quality and size: no margin.
+    expect(
+      estimateGeneration(
+        { provider: "openai", model: "gpt-image-1-mini" },
+        "4:5",
+      ),
+    ).toEqual({ typical: 0.025, max: 0.035 });
   });
 
   it("Gemini charges per 1K image whatever the aspect", () => {
@@ -38,6 +61,7 @@ describe("generation cost", () => {
     });
     expect(e?.typical).toBe(0.134);
     expect(e?.max).toBe(0.136);
+    expect(e?.quality).toBeNull();
   });
 
   it("returns null for a model without a pinned price", () => {
@@ -62,7 +86,7 @@ describe("actual cost and the monthly cap", () => {
   it("estimates one generation per model and aspect", () => {
     expect(
       estimateGeneration({ provider: "openai", model: "gpt-image-2" }, "1:1"),
-    ).toEqual({ typical: 0.063, max: 0.231 });
+    ).toEqual({ typical: 0.063, max: 0.0863 });
   });
 
   it("canAfford counts spent + reserved + the request, exactly up to the cap", () => {

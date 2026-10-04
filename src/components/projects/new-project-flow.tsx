@@ -360,7 +360,7 @@ export function NewProjectFlow({
                 </p>
                 <p className="font-mono text-[0.7rem] text-on-surface-mid">
                   {estimate
-                    ? `≈ ${money(estimate.typical)}–${money(estimate.max)} if each scene is generated once · ${model.model}, quality auto${estimate.confidence === "derived" ? " (derived price)" : ""}`
+                    ? `≈ ${money(estimate.typical)}–${money(estimate.max)} if each scene is generated once · ${model.model}${estimate.quality ? `, quality ${estimate.quality}` : ""}${estimate.confidence === "derived" ? " (derived price)" : ""}`
                     : `no pinned price for ${model.model}`}
                 </p>
                 <p className="font-sans text-[0.75rem] text-on-surface-mid">

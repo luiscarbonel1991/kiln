@@ -1,5 +1,10 @@
 import type { Card } from "@/domain/card";
-import { estimateGeneration, toMicros } from "@/domain/generation-cost";
+import {
+  estimateGeneration,
+  type ImagePrice,
+  imagePrice,
+  toMicros,
+} from "@/domain/generation-cost";
 import {
   buildGenerationRequest,
   type GenerationRequest,
@@ -40,7 +45,11 @@ export interface CardEstimate {
 export async function estimateProjectCards(
   projectId: string,
   cardIds: string[],
-): Promise<{ cards: CardEstimate[]; model: string }> {
+): Promise<{
+  cards: CardEstimate[];
+  model: string;
+  quality: ImagePrice["quality"];
+}> {
   const project = await loadProject(projectId);
   if (!project?.master || !project.understanding) {
     throw new Error("The project needs a reference image first.");
@@ -70,7 +79,12 @@ export async function estimateProjectCards(
       maxMicros: toMicros(estimate.max),
     };
   });
-  return { cards, model: cards[0]?.request.model.model ?? "" };
+  const first = cards[0]?.request.model;
+  return {
+    cards,
+    model: first?.model ?? "",
+    quality: first ? (imagePrice(first)?.quality ?? null) : null,
+  };
 }
 
 // Queue a planned project's cards as one batch and wake the worker.

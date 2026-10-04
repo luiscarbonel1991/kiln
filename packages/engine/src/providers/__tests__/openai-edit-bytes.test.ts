@@ -56,6 +56,7 @@ describe("openai editBytes (the queue's edit)", () => {
     expect(edit.mock.calls[0][0]).toMatchObject({
       model: "gpt-image-2",
       size: "1024x1536",
+      quality: "medium",
       prompt: "a scene\nAvoid: text overlay",
     });
     expect(edit.mock.calls[0][1]).toEqual({ timeout: 180_000, maxRetries: 0 });

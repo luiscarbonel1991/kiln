@@ -21,12 +21,16 @@ async function batchEstimate(
 ): Promise<BatchEstimate | null> {
   if (cardIds.length === 0) return null;
   try {
-    const { cards, model } = await estimateProjectCards(projectId, cardIds);
+    const { cards, model, quality } = await estimateProjectCards(
+      projectId,
+      cardIds,
+    );
     return {
       count: cards.length,
       typicalMicros: cards.reduce((t, c) => t + c.typicalMicros, 0),
       maxMicros: cards.reduce((t, c) => t + c.maxMicros, 0),
       model,
+      quality,
     };
   } catch {
     return null;

@@ -1,49 +1,78 @@
+import {
+  type ImageQuality,
+  OPENAI_IMAGE_QUALITY,
+} from "@/domain/model-defaults";
+
 // What a scene costs before anything is generated (ROADMAP principle 8, "cost
-// before spend"). Prices are pinned with their date and source; an estimate is
-// a range because Kiln sends gpt-image requests with quality "auto".
+// before spend"). Prices are pinned with their date and source.
 //
-// Sources, checked 2026-10-02:
+// Sources, checked 2026-10-04:
 // - Google: per-image prices, https://ai.google.dev/gemini-api/docs/pricing
 //   (official; one price per 1K image whatever the aspect).
-// - OpenAI: the price list gives $ per 1M image output tokens
-//   (https://developers.openai.com/api/docs/pricing: gpt-image-2 $30,
-//   gpt-image-1.5 $32, gpt-image-1-mini $8). Per-image figures for gpt-image-2
-//   at 1024x1024 (medium $0.053, high $0.211) are the image cost calculator's,
-//   as reported by third parties; the other two are scaled by their token price
-//   ("derived"). Portrait/landscape sizes (1024x1536) use 1.5x the tokens.
-//   An edit also pays its input (the reference image and the prompt), which
-//   the per-image figures leave out: `input` is a provisional allowance until
-//   the queue has measured real usage.
+// - OpenAI: the output cost per image by quality and size from the image
+//   generation guide's cost table (https://developers.openai.com/api/docs/
+//   guides/image-generation, "Calculating costs"). Kiln pins the request
+//   quality (OPENAI_IMAGE_QUALITY), so the estimate reads that row. gpt-image-2
+//   can spend a different number of tokens per image at the same quality, so
+//   its max carries a margin until enough runs are measured; the older models'
+//   counts are fixed per quality and size. An edit also pays its input (the
+//   reference image, at high fidelity on gpt-image-2, and the prompt): measured
+//   2026-10-04 at ~$0.009 (205 text + 1024 image tokens, 1024px reference).
 
 export interface ImagePrice {
   provider: "google" | "openai";
   model: string;
-  typical: number;
-  max: number;
+  // The quality the request is sent with; null where the API has none.
+  quality: ImageQuality | null;
+  // $ per image: square (1024x1024) and non-square (1024x1536 / 1536x1024).
+  output: { square: number; nonSquare: number };
+  // The max allows output x margin.
+  outputMargin: number;
   input: { typical: number; max: number };
-  nonSquareFactor: number;
   confidence: "official" | "derived";
 }
 
-export const PRICES_AS_OF = "2026-10-02";
+export const PRICES_AS_OF = "2026-10-04";
 
-const openai = (model: string, perMillionTokens: number): ImagePrice => ({
-  provider: "openai",
-  model,
-  typical: round((0.053 * perMillionTokens) / 30),
-  max: round((0.211 * perMillionTokens) / 30),
-  input: { typical: 0.01, max: 0.02 },
-  nonSquareFactor: 1.5,
-  confidence: model === "gpt-image-2" ? "official" : "derived",
-});
+// $ per image output: [square, non-square] for each quality.
+const OPENAI_OUTPUT: Record<string, Record<ImageQuality, [number, number]>> = {
+  "gpt-image-2": {
+    low: [0.006, 0.005],
+    medium: [0.053, 0.041],
+    high: [0.211, 0.165],
+  },
+  "gpt-image-1.5": {
+    low: [0.009, 0.013],
+    medium: [0.034, 0.05],
+    high: [0.133, 0.2],
+  },
+  "gpt-image-1-mini": {
+    low: [0.005, 0.006],
+    medium: [0.011, 0.015],
+    high: [0.036, 0.052],
+  },
+};
+
+const openai = (model: string, outputMargin: number): ImagePrice => {
+  const [square, nonSquare] = OPENAI_OUTPUT[model][OPENAI_IMAGE_QUALITY];
+  return {
+    provider: "openai",
+    model,
+    quality: OPENAI_IMAGE_QUALITY,
+    output: { square, nonSquare },
+    outputMargin,
+    input: { typical: 0.01, max: 0.02 },
+    confidence: "official",
+  };
+};
 
 const google = (model: string, perImage: number): ImagePrice => ({
   provider: "google",
   model,
-  typical: perImage,
-  max: perImage,
+  quality: null,
+  output: { square: perImage, nonSquare: perImage },
+  outputMargin: 1,
   input: { typical: 0, max: 0.001 },
-  nonSquareFactor: 1,
   confidence: "official",
 });
 
@@ -52,9 +81,9 @@ function round(n: number): number {
 }
 
 export const IMAGE_PRICES: ImagePrice[] = [
-  openai("gpt-image-2", 30),
-  openai("gpt-image-1.5", 32),
-  openai("gpt-image-1-mini", 8),
+  openai("gpt-image-2", 1.25),
+  openai("gpt-image-1.5", 1),
+  openai("gpt-image-1-mini", 1),
   google("gemini-3.1-flash-image", 0.067),
   google("gemini-3.1-flash-lite-image", 0.0336),
   google("gemini-3-pro-image", 0.134),
@@ -73,6 +102,7 @@ export interface SceneEstimate {
   count: number;
   typical: number;
   max: number;
+  quality: ImagePrice["quality"];
   confidence: ImagePrice["confidence"];
 }
 
@@ -84,10 +114,11 @@ export function estimateGeneration(
 ): { typical: number; max: number } | null {
   const price = imagePrice(model);
   if (!price) return null;
-  const factor = !aspect || aspect === "1:1" ? 1 : price.nonSquareFactor;
+  const output =
+    !aspect || aspect === "1:1" ? price.output.square : price.output.nonSquare;
   return {
-    typical: round(price.typical * factor + price.input.typical),
-    max: round(price.max * factor + price.input.max),
+    typical: round(output + price.input.typical),
+    max: round(output * price.outputMargin + price.input.max),
   };
 }
 
@@ -106,6 +137,7 @@ export function estimateScenes(
     count: slots.length,
     typical: sum((e) => e.typical),
     max: sum((e) => e.max),
+    quality: price.quality,
     confidence: price.confidence,
   };
 }

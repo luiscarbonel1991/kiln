@@ -59,6 +59,8 @@ export {
   GENERATION_PROVIDERS,
   generationCatalog,
   generationModel,
+  type ImageQuality,
+  OPENAI_IMAGE_QUALITY,
 } from "@/domain/model-defaults";
 export {
   PersistedProject,
