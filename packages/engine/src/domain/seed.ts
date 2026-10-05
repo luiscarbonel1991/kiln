@@ -290,9 +290,12 @@ export const SEED_SHOT_LISTS: ShotList[] = [
           "Stop the scroll in the first second; the headline sits on it.",
         aspect: "4:5",
         textTemplate: "{product.hook}",
-        scene: "the product at {use}, styled and inviting",
+        // The first slide sells the design: it stays in full view even when
+        // the place of use comes with objects (a mug on a coaster).
+        scene:
+          "the product at {use}, styled and inviting, its whole face and design in clear view: any object of the scene sits beside it, never on top of it or covering it",
         composition:
-          "the product centered low in the frame, clean calm space across the top for a short headline",
+          "the product centered low in the frame and seen from above at a slight angle, clean calm space across the top for a short headline",
         lighting: "warm, soft light",
       },
       {

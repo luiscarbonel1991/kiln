@@ -94,8 +94,20 @@ describe("slotCards", () => {
     expect(hook?.direction).toBe("Hook");
     expect(hook?.model.aspect).toBe("4:5");
     expect(hook?.fields.scene.value).toBe(
-      "the product at a kitchen counter during dinner prep, styled and inviting",
+      "the product at a kitchen counter during dinner prep, styled and inviting, its whole face and design in clear view: any object of the scene sits beside it, never on top of it or covering it",
     );
+  });
+
+  it("the hook keeps the design in view, whatever its place of use holds", () => {
+    const coaster = slotCards(plan, master, productUnderstanding(board), [
+      "a coffee table, under a steaming mug",
+    ]);
+    const hook = coaster.find((c) => c.id === "instagram.hook");
+    expect(hook?.fields.scene.value).toContain("under a steaming mug");
+    expect(hook?.fields.scene.value).toContain(
+      "never on top of it or covering it",
+    );
+    expect(hook?.fields.composition.value).toContain("space across the top");
   });
 
   it("each scene has its own direction; the places of use go in order", () => {
