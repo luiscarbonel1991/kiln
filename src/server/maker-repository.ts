@@ -1,7 +1,5 @@
-import type { Prisma } from "@prisma/client";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { MakerProfileData } from "@/lib/pricing/types";
 
 export interface CurrentMaker {
   id: string;
@@ -29,25 +27,4 @@ export async function getCurrentMaker(): Promise<CurrentMaker> {
   });
   makers.set(slug, maker);
   return maker;
-}
-
-// The laser cost calculator's saved defaults, or null if none exist / the stored
-// blob no longer matches the schema (hardened like project restore — a stale row
-// never throws).
-export async function getMakerPricing(): Promise<MakerProfileData | null> {
-  const maker = await getCurrentMaker();
-  const row = await db.maker.findUnique({
-    where: { id: maker.id },
-    select: { pricing: true },
-  });
-  const parsed = MakerProfileData.safeParse(row?.pricing);
-  return parsed.success ? parsed.data : null;
-}
-
-export async function saveMakerPricing(data: MakerProfileData): Promise<void> {
-  const maker = await getCurrentMaker();
-  await db.maker.update({
-    where: { id: maker.id },
-    data: { pricing: data as unknown as Prisma.InputJsonValue },
-  });
 }

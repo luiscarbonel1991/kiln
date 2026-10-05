@@ -1,5 +1,5 @@
 import { svgPathProperties } from "svg-path-properties";
-import type { SvgGeometry } from "@/lib/pricing/types";
+import type { SvgGeometry } from "@/modules/laser-pricing/types";
 
 // Parse an SVG string into scale-independent geometry: per-color path length (for
 // cut/score), a bounding box, and an engrave fill estimate. Pure and deterministic

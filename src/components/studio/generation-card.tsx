@@ -8,7 +8,6 @@ import { vectorizeCardAction } from "@/app/actions/vectorize";
 import { AssembledPromptTray } from "@/components/studio/assembled-prompt-tray";
 import { CardActions } from "@/components/studio/card-actions";
 import { CardFieldRow } from "@/components/studio/card-field-row";
-import { CostPanel } from "@/components/studio/cost-panel";
 import { RenderCanvas } from "@/components/studio/render-canvas";
 import { assemblePrompt, type FieldKey } from "@/domain/cascade";
 import { estimateGeneration } from "@/domain/generation-cost";
@@ -20,6 +19,8 @@ import type { BaseUnderstanding } from "@/domain/understanding";
 import { assetFilename, downloadAsset } from "@/lib/download";
 import { gradientForSeed } from "@/lib/gradient";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
+import { CostPanel } from "@/modules/laser-pricing/cost-panel";
+import { useModule } from "@/modules/modules-context";
 import { startCardGeneration } from "@/store/generation-runner";
 import { type StudioCard, toPersisted, useProject } from "@/store/project";
 
@@ -62,6 +63,7 @@ export function GenerationCard({
   const inQueue = projectMode && isActiveJob(job);
 
   const recipe = findRecipe(card.recipeId) ?? SEED_RECIPES[0];
+  const laserPricing = useModule("laser-pricing");
   const purpose = recipe.directions.find(
     (s) => s.label === card.direction,
   )?.purpose;
@@ -266,7 +268,7 @@ export function GenerationCard({
               <Download className="size-3" /> Download .svg
             </button>
           ) : null}
-          {card.vectorUrl && !vectorizing ? (
+          {laserPricing && card.vectorUrl && !vectorizing ? (
             <CostPanel vectorUrl={card.vectorUrl} />
           ) : null}
         </>

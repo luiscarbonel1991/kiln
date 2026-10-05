@@ -18,19 +18,31 @@ datasource db {
 }
 
 // The account. `slug` names the maker for the app and headless runs (KILN_MAKER,
-// default "default"). `pricing` is the optional laser cost calculator's saved
-// defaults (Zod MakerProfileData), hardened on read. `monthlyCapCents` caps what
-// Kiln may spend on paid generations per calendar month (UTC).
+// default "default"). `monthlyCapCents` caps what Kiln may spend on paid
+// generations per calendar month (UTC).
 model Maker {
-  id              String    @id @default(cuid())
-  slug            String    @unique
+  id              String           @id @default(cuid())
+  slug            String           @unique
   name            String
-  pricing         Json?
-  monthlyCapCents Int       @default(2500)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  monthlyCapCents Int              @default(2500)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   projects        Project[]
   products        Product[]
+  moduleSettings  ModuleSettings[]
+}
+
+// An optional module's saved settings for a maker (src/modules; an instance
+// switches modules on with KILN_MODULES). The module owns and validates its JSON
+// (laser-pricing: Zod MakerProfileData, hardened on read).
+model ModuleSettings {
+  makerId   String
+  maker     Maker    @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  module    String
+  settings  Json
+  updatedAt DateTime @updatedAt
+
+  @@id([makerId, module])
 }
 
 // One piece of work with a deliverable. `type` is a domain ProjectType. The

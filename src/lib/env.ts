@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MODULE_IDS } from "@/modules/ids";
 
 const EnvSchema = z.object({
   GOOGLE_API_KEY: z.string().min(1).optional(),
@@ -18,6 +19,18 @@ const EnvSchema = z.object({
   KILN_MAKER: z.string().min(1).default("default"),
   // How many queued generations a server process runs at once.
   KILN_GENERATION_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
+  // Optional modules this instance runs, comma-separated (src/modules); none by
+  // default. Today: "laser-pricing", the laser cost calculator.
+  KILN_MODULES: z.preprocess(
+    (v) =>
+      typeof v === "string"
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [],
+    z.array(z.enum(MODULE_IDS)),
+  ),
 
   // Object storage — selectable provider (LocalStack S3 for local dev). Optional
   // with local defaults; the storage adapter asserts what it needs at runtime.

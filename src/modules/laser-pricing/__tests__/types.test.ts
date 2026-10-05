@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SHOP } from "@/lib/pricing/presets";
-import { MakerProfileData } from "@/lib/pricing/types";
+import { DEFAULT_SHOP } from "@/modules/laser-pricing/presets";
+import { MakerProfileData } from "@/modules/laser-pricing/types";
 
 describe("MakerProfileData (persistence boundary)", () => {
   it("accepts a well-formed profile", () => {

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { estimatePrice } from "@/lib/pricing/estimate";
+import { estimatePrice } from "@/modules/laser-pricing/estimate";
 import {
   DEFAULT_SHOP,
   MACHINE_PRESETS,
   MATERIAL_PRESETS,
-} from "@/lib/pricing/presets";
-import type { PricingJob, SvgGeometry } from "@/lib/pricing/types";
+} from "@/modules/laser-pricing/presets";
+import type { PricingJob, SvgGeometry } from "@/modules/laser-pricing/types";
 
 const machine = MACHINE_PRESETS[0]; // CO2 40W: cut 15, score 80, engrave 14 mm2/s
 const material = MATERIAL_PRESETS[1]; // Birch ply 3mm: 600x400, $6, kerf 0.2

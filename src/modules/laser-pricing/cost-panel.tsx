@@ -8,20 +8,24 @@ import {
   Save,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { analyzeSvgGeometryAction } from "@/app/actions/analyze-geometry";
+import { cn } from "@/lib/utils";
 import {
+  analyzeSvgGeometryAction,
   getMakerPricingAction,
   saveMakerPricingAction,
-} from "@/app/actions/maker";
-import { estimatePrice } from "@/lib/pricing/estimate";
+} from "@/modules/laser-pricing/actions";
+import { estimatePrice } from "@/modules/laser-pricing/estimate";
 import {
   DEFAULT_JOB,
   DEFAULT_SHOP,
   MACHINE_PRESETS,
   MATERIAL_PRESETS,
-} from "@/lib/pricing/presets";
-import type { Operation, ShopProfile, SvgGeometry } from "@/lib/pricing/types";
-import { cn } from "@/lib/utils";
+} from "@/modules/laser-pricing/presets";
+import type {
+  Operation,
+  ShopProfile,
+  SvgGeometry,
+} from "@/modules/laser-pricing/types";
 
 const OPS: Operation[] = ["cut", "score", "engrave"];
 // Outline-only SVGs (no closed subpaths) estimate a 0 fill, which would price an

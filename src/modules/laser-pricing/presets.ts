@@ -1,4 +1,8 @@
-import type { Machine, Material, ShopProfile } from "@/lib/pricing/types";
+import type {
+  Machine,
+  Material,
+  ShopProfile,
+} from "@/modules/laser-pricing/types";
 
 // Sensible starting presets. Phase 2 persists per-shop overrides (Prisma); for now
 // these are the editable defaults the panel opens with. Speeds/rates are typical

@@ -45,6 +45,17 @@ maker's monthly cap (`Maker.monthlyCapCents`, $25 by default).
 pnpm dev:mock   # stubs only (no paid calls, nothing counted), 4 s per stub
 ```
 
+## Optional modules
+
+Features outside Kiln's core live in `src/modules/<id>` and stay off unless the
+instance lists them in `KILN_MODULES` (comma-separated). Today there is one:
+`laser-pricing`, the laser cost calculator shown under a vectorized line-art
+card; its saved defaults live in the module's own `ModuleSettings` row.
+
+```bash
+KILN_MODULES=laser-pricing pnpm dev
+```
+
 ## System dependencies (laser "Centerline" vectorize)
 
 The line-art **Centerline** trace — single cut paths for laser cutting — shells out to two

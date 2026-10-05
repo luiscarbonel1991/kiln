@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSvgGeometry } from "@/lib/pricing/geometry";
+import { parseSvgGeometry } from "@/modules/laser-pricing/geometry";
 
 describe("parseSvgGeometry", () => {
   it("reads viewport, length, bbox and a full fill for a closed square", () => {

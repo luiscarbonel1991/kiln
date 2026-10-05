@@ -5,7 +5,7 @@ import type {
   PricingJob,
   ShopProfile,
   SvgGeometry,
-} from "@/lib/pricing/types";
+} from "@/modules/laser-pricing/types";
 
 // The cost model — pure and deterministic (the moat logic; unit-tested against the
 // real-SVG proof). See docs/app-idea/PRICING.md for the derivation.
