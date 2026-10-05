@@ -265,12 +265,22 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       provider: () =>
         ({
           id: "openai",
-          editBytes: async () => ({
-            bytes: new Uint8Array([1]),
-            mime: "image/png",
-            model: "gpt-image-2",
-            usage: { inputTextTokens: 1, inputImageTokens: 1, outputTokens: 1 },
-          }),
+          editBytes: async (
+            _input: unknown,
+            options: { beforeCall?: () => Promise<void> },
+          ) => {
+            await options.beforeCall?.();
+            return {
+              bytes: new Uint8Array([1]),
+              mime: "image/png",
+              model: "gpt-image-2",
+              usage: {
+                inputTextTokens: 1,
+                inputImageTokens: 1,
+                outputTokens: 1,
+              },
+            };
+          },
         }) as never,
       storeAsset: async () => "https://stub.local/queued.png",
       log: () => {},
@@ -284,6 +294,60 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     expect(card.outputs).toEqual(["https://stub.local/queued.png"]);
     const state = await queueRepo.projectGenerationState(maker.id, id);
     expect(state.jobs["etsy.in-use"].status).toBe("done");
+  });
+
+  it("deleting a project cancels its queued jobs, and nothing is paid for an orphan", async () => {
+    const { estimateProjectCards } = await import("@/server/generation-queue");
+    const queueRepo = await import("@/server/generation-repository");
+    const { getCurrentMaker } = await import("@/server/maker-repository");
+    const [saved] = await upsertProducts([product]);
+    const id = await repo.createProject({
+      type: "launch",
+      productId: saved.id,
+      plan,
+      editor,
+    });
+    created.push(id);
+    const maker = await getCurrentMaker();
+    const { cards, model } = await estimateProjectCards(id, [
+      "etsy.hero",
+      "etsy.in-use",
+    ]);
+    // A mode no other test claims, so the claims below see only these rows.
+    const mode = "delete-test" as never;
+    const { batchId } = await queueRepo.enqueueBatch({
+      makerId: maker.id,
+      projectId: id,
+      mode,
+      model,
+      jobs: cards.map((c) => ({
+        cardId: c.cardId,
+        request: c.request,
+        estimateMicros: c.maxMicros,
+      })),
+    });
+    const [inFlight] = await queueRepo.claimJobs(mode, 1, 60);
+    await repo.deleteProject(id);
+
+    const jobs = await db.generationJob.findMany({ where: { batchId } });
+    expect(jobs.map((j) => j.status).sort()).toEqual(["canceled", "running"]);
+    expect(jobs.every((j) => j.projectId === null)).toBe(true);
+    const batch = await db.generationBatch.findUniqueOrThrow({
+      where: { id: batchId },
+    });
+    expect(batch.canceledAt).not.toBeNull();
+    // The claimed job may not start its paid call any more.
+    expect(
+      await queueRepo.markCallStarted(inFlight.id, inFlight.leaseToken),
+    ).toBe(false);
+    // An orphan still queued (left by a crash) is never claimed.
+    const canceled = jobs.find((j) => j.status === "canceled");
+    await db.generationJob.update({
+      where: { id: canceled?.id },
+      data: { status: "queued" },
+    });
+    expect(await queueRepo.claimJobs(mode, 10, 60)).toEqual([]);
+    await db.generationBatch.delete({ where: { id: batchId } });
   });
 
   it("a studio project still follows its recipe's type on autosave", async () => {

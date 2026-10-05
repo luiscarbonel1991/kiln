@@ -181,8 +181,8 @@ export async function enqueueBatch(input: {
 }
 
 // Claim up to `limit` queued jobs of this process's mode, oldest batch first,
-// in slot order. SKIP LOCKED: concurrent claimers (two processes) never take
-// the same job. Each claim gets a fresh lease token and lease. A new job's
+// in slot order; never one whose project is gone. SKIP LOCKED: concurrent
+// claimers (two processes) never take the same job. Each claim gets a fresh lease token and lease. A new job's
 // availableAt is stamped by the app's clock, so the comparison tolerates a few
 // seconds of skew against the database's; retry backoffs (30 s) are stamped by
 // the database itself.
@@ -196,6 +196,7 @@ export async function claimJobs(
     WITH next AS (
       SELECT "id" FROM "GenerationJob"
       WHERE "status" = 'queued' AND "mode" = ${mode}
+        AND "projectId" IS NOT NULL
         AND "availableAt" <= now() + interval '5 seconds'
       ORDER BY "createdAt", "position"
       LIMIT ${limit}::int
@@ -243,15 +244,17 @@ export async function renewLease(
   return count === 1;
 }
 
-// Mark that the paid call is going out, right before it. Guarded by the lease:
-// false = the lease was lost, and the caller must not make the call.
+// Mark that the paid call is going out, right before it. Guarded by the lease
+// and the project: false = the lease was lost or the project deleted, and the
+// caller must not make the call.
 export async function markCallStarted(
   id: string,
   token: string,
 ): Promise<boolean> {
   const count = await db.$executeRaw`
     UPDATE "GenerationJob" SET "callStartedAt" = now()
-    WHERE "id" = ${id} AND "leaseToken" = ${token} AND "status" = 'running'`;
+    WHERE "id" = ${id} AND "leaseToken" = ${token} AND "status" = 'running'
+      AND "projectId" IS NOT NULL`;
   return count === 1;
 }
 

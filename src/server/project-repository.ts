@@ -272,10 +272,25 @@ export async function listProjects(): Promise<ProjectSummary[]> {
 
 // Delete a project; MasterAsset, Card and ProjectProduct all declare onDelete:
 // Cascade, so this single delete removes the thumbnail row + all cards with it.
+// Delete a project. Its queued jobs are canceled in the same transaction, so
+// the worker never pays for scenes nobody can see; a job already in its paid
+// call finishes, keeps its cost, and its output is dropped. The jobs' rows stay
+// (projectId set null) so the month's spend is kept.
 export async function deleteProject(id: string): Promise<void> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
-  await db.project.delete({ where: { id, makerId: maker.id } });
+  await db.$transaction(async (tx) => {
+    const now = new Date();
+    await tx.generationJob.updateMany({
+      where: { projectId: id, makerId: maker.id, status: "queued" },
+      data: { status: "canceled", finishedAt: now },
+    });
+    await tx.generationBatch.updateMany({
+      where: { projectId: id, makerId: maker.id, canceledAt: null },
+      data: { canceledAt: now },
+    });
+    await tx.project.delete({ where: { id, makerId: maker.id } });
+  });
 }
 
 // Rename a project. The only writer of `name` after create — autosave leaves it
