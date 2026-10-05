@@ -51,9 +51,9 @@ export const googleVisionProvider: VisionProvider = {
             text: [
               "Analyze this single product image for a brand content studio that will place the EXACT product into new scenes. Return JSON:",
               "- subject: the product in a short phrase.",
-              "- productType: a concrete product-category noun, e.g. 'door hanger sign', 'coffee mug', 'house number plaque', 'wall print'.",
-              "- useContext: where this product actually lives / is used / installed / displayed in real life — one short phrase, e.g. 'hangs on a door handle or knob', 'mounted beside a front door', 'sits on a desk', 'hung on a wall'. Infer from the product type, not just this photo.",
-              "- sceneProps: name, as a short NOUN phrase, anything visible in THIS photo that is a prop, mount, hand, stand or surface and is NOT part of the product itself, e.g. 'a door handle', 'a wooden display stand', 'a hand'. Use an empty string if the product is shown alone on a plain background.",
+              "- productType: a concrete product-category noun, e.g. 'coffee mug', 'scented candle', 'wall print', 'ceramic planter'.",
+              "- useContext: where this product actually lives / is used / installed / displayed in real life — one short phrase, e.g. 'held at a kitchen counter', 'on a bedside table', 'hung on a living-room wall', 'on a sunny windowsill'. Infer from the product type, not just this photo.",
+              "- sceneProps: name, as a short NOUN phrase, anything visible in THIS photo that is a prop, mount, hand, stand or surface and is NOT part of the product itself, e.g. 'a wooden display stand', 'a hand', 'a hook'. Use an empty string if the product is shown alone on a plain background.",
               "- materials, lighting, composition, mood: each a short phrase.",
               "- palette: 3-6 dominant colors as hex strings like #aabbcc.",
             ].join("\n"),

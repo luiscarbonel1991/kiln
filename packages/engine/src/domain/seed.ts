@@ -414,9 +414,9 @@ export const SEED_RECIPE_MARKETPLACE = preset("recipe-marketplace");
 export const SEED_RECIPE_SOCIAL = preset("recipe-social-launch");
 export const SEED_RECIPE_ADS = preset("recipe-ads");
 
-// The line-art "Laser / line" recipe (the maker IP) lives in the APP, not here —
-// src/lib/recipes.ts. The OSS engine ships the line-art STYLE capability (recipe
-// `style` + the assemblePrompt branch), not the laser-specific treatments.
+// The app's line-art recipe lives in the APP, not here — src/lib/recipes.ts.
+// The OSS engine ships the line-art STYLE capability (recipe `style` + the
+// assemblePrompt branch), not any maker's treatments.
 
 // Selector source for Planning. SEED_RECIPE stays the default (index 0).
 export const SEED_RECIPES: Recipe[] = [

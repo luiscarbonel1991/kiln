@@ -104,8 +104,8 @@ export interface PlateRenderer {
   }): Promise<PlateResult>;
 }
 
-// (f) Product catalog adapter: where a maker's products come from. maker #1's code
-// catalog is the first implementation; a maker without a catalog gets one built
+// (f) Product catalog adapter: where a maker's products come from. A maker's own
+// code catalog is one implementation; a maker without a catalog gets one built
 // from the product form or from a traced SVG (source.kind = "vector").
 export interface ProductCatalogAdapter {
   readonly id: string;

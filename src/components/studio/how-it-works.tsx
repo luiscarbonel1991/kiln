@@ -1,6 +1,6 @@
 // "How it works" — the flow from one master to a full set, in three moves, with
 // the breadth of outputs shown explicitly in the last step. Kept global on purpose
-// (laser is one output among several, not the headline). Static, no entrance anim.
+// (line-art design SVGs are one output among several). Static, no entrance anim.
 
 const STEPS: {
   n: string;
@@ -27,7 +27,7 @@ const STEPS: {
       "Lifestyle scenes",
       "Paid-ad creatives",
       "Social posts",
-      "Laser-ready cut files",
+      "Line-art SVG designs",
     ],
   },
 ];

@@ -164,14 +164,14 @@ export function assemblePrompt(
     : "";
   let prompt: string;
   if (recipe.style === "line-art") {
-    // Line-art / laser style: redraw the subject as flat black strokes on white —
+    // Line-art style: redraw the subject as flat black strokes on white —
     // NO photographic framing. The slot's `purpose` is the per-slot "treatment"
-    // (cut outline / engrave detail / framed / etc.), since line-art recipes skip
+    // (outline / detail / framed / etc.), since line-art recipes skip
     // the ArtDirector's photographic scene diversification.
     const treatment =
       recipe.directions.find((d) => d.label === direction)?.purpose ?? "";
     prompt = [
-      `Black-and-white line art for laser cutting and engraving${slot}.`,
+      `Black-and-white line art${slot}.`,
       `Subject: ${value("subject")}. Redraw it as clean, single-weight solid black strokes on a pure white background — closed continuous outlines, high contrast. NO shading, NO gradients, NO grey, NO color, no background scenery, no photographic detail.`,
       props
         ? `Draw ONLY the ${ptype}; exclude ${props} — it is not part of the product.`

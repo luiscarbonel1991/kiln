@@ -166,19 +166,19 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
               label="Product type"
               value={understanding.productType}
               onChange={(v) => editUnderstandingField("productType", v)}
-              placeholder="e.g. door hanger sign"
+              placeholder="e.g. ceramic mug"
             />
             <ContextRow
               label="Where it's used"
               value={understanding.useContext}
               onChange={(v) => editUnderstandingField("useContext", v)}
-              placeholder="e.g. hangs on a door handle or knob"
+              placeholder="e.g. a kitchen counter at breakfast"
             />
             <ContextRow
               label="Props in photo"
               value={understanding.sceneProps}
               onChange={(v) => editUnderstandingField("sceneProps", v)}
-              placeholder="what's NOT the product — e.g. hooked over a door handle; empty if shot alone"
+              placeholder="what's NOT the product — e.g. held in a hand; empty if shot alone"
             />
           </div>
         </div>

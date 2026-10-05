@@ -3,7 +3,7 @@ import { Aspect } from "@/domain/destination";
 import { ProjectType } from "@/domain/project";
 
 // Render style drives the prompt framing: "photographic" (a product photo) vs
-// "line-art" (clean black strokes on white, for laser / vector workflows).
+// "line-art" (clean black strokes on white, for vector workflows).
 export const RenderStyle = z.enum(["photographic", "line-art"]);
 export type RenderStyle = z.infer<typeof RenderStyle>;
 

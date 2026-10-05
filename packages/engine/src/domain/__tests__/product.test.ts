@@ -3,33 +3,29 @@ import {
   PlateRequest,
   PlateResult,
   Product,
-  productPromptFields,
   validateWording,
 } from "@/domain/product";
 
-const unitPlaque = Product.parse({
-  id: "maker1:UN-01",
-  sku: "UN-01",
-  name: "Unit number plaque",
-  family: "Unit number",
-  dimensions: { w: 5, h: 2.5, d: 0.25, unit: "in" },
+// A generic catalog product with wording (no maker's catalog in the engine's
+// fixtures: Kiln must build and test without any of them).
+const keyFob = Product.parse({
+  id: "example:KF-01",
+  sku: "KF-01",
+  name: "Engraved key fob",
+  family: "Key fob",
+  dimensions: { w: 3, h: 1.25, d: 0.25, unit: "in" },
   shape: "rounded rectangle",
-  material: "matte cast acrylic",
-  treatment: "raised",
+  material: "solid hardwood",
+  treatment: "engraved",
   colours: [
-    { key: "sage", name: "Dark Sage Green", face: "#4B5F50", inlay: "#FEFEFD" },
-    { key: "charcoal", name: "Black Matte", face: "#171311", inlay: "#FEFEFD" },
+    { key: "oak", name: "Oak", face: "#C8A165" },
+    { key: "walnut", name: "Walnut", face: "#5B3A29" },
   ],
-  defaultColour: "charcoal",
-  typography: {
-    family: "Plus Jakarta Sans",
-    weight: 600,
-    case: "upper",
-    tracking: 5,
-  },
+  defaultColour: "walnut",
+  typography: { family: "Hanken Grotesk", weight: 600, case: "upper" },
   wording: [
-    { label: "Word above", maxChars: 6, required: false, example: "UNIT" },
-    { label: "Number", maxChars: 4, required: true, example: "204" },
+    { label: "Name", maxChars: 6, required: false, example: "HOME" },
+    { label: "Initials", maxChars: 3, required: true, example: "AMB" },
   ],
   icons: [],
   variants: [
@@ -37,28 +33,24 @@ const unitPlaque = Product.parse({
       name: "Set",
       values: [
         { key: "1", label: "Single" },
-        { key: "5", label: "Set of 5", priceExtra: 27 },
+        { key: "3", label: "Set of 3", priceExtra: 12 },
       ],
     },
   ],
-  source: {
-    kind: "catalog",
-    adapterId: "maker1-matte-acrylic-signs",
-    ref: "UN-01",
-  },
+  source: { kind: "catalog", adapterId: "example-catalog", ref: "KF-01" },
 });
 
 describe("Product", () => {
   it("parses a catalog product with defaults", () => {
-    expect(unitPlaque.forbidden).toContain("other text");
-    expect(unitPlaque.colours[0].inStock).toBe(true);
-    expect(unitPlaque.dimensions.unit).toBe("in");
+    expect(keyFob.forbidden).toContain("other text");
+    expect(keyFob.colours[0].inStock).toBe(true);
+    expect(keyFob.dimensions.unit).toBe("in");
   });
 
   it("rejects a bad hex colour", () => {
     expect(() =>
       Product.parse({
-        ...unitPlaque,
+        ...keyFob,
         colours: [{ key: "x", name: "X", face: "green" }],
       }),
     ).toThrow();
@@ -68,14 +60,12 @@ describe("Product", () => {
 describe("validateWording", () => {
   it("accepts a valid piece", () => {
     expect(
-      validateWording(unitPlaque, [
-        { colour: "charcoal", wording: ["UNIT", "204"] },
-      ]),
+      validateWording(keyFob, [{ colour: "walnut", wording: ["HOME", "AMB"] }]),
     ).toEqual([]);
   });
 
   it("flags too many characters, a missing required line and an unknown colour", () => {
-    const problems = validateWording(unitPlaque, [
+    const problems = validateWording(keyFob, [
       { colour: "gold", wording: ["STUDIO7", ""] },
     ]);
     expect(problems.some((p) => p.includes("max 6"))).toBe(true);
@@ -87,8 +77,8 @@ describe("validateWording", () => {
 describe("PlateRequest / PlateResult", () => {
   it("defaults to one 1024 px plate without a baked shadow", () => {
     const req = PlateRequest.parse({
-      productId: "maker1:UN-01",
-      pieces: [{ colour: "charcoal", wording: ["UNIT", "204"] }],
+      productId: "example:KF-01",
+      pieces: [{ colour: "walnut", wording: ["HOME", "AMB"] }],
     });
     expect(req.sizePx).toBe(1024);
     expect(req.shadow).toBe(false);
@@ -97,61 +87,24 @@ describe("PlateRequest / PlateResult", () => {
 
   it("carries the QC hints", () => {
     const res = PlateResult.parse({
-      productId: "maker1:UN-01",
+      productId: "example:KF-01",
       assetUrl: "http://localhost:9000/kiln-assets/plates/x.png",
       sizePx: 1024,
       ppi: 120,
       pieces: [
         {
-          bbox: { x: 212, y: 362, w: 600, h: 300 },
-          expectedText: ["UNIT", "204"],
-          colour: "charcoal",
+          bbox: { x: 212, y: 362, w: 600, h: 250 },
+          expectedText: ["HOME", "AMB"],
+          colour: "walnut",
         },
       ],
-      renderer: { id: "maker1-matte-acrylic-signs", version: "1" },
+      renderer: { id: "example-catalog", version: "1" },
       request: {
-        productId: "maker1:UN-01",
-        pieces: [{ colour: "charcoal", wording: ["UNIT", "204"] }],
+        productId: "example:KF-01",
+        pieces: [{ colour: "walnut", wording: ["HOME", "AMB"] }],
       },
     });
     expect(res.mime).toBe("image/png");
-    expect(res.pieces[0].expectedText).toEqual(["UNIT", "204"]);
-  });
-});
-
-describe("productPromptFields", () => {
-  it("quotes the wording verbatim and keeps the exactness clause", () => {
-    const { subject, materials } = productPromptFields(
-      unitPlaque,
-      PlateRequest.parse({
-        productId: "maker1:UN-01",
-        pieces: [{ colour: "charcoal", wording: ["UNIT", "204"] }],
-      }),
-    );
-    expect(subject).toContain('"UNIT" over "204"');
-    expect(subject).toContain("5 x 2.50 in");
-    expect(subject).toContain("keep every letter");
-    expect(subject).toContain("exactly one piece");
-    expect(subject).toContain("no other text");
-    expect(materials).toContain("black matte cast acrylic, zero gloss");
-    expect(subject).toContain("unit number sign of black matte cast acrylic");
-    expect(materials).toContain("raised 1/8 inch");
-  });
-
-  it("describes several pieces with their own wording", () => {
-    const { subject } = productPromptFields(
-      unitPlaque,
-      PlateRequest.parse({
-        productId: "maker1:UN-01",
-        layout: "row",
-        pieces: [
-          { colour: "sage", wording: ["", "01"] },
-          { colour: "sage", wording: ["", "02"] },
-        ],
-      }),
-    );
-    expect(subject).toContain("2 identical");
-    expect(subject).toContain('piece 1: the words "01"');
-    expect(subject).toContain("exactly 2 pieces");
+    expect(res.pieces[0].expectedText).toEqual(["HOME", "AMB"]);
   });
 });

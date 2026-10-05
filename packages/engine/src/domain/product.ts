@@ -80,7 +80,7 @@ export const VariantAxis = z.object({
 export type VariantAxis = z.infer<typeof VariantAxis>;
 
 // Where the product definition comes from. `catalog` = a maker's code catalog,
-// exported as a product package (maker #1 today); `vector` = a traced or drawn SVG
+// exported as a product package; `vector` = a traced or drawn SVG
 // (the maker on-ramp, see PRODUCT-MODEL.md); `photo` = only a photo exists
 // (weakest guarantees); `form` = typed in by the maker.
 export const ProductSource = z.discriminatedUnion("kind", [
@@ -215,68 +215,4 @@ export function validateWording(
     }
   });
   return problems;
-}
-
-const TREATMENT_TEXT: Record<Treatment, string> = {
-  raised:
-    "raised 1/8 inch with clean laser-cut edges bonded on the face, soft edge highlight on each raised element, short soft shadow to the lower right",
-  inlaid: "inlaid flush into the face with clean laser-cut edges, no relief",
-  engraved: "engraved into the face with crisp edges, no relief",
-  printed: "printed flat on the face, no relief",
-  cut: "cut through the panel as a silhouette",
-};
-
-// "black matte" + "matte cast acrylic" reads as "black matte cast acrylic": words the
-// colour name already carries are dropped from the material.
-function colourMaterial(colour: ColourOption, material: string): string {
-  const said = colour.name.toLowerCase().split(/\s+/);
-  const rest = material
-    .split(/\s+/)
-    .filter((w) => !said.includes(w.toLowerCase()))
-    .join(" ");
-  return `${colour.name.toLowerCase()} ${rest}`.trim();
-}
-
-const placementText = (p: z.infer<typeof IconPlacement> | undefined) =>
-  p === "left"
-    ? "before the words"
-    : p === "right"
-      ? "after the words"
-      : p === "top"
-        ? "above the words"
-        : p === "below"
-          ? "below the words"
-          : "";
-
-// The SUBJECT / MATERIALS fields that produced exact lettering on every maker #1
-// hero, generated from data instead of typed by hand. Wording is quoted verbatim
-// and the "keep every letter" clause is always present.
-export function productPromptFields(
-  product: Product,
-  request: PlateRequest,
-): { subject: string; materials: string } {
-  const n = request.pieces.length;
-  const colour = colourOf(product, request.pieces[0].colour);
-  const inlay = colour.inlay
-    ? `${colour.inlay === "#171311" ? "black" : "white"} `
-    : "";
-  const piece = (p: PlatePiece, i: number) => {
-    const words = p.wording.filter((w) => w.trim() !== "");
-    const text =
-      words.length > 1
-        ? `${words.length} lines of ${inlay}${product.treatment} ${product.typography.family} ${product.typography.case === "upper" ? "capitals" : "letters"}: ${words.map((w) => `"${w}"`).join(" over ")}`
-        : `the ${words.length === 1 ? "words" : "text"} ${words.map((w) => `"${w}"`).join("")} in ${inlay}${product.treatment} ${product.typography.family} ${product.typography.case === "upper" ? "capitals" : "letters"}`;
-    const icon = p.icon
-      ? `${p.icon === "arrow" ? "one solid arrow" : `a ${product.icons.find((x) => x.key === p.icon)?.name ?? p.icon} mark`} ${placementText(p.iconPlacement)}`.trim()
-      : "";
-    const label = n > 1 ? `piece ${i + 1}: ` : "";
-    return `${label}${text}${icon ? `, with ${icon}` : ""}`;
-  };
-  const what =
-    n === 1
-      ? `a ${dimensionsLabel(product.dimensions)} ${product.shape} ${product.family.toLowerCase()} sign of ${colourMaterial(colour, product.material)}`
-      : `${n} identical ${dimensionsLabel(product.dimensions)} ${product.shape} ${product.family.toLowerCase()} pieces of ${colourMaterial(colour, product.material)}`;
-  const subject = `${what}, ${request.pieces.map(piece).join("; ")}; keep every letter, letter spacing, mark and proportion exactly as in the master image, exactly ${n === 1 ? "one piece" : `${n} pieces`}, no ${product.forbidden.join(", no ")}`;
-  const materials = `${colourMaterial(colour, product.material)}, zero gloss; ${inlay}acrylic letters ${TREATMENT_TEXT[product.treatment]}`;
-  return { subject, materials };
 }

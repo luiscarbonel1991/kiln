@@ -97,7 +97,6 @@ export {
   Product,
   ProductIcon,
   ProductSource,
-  productPromptFields,
   Treatment,
   Typography,
   VariantAxis,
