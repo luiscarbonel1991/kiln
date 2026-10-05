@@ -1,13 +1,15 @@
 import { z } from "zod";
+import { BrandKit } from "@/domain/brand";
 import { Product } from "@/domain/product";
 
 // The product package contract (ROADMAP Phase 8, PRODUCT-MODEL.md): what a
 // maker's catalog exports and Kiln imports. A package is one Product, an array
-// of them, or { products: [...] }, each validated by the engine's Product
-// schema. Example: src/lib/__fixtures__/product-package.json.
+// of them, or { maker?, products: [...] }: each product validated by the
+// engine's Product schema, the optional `maker` block by BrandKit (the brand
+// kit for text layers). Example: src/lib/__fixtures__/product-package.json.
 
 export type PackageResult =
-  | { ok: true; products: Product[] }
+  | { ok: true; products: Product[]; brand?: BrandKit }
   | { ok: false; errors: string[] };
 
 const MAX_ERRORS = 12;
@@ -28,6 +30,21 @@ function format(issues: z.core.$ZodIssue[], prefix: string): string[] {
 }
 
 export function parseProductPackage(input: unknown): PackageResult {
+  const block =
+    input !== null && typeof input === "object" && !Array.isArray(input)
+      ? (input as { maker?: unknown }).maker
+      : undefined;
+  let brand: BrandKit | undefined;
+  if (block !== undefined) {
+    const kit = BrandKit.safeParse(block);
+    if (!kit.success) {
+      return {
+        ok: false,
+        errors: format(kit.error.issues, "maker").slice(0, MAX_ERRORS),
+      };
+    }
+    brand = kit.data;
+  }
   const [list, prefix] = Array.isArray(input)
     ? [input, ""]
     : input !== null && typeof input === "object" && "products" in input
@@ -48,5 +65,5 @@ export function parseProductPackage(input: unknown): PackageResult {
       errors: [...new Set(repeated)].map((sku) => `sku "${sku}" appears twice`),
     };
   }
-  return { ok: true, products: parsed.data };
+  return { ok: true, products: parsed.data, ...(brand ? { brand } : {}) };
 }

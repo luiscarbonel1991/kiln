@@ -17,8 +17,13 @@ import {
   SlotGrid,
   slotPosition,
 } from "@/components/projects/slot-frame";
+import type { BrandKit } from "@/domain/brand";
 import type { Card } from "@/domain/card";
-import { exactView, renderTextTemplate } from "@/domain/exact";
+import {
+  exactView,
+  renderTextTemplate,
+  textLayerColours,
+} from "@/domain/exact";
 import {
   type PlanSlot,
   type ProjectPlan,
@@ -88,6 +93,7 @@ export function ProjectBoard({
   generation,
   estimate,
   mode,
+  brand,
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -96,6 +102,7 @@ export function ProjectBoard({
   generation: { version: string; batch: BatchProgress | null; budget: Budget };
   estimate: BatchEstimate | null;
   mode: "live" | "mock";
+  brand: BrandKit | null;
 }) {
   const rows = boardRows(board, jobs);
   const waiting = waitingCardIds(rows);
@@ -157,7 +164,12 @@ export function ProjectBoard({
                   >
                     {slot.exact ? (
                       <ExactSlotArt
-                        view={exactView(slot.exact, product, slot.textTemplate)}
+                        view={exactView(
+                          slot.exact,
+                          product,
+                          slot.textTemplate,
+                          brand,
+                        )}
                         aspect={slot.aspect}
                         plate={plateHref(product)}
                       />
@@ -170,6 +182,7 @@ export function ProjectBoard({
                             ? renderTextTemplate(slot.textTemplate, product)
                             : undefined
                         }
+                        band={textLayerColours(brand)}
                       />
                     )}
                   </SlotFrame>

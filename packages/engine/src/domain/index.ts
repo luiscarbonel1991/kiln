@@ -1,4 +1,4 @@
-export { BrandProfile } from "@/domain/brand";
+export { BrandKit, BrandProfile } from "@/domain/brand";
 export {
   Capabilities,
   canUse,

@@ -1,4 +1,9 @@
 {
+  "maker": {
+    "palette": ["#2F4A3A", "#E9E1D2"],
+    "handle": "@northwindmakers",
+    "url": "https://northwind.example"
+  },
   "products": [
     {
       "id": "northwind:CB-01",

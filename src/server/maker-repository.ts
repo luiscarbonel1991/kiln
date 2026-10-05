@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+import { BrandKit } from "@/domain/brand";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { env } from "@/lib/env";
 
@@ -27,4 +29,24 @@ export async function getCurrentMaker(): Promise<CurrentMaker> {
   });
   makers.set(slug, maker);
   return maker;
+}
+
+// The maker's brand kit, or null when none was imported or the stored blob no
+// longer matches the schema (hardened on read: a stale row never throws).
+export async function getMakerBrand(): Promise<BrandKit | null> {
+  const maker = await getCurrentMaker();
+  const row = await db.maker.findUnique({
+    where: { id: maker.id },
+    select: { brand: true },
+  });
+  const parsed = BrandKit.safeParse(row?.brand);
+  return row?.brand && parsed.success ? parsed.data : null;
+}
+
+export async function saveMakerBrand(brand: BrandKit): Promise<void> {
+  const maker = await getCurrentMaker();
+  await db.maker.update({
+    where: { id: maker.id },
+    data: { brand: brand as unknown as Prisma.InputJsonValue },
+  });
 }

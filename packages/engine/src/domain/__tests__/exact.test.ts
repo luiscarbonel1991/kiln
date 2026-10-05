@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   contrastInk,
   exactView,
+  NEUTRAL_INK,
   productOutline,
   renderTextTemplate,
   scaleReference,
+  shopLine,
+  textLayerColours,
 } from "@/domain/exact";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
@@ -170,5 +173,43 @@ describe("drawn to scale", () => {
     expect(contrastInk("#E8D2A6")).toBe("#241f18");
     expect(contrastInk("#171311")).toBe("#ffffff");
     expect(contrastInk("#c0461f")).toBe("#ffffff");
+  });
+});
+
+describe("text layers and the maker's brand kit", () => {
+  const brand = {
+    palette: ["#2F4A3A", "#E9E1D2"],
+    handle: "northwindmakers",
+    url: "https://www.northwind.example/shop",
+  };
+
+  it("the call to action wears the brand's lead colour and the shop line", () => {
+    const view = exactView("text-card", CUTTING_BOARD, "{product.cta}", brand);
+    expect(view).toMatchObject({
+      kind: "text-card",
+      title: "Personalize yours",
+      subtitle: "@northwindmakers · northwind.example",
+      background: "#2F4A3A",
+      ink: "#ffffff",
+    });
+  });
+
+  it("without a brand kit: neutral ink, never Kiln's accent", () => {
+    const view = exactView("text-card", CUTTING_BOARD, "{product.cta}", null);
+    expect(view).toMatchObject({
+      subtitle: CUTTING_BOARD.family,
+      background: NEUTRAL_INK,
+      ink: "#ffffff",
+    });
+    expect(textLayerColours(undefined).background).not.toBe("#c0461f");
+  });
+
+  it("the shop line takes what the kit has", () => {
+    expect(shopLine({ palette: [], handle: "a" })).toBe("@a");
+    expect(shopLine({ palette: [], url: "https://b.example" })).toBe(
+      "b.example",
+    );
+    expect(shopLine({ palette: [] })).toBeNull();
+    expect(shopLine(null)).toBeNull();
   });
 });

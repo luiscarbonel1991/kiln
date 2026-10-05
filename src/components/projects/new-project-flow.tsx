@@ -13,7 +13,12 @@ import {
   slotPosition,
 } from "@/components/projects/slot-frame";
 import { Button } from "@/components/ui/button";
-import { exactView, renderTextTemplate } from "@/domain/exact";
+import type { BrandKit } from "@/domain/brand";
+import {
+  exactView,
+  renderTextTemplate,
+  textLayerColours,
+} from "@/domain/exact";
 import { estimateScenes } from "@/domain/generation-cost";
 import { defaultImageModel } from "@/domain/model-defaults";
 import {
@@ -49,10 +54,13 @@ function money(n: number): string {
 // final. Start creates the project and opens its board; it calls no model.
 export function NewProjectFlow({
   initialProducts,
+  initialBrand,
 }: {
   initialProducts: Product[];
+  initialBrand: BrandKit | null;
 }) {
   const [products, setProducts] = useState(initialProducts);
+  const [brand, setBrand] = useState(initialBrand);
   const [productId, setProductId] = useState<string | null>(
     initialProducts.length === 1 ? initialProducts[0].id : null,
   );
@@ -130,6 +138,7 @@ export function NewProjectFlow({
         return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
       });
       setProductId(result.products[0]?.id ?? null);
+      if (result.brand) setBrand(result.brand);
     } catch {
       setImportErrors(["The import failed. Is the database running?"]);
     } finally {
@@ -371,6 +380,7 @@ export function NewProjectFlow({
                                 slot.exact,
                                 product,
                                 slot.textTemplate,
+                                brand,
                               )}
                               aspect={slot.aspect}
                               plate={plateHref(product)}
@@ -386,6 +396,7 @@ export function NewProjectFlow({
                                     )
                                   : undefined
                               }
+                              band={textLayerColours(brand)}
                               badge="scene"
                             />
                           )}

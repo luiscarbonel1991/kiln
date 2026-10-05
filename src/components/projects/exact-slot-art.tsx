@@ -39,11 +39,11 @@ export function ExactSlotArt({
       role="img"
       aria-label={view.title}
     >
-      <rect
-        width={WIDTH}
-        height={height}
-        className={view.kind === "text-card" ? "fill-primary" : "fill-card"}
-      />
+      {view.kind === "text-card" ? (
+        <rect width={WIDTH} height={height} fill={view.background} />
+      ) : (
+        <rect width={WIDTH} height={height} className="fill-card" />
+      )}
       {view.kind === "colour-grid" ? (
         <ColourGrid view={view} height={height} />
       ) : null}
@@ -669,7 +669,7 @@ function TextCard({
         x={WIDTH / 2}
         y={height / 2}
         textAnchor="middle"
-        className="fill-primary-foreground"
+        fill={view.ink}
         style={{ ...SERIF, fontSize: 34, fontStyle: "italic" }}
       >
         {view.title}
@@ -678,7 +678,7 @@ function TextCard({
         x={WIDTH / 2}
         y={height / 2 + 34}
         textAnchor="middle"
-        className="fill-primary-foreground"
+        fill={view.ink}
         style={{ ...SANS, fontSize: 12, fontWeight: 700, letterSpacing: 3 }}
       >
         {view.subtitle.toUpperCase()}

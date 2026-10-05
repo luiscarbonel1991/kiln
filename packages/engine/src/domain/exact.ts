@@ -1,3 +1,4 @@
+import type { BrandKit } from "@/domain/brand";
 import {
   type ColourOption,
   colourOf,
@@ -125,6 +126,36 @@ export function contrastInk(hex: string): "#241f18" | "#ffffff" {
   return l > 0.4 ? "#241f18" : "#ffffff";
 }
 
+// Neutral ink for text layers when the maker has no brand kit: Kiln's own
+// accent never stands in for a maker's brand.
+export const NEUTRAL_INK = "#241f18";
+
+// The colours of a text layer (the CTA card, the hook band): the brand's lead
+// colour, else neutral ink, with readable ink on it.
+export function textLayerColours(brand: BrandKit | null | undefined): {
+  background: string;
+  ink: string;
+} {
+  const background = brand?.palette[0] ?? NEUTRAL_INK;
+  return { background, ink: contrastInk(background) };
+}
+
+// "@northwind · northwind.shop", or null without a handle or a link.
+export function shopLine(brand: BrandKit | null | undefined): string | null {
+  let host: string | null = null;
+  if (brand?.url) {
+    try {
+      host = new URL(brand.url).host.replace(/^www\./, "");
+    } catch {
+      host = null;
+    }
+  }
+  const parts = [brand?.handle ? `@${brand.handle}` : null, host].filter(
+    (p): p is string => p !== null,
+  );
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 const DEFAULT_TITLE: Record<ExactKind, string> = {
   "colour-grid": "Available in {colours.count} colours",
   "size-spec": "{product.dimensions}",
@@ -162,12 +193,20 @@ export type ExactView =
       product: ProductOutline;
       reference: ScaleReference;
     }
-  | { kind: "text-card"; title: string; subtitle: string };
+  | {
+      kind: "text-card";
+      title: string;
+      subtitle: string;
+      background: string;
+      ink: string;
+    };
 
+// `brand` (the maker's kit, when it has one) styles the text layers.
 export function exactView(
   kind: ExactKind,
   product: Product,
   textTemplate?: string,
+  brand?: BrandKit | null,
 ): ExactView {
   const title = renderTextTemplate(
     textTemplate ?? DEFAULT_TITLE[kind],
@@ -212,6 +251,11 @@ export function exactView(
         })),
       };
     case "text-card":
-      return { kind, title, subtitle: product.family };
+      return {
+        kind,
+        title,
+        subtitle: shopLine(brand) ?? product.family,
+        ...textLayerColours(brand),
+      };
   }
 }

@@ -10,7 +10,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { providerMode } from "@/providers/mode";
 import { estimateProjectCards } from "@/server/generation-queue";
 import { projectGenerationState } from "@/server/generation-repository";
-import { getCurrentMaker } from "@/server/maker-repository";
+import { getCurrentMaker, getMakerBrand } from "@/server/maker-repository";
 import { loadProjectBoard } from "@/server/project-repository";
 
 // The estimate of a batch of every waiting scene, built exactly as the queue
@@ -51,6 +51,7 @@ export default async function ProjectBoardPage({
   const { board, product } = loaded;
   const maker = await getCurrentMaker();
   const generation = await projectGenerationState(maker.id, board.id);
+  const brand = await getMakerBrand();
   const plan = board.plan;
   const estimate =
     plan && board.master
@@ -75,6 +76,7 @@ export default async function ProjectBoardPage({
           generation={generation}
           estimate={estimate}
           mode={providerMode()}
+          brand={brand}
         />
       ) : (
         <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">

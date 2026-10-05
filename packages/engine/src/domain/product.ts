@@ -6,7 +6,9 @@ import { z } from "zod";
 // request) into an exact reference image; the prompt fields are templated from
 // the same data so nobody hand-writes SUBJECT / MATERIALS again.
 
-const Hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "hex colour like #4B5F50");
+export const Hex = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, "hex colour like #4B5F50");
 
 export const Unit = z.enum(["in", "mm"]);
 export type Unit = z.infer<typeof Unit>;

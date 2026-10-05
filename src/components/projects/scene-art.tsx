@@ -3,17 +3,20 @@ import { gradientForPrompt } from "@/lib/gradient";
 
 // What a scene slot shows: its candidate image, or a placeholder until one
 // exists, with the slot's text layer on top when it has a text template (the
-// text is drawn by the template, never by the image model). Shared by the
-// board and the New project plan so both read the same.
+// text is drawn by the template, never by the image model) on a band in the
+// maker's brand colours. Shared by the board and the New project plan so both
+// read the same.
 export function SceneArt({
   seed,
   output,
   text,
+  band,
   badge,
 }: {
   seed: string;
   output?: string;
   text?: string;
+  band?: { background: string; ink: string };
   badge?: string;
 }) {
   const image = isRenderableUrl(output) ? output : null;
@@ -28,7 +31,12 @@ export function SceneArt({
       ) : null}
       {text ? (
         <span
-          className="absolute inset-x-3 top-3 rounded-field bg-card/85 px-2.5 py-1.5 font-serif text-[0.95rem] italic leading-tight text-foreground"
+          className="absolute inset-x-3 top-3 rounded-field px-2.5 py-1.5 font-serif text-[0.95rem] italic leading-tight"
+          style={
+            band
+              ? { backgroundColor: band.background, color: band.ink }
+              : undefined
+          }
           title="Text layer drawn by a template, never by the image model"
         >
           {text}
