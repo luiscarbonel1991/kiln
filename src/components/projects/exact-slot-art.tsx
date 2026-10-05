@@ -48,7 +48,7 @@ export function ExactSlotArt({
         <ColourGrid view={view} height={height} />
       ) : null}
       {view.kind === "size-spec" ? (
-        <SizeSpec view={view} height={height} />
+        <SizeSpec view={view} height={height} plate={plate ?? null} />
       ) : null}
       {view.kind === "scale" ? (
         <ScaleDrawing view={view} height={height} plate={plate ?? null} />
@@ -496,9 +496,11 @@ function ScaleDrawing({
 function SizeSpec({
   view,
   height,
+  plate,
 }: {
   view: Extract<ExactView, { kind: "size-spec" }>;
   height: number;
+  plate: string | null;
 }) {
   const boxMaxW = WIDTH - 140;
   const boxMaxH = height * 0.3;
@@ -511,14 +513,13 @@ function SizeSpec({
   return (
     <g>
       <Title text={view.title} />
-      <rect
+      <ProductShape
+        outline={view.product}
+        plate={plate}
         x={x}
         y={y}
-        width={w}
-        height={h}
-        rx={8}
-        className="fill-surface-soft stroke-on-surface-mid"
-        strokeWidth={1.5}
+        w={w}
+        h={h}
       />
       <line
         x1={x}

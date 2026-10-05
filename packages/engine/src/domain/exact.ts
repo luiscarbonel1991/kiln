@@ -142,6 +142,8 @@ export type ExactView =
       height: number;
       unit: string;
       depth?: number;
+      product: ProductOutline;
+      // Buyer-facing facts only: no internal fields such as the typeface.
       facts: { label: string; value: string }[];
     }
   | {
@@ -183,11 +185,11 @@ export function exactView(
         height: d.h,
         unit: d.unit,
         ...(d.d ? { depth: d.d } : {}),
+        product: productOutline(product),
         facts: [
           { label: "Shape", value: product.shape },
           { label: "Material", value: product.material },
           { label: "Finish", value: TREATMENT_LABEL[product.treatment] },
-          { label: "Lettering", value: product.typography.family },
         ],
       };
     }

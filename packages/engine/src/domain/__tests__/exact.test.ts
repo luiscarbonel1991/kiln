@@ -61,6 +61,13 @@ describe("exactView", () => {
     ]);
     expect(view.title).toBe("16 x 10 in");
     expect(view.facts).toContainEqual({ label: "Finish", value: "Engraved" });
+    // The product itself is drawn, and no internal field reaches the buyer.
+    expect(view.product).toMatchObject({ width: 16, height: 10, round: false });
+    expect(view.facts.map((f) => f.label)).toEqual([
+      "Shape",
+      "Material",
+      "Finish",
+    ]);
   });
 
   it("personalize mirrors the wording lines; a text template overrides the title", () => {
