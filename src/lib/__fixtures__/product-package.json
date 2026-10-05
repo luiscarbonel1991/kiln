@@ -107,6 +107,77 @@
         "a sunny reading nook beside an armchair"
       ],
       "hook": "A little forest for every mug"
+    },
+    {
+      "id": "northwind:PL-03",
+      "sku": "PL-03",
+      "name": "Glazed ceramic planter",
+      "family": "Home",
+      "description": "Wheel-thrown stoneware planter with a drainage dish, in eight glazes.",
+      "dimensions": {
+        "w": 6,
+        "h": 6,
+        "d": 6,
+        "unit": "in"
+      },
+      "shape": "round planter",
+      "material": "glazed stoneware",
+      "treatment": "printed",
+      "colours": [
+        {
+          "key": "hunter",
+          "name": "Matte Hunter Green",
+          "face": "#355E3B"
+        },
+        {
+          "key": "terracotta",
+          "name": "Matte Terra Cotta",
+          "face": "#C46A47"
+        },
+        {
+          "key": "midnight",
+          "name": "Glossy Midnight Blue",
+          "face": "#1F2A44"
+        },
+        {
+          "key": "oatmeal",
+          "name": "Speckled Oatmeal White",
+          "face": "#E9E1D2"
+        },
+        {
+          "key": "charcoal",
+          "name": "Matte Charcoal Black",
+          "face": "#2B2A28"
+        },
+        {
+          "key": "rose",
+          "name": "Satin Dusty Rose",
+          "face": "#C9A0A0"
+        },
+        {
+          "key": "teal",
+          "name": "Gloss Ocean Teal",
+          "face": "#2E6E73"
+        },
+        {
+          "key": "gold",
+          "name": "Matte Champagne Gold",
+          "face": "#C9B37E",
+          "inStock": false
+        }
+      ],
+      "defaultColour": "terracotta",
+      "typography": {
+        "family": "Hanken Grotesk"
+      },
+      "useContexts": [
+        "a sunny windowsill with a trailing plant",
+        "a living-room shelf among books"
+      ],
+      "hook": "Eight glazes for every green thing you grow",
+      "source": {
+        "kind": "form"
+      }
     }
   ]
 }

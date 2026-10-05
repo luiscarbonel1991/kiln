@@ -1,3 +1,4 @@
+import { colourGridLayout } from "@/components/projects/colour-grid-layout";
 import {
   contrastInk,
   type ExactView,
@@ -83,63 +84,65 @@ function ColourGrid({
   view: Extract<ExactView, { kind: "colour-grid" }>;
   height: number;
 }) {
-  const n = view.swatches.length;
-  const cols = n <= 3 ? n : n === 4 ? 2 : 3;
-  const rows = Math.ceil(n / cols);
-  const size = Math.min(96, (WIDTH - 80) / cols - 20);
-  const top = 100;
-  const rowH = Math.min(size + 52, (height - top - 20) / rows);
+  const layout = colourGridLayout({
+    names: view.swatches.map((s) => s.name),
+    inStock: view.swatches.map((s) => s.inStock),
+    width: WIDTH,
+    height,
+    top: 92,
+  });
+  const { swatch, fontSize, lineHeight } = layout;
   return (
     <g>
       <Title text={view.title} />
       {view.swatches.map((s, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const cx = WIDTH / 2 + (col - (cols - 1) / 2) * (size + 24);
-        const y = top + row * rowH;
+        const cell = layout.cells[i];
         return (
           <g key={s.key} opacity={s.inStock ? 1 : 0.45}>
             <rect
-              x={cx - size / 2}
-              y={y}
-              width={size}
-              height={size}
-              rx={14}
+              x={cell.cx - swatch / 2}
+              y={cell.swatchY}
+              width={swatch}
+              height={swatch}
+              rx={Math.min(14, swatch / 5)}
               fill={s.face}
               className="stroke-border"
               strokeWidth={1}
             />
             {s.inlay ? (
               <text
-                x={cx}
-                y={y + size / 2 + 9}
+                x={cell.cx}
+                y={cell.swatchY + swatch / 2 + swatch * 0.1}
                 textAnchor="middle"
                 fill={s.inlay}
-                style={{ ...SERIF, fontSize: 26 }}
+                style={{ ...SERIF, fontSize: swatch * 0.28 }}
               >
                 Aa
               </text>
             ) : null}
-            <text
-              x={cx}
-              y={y + size + 22}
-              textAnchor="middle"
-              className="fill-foreground"
-              style={{ ...SANS, fontSize: 14, fontWeight: 600 }}
-            >
-              {s.name}
-            </text>
-            {s.inStock ? null : (
+            {cell.lines.map((line, l) => (
               <text
-                x={cx}
-                y={y + size + 38}
+                key={line}
+                x={cell.cx}
+                y={cell.nameY + l * lineHeight}
+                textAnchor="middle"
+                className="fill-foreground"
+                style={{ ...SANS, fontSize, fontWeight: 600 }}
+              >
+                {line}
+              </text>
+            ))}
+            {cell.stockY !== undefined ? (
+              <text
+                x={cell.cx}
+                y={cell.stockY}
                 textAnchor="middle"
                 className="fill-on-surface-mid"
                 style={{ ...MONO, fontSize: 10 }}
               >
                 out of stock
               </text>
-            )}
+            ) : null}
           </g>
         );
       })}
