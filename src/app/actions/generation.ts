@@ -12,7 +12,12 @@ import { getCurrentMaker } from "@/server/maker-repository";
 
 const Enqueue = z.object({
   projectId: z.string().min(1),
-  cardIds: z.array(z.string().min(1)).min(1).max(50),
+  // Each card once: a repeated id would otherwise ask for a second paid job.
+  cardIds: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(50)
+    .transform((ids) => [...new Set(ids)]),
   // The estimated max the maker approved; the server refuses if its own is
   // higher (the cards changed since the estimate was shown).
   shownMaxMicros: z.number().int().min(0).optional(),

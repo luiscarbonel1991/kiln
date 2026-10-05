@@ -287,6 +287,34 @@ describe.skipIf(!enabled)(
       expect(after.version).not.toBe(before.version);
     });
 
+    it("a card asked for twice is queued once, and the index refuses a second active job", async () => {
+      // A mode no other test claims, so no worker picks these rows up.
+      const mode = "dup-test" as never;
+      const { queued } = await repo.enqueueBatch({
+        ...base(),
+        mode,
+        jobs: [job("dup", 1), job("dup", 1)],
+      });
+      expect(queued).toBe(1);
+      await expect(
+        db.generationJob.create({
+          data: {
+            makerId,
+            projectId,
+            cardId: "dup",
+            mode,
+            status: "running",
+            maxAttempts: 2,
+            estimateMicros: 1,
+          },
+        }),
+      ).rejects.toThrow();
+      await db.generationJob.updateMany({
+        where: { makerId, cardId: "dup" },
+        data: { status: "canceled" },
+      });
+    });
+
     it("deleting the project keeps the month's spend", async () => {
       const spentBefore = (await repo.budget(makerId)).spentMicros;
       expect(spentBefore).toBeGreaterThan(0);

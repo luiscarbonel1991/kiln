@@ -8,7 +8,9 @@
 // `prisma db push`.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // The queue's "one active job per card" is a partial unique index.
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -35,9 +37,9 @@ model Maker {
 // studio editor's state rides on it: recipeId resolves from the app recipe
 // presets on load; understanding/planning are Zod JSON snapshots.
 model Project {
-  id            String           @id @default(cuid())
+  id            String            @id @default(cuid())
   makerId       String
-  maker         Maker            @relation(fields: [makerId], references: [id])
+  maker         Maker             @relation(fields: [makerId], references: [id])
   name          String
   type          String
   phase         String
@@ -47,8 +49,8 @@ model Project {
   // Domain ProjectPlan for projects started from the New project flow; null for
   // studio-only projects. Owned by the board, never written by the autosave.
   plan          Json?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
   master        MasterAsset?
   cards         Card[]
   products      ProjectProduct[]
@@ -182,6 +184,9 @@ model GenerationJob {
   callStartedAt  DateTime?        @db.Timestamptz(3)
   finishedAt     DateTime?        @db.Timestamptz(3)
 
+  // One queued or running job per card. The predicate is written as Postgres
+  // stores it (it normalizes IN to = ANY), so migrate sees no drift.
+  @@unique([projectId, cardId], map: "GenerationJob_one_active_per_card", where: raw("(status = ANY (ARRAY['queued'::text, 'running'::text]))"))
   @@index([status, mode, availableAt])
   @@index([projectId, cardId])
   @@index([makerId, createdAt])

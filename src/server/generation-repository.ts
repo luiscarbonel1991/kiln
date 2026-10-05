@@ -99,8 +99,9 @@ export async function budget(makerId: string): Promise<Budget> {
 // Queue an approved batch. The maker row is locked for the whole check-and-
 // insert, so concurrent enqueues (two tabs, the board and an editor) are
 // serialized: one cap check sees the other's reservation, and a card already
-// queued or running is never queued twice. A live batch must fit the monthly
-// cap; the server's estimate may not exceed what the maker was shown.
+// queued or running — or asked for twice in this batch — is queued once (a
+// partial unique index backs this). A live batch must fit the monthly cap;
+// the server's estimate may not exceed what the maker was shown.
 export async function enqueueBatch(input: {
   makerId: string;
   projectId: string;
@@ -128,7 +129,12 @@ export async function enqueueBatch(input: {
         })
       ).map((j) => j.cardId),
     );
-    const fresh = input.jobs.filter((j) => !busy.has(j.cardId));
+    const seen = new Set<string>();
+    const fresh = input.jobs.filter((j) => {
+      if (busy.has(j.cardId) || seen.has(j.cardId)) return false;
+      seen.add(j.cardId);
+      return true;
+    });
     if (fresh.length === 0) {
       throw new QueueRefusal(
         "already-queued",
