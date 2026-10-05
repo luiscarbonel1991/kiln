@@ -5,6 +5,10 @@ import { cn } from "@/lib/utils";
 // Slot states in the provenance hues (DESIGN.md): pine = exact / approved (true
 // to the spec), slate = to review, primary = generating, amber = retrying.
 const STYLE: Record<SlotView["state"], { label: string; className: string }> = {
+  off: {
+    label: "off",
+    className: "text-on-surface-dim bg-transparent ring-1 ring-border",
+  },
   exact: { label: "exact", className: "text-prov-recipe bg-prov-recipe/10" },
   queued: { label: "queued", className: "text-on-surface-dim bg-surface-soft" },
   generating: {

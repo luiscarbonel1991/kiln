@@ -15,6 +15,10 @@ import {
 export const PlanSlot = ShotSlotFields.extend({
   approvedOutput: z.string().min(1).optional(),
   deliveredAt: z.string().optional(),
+  // Switched off by the maker (a gift shot for a product nobody gifts): the
+  // slot stays in the plan, so the plan keeps its shape, but leaves the
+  // deliverable — never generated, never counted. Absent = on.
+  off: z.boolean().optional(),
 }).refine(exactKindMatchesFill.check, {
   message: exactKindMatchesFill.message,
 });
@@ -33,6 +37,7 @@ export const ProjectPlan = z.object({
 export type ProjectPlan = z.infer<typeof ProjectPlan>;
 
 export const SlotState = z.enum([
+  "off",
   "exact",
   "queued",
   "generating",
@@ -129,6 +134,23 @@ export const slotCardId = (destinationId: string, slotKey: string) =>
 export const slotRecipeId = (shotListId: string, destinationId: string) =>
   `${shotListId}@${destinationId}`;
 
+// "etsy.gift" -> { destinationId: "etsy", slotKey: "gift" } (destination ids
+// carry no dot).
+export function parseSlotCardId(id: string): SlotRef | null {
+  const dot = id.indexOf(".");
+  if (dot <= 0 || dot === id.length - 1) return null;
+  return { destinationId: id.slice(0, dot), slotKey: id.slice(dot + 1) };
+}
+
+// The cards a plan may generate: its scene slots that are switched on.
+export function sceneCardIds(plan: ProjectPlan): string[] {
+  return plan.destinations.flatMap((d) =>
+    d.slots
+      .filter((s) => s.fill === "scene" && !s.off)
+      .map((s) => slotCardId(d.destinationId, s.key)),
+  );
+}
+
 export function parseSlotRecipeId(
   id: string,
 ): { shotListId: string; destinationId: string } | null {
@@ -165,6 +187,7 @@ export function slotState(
   card?: CardLike,
   job?: JobLike,
 ): SlotView {
+  if (slot.off) return { state: "off", failed: false };
   if (slot.fill === "exact") {
     return { state: slot.deliveredAt ? "delivered" : "exact", failed: false };
   }
@@ -225,6 +248,17 @@ export function unapproveSlot(plan: ProjectPlan, ref: SlotRef): ProjectPlan {
   return updateSlot(plan, ref, ({ approvedOutput: _a, ...slot }) => slot);
 }
 
+// Switch a slot off or back on. An approval survives the round trip.
+export function withSlotOff(
+  plan: ProjectPlan,
+  ref: SlotRef,
+  off: boolean,
+): ProjectPlan {
+  return updateSlot(plan, ref, ({ off: _o, ...slot }) =>
+    off ? { ...slot, off: true } : slot,
+  );
+}
+
 function updateSlot(
   plan: ProjectPlan,
   ref: SlotRef,
@@ -249,11 +283,15 @@ function updateSlot(
   return { destinations };
 }
 
+// The deliverable's size: the slots that are on, exact vs scene, and how many
+// the maker switched off.
 export function planCounts(plan: ProjectPlan): {
   exact: number;
   scene: number;
+  off: number;
 } {
   const slots = plan.destinations.flatMap((d) => d.slots);
-  const exact = slots.filter((s) => s.fill === "exact").length;
-  return { exact, scene: slots.length - exact };
+  const on = slots.filter((s) => !s.off);
+  const exact = on.filter((s) => s.fill === "exact").length;
+  return { exact, scene: on.length - exact, off: slots.length - on.length };
 }

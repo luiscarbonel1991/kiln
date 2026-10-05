@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, FileUp, Loader2 } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, FileUp, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { createProjectAction } from "@/app/actions/new-project";
@@ -20,6 +20,7 @@ import {
   offeredDestinations,
   type ProjectPlan,
   planProject,
+  slotCardId,
 } from "@/domain/plan";
 import { dimensionsLabel, type Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
@@ -56,6 +57,8 @@ export function NewProjectFlow({
   );
   const [type, setType] = useState<BoardType | null>(null);
   const [destinationIds, setDestinationIds] = useState<string[]>([]);
+  // Slot card ids ("etsy.gift") the maker switched off for this product.
+  const [offSlots, setOffSlots] = useState<string[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -74,10 +77,24 @@ export function NewProjectFlow({
     }
   }, [product, type, destinationIds]);
 
-  const slots = plan?.destinations.flatMap((d) => d.slots) ?? [];
+  const planned =
+    plan?.destinations.flatMap((d) =>
+      d.slots.map((slot) => ({
+        id: slotCardId(d.destinationId, slot.key),
+        slot,
+      })),
+    ) ?? [];
+  const off = planned.filter((p) => offSlots.includes(p.id)).map((p) => p.id);
+  const slots = planned.filter((p) => !off.includes(p.id)).map((p) => p.slot);
   const scenes = slots.filter((s) => s.fill === "scene");
   const model = defaultImageModel();
   const estimate = estimateScenes(scenes, model);
+
+  function toggleSlot(id: string) {
+    setOffSlots((ids) =>
+      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+    );
+  }
 
   function chooseType(next: BoardType) {
     setType(next);
@@ -128,6 +145,7 @@ export function NewProjectFlow({
         productId: product.id,
         type,
         destinationIds,
+        offSlots: off,
       });
       if (result?.error) setStartError(result.error);
     });
@@ -307,43 +325,71 @@ export function NewProjectFlow({
               return (
                 <section key={d.destinationId} className="flex flex-col gap-3">
                   <h3 className="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
-                    {destination.name} · {d.slots.length} frames
+                    {destination.name} ·{" "}
+                    {
+                      d.slots.filter(
+                        (s) =>
+                          !off.includes(slotCardId(d.destinationId, s.key)),
+                      ).length
+                    }{" "}
+                    frames
                   </h3>
                   <SlotGrid>
-                    {d.slots.map((slot, i) => (
-                      <SlotFrame
-                        key={slot.key}
-                        position={slotPosition(destination, i)}
-                        label={slot.label}
-                        purpose={slot.purpose}
-                        aspect={slot.aspect}
-                        view={{
-                          state: slot.fill === "exact" ? "exact" : "queued",
-                          failed: false,
-                        }}
-                      >
-                        {slot.exact ? (
-                          <ExactSlotArt
-                            view={exactView(
-                              slot.exact,
-                              product,
-                              slot.textTemplate,
-                            )}
-                            aspect={slot.aspect}
-                          />
-                        ) : (
-                          <SceneArt
-                            seed={`${d.destinationId}.${slot.key}`}
-                            text={
-                              slot.textTemplate
-                                ? renderTextTemplate(slot.textTemplate, product)
-                                : undefined
-                            }
-                            badge="scene"
-                          />
-                        )}
-                      </SlotFrame>
-                    ))}
+                    {d.slots.map((slot, i) => {
+                      const id = slotCardId(d.destinationId, slot.key);
+                      const isOff = off.includes(id);
+                      return (
+                        <SlotFrame
+                          key={slot.key}
+                          position={slotPosition(destination, i)}
+                          label={slot.label}
+                          purpose={slot.purpose}
+                          aspect={slot.aspect}
+                          view={{
+                            state: isOff
+                              ? "off"
+                              : slot.fill === "exact"
+                                ? "exact"
+                                : "queued",
+                            failed: false,
+                          }}
+                          actions={
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => toggleSlot(id)}
+                            >
+                              {isOff ? <Eye /> : <EyeOff />}
+                              {isOff ? "Switch on" : "Switch off"}
+                            </Button>
+                          }
+                        >
+                          {slot.exact ? (
+                            <ExactSlotArt
+                              view={exactView(
+                                slot.exact,
+                                product,
+                                slot.textTemplate,
+                              )}
+                              aspect={slot.aspect}
+                            />
+                          ) : (
+                            <SceneArt
+                              seed={`${d.destinationId}.${slot.key}`}
+                              text={
+                                slot.textTemplate
+                                  ? renderTextTemplate(
+                                      slot.textTemplate,
+                                      product,
+                                    )
+                                  : undefined
+                              }
+                              badge="scene"
+                            />
+                          )}
+                        </SlotFrame>
+                      );
+                    })}
                   </SlotGrid>
                 </section>
               );
@@ -357,6 +403,9 @@ export function NewProjectFlow({
                   </strong>{" "}
                   frames are exact — drawn from the spec, free and final.{" "}
                   {scenes.length} scenes need the image model.
+                  {off.length > 0
+                    ? ` ${off.length} switched off, not part of the deliverable.`
+                    : ""}
                 </p>
                 <p className="font-mono text-[0.7rem] text-on-surface-mid">
                   {estimate

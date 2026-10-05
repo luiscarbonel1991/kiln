@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import type { GenerationRequest } from "@/domain/generation-request";
+import { ProjectPlan, sceneCardIds } from "@/domain/plan";
 import {
   ACTIVE_JOB_STATUSES,
   type JobStatus,
@@ -23,7 +24,11 @@ export type ProviderMode = "live" | "mock";
 
 export class QueueRefusal extends Error {
   constructor(
-    readonly reason: "cap" | "estimate-changed" | "already-queued",
+    readonly reason:
+      | "cap"
+      | "estimate-changed"
+      | "already-queued"
+      | "not-in-plan",
     message: string,
   ) {
     super(message);
@@ -117,6 +122,22 @@ export async function enqueueBatch(input: {
       SELECT "monthlyCapCents"::int AS "cap" FROM "Maker"
       WHERE "id" = ${makerId} FOR UPDATE`;
     if (!maker) throw new Error("maker not found");
+    // The project row too (setSlotOff and approvals take it): a planned
+    // project generates only its scene slots that are switched on.
+    const [project] = await tx.$queryRaw<{ plan: unknown }[]>`
+      SELECT "plan" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${makerId} FOR UPDATE`;
+    if (!project) throw new Error("project not found");
+    const plan = ProjectPlan.safeParse(project.plan);
+    if (plan.success) {
+      const allowed = new Set(sceneCardIds(plan.data));
+      if (input.jobs.some((j) => !allowed.has(j.cardId))) {
+        throw new QueueRefusal(
+          "not-in-plan",
+          "Only the scenes switched on in the plan can be generated.",
+        );
+      }
+    }
     const busy = new Set(
       (
         await tx.generationJob.findMany({

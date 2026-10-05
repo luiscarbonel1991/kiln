@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { SlotStateBadge } from "@/components/projects/slot-state-badge";
 import type { SlotView } from "@/domain/plan";
+import { cn } from "@/lib/utils";
 
 const css = (aspect?: string) => (aspect ?? "1:1").replace(":", " / ");
 
@@ -18,7 +19,8 @@ export function SlotGrid({ children }: { children: ReactNode }) {
 
 // One frame of the storyboard: the render at the slot's real aspect (render
 // radius + render shadow, DESIGN.md), the position label ("Etsy photo 1"), the
-// slot's job as a serif caption, and its state.
+// slot's job as a serif caption, and its state. A slot switched off stays in
+// place, faded, so the maker can switch it back on.
 export function SlotFrame({
   position,
   label,
@@ -39,7 +41,10 @@ export function SlotFrame({
   return (
     <figure className="row-span-2 grid min-w-0 grid-rows-subgrid gap-y-2">
       <div
-        className="self-end overflow-hidden rounded-render bg-surface-soft shadow-render"
+        className={cn(
+          "self-end overflow-hidden rounded-render bg-surface-soft shadow-render transition-opacity",
+          view.state === "off" && "opacity-35 grayscale",
+        )}
         style={{ aspectRatio: css(aspect) }}
       >
         {children}

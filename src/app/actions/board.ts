@@ -14,6 +14,7 @@ import {
   loadProjectBoard,
   setProjectReference,
   setSlotApproval,
+  setSlotOff,
 } from "@/server/project-repository";
 
 // Board mutations. Server Functions are POST-reachable: Zod is the trust
@@ -29,6 +30,27 @@ const Approval = z.object({
 export async function setSlotApprovalAction(input: unknown): Promise<void> {
   const { projectId, destinationId, slotKey, approved } = Approval.parse(input);
   await setSlotApproval(projectId, { destinationId, slotKey }, approved);
+  refresh();
+}
+
+const Switch = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  slotKey: z.string().min(1),
+  off: z.boolean(),
+});
+
+export async function setSlotOffAction(
+  input: unknown,
+): Promise<{ error: string } | undefined> {
+  const { projectId, destinationId, slotKey, off } = Switch.parse(input);
+  try {
+    await setSlotOff(projectId, { destinationId, slotKey }, off);
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Could not switch it.",
+    };
+  }
   refresh();
 }
 

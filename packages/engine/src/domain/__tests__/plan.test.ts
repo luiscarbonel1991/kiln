@@ -3,13 +3,16 @@ import { DestinationProfile } from "@/domain/destination";
 import {
   approveSlot,
   destinationsFor,
+  parseSlotCardId,
   parseSlotRecipeId,
   planCounts,
   planProject,
+  sceneCardIds,
   slotCardId,
   slotRecipeId,
   slotState,
   unapproveSlot,
+  withSlotOff,
 } from "@/domain/plan";
 import { ShotList } from "@/domain/shot-list";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
@@ -88,7 +91,7 @@ describe("planProject", () => {
       "colours",
       "personalize",
     ]);
-    expect(planCounts(plan)).toEqual({ exact: 2, scene: 2 });
+    expect(planCounts(plan)).toEqual({ exact: 2, scene: 2, off: 0 });
   });
 
   it("skips editor-only presets and offers destinations by project type", () => {
@@ -278,5 +281,57 @@ describe("slotState with the queue", () => {
       state: "queued",
       failed: false,
     });
+  });
+});
+
+describe("switching slots off", () => {
+  const launch = () =>
+    planProject({
+      product: CUTTING_BOARD,
+      type: "launch",
+      destinationIds: ["shop", "social"],
+      catalog,
+    });
+  const hero = { destinationId: "shop", slotKey: "hero" };
+
+  it("an off slot stays in the plan, reads as off and leaves the counts", () => {
+    const plan = withSlotOff(launch(), hero, true);
+    const slot = plan.destinations[0].slots[0];
+    expect(slot).toMatchObject({ key: "hero", off: true });
+    expect(slotState(slot).state).toBe("off");
+    expect(planCounts(plan)).toEqual({ exact: 2, scene: 1, off: 1 });
+    expect(sceneCardIds(plan)).toEqual(["social.hook"]);
+  });
+
+  it("switching back on keeps an approval; an exact slot can be switched off too", () => {
+    const card = { status: "done" as const, outputs: ["https://x/1.png"] };
+    const approved = approveSlot(launch(), hero, card);
+    const back = withSlotOff(withSlotOff(approved, hero, true), hero, false);
+    expect(back.destinations[0].slots[0]).not.toHaveProperty("off");
+    expect(slotState(back.destinations[0].slots[0], card).state).toBe(
+      "approved",
+    );
+    const colours = withSlotOff(
+      launch(),
+      { destinationId: "shop", slotKey: "colours" },
+      true,
+    );
+    expect(slotState(colours.destinations[0].slots[1]).state).toBe("off");
+  });
+
+  it("an unknown slot is refused", () => {
+    expect(() =>
+      withSlotOff(launch(), { destinationId: "shop", slotKey: "nope" }, true),
+    ).toThrow('no slot "nope"');
+  });
+
+  it("slot card ids parse back to their slot", () => {
+    expect(parseSlotCardId("etsy.in-use")).toEqual({
+      destinationId: "etsy",
+      slotKey: "in-use",
+    });
+    expect(parseSlotCardId("etsy")).toBeNull();
+    expect(parseSlotCardId(".gift")).toBeNull();
+    expect(parseSlotCardId("etsy.")).toBeNull();
   });
 });

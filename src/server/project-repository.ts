@@ -12,9 +12,11 @@ import {
   type SlotRef,
   slotCardId,
   unapproveSlot,
+  withSlotOff,
 } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
+import { ACTIVE_JOB_STATUSES } from "@/domain/queue";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
@@ -430,6 +432,51 @@ export async function setSlotApproval(
     await tx.project.update({
       where: { id: projectId },
       data: { plan: next as unknown as Prisma.InputJsonValue },
+    });
+  });
+}
+
+// Switch a slot off (out of the deliverable: never generated, not counted) or
+// back on. Locked like approvals; enqueueBatch takes the same lock, so a scene
+// is never queued as it is switched off. A scene with a job queued or running
+// cannot be switched off (cancel the batch first).
+export async function setSlotOff(
+  projectId: string,
+  ref: SlotRef,
+  off: boolean,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true },
+    });
+    const plan = ProjectPlan.parse(project.plan);
+    if (off) {
+      const busy = await tx.generationJob.count({
+        where: {
+          projectId,
+          cardId: slotCardId(ref.destinationId, ref.slotKey),
+          status: { in: ACTIVE_JOB_STATUSES },
+        },
+      });
+      if (busy > 0) {
+        throw new Error(
+          "This scene is in the queue; switch it off when it is done.",
+        );
+      }
+    }
+    await tx.project.update({
+      where: { id: projectId },
+      data: {
+        plan: withSlotOff(plan, ref, off) as unknown as Prisma.InputJsonValue,
+      },
     });
   });
 }

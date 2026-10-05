@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   ApproveButton,
   ReferenceUpload,
+  SlotSwitch,
 } from "@/components/projects/board-actions";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import {
@@ -125,8 +126,12 @@ export function ProjectBoard({
                   {destination.name}
                 </span>
                 <span className="font-mono text-[0.625rem] text-on-surface-dim">
-                  {destination.kind} · {slots.length} frames ·{" "}
-                  {destination.formats.map((f) => f.aspect).join(" / ")}
+                  {destination.kind} · {slots.filter((s) => !s.slot.off).length}{" "}
+                  frames
+                  {slots.some((s) => s.slot.off)
+                    ? ` (${slots.filter((s) => s.slot.off).length} off)`
+                    : ""}{" "}
+                  · {destination.formats.map((f) => f.aspect).join(" / ")}
                 </span>
               </h2>
               <SlotGrid>
@@ -229,7 +234,8 @@ export function ProjectBoard({
           if (!destination) return null;
           const count = (state: SlotView["state"]) =>
             slots.filter((s) => s.view.state === state).length;
-          const scenes = slots.filter((s) => s.slot.fill === "scene").length;
+          const on = slots.filter((s) => !s.slot.off);
+          const scenes = on.filter((s) => s.slot.fill === "scene").length;
           const done = count("exact") + count("approved") + count("delivered");
           return (
             <div
@@ -241,13 +247,16 @@ export function ProjectBoard({
                   {destination.name}
                 </h2>
                 <span className="font-mono text-[0.625rem] text-on-surface-mid">
-                  {done} / {slots.length} ready
+                  {done} / {on.length} ready
+                  {count("off") > 0 ? ` · ${count("off")} off` : ""}
                 </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-pill bg-surface-soft">
                 <div
                   className="h-full rounded-pill bg-prov-recipe"
-                  style={{ width: `${(done / slots.length) * 100}%` }}
+                  style={{
+                    width: `${on.length > 0 ? (done / on.length) * 100 : 0}%`,
+                  }}
                 />
               </div>
               <ul className="flex flex-col gap-1 pt-1 font-mono text-[0.65rem] text-on-surface-mid">
@@ -289,7 +298,15 @@ function SlotActions({
   view: SlotView;
   hasReference: boolean;
 }) {
-  if (slot.fill === "exact") return null;
+  const toggle = (
+    <SlotSwitch
+      projectId={projectId}
+      destinationId={destinationId}
+      slotKey={slot.key}
+      off={view.state === "off"}
+    />
+  );
+  if (slot.fill === "exact" || view.state === "off") return toggle;
   return (
     <div className="flex flex-wrap items-center gap-2">
       {view.state === "to-review" || view.state === "approved" ? (
@@ -312,6 +329,7 @@ function SlotActions({
           needs a reference image
         </span>
       )}
+      {view.inBatch ? null : toggle}
     </div>
   );
 }

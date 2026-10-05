@@ -350,6 +350,76 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     await db.generationBatch.delete({ where: { id: batchId } });
   });
 
+  it("a slot switched off is never queued, and a queued scene cannot be switched off", async () => {
+    const { estimateProjectCards } = await import("@/server/generation-queue");
+    const queueRepo = await import("@/server/generation-repository");
+    const { getCurrentMaker } = await import("@/server/maker-repository");
+    const [saved] = await upsertProducts([product]);
+    const id = await repo.createProject({
+      type: "launch",
+      productId: saved.id,
+      plan,
+      editor,
+    });
+    created.push(id);
+    const maker = await getCurrentMaker();
+    const hero = { destinationId: "etsy", slotKey: "hero" };
+    const { cards, model } = await estimateProjectCards(id, ["etsy.hero"]);
+    // A mode no worker claims, so the job stays queued for the test.
+    const mode = "off-test" as never;
+    const enqueue = () =>
+      queueRepo.enqueueBatch({
+        makerId: maker.id,
+        projectId: id,
+        mode,
+        model,
+        jobs: cards.map((c) => ({
+          cardId: c.cardId,
+          request: c.request,
+          estimateMicros: c.maxMicros,
+        })),
+      });
+
+    await repo.setSlotOff(id, hero, true);
+    await expect(enqueue()).rejects.toMatchObject({ reason: "not-in-plan" });
+
+    await repo.setSlotOff(id, hero, false);
+    const { batchId } = await enqueue();
+    await expect(repo.setSlotOff(id, hero, true)).rejects.toThrow(
+      "in the queue",
+    );
+    await db.generationBatch.delete({ where: { id: batchId } });
+  });
+
+  it("switching a slot off and approving another at once both persist", async () => {
+    const id = created[0];
+    await repo.setSlotApproval(
+      id,
+      { destinationId: "etsy", slotKey: "in-use" },
+      false,
+    );
+    await Promise.all([
+      repo.setSlotOff(id, { destinationId: "etsy", slotKey: "hero" }, true),
+      repo.setSlotApproval(
+        id,
+        { destinationId: "etsy", slotKey: "in-use" },
+        true,
+      ),
+    ]);
+    const slots = (await repo.loadProjectBoard(id))?.board.plan?.destinations[0]
+      .slots;
+    const inUse = await db.card.findUniqueOrThrow({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
+    });
+    expect(slots?.[0].off).toBe(true);
+    expect(slots?.[1].approvedOutput).toBe((inUse.outputs as string[])[0]);
+    await repo.setSlotOff(
+      id,
+      { destinationId: "etsy", slotKey: "hero" },
+      false,
+    );
+  });
+
   it("a studio project still follows its recipe's type on autosave", async () => {
     const id = await repo.saveProject({
       ...editor,
