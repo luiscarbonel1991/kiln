@@ -6,7 +6,7 @@ import { DEFAULT_PROVIDER } from "@/domain/model-defaults";
 import { MODELS } from "@/providers/models";
 import { getImageProvider } from "@/providers/registry";
 import { GenerationResult, ImageGenInput } from "@/providers/types";
-import { assertUnderCap, recordDirectGeneration } from "@/server/direct-spend";
+import { withDirectSpend } from "@/server/direct-spend";
 
 const PromptInput = z.string().trim().min(1, "Describe the image to generate.");
 
@@ -21,10 +21,9 @@ export async function generateImage(prompt: string): Promise<GenerationResult> {
       model: MODELS[DEFAULT_PROVIDER].image,
     }),
   });
-  await assertUnderCap();
-  const result = GenerationResult.parse(
-    await getImageProvider(DEFAULT_PROVIDER).generate(input),
+  return withDirectSpend(input.model, input.model.aspect, async (beforeCall) =>
+    GenerationResult.parse(
+      await getImageProvider(DEFAULT_PROVIDER).generate(input, { beforeCall }),
+    ),
   );
-  await recordDirectGeneration(result, input.model.aspect);
-  return result;
 }

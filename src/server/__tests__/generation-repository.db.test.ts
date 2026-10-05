@@ -315,6 +315,60 @@ describe.skipIf(!enabled)(
       });
     });
 
+    it("direct calls reserve against the cap: two at the limit, one passes", async () => {
+      const solo = await db.maker.create({
+        data: {
+          slug: `${slug}-direct`,
+          name: "Direct test",
+          monthlyCapCents: 10,
+        },
+      });
+      try {
+        const reserve = () =>
+          repo.reserveDirectCall({
+            makerId: solo.id,
+            model: "gpt-image-2",
+            estimateMicros: 60_000,
+          });
+        const results = await Promise.allSettled([reserve(), reserve()]);
+        const passed = results.find((r) => r.status === "fulfilled");
+        const refused = results.find((r) => r.status === "rejected");
+        expect(refused?.status === "rejected" && refused.reason.reason).toBe(
+          "cap",
+        );
+        const id = passed?.status === "fulfilled" ? passed.value : "";
+        expect((await repo.budget(solo.id)).reservedMicros).toBe(60_000);
+
+        await repo.markDirectCall(id);
+        await repo.closeDirectCall(id, {
+          usage: { outputTokens: 1 },
+          actualMicros: 20_000,
+        });
+        const paid = await repo.budget(solo.id);
+        expect(paid).toMatchObject({ spentMicros: 20_000, reservedMicros: 0 });
+
+        // An error the provider answered counts nothing; no answer counts at
+        // the estimate.
+        const answered = await reserve();
+        await repo.markDirectCall(answered);
+        await repo.closeDirectCall(answered, {
+          error: "429",
+          mayBeCharged: false,
+        });
+        expect((await repo.budget(solo.id)).spentMicros).toBe(20_000);
+        const unanswered = await reserve();
+        await repo.markDirectCall(unanswered);
+        await repo.closeDirectCall(unanswered, {
+          error: "timeout",
+          mayBeCharged: true,
+        });
+        expect((await repo.budget(solo.id)).spentMicros).toBe(80_000);
+      } finally {
+        await db.generationJob.deleteMany({ where: { makerId: solo.id } });
+        await db.maker.delete({ where: { id: solo.id } });
+      }
+    });
+
     it("deleting the project keeps the month's spend", async () => {
       const spentBefore = (await repo.budget(makerId)).spentMicros;
       expect(spentBefore).toBeGreaterThan(0);

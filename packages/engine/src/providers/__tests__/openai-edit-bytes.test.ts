@@ -101,3 +101,21 @@ describe("openai editBytes (the queue's edit)", () => {
     expect(edit).not.toHaveBeenCalled();
   });
 });
+
+describe("openai edit (the studio's direct call)", () => {
+  it("marks the call right before the request and makes exactly one", async () => {
+    const order: string[] = [];
+    storeAsset.mockResolvedValue("https://stub.local/out.png");
+    edit.mockImplementation(async () => {
+      order.push("edit");
+      return { data: [{ b64_json: "aW1n" }] };
+    });
+    await openaiImageProvider.edit(input, {
+      beforeCall: async () => {
+        order.push("mark");
+      },
+    });
+    expect(order).toEqual(["mark", "edit"]);
+    expect(edit.mock.calls[0][1]).toEqual({ maxRetries: 0 });
+  });
+});

@@ -3,7 +3,11 @@ import { toFile } from "openai";
 import { OPENAI_IMAGE_QUALITY } from "@/domain/model-defaults";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { assertCapability, OPENAI_CAPS } from "@/providers/capabilities";
-import type { EditBytesResult, ImageProvider } from "@/providers/interfaces";
+import type {
+  DirectCallOptions,
+  EditBytesResult,
+  ImageProvider,
+} from "@/providers/interfaces";
 import { mockDelay, providerMode } from "@/providers/mode";
 import { MODELS, resolveImageModel } from "@/providers/models";
 import { getOpenAI, hasOpenAIKey } from "@/providers/openai/client";
@@ -98,22 +102,27 @@ async function storeB64(
 export const openaiImageProvider: ImageProvider = {
   id: "openai",
   capabilities: OPENAI_CAPS,
-  async generate(input: ImageGenInput) {
+  // Direct calls make one request (no SDK retries): one call, one cost.
+  async generate(input: ImageGenInput, options?: DirectCallOptions) {
     assertCapability(this, "generate");
     if (!hasOpenAIKey()) {
       await mockDelay();
       return mockResult("generate");
     }
     const model = resolveImageModel("openai", input.model.model);
-    const r = await getOpenAI().images.generate({
-      model,
-      prompt: input.prompt,
-      size: sizeFor(input.model.aspect),
-      quality: OPENAI_IMAGE_QUALITY,
-    });
+    await options?.beforeCall?.();
+    const r = await getOpenAI().images.generate(
+      {
+        model,
+        prompt: input.prompt,
+        size: sizeFor(input.model.aspect),
+        quality: OPENAI_IMAGE_QUALITY,
+      },
+      { maxRetries: 0 },
+    );
     return storeB64(r.data?.[0]?.b64_json, model, usageOf(r.usage));
   },
-  async edit(input: ImageEditInput) {
+  async edit(input: ImageEditInput, options?: DirectCallOptions) {
     assertCapability(this, "edit", input.imageInputs.length);
     if (!hasOpenAIKey()) {
       await mockDelay();
@@ -124,10 +133,11 @@ export const openaiImageProvider: ImageProvider = {
     const image = await toFile(master.bytes, "master.png", {
       type: master.mime,
     });
-    const r = await getOpenAI().images.edit({
-      ...editParams(input, model),
-      image,
-    });
+    await options?.beforeCall?.();
+    const r = await getOpenAI().images.edit(
+      { ...editParams(input, model), image },
+      { maxRetries: 0 },
+    );
     return storeB64(r.data?.[0]?.b64_json, model, usageOf(r.usage));
   },
   async editBytes(

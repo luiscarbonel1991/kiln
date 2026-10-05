@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import type { GenerationRequest } from "@/domain/generation-request";
 import {
@@ -396,35 +396,85 @@ export async function cancelBatch(
   });
 }
 
-// A direct studio call's spend (no batch), so the cap covers every paid call.
-export async function recordDirectSpend(input: {
+// A direct studio call (no batch) holds its reservation in a running row, so
+// the cap covers every paid call. The lease outlasts the SDK's own timeout;
+// if the process dies, the worker's sweep closes the row (requeueExpired).
+const DIRECT_LEASE_MS = 15 * 60 * 1000;
+
+// Reserve a direct call's estimated max: under the maker lock (like
+// enqueueBatch) it must fit the cap with what is spent and reserved.
+export async function reserveDirectCall(input: {
   makerId: string;
-  mode: ProviderMode;
   model: string;
-  usage: unknown;
-  actualMicros: number | null;
   estimateMicros: number;
-}): Promise<void> {
+}): Promise<string> {
   assertDatabaseUrl();
-  await db.generationJob.create({
-    data: {
-      makerId: input.makerId,
-      cardId: "direct",
-      mode: input.mode,
-      status: "done",
-      attempt: 1,
-      maxAttempts: 1,
-      estimateMicros: input.estimateMicros,
-      actualMicros: input.actualMicros,
-      usage:
-        input.usage === undefined
-          ? Prisma.DbNull
-          : (input.usage as Prisma.InputJsonValue),
-      request: { kind: "image", model: input.model },
-      startedAt: new Date(),
-      callStartedAt: new Date(),
-      finishedAt: new Date(),
-    },
+  return db.$transaction(async (tx) => {
+    const [maker] = await tx.$queryRaw<{ cap: number }[]>`
+      SELECT "monthlyCapCents"::int AS "cap" FROM "Maker"
+      WHERE "id" = ${input.makerId} FOR UPDATE`;
+    if (!maker) throw new Error("maker not found");
+    const used = await spend(tx, input.makerId);
+    const capMicros = maker.cap * CENT_MICROS;
+    if (
+      !canAfford({ ...used, requestMicros: input.estimateMicros, capMicros })
+    ) {
+      throw new QueueRefusal(
+        "cap",
+        "This generation would go over this month's spending cap.",
+      );
+    }
+    const now = new Date();
+    const row = await tx.generationJob.create({
+      data: {
+        makerId: input.makerId,
+        cardId: "direct",
+        mode: "live",
+        status: "running",
+        attempt: 1,
+        maxAttempts: 1,
+        estimateMicros: input.estimateMicros,
+        request: { kind: "direct", model: input.model },
+        startedAt: now,
+        leaseUntil: new Date(now.getTime() + DIRECT_LEASE_MS),
+      },
+    });
+    return row.id;
+  });
+}
+
+// The direct call's request is going out.
+export async function markDirectCall(id: string): Promise<void> {
+  await db.$executeRaw`
+    UPDATE "GenerationJob" SET "callStartedAt" = now()
+    WHERE "id" = ${id} AND "status" = 'running'`;
+}
+
+// Close a direct call's row: its measured cost, or its failure (by the queue's
+// rule: an answered error counts nothing, no answer counts at the estimate).
+export async function closeDirectCall(
+  id: string,
+  outcome:
+    | { usage: unknown; actualMicros: number | null }
+    | { error: string; mayBeCharged: boolean },
+): Promise<void> {
+  if ("error" in outcome) {
+    await db.generationJob.updateMany({
+      where: { id, status: "running" },
+      data: {
+        status: "failed",
+        error: outcome.error,
+        finishedAt: new Date(),
+        leaseUntil: null,
+        ...(outcome.mayBeCharged ? {} : { callStartedAt: null }),
+      },
+    });
+    return;
+  }
+  await recordCost(id, outcome.usage, outcome.actualMicros);
+  await db.generationJob.updateMany({
+    where: { id, status: "running" },
+    data: { status: "done", finishedAt: new Date(), leaseUntil: null },
   });
 }
 
