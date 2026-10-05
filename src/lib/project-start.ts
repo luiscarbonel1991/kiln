@@ -7,11 +7,11 @@ import { type ProjectPlan, slotCardId, slotRecipeId } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import type { ProjectType } from "@/domain/project";
+import { sceneVariants } from "@/domain/scene-direction";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { projectTypeLabel } from "@/lib/project-types";
 import { findRecipe } from "@/lib/recipes";
-import { fallbackVariants } from "@/providers/mock/art-director";
 
 // What a planned project starts with in the editor: the understanding written
 // from the spec (no vision call), the product's reference as the anchor, and one
@@ -43,13 +43,16 @@ export function photoReference(product: Product): MasterAsset | null {
 
 // One draft card per scene slot, per destination. Ids are `${destination}.${slot}`
 // (unique across destinations; a video child appends "-video"); the recipe is
-// the slot's shot list composed on its destination. Scenes come from the same
-// deterministic fallback the studio uses without an ArtDirector; line-art shot
-// lists skip it, as in the studio.
+// the slot's shot list composed on its destination. Cards come from the plan's
+// own scene slots (the plan is the project's snapshot, so a shot list edited
+// since keeps working), each with its slot's art direction and the product's
+// places of use in order; line-art shot lists keep the planning fields, as in
+// the studio.
 export function slotCards(
   plan: ProjectPlan,
   master: MasterAsset,
   understanding: BaseUnderstanding,
+  useContexts: string[],
 ): Card[] {
   return plan.destinations.flatMap((d) => {
     const recipe = findRecipe(slotRecipeId(d.shotListId, d.destinationId));
@@ -57,17 +60,25 @@ export function slotCards(
       throw new Error(`no recipe for ${d.shotListId} on ${d.destinationId}`);
     }
     const scenes = d.slots.filter((s) => s.fill === "scene");
-    if (scenes.length !== recipe.directions.length) {
-      throw new Error(
-        `the plan for ${d.destinationId} no longer matches its shot list`,
-      );
-    }
     const planning = buildPlanningContext(understanding, recipe, SEED_BRAND);
     const variants =
       recipe.style === "line-art"
         ? undefined
-        : fallbackVariants(recipe, understanding, recipe.directions.length);
-    return buildCards({ master, recipe, planning, variants }).map(
+        : sceneVariants(
+            scenes,
+            recipe.fieldDefaults,
+            understanding,
+            useContexts,
+          );
+    const slotRecipe = {
+      ...recipe,
+      directions: scenes.map((s) => ({
+        label: s.label,
+        purpose: s.purpose,
+        ...(s.aspect ? { aspect: s.aspect } : {}),
+      })),
+    };
+    return buildCards({ master, recipe: slotRecipe, planning, variants }).map(
       (card, i) => ({
         ...card,
         id: slotCardId(d.destinationId, scenes[i].key),
@@ -97,6 +108,8 @@ export function startEditorState(input: {
     understanding,
     recipeId: slotRecipeId(first.shotListId, first.destinationId),
     planning: null,
-    cards: master ? slotCards(plan, master, understanding) : [],
+    cards: master
+      ? slotCards(plan, master, understanding, product.useContexts)
+      : [],
   };
 }

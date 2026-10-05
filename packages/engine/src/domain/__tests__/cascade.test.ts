@@ -223,6 +223,30 @@ describe("assemblePrompt", () => {
     expect(prompt).not.toContain("centered top-down");
   });
 
+  it("a value written as a sentence never doubles the template's period", () => {
+    const current: CardFieldsLike = {
+      fields: {
+        scene: {
+          value: "Show it gift-ready to trigger Etsy gift-buying. ",
+          source: "recipe",
+          locked: false,
+        },
+      },
+    };
+    const { prompt } = assemblePrompt(
+      current,
+      master,
+      understanding,
+      SEED_RECIPE,
+      SEED_BRAND,
+      "Packaging / gift",
+    );
+    expect(prompt).toContain(
+      "Scene: Show it gift-ready to trigger Etsy gift-buying. Composition:",
+    );
+    expect(prompt).not.toContain("..");
+  });
+
   it("always lists master.assetUrl first, then references", () => {
     const current: CardFieldsLike = {
       references: ["https://stub.local/ref.png"],

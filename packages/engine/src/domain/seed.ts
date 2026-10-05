@@ -93,6 +93,11 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         purpose:
           "Win the click: clean seamless background, soft contact shadow, no props.",
         aspect: "1:1",
+        scene:
+          "a clean seamless sweep in a soft neutral tone, a soft contact shadow, no props",
+        composition:
+          "the product centered at a slight three-quarter angle, filling most of the frame",
+        lighting: "soft, even studio light",
       },
       {
         key: "in-use",
@@ -100,6 +105,11 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         purpose:
           "Show it where the customer actually uses it, product still the hero.",
         aspect: "4:5",
+        scene:
+          "in use at {use}, doing its job, with the everyday objects that belong there",
+        composition:
+          "eye level or slightly above, the product sharp and unmistakably the hero, its surroundings readable",
+        lighting: "natural window light",
       },
       {
         key: "colours",
@@ -141,6 +151,11 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         purpose:
           "Place it in an aspirational styled setting that sells the feeling.",
         aspect: "4:5",
+        scene:
+          "an aspirational, lived-in setting at {use}, styled to sell the feeling",
+        composition:
+          "a wider styled shot, the product the clear focal point and the props secondary",
+        lighting: "warm natural light",
       },
       {
         key: "detail",
@@ -148,12 +163,22 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         purpose:
           "Macro on texture and finish to prove craft and justify the price.",
         aspect: "4:5",
+        scene:
+          "a macro close-up of the material, texture and edges, nothing else in the frame",
+        composition:
+          "a tight macro crop on the finish, shallow depth of field, the product filling the frame",
+        lighting: "raking side light that reveals the texture",
       },
       {
         key: "gift",
         label: "Packaging / gift",
         purpose: "Show it gift-ready to trigger Etsy gift-buying.",
         aspect: "4:5",
+        scene:
+          "gift-ready: the product with gift packaging (a box, tissue paper, a ribbon or a gift tag) on a simple surface",
+        composition:
+          "the product and its packaging arranged together, the product in front and unmistakable",
+        lighting: "soft daylight",
       },
     ],
   },
@@ -263,18 +288,28 @@ export const SEED_SHOT_LISTS: ShotList[] = [
           "Stop the scroll in the first second; the headline sits on it.",
         aspect: "4:5",
         textTemplate: "{product.hook}",
+        scene: "the product at {use}, styled and inviting",
+        composition:
+          "the product centered low in the frame, clean calm space across the top for a short headline",
+        lighting: "warm, soft light",
       },
       {
         key: "in-place",
         label: "Product in place",
         purpose: "Show it where it lives, product still the hero.",
         aspect: "4:5",
+        scene: "where it lives: {use}, with the everyday objects around it",
+        composition: "eye level, the product the clear hero",
+        lighting: "natural window light",
       },
       {
         key: "detail",
         label: "Detail",
         purpose: "A close look at the finish that proves the craft.",
         aspect: "4:5",
+        scene: "a close look at the material and the finish",
+        composition: "a tight crop on the finish, shallow depth of field",
+        lighting: "raking side light that reveals the texture",
       },
       {
         key: "colours",

@@ -143,10 +143,14 @@ export function assemblePrompt(
   // values (it only honors source==="local"). So here we prefer the card's stored
   // value for any present key, and fall back to the cascade only when there is no
   // card yet (the planning-preview path passes current === undefined).
+  // Each value is a clause the template ends with its own period, so a value
+  // written as a sentence ("Show it gift-ready.") never doubles it.
   const value = (key: FieldKey) => {
     const stored = current?.fields?.[key];
-    if (stored) return stored.value;
-    return resolveField(key, current, understanding, recipe, brand).value;
+    const raw = stored
+      ? stored.value
+      : resolveField(key, current, understanding, recipe, brand).value;
+    return raw.trim().replace(/[.\s]+$/, "");
   };
   // Imperative, instruction-style prompt. The image models (Gemini / OpenAI edit)
   // anchor to the reference photo, so a comma-list of attributes barely changes the
@@ -156,7 +160,7 @@ export function assemblePrompt(
   const slot = direction ? ` — "${direction}"` : "";
   // When the analysis flagged a mount/hand/stand in the reference photo (sceneProps),
   // name it so the edit removes it — "keep ONLY the product" alone leaves an attached
-  // prop (e.g. the door handle a hanger was photographed on) riding into the result.
+  // prop (e.g. the stand or hand it was photographed on) riding into the result.
   const props = understanding.sceneProps.trim();
   const ptype = understanding.productType.trim() || value("subject");
   const exclusion = props

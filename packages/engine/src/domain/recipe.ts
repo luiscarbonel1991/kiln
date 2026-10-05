@@ -5,11 +5,15 @@ import { RenderStyle, type ShotList, sceneSlots } from "@/domain/shot-list";
 // A listing slot: a buyer-decision job, not a photo style. `label` is the short
 // card title; `purpose` is its commercial goal — it drives the ArtDirector and is
 // shown to the user. `aspect` optionally overrides the recipe target for this slot
-// (e.g. a 1:1 hero inside a 4:5 recipe).
+// (e.g. a 1:1 hero inside a 4:5 recipe). `scene` / `composition` / `lighting`
+// are the slot's own art direction, when its shot list writes one.
 export const ListingSlot = z.object({
   label: z.string(),
   purpose: z.string(),
   aspect: z.string().optional(),
+  scene: z.string().optional(),
+  composition: z.string().optional(),
+  lighting: z.string().optional(),
 });
 export type ListingSlot = z.infer<typeof ListingSlot>;
 
@@ -84,8 +88,15 @@ export function composeRecipe(input: {
     id: input.id,
     name: input.name,
     style: shotList.style,
-    directions: sceneSlots(shotList).map(({ label, purpose, aspect }) =>
-      aspect ? { label, purpose, aspect } : { label, purpose },
+    directions: sceneSlots(shotList).map(
+      ({ label, purpose, aspect, scene, composition, lighting }) => ({
+        label,
+        purpose,
+        ...(aspect ? { aspect } : {}),
+        ...(scene ? { scene } : {}),
+        ...(composition ? { composition } : {}),
+        ...(lighting ? { lighting } : {}),
+      }),
     ),
     fieldDefaults: shotList.fieldDefaults,
     targets: input.targets ?? defaultTargets(shotList, destination),

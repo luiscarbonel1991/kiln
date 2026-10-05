@@ -24,6 +24,7 @@ const board = Product.parse({
   defaultColour: "maple",
   typography: { family: "Fraunces" },
   wording: [{ label: "Family name", maxChars: 14, example: "The Riveras" }],
+  useContexts: ["a kitchen counter during dinner prep", "a set dinner table"],
   source: { kind: "photo", assetUrl: "https://cdn.example.com/board.jpg" },
 });
 
@@ -63,7 +64,14 @@ describe("findRecipe for planned slots", () => {
 });
 
 describe("slotCards", () => {
-  const cards = slotCards(plan, master, productUnderstanding(board));
+  const cards = slotCards(
+    plan,
+    master,
+    productUnderstanding(board),
+    board.useContexts,
+  );
+  const scene = (id: string) =>
+    cards.find((c) => c.id === id)?.fields.scene.value ?? "";
 
   it("one draft card per scene slot, ids unique across destinations", () => {
     expect(cards.map((c) => c.id)).toEqual([
@@ -87,7 +95,51 @@ describe("slotCards", () => {
     expect(findRecipe(hook?.recipeId ?? "")).toBeDefined();
     expect(hook?.direction).toBe("Hook");
     expect(hook?.model.aspect).toBe("4:5");
-    expect(hook?.fields.scene.value).toContain("stop the scroll");
+    expect(hook?.fields.scene.value).toBe(
+      "the product at a kitchen counter during dinner prep, styled and inviting",
+    );
+  });
+
+  it("each scene has its own direction; the places of use go in order", () => {
+    expect(scene("etsy.in-use")).toContain(
+      "in use at a kitchen counter during dinner prep",
+    );
+    expect(scene("etsy.lifestyle")).toContain("at a set dinner table");
+    expect(scene("etsy.detail")).toContain("macro");
+    expect(scene("etsy.gift")).toContain("gift packaging");
+    const etsy = cards.filter((c) => c.id.startsWith("etsy."));
+    expect(new Set(etsy.map((c) => c.fields.scene.value)).size).toBe(
+      etsy.length,
+    );
+    expect(
+      new Set(etsy.map((c) => c.fields.composition.value)).size,
+    ).toBeGreaterThan(1);
+  });
+
+  it("follows the plan's own slots, even when the shot list has changed since", () => {
+    const etsy = plan.destinations[0];
+    const edited = {
+      destinations: [
+        {
+          ...etsy,
+          slots: [
+            ...etsy.slots.filter((s) => s.key !== "gift"),
+            {
+              key: "retired",
+              label: "A slot the list no longer has",
+              purpose: "Kept from an older plan.",
+              fill: "scene" as const,
+            },
+          ],
+        },
+      ],
+    };
+    const built = slotCards(edited, master, productUnderstanding(board), []);
+    expect(built.map((c) => c.id)).toContain("etsy.retired");
+    expect(built.map((c) => c.id)).not.toContain("etsy.gift");
+    expect(built.find((c) => c.id === "etsy.retired")?.direction).toBe(
+      "A slot the list no longer has",
+    );
   });
 });
 

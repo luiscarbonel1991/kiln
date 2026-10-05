@@ -137,6 +137,13 @@ export {
   RecipePreset,
 } from "@/domain/recipe";
 export {
+  GENERIC_USE,
+  inSentence,
+  type SceneDefaults,
+  type SceneSlot,
+  sceneVariants,
+} from "@/domain/scene-direction";
+export {
   SEED_BRAND,
   SEED_DESTINATIONS,
   SEED_RECIPE,

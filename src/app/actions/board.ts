@@ -71,6 +71,7 @@ export async function addReferenceAction(formData: FormData): Promise<void> {
           loaded.board.plan,
           master,
           productUnderstanding(loaded.product),
+          loaded.product.useContexts,
         )
       : [];
   await setProjectReference(projectId, master, cards);

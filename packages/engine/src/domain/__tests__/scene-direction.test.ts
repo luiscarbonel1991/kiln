@@ -1,0 +1,91 @@
+import { describe, expect, it } from "vitest";
+import {
+  GENERIC_USE,
+  inSentence,
+  sceneVariants,
+} from "@/domain/scene-direction";
+import type { BaseUnderstanding } from "@/domain/understanding";
+
+const understanding: BaseUnderstanding = {
+  subject: "a coaster",
+  productType: "coaster",
+  useContext: "",
+  sceneProps: "",
+  materials: "cork",
+  lighting: "soft natural light",
+  composition: "the product centered",
+  mood: "calm",
+  palette: ["#D9B98C"],
+};
+
+const slots = [
+  { label: "Hero", purpose: "Win the click.", scene: "a clean sweep" },
+  { label: "In use", purpose: "Show it used.", scene: "in use at {use}" },
+  { label: "Lifestyle", purpose: "Sell it.", scene: "a styled {use}" },
+  { label: "Gift", purpose: "Show it gift-ready to trigger Etsy gift-buying." },
+];
+
+describe("sceneVariants", () => {
+  it("a slot's own scene wins; {use} takes the places of use in order", () => {
+    const v = sceneVariants(slots, {}, understanding, [
+      "a coffee table",
+      "a reading nook",
+    ]);
+    expect(v.map((x) => x.scene).slice(0, 3)).toEqual([
+      "a clean sweep",
+      "in use at a coffee table",
+      "a styled a reading nook",
+    ]);
+    expect(v.map((x) => x.direction)).toEqual([
+      "Hero",
+      "In use",
+      "Lifestyle",
+      "Gift",
+    ]);
+  });
+
+  it("wraps around the places of use, and names a generic place without any", () => {
+    const one = sceneVariants(slots, {}, understanding, ["a desk"]);
+    expect(one[1].scene).toBe("in use at a desk");
+    expect(one[2].scene).toBe("a styled a desk");
+    const none = sceneVariants(slots, {}, understanding, []);
+    expect(none[1].scene).toBe(`in use at ${GENERIC_USE}`);
+  });
+
+  it("a slot without a scene leans the defaults to its purpose, mid-sentence and without a double period", () => {
+    const [, , , gift] = sceneVariants(
+      slots,
+      { scene: "soft neutral sweep", composition: "centered" },
+      understanding,
+      [],
+    );
+    expect(gift.scene).toBe(
+      "soft neutral sweep — show it gift-ready to trigger Etsy gift-buying",
+    );
+    expect(gift.composition).toBe("centered");
+    expect(gift.lighting).toBe("soft natural light");
+  });
+
+  it("composition and lighting: the slot's, else the defaults, else the understanding", () => {
+    const [v] = sceneVariants(
+      [
+        {
+          label: "Detail",
+          purpose: "p",
+          composition: "macro",
+          lighting: "raking",
+        },
+      ],
+      {},
+      understanding,
+      [],
+    );
+    expect([v.composition, v.lighting]).toEqual(["macro", "raking"]);
+  });
+});
+
+describe("inSentence", () => {
+  it("lowers only the first letter and drops the final period", () => {
+    expect(inSentence("Show it on Etsy.")).toBe("show it on Etsy");
+  });
+});

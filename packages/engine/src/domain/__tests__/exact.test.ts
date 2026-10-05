@@ -87,6 +87,12 @@ describe("productUnderstanding", () => {
     expect(u.palette).toEqual(["#E8D2A6", "#3B2A1E"]);
   });
 
+  it("keeps the forbidden list on the product, so a scene may hold props", () => {
+    expect(productUnderstanding(CUTTING_BOARD).subject).toContain(
+      "; add nothing to the product itself (no other text, no logos, no people, no extra objects on the product)",
+    );
+  });
+
   it("takes the first place of use as the use context", () => {
     expect(productUnderstanding(CUTTING_BOARD).useContext).toBe("");
     expect(

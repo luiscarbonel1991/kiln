@@ -23,6 +23,9 @@ export type ExactKind = z.infer<typeof ExactKind>;
 // One frame of a deliverable: a buyer-decision job, not a photo style. `purpose`
 // drives the ArtDirector and is shown to the maker; `textTemplate` is text a
 // template draws on the frame (e.g. "{product.name}"), never the image model.
+// A scene slot may write its own art direction (scene / composition /
+// lighting); `{use}` in its scene takes the product's places of use (see
+// scene-direction.ts). Without them it leans the list's defaults to its purpose.
 export const ShotSlotFields = z.object({
   key: z.string().regex(/^[a-z0-9-]+$/, "kebab-case slot key"),
   label: z.string().min(1),
@@ -31,6 +34,9 @@ export const ShotSlotFields = z.object({
   fill: SlotFill.default("scene"),
   exact: ExactKind.optional(),
   textTemplate: z.string().optional(),
+  scene: z.string().min(1).optional(),
+  composition: z.string().min(1).optional(),
+  lighting: z.string().min(1).optional(),
 });
 
 export const exactKindMatchesFill = {

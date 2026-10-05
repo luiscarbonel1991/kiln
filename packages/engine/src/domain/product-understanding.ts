@@ -27,9 +27,11 @@ export function productUnderstanding(product: Product): BaseUnderstanding {
     examples.length > 0
       ? `, with the wording ${examples.map((e) => `"${e}"`).join(" and ")} in ${product.typography.family}`
       : "";
+  // The forbidden list is about the product itself; the scene around it may
+  // hold the props a slot calls for (a mug on a coaster, a hand, packaging).
   const forbidden =
     product.forbidden.length > 0
-      ? `; no ${product.forbidden.join(", no ")}`
+      ? `; add nothing to the product itself (no ${product.forbidden.join(", no ")})`
       : "";
   return {
     subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${colour.name.toLowerCase()} ${product.material}${wording}; keep every letter, mark and proportion exactly as in the master image${forbidden}`,
