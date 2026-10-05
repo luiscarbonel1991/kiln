@@ -12,10 +12,10 @@ describe("art director (mock fallback without a key)", () => {
       understanding,
       recipe: SEED_RECIPE,
       brand: SEED_BRAND,
-      n: 6,
+      n: 5,
     });
 
-    expect(variants).toHaveLength(6);
+    expect(variants).toHaveLength(5);
     expect(variants.map((v) => v.direction)).toEqual(
       SEED_RECIPE.directions.map((d) => d.label),
     );

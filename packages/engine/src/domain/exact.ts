@@ -1,5 +1,7 @@
 import {
   type ColourOption,
+  colourOf,
+  type Dimensions,
   dimensionsLabel,
   type Product,
   type Treatment,
@@ -45,9 +47,88 @@ export function renderTextTemplate(template: string, product: Product): string {
   );
 }
 
+// The product as a flat shape for frames drawn to scale: its size, whether it
+// is round, its default colour and what its face says. The app draws the
+// product's plate image when it has one, else this outline.
+export interface ProductOutline {
+  width: number;
+  height: number;
+  unit: Dimensions["unit"];
+  round: boolean;
+  face: string;
+  wording: string[];
+}
+
+export function productOutline(product: Product): ProductOutline {
+  const d = product.dimensions;
+  return {
+    width: d.w,
+    height: d.h,
+    unit: d.unit,
+    round: /\b(round|circle|circular|disc|disk|oval)\b/i.test(product.shape),
+    face: colourOf(product, product.defaultColour).face,
+    wording: product.wording
+      .map((w) => w.example?.trim() ?? "")
+      .filter((e) => e !== ""),
+  };
+}
+
+// Everyday objects of a known size a buyer reads at a glance, for drawings to
+// scale (sizes in inches; an ISO credit card, a typical phone, a US letter
+// sheet, a standard interior door).
+const SCALE_REFERENCES = [
+  { key: "card", name: "a credit card", width: 3.37, height: 2.13 },
+  { key: "phone", name: "a phone", width: 2.8, height: 5.8 },
+  { key: "letter", name: "a letter sheet", width: 8.5, height: 11 },
+  { key: "door", name: "a door", width: 36, height: 80 },
+] as const;
+
+export interface ScaleReference {
+  key: (typeof SCALE_REFERENCES)[number]["key"];
+  name: string;
+  // In the product's unit.
+  width: number;
+  height: number;
+}
+
+// The reference whose size is closest to the product's (by the longest side,
+// on a log scale), in the product's unit.
+export function scaleReference(dimensions: Dimensions): ScaleReference {
+  const perInch = dimensions.unit === "mm" ? 25.4 : 1;
+  const longest = Math.max(dimensions.w, dimensions.h) / perInch;
+  const distance = (r: (typeof SCALE_REFERENCES)[number]) =>
+    Math.abs(Math.log(Math.max(r.width, r.height) / longest));
+  const best = SCALE_REFERENCES.reduce((a, b) =>
+    distance(b) < distance(a) ? b : a,
+  );
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  return {
+    key: best.key,
+    name: best.name,
+    width: round2(best.width * perInch),
+    height: round2(best.height * perInch),
+  };
+}
+
+// Readable ink on a colour: near-black on light colours, white on dark ones
+// (WCAG relative luminance).
+export function contrastInk(hex: string): "#241f18" | "#ffffff" {
+  const n = Number.parseInt(hex.replace("#", "").slice(0, 6), 16);
+  const channel = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const l =
+    0.2126 * channel((n >> 16) & 255) +
+    0.7152 * channel((n >> 8) & 255) +
+    0.0722 * channel(n & 255);
+  return l > 0.4 ? "#241f18" : "#ffffff";
+}
+
 const DEFAULT_TITLE: Record<ExactKind, string> = {
   "colour-grid": "Available in {colours.count} colours",
   "size-spec": "{product.dimensions}",
+  scale: "Shown to scale",
   personalize: "Make it yours",
   "text-card": "{product.name}",
 };
@@ -72,6 +153,12 @@ export type ExactView =
         required: boolean;
         example?: string;
       }[];
+    }
+  | {
+      kind: "scale";
+      title: string;
+      product: ProductOutline;
+      reference: ScaleReference;
     }
   | { kind: "text-card"; title: string; subtitle: string };
 
@@ -104,6 +191,13 @@ export function exactView(
         ],
       };
     }
+    case "scale":
+      return {
+        kind,
+        title,
+        product: productOutline(product),
+        reference: scaleReference(product.dimensions),
+      };
     case "personalize":
       return {
         kind,

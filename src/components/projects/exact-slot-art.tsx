@@ -1,4 +1,9 @@
-import type { ExactView } from "@/domain/exact";
+import {
+  contrastInk,
+  type ExactView,
+  type ProductOutline,
+  type ScaleReference,
+} from "@/domain/exact";
 
 // Draws an exact slot from its view model: plain SVG, no image model, the same
 // pixels every time. Product colours are the spec's hex values (render content);
@@ -14,12 +19,16 @@ const SERIF = { fontFamily: "var(--font-fraunces)" };
 const SANS = { fontFamily: "var(--font-hanken)" };
 const MONO = { fontFamily: "var(--font-jetbrains-mono)" };
 
+// `plate` is the product's own plate image (a vector product's SVG) for the
+// frames drawn to scale; without it they draw the product's outline.
 export function ExactSlotArt({
   view,
   aspect,
+  plate,
 }: {
   view: ExactView;
   aspect?: string;
+  plate?: string | null;
 }) {
   const height = heightFor(aspect);
   return (
@@ -39,6 +48,9 @@ export function ExactSlotArt({
       ) : null}
       {view.kind === "size-spec" ? (
         <SizeSpec view={view} height={height} />
+      ) : null}
+      {view.kind === "scale" ? (
+        <ScaleDrawing view={view} height={height} plate={plate ?? null} />
       ) : null}
       {view.kind === "personalize" ? (
         <Personalize view={view} height={height} />
@@ -131,6 +143,349 @@ function ColourGrid({
           </g>
         );
       })}
+    </g>
+  );
+}
+
+const fmtSize = (n: number) =>
+  Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "");
+
+// The product at (x, y, w, h): its plate image, or its outline in its default
+// colour with the wording an example piece would carry.
+function ProductShape({
+  outline,
+  plate,
+  x,
+  y,
+  w,
+  h,
+}: {
+  outline: ProductOutline;
+  plate: string | null;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}) {
+  if (plate) {
+    return (
+      <image
+        href={plate}
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        preserveAspectRatio="xMidYMid meet"
+      />
+    );
+  }
+  const ink = contrastInk(outline.face);
+  const lines = outline.wording.slice(0, 3);
+  const longest = Math.max(1, ...lines.map((l) => l.length));
+  const fontSize = Math.max(
+    6,
+    Math.min(
+      (h * 0.5) / Math.max(1, lines.length),
+      (w * 0.8) / (longest * 0.62),
+    ),
+  );
+  return (
+    <g>
+      {outline.round ? (
+        <ellipse
+          cx={x + w / 2}
+          cy={y + h / 2}
+          rx={w / 2}
+          ry={h / 2}
+          fill={outline.face}
+          className="stroke-on-surface-mid"
+          strokeWidth={1}
+        />
+      ) : (
+        <rect
+          x={x}
+          y={y}
+          width={w}
+          height={h}
+          rx={Math.min(w, h) * 0.08}
+          fill={outline.face}
+          className="stroke-on-surface-mid"
+          strokeWidth={1}
+        />
+      )}
+      {lines.map((line, i) => (
+        <text
+          key={line}
+          x={x + w / 2}
+          y={
+            y +
+            h / 2 +
+            (i - (lines.length - 1) / 2) * fontSize * 1.15 +
+            fontSize * 0.35
+          }
+          textAnchor="middle"
+          fill={ink}
+          style={{ ...SANS, fontSize, fontWeight: 600 }}
+        >
+          {line}
+        </text>
+      ))}
+    </g>
+  );
+}
+
+// An everyday object's silhouette, in the chrome's neutral tones.
+function ReferenceShape({
+  reference,
+  x,
+  y,
+  w,
+  h,
+}: {
+  reference: ScaleReference;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}) {
+  const body = "fill-surface-soft stroke-on-surface-mid";
+  const detail = "fill-on-surface-dim/25";
+  switch (reference.key) {
+    case "card":
+      return (
+        <g>
+          <rect
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            rx={w * 0.05}
+            className={body}
+            strokeWidth={1}
+          />
+          <rect
+            x={x + w * 0.1}
+            y={y + h * 0.32}
+            width={w * 0.17}
+            height={h * 0.24}
+            rx={2}
+            className={detail}
+          />
+          <rect
+            x={x + w * 0.1}
+            y={y + h * 0.72}
+            width={w * 0.6}
+            height={h * 0.07}
+            rx={1}
+            className={detail}
+          />
+        </g>
+      );
+    case "phone":
+      return (
+        <g>
+          <rect
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            rx={w * 0.16}
+            className={body}
+            strokeWidth={1}
+          />
+          <rect
+            x={x + w * 0.07}
+            y={y + h * 0.05}
+            width={w * 0.86}
+            height={h * 0.9}
+            rx={w * 0.1}
+            className={detail}
+          />
+        </g>
+      );
+    case "letter":
+      return (
+        <g>
+          <path
+            d={`M${x} ${y} H${x + w * 0.86} L${x + w} ${y + w * 0.14} V${y + h} H${x} Z`}
+            className={body}
+            strokeWidth={1}
+          />
+          {[0.22, 0.3, 0.38, 0.46, 0.54].map((f) => (
+            <rect
+              key={f}
+              x={x + w * 0.12}
+              y={y + h * f}
+              width={w * (f === 0.54 ? 0.45 : 0.76)}
+              height={Math.max(1, h * 0.012)}
+              className={detail}
+            />
+          ))}
+        </g>
+      );
+    case "door":
+      return (
+        <g>
+          <rect
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            className={body}
+            strokeWidth={1}
+          />
+          <rect
+            x={x + w * 0.14}
+            y={y + h * 0.06}
+            width={w * 0.72}
+            height={h * 0.38}
+            className={detail}
+          />
+          <rect
+            x={x + w * 0.14}
+            y={y + h * 0.5}
+            width={w * 0.72}
+            height={h * 0.44}
+            className={detail}
+          />
+          <circle
+            cx={x + w * 0.88}
+            cy={y + h * 0.5}
+            r={Math.max(2, w * 0.035)}
+            className="fill-on-surface-mid"
+          />
+        </g>
+      );
+  }
+}
+
+// The product drawn to scale beside an everyday object of a similar size, on
+// one baseline, with a ruler under the product in its own unit.
+function ScaleDrawing({
+  view,
+  height,
+  plate,
+}: {
+  view: Extract<ExactView, { kind: "scale" }>;
+  height: number;
+  plate: string | null;
+}) {
+  const { product: p, reference: r } = view;
+  const gapU = Math.max(p.width, r.width) * 0.3;
+  // The drawing fits between the title and the labels under it, centred
+  // vertically when the width is what limits it.
+  const top = 92;
+  const bottom = height - 96;
+  const k = Math.min(
+    (WIDTH - 80) / (p.width + gapU + r.width),
+    (bottom - top) / Math.max(p.height, r.height),
+  );
+  const baseline = top + (bottom - top + Math.max(p.height, r.height) * k) / 2;
+  const x0 = (WIDTH - (p.width + gapU + r.width) * k) / 2;
+  const px = x0;
+  const rx = x0 + (p.width + gapU) * k;
+  // Ruler under the product: whole units (cm for a product in mm), at most
+  // about ten ticks.
+  const metric = p.unit === "mm";
+  const unitLen = metric ? 10 : 1;
+  const steps = metric ? [1, 2, 5, 10, 20, 50] : [1, 2, 6, 12];
+  const span = Math.ceil(p.width / unitLen);
+  const step = steps.find((s) => span / s <= 10) ?? steps[steps.length - 1];
+  const ticks = Array.from(
+    { length: Math.floor(span / step) + 1 },
+    (_unused, i) => i * step,
+  );
+  const rulerY = baseline + 12;
+  return (
+    <g>
+      <Title text={view.title} />
+      <ProductShape
+        outline={p}
+        plate={plate}
+        x={px}
+        y={baseline - p.height * k}
+        w={p.width * k}
+        h={p.height * k}
+      />
+      <ReferenceShape
+        reference={r}
+        x={rx}
+        y={baseline - r.height * k}
+        w={r.width * k}
+        h={r.height * k}
+      />
+      <line
+        x1={x0 - 10}
+        x2={WIDTH - x0 + 10}
+        y1={baseline}
+        y2={baseline}
+        className="stroke-on-surface-dim"
+        strokeWidth={1}
+      />
+      <line
+        x1={px}
+        x2={px + span * unitLen * k}
+        y1={rulerY}
+        y2={rulerY}
+        className="stroke-foreground"
+        strokeWidth={1}
+      />
+      {ticks.map((t) => (
+        <g key={t}>
+          <line
+            x1={px + t * unitLen * k}
+            x2={px + t * unitLen * k}
+            y1={rulerY}
+            y2={rulerY + 6}
+            className="stroke-foreground"
+            strokeWidth={1}
+          />
+          <text
+            x={px + t * unitLen * k}
+            y={rulerY + 17}
+            textAnchor="middle"
+            className="fill-on-surface-mid"
+            style={{ ...MONO, fontSize: 9 }}
+          >
+            {t}
+          </text>
+        </g>
+      ))}
+      <text
+        x={px + span * unitLen * k + 6}
+        y={rulerY + 4}
+        className="fill-on-surface-mid"
+        style={{ ...MONO, fontSize: 9 }}
+      >
+        {metric ? "cm" : "in"}
+      </text>
+      <text
+        x={px + (p.width * k) / 2}
+        y={rulerY + 44}
+        textAnchor="middle"
+        className="fill-foreground"
+        style={{ ...MONO, fontSize: 11 }}
+      >
+        {fmtSize(p.width)} x {fmtSize(p.height)} {p.unit}
+      </text>
+      <text
+        x={rx + (r.width * k) / 2}
+        y={rulerY + 44}
+        textAnchor="middle"
+        className="fill-on-surface-mid"
+        style={{ ...SANS, fontSize: 11 }}
+      >
+        {r.name}
+      </text>
+      <text
+        x={rx + (r.width * k) / 2}
+        y={rulerY + 58}
+        textAnchor="middle"
+        className="fill-on-surface-dim"
+        style={{ ...MONO, fontSize: 9 }}
+      >
+        {fmtSize(r.width)} x {fmtSize(r.height)} {p.unit}
+      </text>
     </g>
   );
 }

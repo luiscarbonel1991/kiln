@@ -142,8 +142,10 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         key: "scale",
         label: "Scale & size",
         purpose:
-          "Give a believable size cue so buyers know exactly what they get.",
+          "Drawn to scale beside an everyday object, so buyers know exactly what they get.",
         aspect: "1:1",
+        fill: "exact",
+        exact: "scale",
       },
       {
         key: "lifestyle",

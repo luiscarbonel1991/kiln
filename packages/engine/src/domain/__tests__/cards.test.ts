@@ -36,7 +36,7 @@ describe("buildCards", () => {
   const cards = buildCards({ master, recipe: SEED_RECIPE, planning });
 
   it("builds one card per listing slot, anchored to the master", () => {
-    expect(cards).toHaveLength(6);
+    expect(cards).toHaveLength(5);
     for (const card of cards) {
       expect(card.masterAssetId).toBe("master-1");
       expect(card.recipeId).toBe(SEED_RECIPE.id);

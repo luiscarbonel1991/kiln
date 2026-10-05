@@ -49,7 +49,6 @@ describe("findRecipe for planned slots", () => {
     expect(recipe?.directions.map((d) => d.label)).toEqual([
       "Marketplace hero",
       "In-use mockup",
-      "Scale & size",
       "Lifestyle scene",
       "Material detail",
       "Packaging / gift",
@@ -77,7 +76,6 @@ describe("slotCards", () => {
     expect(cards.map((c) => c.id)).toEqual([
       "etsy.hero",
       "etsy.in-use",
-      "etsy.scale",
       "etsy.lifestyle",
       "etsy.detail",
       "etsy.gift",
@@ -153,7 +151,7 @@ describe("startEditorState", () => {
     });
     expect(state.phase).toBe("generation");
     expect(state.understanding?.subject).toContain('"The Riveras"');
-    expect(state.cards).toHaveLength(9);
+    expect(state.cards).toHaveLength(8);
     expect(state.name).toBe("Engraved family cutting board — Launch");
   });
 

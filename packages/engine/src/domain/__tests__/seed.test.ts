@@ -15,9 +15,9 @@ describe("seed data", () => {
     expect(SEED_BRAND.palette.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("SEED_RECIPE parses cleanly with six listing slots and two targets", () => {
+  it("SEED_RECIPE parses cleanly with five scene slots and two targets", () => {
     expect(() => Recipe.parse(SEED_RECIPE)).not.toThrow();
-    expect(SEED_RECIPE.directions).toHaveLength(6);
+    expect(SEED_RECIPE.directions).toHaveLength(5);
     for (const slot of SEED_RECIPE.directions) {
       expect(slot.label).toBeTruthy();
       expect(slot.purpose).toBeTruthy();

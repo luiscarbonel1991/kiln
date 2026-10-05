@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { exactView, renderTextTemplate } from "@/domain/exact";
+import {
+  contrastInk,
+  exactView,
+  productOutline,
+  renderTextTemplate,
+  scaleReference,
+} from "@/domain/exact";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
 
@@ -105,5 +111,57 @@ describe("productUnderstanding", () => {
 
   it("is generic: nothing about signs or acrylic", () => {
     expect(JSON.stringify(u).toLowerCase()).not.toMatch(/sign|acrylic/);
+  });
+});
+
+describe("drawn to scale", () => {
+  it("picks the everyday object closest in size to the product", () => {
+    const ref = (w: number, h: number, unit: "in" | "mm" = "in") =>
+      scaleReference({ w, h, unit }).key;
+    expect(ref(4, 4)).toBe("card");
+    expect(ref(5, 3)).toBe("phone");
+    expect(ref(16, 10)).toBe("letter");
+    expect(ref(30, 60)).toBe("door");
+    expect(ref(100, 100, "mm")).toBe("card");
+  });
+
+  it("gives the reference in the product's unit", () => {
+    expect(scaleReference({ w: 100, h: 100, unit: "mm" })).toMatchObject({
+      name: "a credit card",
+      width: 85.6,
+      height: 54.1,
+    });
+  });
+
+  it("the scale view carries the product's outline and its reference", () => {
+    const view = exactView("scale", CUTTING_BOARD);
+    if (view.kind !== "scale") throw new Error();
+    expect(view.title).toBe("Shown to scale");
+    expect(view.reference.key).toBe("letter");
+    expect(view.product).toMatchObject({
+      width: 16,
+      height: 10,
+      unit: "in",
+      round: false,
+    });
+    expect(view.product.face).toMatch(/^#/);
+  });
+
+  it("an outline is round for round shapes only, and shows the example wording", () => {
+    expect(
+      productOutline({ ...CUTTING_BOARD, shape: "round coaster" }).round,
+    ).toBe(true);
+    expect(
+      productOutline({ ...CUTTING_BOARD, shape: "rounded rectangle board" })
+        .round,
+    ).toBe(false);
+    expect(productOutline(CUTTING_BOARD).wording.length).toBeGreaterThan(0);
+  });
+
+  it("ink contrasts with the colour under it", () => {
+    expect(contrastInk("#FFFFFF")).toBe("#241f18");
+    expect(contrastInk("#E8D2A6")).toBe("#241f18");
+    expect(contrastInk("#171311")).toBe("#ffffff");
+    expect(contrastInk("#c0461f")).toBe("#ffffff");
   });
 });

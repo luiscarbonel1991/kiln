@@ -29,6 +29,7 @@ import {
 import { dimensionsLabel, type Product } from "@/domain/product";
 import type { JobView } from "@/domain/queue";
 import { isRenderableUrl } from "@/lib/asset-url";
+import { plateHref } from "@/lib/plate-href";
 import { projectTypeLabel } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
 import type { BatchProgress, Budget } from "@/server/generation-repository";
@@ -158,6 +159,7 @@ export function ProjectBoard({
                       <ExactSlotArt
                         view={exactView(slot.exact, product, slot.textTemplate)}
                         aspect={slot.aspect}
+                        plate={plateHref(product)}
                       />
                     ) : (
                       <SceneArt
@@ -330,6 +332,13 @@ function SlotActions({
         </span>
       )}
       {view.inBatch ? null : toggle}
+      {slot.key === "scale" ? (
+        // Plans from before M4 kept an AI scale scene; its size cue can lie
+        // (new plans draw the scale exactly).
+        <span className="font-mono text-[0.6rem] text-prov-brand">
+          AI scale · unverified
+        </span>
+      ) : null}
     </div>
   );
 }

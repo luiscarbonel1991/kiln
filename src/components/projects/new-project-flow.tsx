@@ -24,6 +24,7 @@ import {
 } from "@/domain/plan";
 import { dimensionsLabel, type Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
+import { plateHref } from "@/lib/plate-href";
 import { PROJECT_TYPES } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
@@ -372,6 +373,7 @@ export function NewProjectFlow({
                                 slot.textTemplate,
                               )}
                               aspect={slot.aspect}
+                              plate={plateHref(product)}
                             />
                           ) : (
                             <SceneArt

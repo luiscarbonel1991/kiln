@@ -15,6 +15,7 @@ export type SlotFill = z.infer<typeof SlotFill>;
 export const ExactKind = z.enum([
   "colour-grid",
   "size-spec",
+  "scale",
   "personalize",
   "text-card",
 ]);

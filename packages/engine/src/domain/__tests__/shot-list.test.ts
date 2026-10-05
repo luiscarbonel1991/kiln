@@ -99,7 +99,7 @@ describe("board seeds", () => {
     expect(ids("launch")).toEqual(["etsy", "instagram"]);
   });
 
-  it("the Etsy listing interleaves three exact slots among its six scenes", () => {
+  it("the Etsy listing interleaves four exact slots among its five scenes", () => {
     const etsy = SEED_SHOT_LISTS.find((l) => l.id === "etsy-listing");
     expect(etsy?.slots.map((s) => s.fill)).toEqual([
       "scene",
@@ -107,7 +107,7 @@ describe("board seeds", () => {
       "exact",
       "exact",
       "exact",
-      "scene",
+      "exact",
       "scene",
       "scene",
       "scene",

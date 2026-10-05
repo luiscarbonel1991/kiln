@@ -150,7 +150,7 @@ describe("useProject generation", () => {
     generate();
     const state = useProject.getState();
     expect(state.phase).toBe("generation");
-    expect(state.cards).toHaveLength(6);
+    expect(state.cards).toHaveLength(5);
     // Cards start as drafts — generation is manual (cost control), no auto-run.
     expect(cardsOf()[0].status).toBe("draft");
   });
@@ -305,7 +305,7 @@ describe("useProject persistence", () => {
     const persisted = toPersisted(useProject.getState());
     expect(persisted.name).toBe("a glazed cream pitcher");
     expect(persisted.phase).toBe("generation");
-    expect(persisted.cards).toHaveLength(6);
+    expect(persisted.cards).toHaveLength(5);
     expect("renderSeed" in persisted.cards[0]).toBe(false);
   });
 
@@ -321,7 +321,7 @@ describe("useProject persistence", () => {
     const state = useProject.getState();
     expect(state.projectId).toBe("ws-9");
     expect(state.phase).toBe("generation");
-    expect(state.cards).toHaveLength(6);
+    expect(state.cards).toHaveLength(5);
     expect(state.cards?.[0].renderSeed).toBe(5);
     expect(state.master).toEqual(sampleMaster);
   });
