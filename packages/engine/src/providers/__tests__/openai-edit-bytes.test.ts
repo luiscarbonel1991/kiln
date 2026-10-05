@@ -63,10 +63,41 @@ describe("openai editBytes (the queue's edit)", () => {
     expect(storeAsset).not.toHaveBeenCalled();
   });
 
-  it("an empty response is an error (retried by the queue, not here)", async () => {
-    edit.mockResolvedValue({ data: [] });
+  it("an answer without an image still returns its usage (it was paid)", async () => {
+    edit.mockResolvedValue({
+      data: [],
+      usage: { input_tokens: 10, output_tokens: 20 },
+    });
+    const result = await openaiImageProvider.editBytes?.(input, {
+      timeoutMs: 1000,
+    });
+    expect(result?.bytes).toBeNull();
+    expect(result?.usage?.outputTokens).toBe(20);
+  });
+
+  it("beforeCall runs right before the paid request; if it throws, none is made", async () => {
+    const order: string[] = [];
+    edit.mockImplementation(async () => {
+      order.push("edit");
+      return { data: [{ b64_json: "aW1n" }] };
+    });
+    await openaiImageProvider.editBytes?.(input, {
+      timeoutMs: 1000,
+      beforeCall: async () => {
+        order.push("mark");
+      },
+    });
+    expect(order).toEqual(["mark", "edit"]);
+
+    edit.mockClear();
     await expect(
-      openaiImageProvider.editBytes?.(input, { timeoutMs: 1000 }),
-    ).rejects.toThrow("OpenAI returned no image");
+      openaiImageProvider.editBytes?.(input, {
+        timeoutMs: 1000,
+        beforeCall: async () => {
+          throw new Error("lease lost");
+        },
+      }),
+    ).rejects.toThrow("lease lost");
+    expect(edit).not.toHaveBeenCalled();
   });
 });

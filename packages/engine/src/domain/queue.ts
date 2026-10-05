@@ -61,6 +61,14 @@ export function classifyGenerationError(
   return "transient";
 }
 
+// Did the provider answer? An error with an HTTP status is a response: the
+// request was refused or failed and nothing was generated. One without (a
+// timeout, an abort, a dropped connection) leaves the outcome unknown — once
+// the paid call went out, it may have been charged.
+export function hadResponse(error: unknown): boolean {
+  return typeof (error as { status?: unknown } | null)?.status === "number";
+}
+
 export function retryDecision(
   attempt: number,
   error: unknown,

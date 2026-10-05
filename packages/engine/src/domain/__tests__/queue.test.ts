@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classifyGenerationError, retryDecision } from "@/domain/queue";
+import {
+  classifyGenerationError,
+  hadResponse,
+  retryDecision,
+} from "@/domain/queue";
 
 const withStatus = (status: number) =>
   Object.assign(new Error(`HTTP ${status}`), { status });
@@ -54,5 +58,17 @@ describe("retryDecision", () => {
       retry: false,
       reason: "permanent",
     });
+  });
+});
+
+describe("hadResponse", () => {
+  it("an HTTP error is an answer; a timeout or a dropped connection is not", () => {
+    expect(hadResponse(withStatus(503))).toBe(true);
+    expect(hadResponse(withStatus(400))).toBe(true);
+    expect(hadResponse(new Error("Request timed out."))).toBe(false);
+    expect(
+      hadResponse(Object.assign(new Error("aborted"), { name: "AbortError" })),
+    ).toBe(false);
+    expect(hadResponse(null)).toBe(false);
   });
 });

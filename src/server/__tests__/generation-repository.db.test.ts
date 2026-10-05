@@ -180,7 +180,10 @@ describe.skipIf(!enabled)(
     it("a retried failure waits out its backoff; an expired lease follows the retry rule", async () => {
       const [claimed] = await repo.claimJobs("live", 1, 60);
       expect(
-        await repo.failJob(claimed.id, claimed.leaseToken, "503", true),
+        await repo.failJob(claimed.id, claimed.leaseToken, "503", {
+          retry: true,
+          mayBeCharged: false,
+        }),
       ).toBe(true);
       expect(await repo.claimJobs("live", 1, 60)).toEqual([]);
 
@@ -198,6 +201,66 @@ describe.skipIf(!enabled)(
         where: { id: claimed.id },
       });
       expect(failed.status).toBe("failed");
+    });
+
+    it("a job whose worker died during its paid call is never requeued, and counts at its estimate", async () => {
+      const before = await repo.budget(makerId);
+      const dead = {
+        makerId,
+        projectId,
+        mode: "live",
+        status: "running",
+        attempt: 1,
+        maxAttempts: 2,
+        leaseToken: "dead",
+        leaseUntil: new Date(Date.now() - 1000),
+        startedAt: new Date(),
+      };
+      const during = await db.generationJob.create({
+        data: {
+          ...dead,
+          cardId: "died-during",
+          estimateMicros: 70_000,
+          callStartedAt: new Date(),
+        },
+      });
+      const early = await db.generationJob.create({
+        data: { ...dead, cardId: "died-before", estimateMicros: 1 },
+      });
+      expect(await repo.requeueExpired("live")).toBe(2);
+      const failed = await db.generationJob.findUniqueOrThrow({
+        where: { id: during.id },
+      });
+      expect(failed.status).toBe("failed");
+      expect(failed.error).toContain("may have been charged");
+      const requeued = await db.generationJob.findUniqueOrThrow({
+        where: { id: early.id },
+      });
+      expect(requeued.status).toBe("queued");
+      await db.generationJob.delete({ where: { id: early.id } });
+      const after = await repo.budget(makerId);
+      expect(after.spentMicros - before.spentMicros).toBe(70_000);
+    });
+
+    it("recordCost adds to what the job recorded, never overwrites it", async () => {
+      const job = await db.generationJob.create({
+        data: {
+          makerId,
+          projectId,
+          cardId: "cost",
+          mode: "mock",
+          status: "done",
+          maxAttempts: 2,
+          estimateMicros: 1,
+        },
+      });
+      await repo.recordCost(job.id, { outputTokens: 1 }, 100);
+      await repo.recordCost(job.id, { outputTokens: 2 }, 50);
+      const after = await db.generationJob.findUniqueOrThrow({
+        where: { id: job.id },
+      });
+      expect(after.actualMicros).toBe(150);
+      expect(after.usage).toEqual({ outputTokens: 2 });
     });
 
     it("cancel stops what has not started", async () => {

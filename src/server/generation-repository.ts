@@ -14,7 +14,10 @@ import { assertDatabaseUrl, db } from "@/lib/db";
 // Persistence for the background generation queue. Every closing write on a
 // job is guarded by its lease token, so a worker that lost its lease (another
 // process requeued it) changes nothing — except the cost it already incurred,
-// which is always recorded. Money is in micro-dollars.
+// which is always recorded. A job pays for at most one call: "callStartedAt"
+// is stamped under the lease right before the paid request, and a job with it
+// set is never requeued; finished without a measured cost, it counts at its
+// estimate. Money is in micro-dollars.
 
 export type ProviderMode = "live" | "mock";
 
@@ -58,7 +61,9 @@ type Tx = Prisma.TransactionClient;
 
 // What this calendar month (UTC) has spent on live generations, and what live
 // jobs in the queue have reserved (their recorded cost, else their estimate).
-// One statement, so a job moving to done mid-read is counted exactly once.
+// A finished job counts its measured cost; without one, its estimate if its
+// paid call went out (the outcome is unknown), else nothing. One statement, so
+// a job moving to done mid-read is counted exactly once.
 async function spend(
   tx: Tx | typeof db,
   makerId: string,
@@ -68,7 +73,7 @@ async function spend(
       COALESCE(SUM(CASE
         WHEN "status" IN ('done', 'failed', 'canceled')
           AND "finishedAt" >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
-        THEN COALESCE("actualMicros", CASE WHEN "status" = 'done' THEN "estimateMicros" ELSE 0 END)
+        THEN COALESCE("actualMicros", CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)
         ELSE 0 END), 0)::float8 AS "spent",
       COALESCE(SUM(CASE
         WHEN "status" IN ('queued', 'running')
@@ -238,21 +243,33 @@ export async function renewLease(
   return count === 1;
 }
 
+// Mark that the paid call is going out, right before it. Guarded by the lease:
+// false = the lease was lost, and the caller must not make the call.
+export async function markCallStarted(
+  id: string,
+  token: string,
+): Promise<boolean> {
+  const count = await db.$executeRaw`
+    UPDATE "GenerationJob" SET "callStartedAt" = now()
+    WHERE "id" = ${id} AND "leaseToken" = ${token} AND "status" = 'running'`;
+  return count === 1;
+}
+
 // Record what a call cost, as soon as it is known. Not guarded by the lease:
-// money spent is recorded even by a worker that lost its lease.
+// money spent is recorded even by a worker that lost its lease. Adds to what
+// the job already recorded, so no charge is ever overwritten.
 export async function recordCost(
   id: string,
   usage: unknown,
   actualMicros: number | null,
 ): Promise<void> {
-  await db.generationJob.update({
-    where: { id },
-    data: {
-      usage:
-        usage === undefined ? Prisma.DbNull : (usage as Prisma.InputJsonValue),
-      actualMicros,
-    },
-  });
+  const json = usage === undefined ? null : JSON.stringify(usage);
+  await db.$executeRaw`
+    UPDATE "GenerationJob"
+    SET "usage" = COALESCE(${json}::jsonb, "usage"),
+        "actualMicros" = CASE WHEN ${actualMicros}::int IS NULL THEN "actualMicros"
+          ELSE COALESCE("actualMicros", 0) + ${actualMicros}::int END
+    WHERE "id" = ${id}`;
 }
 
 // Finish a job and put its output on the card, in one transaction (job, then
@@ -291,16 +308,23 @@ export async function completeJob(
 }
 
 // A failed attempt: back to the queue after the backoff, or failed for good.
+// `mayBeCharged` keeps the call mark (the call was paid, or its outcome is
+// unknown), so the job counts at its estimate until a cost is recorded; such a
+// job is never retried. Otherwise the provider answered with an error, nothing
+// was generated, and the mark is cleared.
 export async function failJob(
   id: string,
   token: string,
   error: string,
-  retry: boolean,
+  outcome: { retry: boolean; mayBeCharged: boolean },
 ): Promise<boolean> {
-  const count = retry
+  if (outcome.retry && outcome.mayBeCharged) {
+    throw new Error("a job that may have been charged is never retried");
+  }
+  const count = outcome.retry
     ? await db.$executeRaw`
         UPDATE "GenerationJob"
-        SET "status" = 'queued', "error" = ${error},
+        SET "status" = 'queued', "error" = ${error}, "callStartedAt" = NULL,
             "availableAt" = now() + make_interval(secs => ${RETRY_BACKOFF_MS / 1000}::int),
             "leaseToken" = NULL, "leaseUntil" = NULL
         WHERE "id" = ${id} AND "leaseToken" = ${token} AND "status" = 'running'`
@@ -313,22 +337,32 @@ export async function failJob(
             finishedAt: new Date(),
             leaseToken: null,
             leaseUntil: null,
+            ...(outcome.mayBeCharged ? {} : { callStartedAt: null }),
           },
         })
       ).count;
   return count === 1;
 }
 
-// Jobs whose worker died (lease expired) go back to the queue under the same
-// retry rule as a failure, so a job that kills its process every time is
-// failed after its last attempt instead of being paid for forever.
+// Jobs whose worker died (lease expired). One that died before its paid call
+// goes back to the queue under the retry rule, so a job that kills its process
+// every time is failed after its last attempt. One that died during or after
+// the call is never requeued — it may have been charged: it fails, and counts
+// at its estimate unless the worker still records the real cost.
 export async function requeueExpired(mode: ProviderMode): Promise<number> {
   return db.$executeRaw`
     UPDATE "GenerationJob"
-    SET "status" = CASE WHEN "attempt" < "maxAttempts" THEN 'queued' ELSE 'failed' END,
-        "error" = COALESCE("error", 'the worker stopped (lease expired)'),
+    SET "status" = CASE
+          WHEN "callStartedAt" IS NULL AND "attempt" < "maxAttempts" THEN 'queued'
+          ELSE 'failed' END,
+        "error" = CASE
+          WHEN "callStartedAt" IS NOT NULL
+            THEN 'The worker stopped during the paid call; it may have been charged, so it was not retried.'
+          ELSE COALESCE("error", 'the worker stopped (lease expired)') END,
         "availableAt" = now() + make_interval(secs => ${RETRY_BACKOFF_MS / 1000}::int),
-        "finishedAt" = CASE WHEN "attempt" < "maxAttempts" THEN NULL ELSE now() END,
+        "finishedAt" = CASE
+          WHEN "callStartedAt" IS NULL AND "attempt" < "maxAttempts" THEN NULL
+          ELSE now() END,
         "leaseToken" = NULL,
         "leaseUntil" = NULL
     WHERE "status" = 'running' AND "mode" = ${mode} AND "leaseUntil" < now()`;
@@ -379,6 +413,7 @@ export async function recordDirectSpend(input: {
           : (input.usage as Prisma.InputJsonValue),
       request: { kind: "image", model: input.model },
       startedAt: new Date(),
+      callStartedAt: new Date(),
       finishedAt: new Date(),
     },
   });

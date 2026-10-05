@@ -1,6 +1,6 @@
 import { costFromUsage, toMicros } from "@/domain/generation-cost";
 import { GenerationRequest } from "@/domain/generation-request";
-import { errorMessage, retryDecision } from "@/domain/queue";
+import { errorMessage, hadResponse, retryDecision } from "@/domain/queue";
 import type { EditBytesResult, ImageProvider } from "@/providers/interfaces";
 import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 
@@ -8,12 +8,16 @@ import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 // singleton, started from src/instrumentation.ts), woken when a batch is
 // queued and swept periodically. It claims jobs of its process's provider mode,
 // runs at most `concurrency` at once, keeps their leases alive, and closes each
-// one exactly once:
+// one exactly once. A job pays for at most one call:
+// - the call is marked under the lease right before it goes out; no mark, no
+//   call;
 // - the paid call runs with a bounded timeout and no SDK retries;
-// - its cost is recorded as soon as the call returns, before anything else;
+// - its cost is recorded as soon as the call returns, before anything else
+//   (a failure to record it never loses the image);
 // - storing the image is retried in-process — never the paid call;
-// - a failure before the call is retried once if it may pass (domain
-//   retryDecision); a failure after it is final (a retry would pay again).
+// - a failure the provider answered (an HTTP error: nothing generated) is
+//   retried once if it may pass (domain retryDecision); a call with no answer
+//   (timeout, dropped connection) or one that was paid is final.
 
 export interface WorkerDeps {
   mode: ProviderMode;
@@ -28,6 +32,7 @@ export interface WorkerDeps {
     leaseSec: number,
   ): Promise<ClaimedJob[]>;
   renewLease(id: string, token: string, leaseSec: number): Promise<boolean>;
+  markCallStarted(id: string, token: string): Promise<boolean>;
   recordCost(
     id: string,
     usage: unknown,
@@ -38,7 +43,7 @@ export interface WorkerDeps {
     id: string,
     token: string,
     error: string,
-    retry: boolean,
+    outcome: { retry: boolean; mayBeCharged: boolean },
   ): Promise<boolean>;
   requeueExpired(mode: ProviderMode): Promise<number>;
   overCap(makerId: string): Promise<boolean>;
@@ -59,12 +64,13 @@ const STORE_ATTEMPTS = 3;
 
 async function storeWithRetries(
   deps: WorkerDeps,
-  result: EditBytesResult,
+  bytes: Uint8Array,
+  mime: string,
 ): Promise<string> {
   let last: unknown;
   for (let i = 0; i < STORE_ATTEMPTS; i++) {
     try {
-      return await deps.storeAsset(result.bytes, result.mime, "cards");
+      return await deps.storeAsset(bytes, mime, "cards");
     } catch (error) {
       last = error;
     }
@@ -72,7 +78,35 @@ async function storeWithRetries(
   throw last;
 }
 
+// The job lost its lease (or its project) before the paid call: nothing was
+// spent, and there is nothing to retry from here.
+class CallNotStarted extends Error {
+  constructor() {
+    super("The job lost its lease before the paid call; nothing was spent.");
+    this.name = "CallNotStarted";
+  }
+}
+
+async function recordPaidCost(
+  deps: WorkerDeps,
+  job: ClaimedJob,
+  result: EditBytesResult,
+): Promise<void> {
+  const usd = result.usage ? costFromUsage(result.model, result.usage) : null;
+  try {
+    await deps.recordCost(
+      job.id,
+      result.usage,
+      usd === null ? null : toMicros(usd),
+    );
+  } catch (error) {
+    // The job keeps its call mark, so it still counts at its estimate.
+    deps.log(`could not record the cost of ${job.id}`, error);
+  }
+}
+
 export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
+  let callStarted = false;
   let paid = false;
   const renew = setInterval(() => {
     void deps.renewLease(job.id, job.leaseToken, deps.leaseSec).catch(() => {});
@@ -83,7 +117,7 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
         job.id,
         job.leaseToken,
         "This month's spending cap was reached.",
-        false,
+        { retry: false, mayBeCharged: false },
       );
       return;
     }
@@ -102,23 +136,34 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
         negative: request.negative,
         model: request.model,
       },
-      { timeoutMs: deps.callTimeoutMs },
+      {
+        timeoutMs: deps.callTimeoutMs,
+        beforeCall: async () => {
+          if (!(await deps.markCallStarted(job.id, job.leaseToken))) {
+            throw new CallNotStarted();
+          }
+          callStarted = true;
+        },
+      },
     );
     paid = true;
-    const usd = result.usage ? costFromUsage(result.model, result.usage) : null;
-    await deps.recordCost(
-      job.id,
-      result.usage,
-      usd === null ? null : toMicros(usd),
-    );
-    const url = await storeWithRetries(deps, result);
+    await recordPaidCost(deps, job, result);
+    if (!result.bytes) throw new Error("The provider returned no image.");
+    const url = await storeWithRetries(deps, result.bytes, result.mime);
     await deps.completeJob(job.id, job.leaseToken, url);
   } catch (error) {
+    const unanswered = callStarted && !paid && !hadResponse(error);
+    const mayBeCharged = paid || unanswered;
     const retry =
-      !paid && retryDecision(job.attempt, error, job.maxAttempts).retry;
+      !mayBeCharged &&
+      !(error instanceof CallNotStarted) &&
+      retryDecision(job.attempt, error, job.maxAttempts).retry;
+    const message = unanswered
+      ? `The call got no answer (${errorMessage(error)}); it may have been charged, so it was not retried.`
+      : errorMessage(error);
     deps.log(`generation job ${job.id} failed (retry: ${retry})`, error);
     await deps
-      .failJob(job.id, job.leaseToken, errorMessage(error), retry)
+      .failJob(job.id, job.leaseToken, message, { retry, mayBeCharged })
       .catch((e) => deps.log(`could not record the failure of ${job.id}`, e));
   } finally {
     clearInterval(renew);

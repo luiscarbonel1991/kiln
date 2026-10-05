@@ -41,12 +41,19 @@ const bytes: EditBytesResult = {
   usage: { inputTextTokens: 200, inputImageTokens: 1000, outputTokens: 4000 },
 };
 
+type EditOptions = { timeoutMs: number; beforeCall?: () => Promise<void> };
+
+// The stub provider calls beforeCall right before its "paid request", like the
+// OpenAI adapter does.
 function deps(overrides: Partial<WorkerDeps> = {}) {
   const calls: string[] = [];
-  const editBytes = vi.fn(async () => {
-    calls.push("edit");
-    return bytes;
-  });
+  const editBytes = vi.fn(
+    async (_input: unknown, options: EditOptions): Promise<EditBytesResult> => {
+      await options.beforeCall?.();
+      calls.push("edit");
+      return bytes;
+    },
+  );
   const provider = { id: "openai", editBytes } as unknown as ImageProvider;
   const d: WorkerDeps = {
     mode: "live",
@@ -57,6 +64,10 @@ function deps(overrides: Partial<WorkerDeps> = {}) {
     callTimeoutMs: 180_000,
     claimJobs: vi.fn(async () => []),
     renewLease: vi.fn(async () => true),
+    markCallStarted: vi.fn(async () => {
+      calls.push("mark");
+      return true;
+    }),
     recordCost: vi.fn(async () => {
       calls.push("cost");
     }),
@@ -88,7 +99,7 @@ describe("runJob", () => {
   it("records the cost before storing, then completes", async () => {
     const { d, calls } = deps();
     await runJob(d, claimed("a"));
-    expect(calls).toEqual(["edit", "cost", "store", "complete"]);
+    expect(calls).toEqual(["mark", "edit", "cost", "store", "complete"]);
     expect(d.recordCost).toHaveBeenCalledWith("a", bytes.usage, 129_000);
     expect(d.completeJob).toHaveBeenCalledWith(
       "a",
@@ -120,27 +131,114 @@ describe("runJob", () => {
     await runJob(d, claimed("a"));
     expect(editBytes).toHaveBeenCalledTimes(1);
     expect(d.recordCost).toHaveBeenCalled();
-    expect(d.failJob).toHaveBeenCalledWith("a", "t-a", "S3 down", false);
+    expect(d.failJob).toHaveBeenCalledWith("a", "t-a", "S3 down", {
+      retry: false,
+      mayBeCharged: true,
+    });
   });
 
-  it("a transient provider failure is retried once; a permanent one is not", async () => {
-    const transient = Object.assign(new Error("busy"), { status: 503 });
+  // A provider that answers with an HTTP error after the call went out.
+  const answering = (error: Error) =>
+    vi.fn(async (_input: unknown, options: EditOptions) => {
+      await options.beforeCall?.();
+      throw error;
+    });
+
+  it("a failure the provider answered is retried once; a permanent one is not", async () => {
+    const busy = Object.assign(new Error("busy"), { status: 503 });
     const one = deps();
-    one.editBytes.mockRejectedValueOnce(transient);
+    one.editBytes.mockImplementationOnce(answering(busy));
     await runJob(one.d, claimed("a", 1));
-    expect(one.d.failJob).toHaveBeenCalledWith("a", "t-a", "busy", true);
+    expect(one.d.failJob).toHaveBeenCalledWith("a", "t-a", "busy", {
+      retry: true,
+      mayBeCharged: false,
+    });
 
     const two = deps();
-    two.editBytes.mockRejectedValueOnce(transient);
+    two.editBytes.mockImplementationOnce(answering(busy));
     await runJob(two.d, claimed("a", 2));
-    expect(two.d.failJob).toHaveBeenCalledWith("a", "t-a", "busy", false);
+    expect(two.d.failJob).toHaveBeenCalledWith("a", "t-a", "busy", {
+      retry: false,
+      mayBeCharged: false,
+    });
 
     const three = deps();
-    three.editBytes.mockRejectedValueOnce(
-      Object.assign(new Error("rejected"), { status: 400 }),
+    three.editBytes.mockImplementationOnce(
+      answering(Object.assign(new Error("rejected"), { status: 400 })),
     );
     await runJob(three.d, claimed("a", 1));
-    expect(three.d.failJob).toHaveBeenCalledWith("a", "t-a", "rejected", false);
+    expect(three.d.failJob).toHaveBeenCalledWith("a", "t-a", "rejected", {
+      retry: false,
+      mayBeCharged: false,
+    });
+  });
+
+  it("a call with no answer (timeout) may have been charged: final, never retried", async () => {
+    const { d, editBytes } = deps();
+    editBytes.mockImplementationOnce(
+      answering(new Error("Request timed out.")),
+    );
+    await runJob(d, claimed("a", 1));
+    expect(d.failJob).toHaveBeenCalledWith(
+      "a",
+      "t-a",
+      expect.stringContaining("may have been charged"),
+      { retry: false, mayBeCharged: true },
+    );
+  });
+
+  it("a failure before the call (fetching the reference) is still retried", async () => {
+    const { d, editBytes } = deps();
+    editBytes.mockRejectedValueOnce(new Error("fetch failed"));
+    await runJob(d, claimed("a", 1));
+    expect(d.markCallStarted).not.toHaveBeenCalled();
+    expect(d.failJob).toHaveBeenCalledWith("a", "t-a", "fetch failed", {
+      retry: true,
+      mayBeCharged: false,
+    });
+  });
+
+  it("no call mark, no call: a lost lease stops it before paying", async () => {
+    const { d, calls } = deps({ markCallStarted: vi.fn(async () => false) });
+    await runJob(d, claimed("a", 1));
+    expect(calls).not.toContain("edit");
+    expect(d.failJob).toHaveBeenCalledWith(
+      "a",
+      "t-a",
+      expect.stringContaining("nothing was spent"),
+      { retry: false, mayBeCharged: false },
+    );
+  });
+
+  it("a paid answer without an image keeps its cost and fails for good", async () => {
+    const { d, editBytes } = deps();
+    editBytes.mockImplementationOnce(async (_input, options) => {
+      await options.beforeCall?.();
+      return { ...bytes, bytes: null };
+    });
+    await runJob(d, claimed("a", 1));
+    expect(d.recordCost).toHaveBeenCalledWith("a", bytes.usage, 129_000);
+    expect(d.storeAsset).not.toHaveBeenCalled();
+    expect(d.failJob).toHaveBeenCalledWith(
+      "a",
+      "t-a",
+      "The provider returned no image.",
+      { retry: false, mayBeCharged: true },
+    );
+  });
+
+  it("failing to record the cost never loses the image", async () => {
+    const { d } = deps({
+      recordCost: vi.fn(async () => {
+        throw new Error("db blip");
+      }),
+    });
+    await runJob(d, claimed("a"));
+    expect(d.completeJob).toHaveBeenCalledWith(
+      "a",
+      "t-a",
+      "https://storage/out.png",
+    );
   });
 
   it("over the monthly cap, a live job fails without calling the provider", async () => {
@@ -151,7 +249,7 @@ describe("runJob", () => {
       "a",
       "t-a",
       "This month's spending cap was reached.",
-      false,
+      { retry: false, mayBeCharged: false },
     );
   });
 });

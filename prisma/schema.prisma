@@ -176,6 +176,10 @@ model GenerationJob {
   error          String?
   createdAt      DateTime         @default(now()) @db.Timestamptz(3)
   startedAt      DateTime?        @db.Timestamptz(3)
+  // The paid call went out (stamped under the lease right before it). Set and
+  // no measured cost = the outcome is unknown: never retried, counted at its
+  // estimate.
+  callStartedAt  DateTime?        @db.Timestamptz(3)
   finishedAt     DateTime?        @db.Timestamptz(3)
 
   @@index([status, mode, availableAt])

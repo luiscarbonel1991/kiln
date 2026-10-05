@@ -122,6 +122,7 @@ export {
   ACTIVE_JOB_STATUSES,
   classifyGenerationError,
   errorMessage,
+  hadResponse,
   isActiveJob,
   JobStatus,
   type JobView,

@@ -132,11 +132,12 @@ export const openaiImageProvider: ImageProvider = {
   },
   async editBytes(
     input: ImageEditInput,
-    options: { timeoutMs: number },
+    options: { timeoutMs: number; beforeCall?: () => Promise<void> },
   ): Promise<EditBytesResult> {
     assertCapability(this, "edit", input.imageInputs.length);
     const model = resolveImageModel("openai", input.model.model);
     const master = await fetchAsset(input.masterAssetUrl);
+    await options.beforeCall?.();
     if (!hasOpenAIKey()) {
       // The stub "edit" returns the reference itself: a real, storable image,
       // so mock runs fill the board with something to look at.
@@ -156,9 +157,8 @@ export const openaiImageProvider: ImageProvider = {
       { timeout: options.timeoutMs, maxRetries: 0 },
     );
     const b64 = r.data?.[0]?.b64_json;
-    if (!b64) throw new Error("OpenAI returned no image");
     return {
-      bytes: new Uint8Array(Buffer.from(b64, "base64")),
+      bytes: b64 ? new Uint8Array(Buffer.from(b64, "base64")) : null,
       mime: "image/png",
       model,
       usage: usageOf(r.usage),

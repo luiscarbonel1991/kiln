@@ -256,6 +256,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       callTimeoutMs: 10_000,
       claimJobs: queueRepo.claimJobs,
       renewLease: queueRepo.renewLease,
+      markCallStarted: queueRepo.markCallStarted,
       recordCost: queueRepo.recordCost,
       completeJob: queueRepo.completeJob,
       failJob: queueRepo.failJob,
