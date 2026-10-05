@@ -23,7 +23,7 @@ describe("generation cost", () => {
 
   it("sums one generation per scene at the pinned quality, by size, plus the edit's input allowance", () => {
     // gpt-image-2 medium: $0.053 square, $0.041 portrait (cheaper, per the
-    // official table); the max allows 1.25x output and a $0.02 input.
+    // official table); input $0.01 typical, $0.02 at most.
     const e = estimateScenes([{ aspect: "1:1" }, { aspect: "4:5" }], {
       provider: "openai",
       model: "gpt-image-2",
@@ -31,7 +31,7 @@ describe("generation cost", () => {
     expect(e).toEqual({
       count: 2,
       typical: 0.114,
-      max: 0.1576,
+      max: 0.134,
       quality: "medium",
       confidence: "official",
     });
@@ -45,7 +45,6 @@ describe("generation cost", () => {
       quality: OPENAI_IMAGE_QUALITY,
       output: { square: 0.053, nonSquare: 0.041 },
     });
-    // The older models spend a fixed token count per quality and size: no margin.
     expect(
       estimateGeneration(
         { provider: "openai", model: "gpt-image-1-mini" },
@@ -86,7 +85,7 @@ describe("actual cost and the monthly cap", () => {
   it("estimates one generation per model and aspect", () => {
     expect(
       estimateGeneration({ provider: "openai", model: "gpt-image-2" }, "1:1"),
-    ).toEqual({ typical: 0.063, max: 0.0863 });
+    ).toEqual({ typical: 0.063, max: 0.073 });
   });
 
   it("canAfford counts spent + reserved + the request, exactly up to the cap", () => {
