@@ -58,7 +58,12 @@
       ],
       "source": {
         "kind": "form"
-      }
+      },
+      "useContexts": [
+        "a kitchen counter during dinner prep",
+        "a set dinner table, serving cheese and bread"
+      ],
+      "hook": "Your family name, carved to last"
     },
     {
       "id": "northwind:CO-02",
@@ -96,7 +101,12 @@
       "source": {
         "kind": "vector",
         "svgUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48Y2lyY2xlIGN4PSc1MCcgY3k9JzUwJyByPSc0NicgZmlsbD0nI0Q5Qjk4Qycgc3Ryb2tlPScjNUIzQTI5JyBzdHJva2Utd2lkdGg9JzMnLz48cGF0aCBkPSdNNTAgMjAgQzY3IDMzIDcxIDU3IDUwIDgwIEMyOSA1NyAzMyAzMyA1MCAyMCBaJyBmaWxsPScjM0Y1RjNBJy8+PHBhdGggZD0nTTUwIDI4IEw1MCA3NiBNNTAgNDQgTDYwIDM2IE01MCA1NiBMNDAgNDggTTUwIDY2IEw2MCA1OCcgc3Ryb2tlPScjRDlCOThDJyBzdHJva2Utd2lkdGg9JzIuMicgZmlsbD0nbm9uZScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJy8+PC9zdmc+"
-      }
+      },
+      "useContexts": [
+        "a coffee table, under a steaming mug",
+        "a sunny reading nook beside an armchair"
+      ],
+      "hook": "A little forest for every mug"
     }
   ]
 }

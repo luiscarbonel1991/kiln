@@ -18,11 +18,22 @@ const TREATMENT_LABEL: Record<Treatment, string> = {
   cut: "Cut-out",
 };
 
+// The call to action when the product names none: invite personalization only
+// when there is something to personalize.
+export function defaultCta(product: Product): string {
+  return product.wording.length > 0
+    ? "Personalize yours"
+    : "Shop the collection";
+}
+
 // "{product.name}"-style tokens. Unknown tokens stay as written, so a typo is
-// visible on the frame instead of silently vanishing.
+// visible on the frame instead of silently vanishing. `product.hook` and
+// `product.cta` fall back to the name and to defaultCta.
 export function renderTextTemplate(template: string, product: Product): string {
   const values: Record<string, string> = {
     "product.name": product.name,
+    "product.hook": product.hook ?? product.name,
+    "product.cta": product.cta ?? defaultCta(product),
     "product.family": product.family,
     "product.dimensions": dimensionsLabel(product.dimensions),
     "product.material": product.material,

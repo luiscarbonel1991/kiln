@@ -45,6 +45,15 @@ describe("Product", () => {
     expect(keyFob.forbidden).toContain("other text");
     expect(keyFob.colours[0].inStock).toBe(true);
     expect(keyFob.dimensions.unit).toBe("in");
+    expect(keyFob.useContexts).toEqual([]);
+    expect(keyFob.hook).toBeUndefined();
+  });
+
+  it("caps the places of use and the copy lengths", () => {
+    expect(() =>
+      Product.parse({ ...keyFob, useContexts: Array(7).fill("a hallway") }),
+    ).toThrow();
+    expect(() => Product.parse({ ...keyFob, hook: "x".repeat(81) })).toThrow();
   });
 
   it("rejects a bad hex colour", () => {

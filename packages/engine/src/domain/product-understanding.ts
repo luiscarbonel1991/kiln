@@ -34,7 +34,7 @@ export function productUnderstanding(product: Product): BaseUnderstanding {
   return {
     subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${colour.name.toLowerCase()} ${product.material}${wording}; keep every letter, mark and proportion exactly as in the master image${forbidden}`,
     productType: `${product.family.toLowerCase()}, ${product.shape}`,
-    useContext: "",
+    useContext: product.useContexts[0] ?? "",
     sceneProps: "",
     materials: `${colour.name.toLowerCase()} ${product.material}, ${TREATMENT_DETAIL[product.treatment]}`,
     lighting: "soft natural light",

@@ -12,6 +12,24 @@ describe("renderTextTemplate", () => {
       ),
     ).toBe("Engraved family cutting board · 16 x 10 in · 3 · {nope}");
   });
+
+  it("hook and call to action come from the product, with fallbacks", () => {
+    const written = {
+      ...CUTTING_BOARD,
+      hook: "Your family name, carved to last",
+      cta: "Order yours",
+    };
+    expect(renderTextTemplate("{product.hook}|{product.cta}", written)).toBe(
+      "Your family name, carved to last|Order yours",
+    );
+    // No hook: the name. No CTA: personalize only when there is wording.
+    expect(
+      renderTextTemplate("{product.hook}|{product.cta}", CUTTING_BOARD),
+    ).toBe("Engraved family cutting board|Personalize yours");
+    expect(
+      renderTextTemplate("{product.cta}", { ...CUTTING_BOARD, wording: [] }),
+    ).toBe("Shop the collection");
+  });
 });
 
 describe("exactView", () => {
@@ -67,6 +85,16 @@ describe("productUnderstanding", () => {
   it("uses the default colour for materials and palette", () => {
     expect(u.materials).toContain("maple solid hardwood");
     expect(u.palette).toEqual(["#E8D2A6", "#3B2A1E"]);
+  });
+
+  it("takes the first place of use as the use context", () => {
+    expect(productUnderstanding(CUTTING_BOARD).useContext).toBe("");
+    expect(
+      productUnderstanding({
+        ...CUTTING_BOARD,
+        useContexts: ["a kitchen counter", "a dinner table"],
+      }).useContext,
+    ).toBe("a kitchen counter");
   });
 
   it("is generic: nothing about signs or acrylic", () => {

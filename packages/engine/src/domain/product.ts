@@ -118,6 +118,14 @@ export const Product = z.object({
   forbidden: z
     .array(z.string())
     .default(["other text", "logos", "people", "extra objects on the product"]),
+  // Where the product is used, the most typical first ("a kitchen counter",
+  // "an exterior front door"): scenes that show it in context take these in
+  // order, so the in-use and lifestyle shots land where buyers will use it.
+  useContexts: z.array(z.string().trim().min(1).max(80)).max(6).default([]),
+  // Marketing copy for text layers: the hook on a carousel's first slide and
+  // the call to action. Templates fall back when absent (see exact.ts).
+  hook: z.string().trim().min(1).max(80).optional(),
+  cta: z.string().trim().min(1).max(40).optional(),
   source: ProductSource,
 });
 export type Product = z.infer<typeof Product>;

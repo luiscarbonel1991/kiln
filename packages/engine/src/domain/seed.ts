@@ -262,7 +262,7 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         purpose:
           "Stop the scroll in the first second; the headline sits on it.",
         aspect: "4:5",
-        textTemplate: "{product.name}",
+        textTemplate: "{product.hook}",
       },
       {
         key: "in-place",
@@ -299,7 +299,7 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         aspect: "4:5",
         fill: "exact",
         exact: "text-card",
-        textTemplate: "Personalize yours",
+        textTemplate: "{product.cta}",
       },
     ],
   },
