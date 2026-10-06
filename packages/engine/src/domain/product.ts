@@ -22,13 +22,16 @@ export const Dimensions = z.object({
 export type Dimensions = z.infer<typeof Dimensions>;
 
 // One sellable finish. `face` is what the camera sees; `inlay` is the contrast
-// colour of the lettering on that face (white on dark, black on light).
+// colour of the lettering or marks on that face (white on dark, black on
+// light); `inlayName` names it for prompts ("white"), else the nearest plain
+// colour word is used.
 export const ColourOption = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
   face: Hex,
   edge: Hex.optional(),
   inlay: Hex.optional(),
+  inlayName: z.string().trim().min(1).max(40).optional(),
   supplierUrl: z.string().optional(),
   inStock: z.boolean().default(true),
 });

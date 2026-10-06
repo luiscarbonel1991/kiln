@@ -1,4 +1,6 @@
+import { colourMaterial, colourWord } from "@/domain/colour-words";
 import {
+  type ColourOption,
   colourOf,
   dimensionsLabel,
   type Product,
@@ -6,13 +8,21 @@ import {
 } from "@/domain/product";
 import type { BaseUnderstanding } from "@/domain/understanding";
 
-const TREATMENT_DETAIL: Record<Treatment, string> = {
-  raised: "raised elements on the face",
-  inlaid: "inlaid elements flush with the face",
-  engraved: "engraved detail",
-  printed: "a printed design",
-  cut: "a cut-out silhouette",
+// What the treatment puts on the face, in the colour of its marks when the
+// spec gives one ("white raised elements on the face"): without it a model
+// guesses, and a macro once rendered white letters as brushed silver.
+const TREATMENT_DETAIL: Record<Treatment, (ink: string | null) => string> = {
+  raised: (ink) => `${ink ? `${ink} ` : ""}raised elements on the face`,
+  inlaid: (ink) => `${ink ? `${ink} ` : ""}inlaid elements flush with the face`,
+  engraved: (ink) => `engraved detail${ink ? ` in ${ink}` : ""}`,
+  printed: (ink) => `a printed design${ink ? ` in ${ink}` : ""}`,
+  cut: () => "a cut-out silhouette",
 };
+
+function inkOf(colour: ColourOption): string | null {
+  if (colour.inlayName) return colour.inlayName.toLowerCase();
+  return colour.inlay ? colourWord(colour.inlay) : null;
+}
 
 // The studio's "image" layer for a product-first project: what the vision call
 // would have extracted from a photo, written from the spec instead (no paid
@@ -20,6 +30,7 @@ const TREATMENT_DETAIL: Record<Treatment, string> = {
 // stand in for a buyer's choice until the project asks for one.
 export function productUnderstanding(product: Product): BaseUnderstanding {
   const colour = colourOf(product, product.defaultColour);
+  const material = colourMaterial(colour.name, product.material);
   const examples = product.wording
     .map((w) => w.example?.trim())
     .filter((e): e is string => !!e);
@@ -34,11 +45,11 @@ export function productUnderstanding(product: Product): BaseUnderstanding {
       ? `; add nothing to the product itself (no ${product.forbidden.join(", no ")})`
       : "";
   return {
-    subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${colour.name.toLowerCase()} ${product.material}${wording}; keep every letter, mark and proportion exactly as in the master image${forbidden}`,
+    subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${material}${wording}; keep every letter, mark and proportion exactly as in the master image${forbidden}`,
     productType: `${product.family.toLowerCase()}, ${product.shape}`,
     useContext: product.useContexts[0] ?? "",
     sceneProps: "",
-    materials: `${colour.name.toLowerCase()} ${product.material}, ${TREATMENT_DETAIL[product.treatment]}`,
+    materials: `${material}, ${TREATMENT_DETAIL[product.treatment](inkOf(colour))}`,
     lighting: "soft natural light",
     composition: "the product centered, filling most of the frame",
     mood: "clean and true to the product",
