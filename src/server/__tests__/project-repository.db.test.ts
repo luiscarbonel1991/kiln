@@ -274,7 +274,10 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const { getCurrentMaker } = await import("@/server/maker-repository");
     const id = created[0];
     const { cards, model } = await estimateProjectCards(id, ["etsy.in-use"]);
-    expect(cards[0].request.masterAssetUrl).toBe(master.assetUrl);
+    expect(cards[0].request).toMatchObject({
+      kind: "image",
+      masterAssetUrl: master.assetUrl,
+    });
     expect(cards[0].request.model.provider).toBe("openai");
     const maker = await getCurrentMaker();
     await queueRepo.enqueueBatch({

@@ -1,5 +1,5 @@
 import { costFromUsage, toMicros } from "@/domain/generation-cost";
-import { GenerationRequest } from "@/domain/generation-request";
+import { ImageGenerationRequest } from "@/domain/generation-request";
 import { errorMessage, hadResponse, retryDecision } from "@/domain/queue";
 import type { EditBytesResult, ImageProvider } from "@/providers/interfaces";
 import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
@@ -123,7 +123,7 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
       );
       return;
     }
-    const request = GenerationRequest.parse(job.request);
+    const request = ImageGenerationRequest.parse(job.request);
     const provider = deps.provider(request.model.provider);
     if (!provider.editBytes) {
       throw Object.assign(new Error(`${provider.id} cannot run queued edits`), {
