@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { DestinationKind, DestinationProfile } from "@/domain/destination";
+import type { VideoResolution } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
 import {
@@ -8,6 +9,7 @@ import {
   ShotSlotFields,
 } from "@/domain/shot-list";
 import {
+  snapSeconds,
   type VideoChoice,
   VideoChoice as VideoChoiceSchema,
   type VideoMotion,
@@ -177,31 +179,29 @@ export interface VideoSettings {
   motion: VideoMotion;
   seconds: VideoSeconds;
   orientation: VideoOrientation;
-  // The lengths the destination accepts.
+  // The lengths the model renders (at its resolution) that the destination
+  // accepts.
   allowed: VideoSeconds[];
 }
 
 // A video slot's choices with their defaults: the start frame is the chosen
 // slot's approved scene, else the first approved scene in photo order (photo 1
-// when it is a scene); a push-in; 8 s (or the destination's nearest
-// accepted length); vertical.
+// when it is a scene); a push-in; 8 s, or the nearest length the card's model
+// renders and the destination accepts (a saved 12 s from Sora reads as 8);
+// vertical.
 export function videoSettings(
   destination: PlanDestination,
   slot: PlanSlot,
   rules?: { minSec: number; maxSec: number },
+  model?: { provider: string; model: string; resolution?: VideoResolution },
 ): VideoSettings {
   const choice: VideoChoice = slot.video ?? {};
   const scenes = destination.slots.filter(
     (s) => s.fill === "scene" && !s.off && s.approvedOutput,
   );
   const chosen = scenes.find((s) => s.key === choice.from) ?? scenes[0];
-  const allowed = videoSecondsFor(rules);
-  const seconds =
-    choice.seconds && allowed.includes(choice.seconds)
-      ? choice.seconds
-      : allowed.includes(8)
-        ? 8
-        : allowed[0];
+  const allowed = videoSecondsFor(rules, model);
+  const seconds = snapSeconds(choice.seconds, allowed);
   return {
     from: chosen?.key ?? null,
     startFrame: chosen?.approvedOutput ?? null,

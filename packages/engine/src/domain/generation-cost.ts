@@ -1,25 +1,33 @@
 import {
   DEFAULT_IMAGE_QUALITY,
+  DEFAULT_VIDEO_RESOLUTION,
   type ImageQuality,
+  modelEntry,
+  type VideoResolution,
 } from "@/domain/model-defaults";
 
-// What a scene costs before anything is generated (ROADMAP principle 8, "cost
-// before spend"). Prices are pinned with their date and source.
+// What a generation costs before anything is generated (ROADMAP principle 8,
+// "cost before spend"). Prices are pinned with their date and source; a model
+// without one cannot be queued or run under the cap.
 //
-// Sources, checked 2026-10-04:
-// - Google: per-image prices, https://ai.google.dev/gemini-api/docs/pricing
-//   (official; one price per 1K image whatever the aspect).
-// - OpenAI: the output cost per image by quality and size from the image
-//   generation guide's cost table (https://developers.openai.com/api/docs/
-//   guides/image-generation, "Calculating costs"). Kiln pins the request
-//   quality (DEFAULT_IMAGE_QUALITY), so the estimate reads that row. Measured
-//   2026-10-04 on gpt-image-2 medium (6 live edits): exactly 1756 output tokens
-//   square and 1372 portrait every time ($0.0527 / $0.0412, the table's
-//   figures), so the output needs no margin once the quality is pinned ("auto"
-//   varied per image). An edit also pays its input (the reference image, at
-//   high fidelity on gpt-image-2, and the prompt): measured at 203-206 text +
-//   1024 image tokens (~$0.0092) with a 1024px reference; the input max leaves
-//   room for longer prompts and larger references.
+// Sources:
+// - Google, checked 2026-10-06: https://ai.google.dev/gemini-api/docs/pricing
+//   (official). Images: one price per 1K image whatever the aspect (1,120
+//   output tokens); text and thinking beside the image at the text rate. Veo:
+//   per second by resolution, audio included. Text: per 1M tokens, thinking
+//   billed as output.
+// - OpenAI, checked 2026-10-04 (images) and 2026-10-06 (text): the output cost
+//   per image by quality and size from the image generation guide's cost table
+//   (https://developers.openai.com/api/docs/guides/image-generation,
+//   "Calculating costs"), and https://developers.openai.com/api/docs/pricing
+//   for token prices. Kiln pins the request quality, so the estimate reads that
+//   row. Measured 2026-10-04 on gpt-image-2 medium (6 live edits): exactly 1756
+//   output tokens square and 1372 portrait every time ($0.0527 / $0.0412, the
+//   table's figures), so the output needs no margin once the quality is pinned
+//   ("auto" varied per image). An edit also pays its input (the reference
+//   image, at high fidelity on gpt-image-2, and the prompt): measured at
+//   203-206 text + 1024 image tokens (~$0.0092) with a 1024px reference; the
+//   input max leaves room for longer prompts and larger references.
 
 export interface ImagePrice {
   provider: "google" | "openai";
@@ -32,7 +40,63 @@ export interface ImagePrice {
   confidence: "official" | "derived";
 }
 
-export const PRICES_AS_OF = "2026-10-04";
+export const PRICES_AS_OF = "2026-10-06";
+
+// $ per 1M tokens. An image model's main output is the image (`imageOut`);
+// text and thinking beside it bill at `textOut`. A text model's output,
+// thinking included, bills at `textOut`.
+interface TokenPrices {
+  textIn: number;
+  imageIn: number;
+  textOut: number;
+  imageOut: number;
+}
+
+const TOKEN_PRICES: Record<string, TokenPrices> = {
+  "openai/gpt-image-2": { textIn: 5, imageIn: 8, textOut: 0, imageOut: 30 },
+  "openai/gpt-image-1.5": { textIn: 5, imageIn: 8, textOut: 0, imageOut: 32 },
+  "openai/gpt-image-1-mini": {
+    textIn: 2,
+    imageIn: 2.5,
+    textOut: 0,
+    imageOut: 8,
+  },
+  "google/gemini-3.1-flash-image": {
+    textIn: 0.5,
+    imageIn: 0.5,
+    textOut: 3,
+    imageOut: 60,
+  },
+  "google/gemini-3.1-flash-lite-image": {
+    textIn: 0.25,
+    imageIn: 0.25,
+    textOut: 1.5,
+    imageOut: 30,
+  },
+  "google/gemini-3-pro-image": {
+    textIn: 2,
+    imageIn: 2,
+    textOut: 12,
+    imageOut: 120,
+  },
+  "openai/gpt-6.1-sol": { textIn: 2, imageIn: 2, textOut: 10, imageOut: 0 },
+  "openai/gpt-6-luna": { textIn: 0.1, imageIn: 0.1, textOut: 0.5, imageOut: 0 },
+  "google/gemini-3.5-flash": {
+    textIn: 1.5,
+    imageIn: 1.5,
+    textOut: 9,
+    imageOut: 0,
+  },
+  "google/gemini-3.8-flash": {
+    textIn: 0.75,
+    imageIn: 0.75,
+    textOut: 3.75,
+    imageOut: 0,
+  },
+};
+
+const key = (model: { provider: string; model: string }) =>
+  `${model.provider}/${model.model}`;
 
 // $ per image output: [square, non-square] for each quality.
 const OPENAI_OUTPUT: Record<string, Record<ImageQuality, [number, number]>> = {
@@ -53,47 +117,57 @@ const OPENAI_OUTPUT: Record<string, Record<ImageQuality, [number, number]>> = {
   },
 };
 
-const openai = (model: string): ImagePrice => {
-  const [square, nonSquare] = OPENAI_OUTPUT[model][DEFAULT_IMAGE_QUALITY];
-  return {
-    provider: "openai",
-    model,
-    quality: DEFAULT_IMAGE_QUALITY,
-    output: { square, nonSquare },
-    input: { typical: 0.01, max: 0.02 },
-    confidence: "official",
-  };
+// $ per 1K image (1,120 output tokens at the image rate).
+const GOOGLE_PER_IMAGE: Record<string, number> = {
+  "gemini-3.1-flash-image": 0.067,
+  "gemini-3.1-flash-lite-image": 0.0336,
+  "gemini-3-pro-image": 0.134,
 };
 
-const google = (model: string, perImage: number): ImagePrice => ({
-  provider: "google",
-  model,
-  quality: null,
-  output: { square: perImage, nonSquare: perImage },
-  input: { typical: 0, max: 0.001 },
-  confidence: "official",
-});
+// What a Gemini edit reads: the prompt and the reference (about 1,100 tokens
+// per image), up to three more references at most.
+const GOOGLE_INPUT_TOKENS = { typical: 1_800, max: 5_000 };
 
 function round(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
-export const IMAGE_PRICES: ImagePrice[] = [
-  openai("gpt-image-2"),
-  openai("gpt-image-1.5"),
-  openai("gpt-image-1-mini"),
-  google("gemini-3.1-flash-image", 0.067),
-  google("gemini-3.1-flash-lite-image", 0.0336),
-  google("gemini-3-pro-image", 0.134),
-];
-
 export function imagePrice(model: {
   provider: string;
   model: string;
+  quality?: ImageQuality;
 }): ImagePrice | undefined {
-  return IMAGE_PRICES.find(
-    (p) => p.provider === model.provider && p.model === model.model,
-  );
+  if (model.provider === "openai") {
+    const rows = OPENAI_OUTPUT[model.model];
+    if (!rows) return undefined;
+    const quality = model.quality ?? DEFAULT_IMAGE_QUALITY;
+    const [square, nonSquare] = rows[quality];
+    return {
+      provider: "openai",
+      model: model.model,
+      quality,
+      output: { square, nonSquare },
+      input: { typical: 0.01, max: 0.02 },
+      confidence: "official",
+    };
+  }
+  if (model.provider === "google") {
+    const perImage = GOOGLE_PER_IMAGE[model.model];
+    const tokens = TOKEN_PRICES[key(model)];
+    if (perImage === undefined || !tokens) return undefined;
+    return {
+      provider: "google",
+      model: model.model,
+      quality: null,
+      output: { square: perImage, nonSquare: perImage },
+      input: {
+        typical: round((GOOGLE_INPUT_TOKENS.typical * tokens.imageIn) / 1e6),
+        max: round((GOOGLE_INPUT_TOKENS.max * tokens.imageIn) / 1e6),
+      },
+      confidence: "official",
+    };
+  }
+  return undefined;
 }
 
 export interface SceneEstimate {
@@ -107,7 +181,7 @@ export interface SceneEstimate {
 // What one generation at this model and aspect costs: output plus the edit's
 // input allowance. null when the model has no pinned price.
 export function estimateGeneration(
-  model: { provider: string; model: string },
+  model: { provider: string; model: string; quality?: ImageQuality },
   aspect?: string,
 ): { typical: number; max: number } | null {
   const price = imagePrice(model);
@@ -124,7 +198,7 @@ export function estimateGeneration(
 // no pinned price (the UI says so instead of guessing).
 export function estimateScenes(
   slots: { aspect?: string }[],
-  model: { provider: string; model: string },
+  model: { provider: string; model: string; quality?: ImageQuality },
 ): SceneEstimate | null {
   const price = imagePrice(model);
   if (!price) return null;
@@ -140,70 +214,85 @@ export function estimateScenes(
   };
 }
 
-// Video: OpenAI bills Sora by the second generated, at a price per size
-// (https://developers.openai.com/api/docs/models/sora-2 and .../sora-2-pro,
-// checked 2026-10-05). Kiln renders only 720x1280 / 1280x720, the size both
-// models share, so one price per second per model.
-export const VIDEO_PRICES_AS_OF = "2026-10-05";
-
-const VIDEO_PER_SECOND: Record<string, number> = {
-  "sora-2": 0.1,
-  "sora-2-pro": 0.3,
+// Video is billed by the second rendered, at a price per resolution: Veo 3.1
+// (Google, 2026-10-06, audio included). Sora is retired; its rates stay so
+// old outputs keep their cost.
+const VIDEO_PER_SECOND: Record<
+  string,
+  Partial<Record<VideoResolution, number>>
+> = {
+  "google/veo-3.1-generate-preview": { "720p": 0.4, "1080p": 0.4 },
+  "google/veo-3.1-fast-generate-preview": { "720p": 0.1, "1080p": 0.12 },
+  "google/veo-3.1-lite-generate-preview": { "720p": 0.05, "1080p": 0.08 },
+  "openai/sora-2": { "720p": 0.1 },
+  "openai/sora-2-pro": { "720p": 0.3 },
 };
 
-// Sora takes 4, 8 or 12 seconds; a card's duration snaps to the nearest. The
-// adapter sends this and the estimate prices it, so they always agree.
-export function soraSeconds(durationSec: number): 4 | 8 | 12 {
-  if (durationSec <= 6) return 4;
-  if (durationSec <= 10) return 8;
-  return 12;
-}
-
-// What `seconds` of video cost on this model; null when it has no pinned price.
-export function videoCost(model: string, seconds: number): number | null {
-  const perSecond = VIDEO_PER_SECOND[model];
+// What `seconds` of video cost on this model at its resolution; null when it
+// has no pinned price there.
+export function videoCost(
+  model: { provider: string; model: string; resolution?: VideoResolution },
+  seconds: number,
+): number | null {
+  const resolution = model.resolution ?? DEFAULT_VIDEO_RESOLUTION;
+  const perSecond = VIDEO_PER_SECOND[key(model)]?.[resolution];
   return perSecond === undefined ? null : round(perSecond * seconds);
 }
 
-// What one video at this duration costs. Billing is by the seconds generated,
-// so the estimate is also the measured cost of a finished video.
+// What one video of this length costs, before it is made: null when the model
+// has no pinned price at that resolution or does not render that length there.
+// Billing is by the seconds rendered, so the estimate is also the cost of a
+// finished video.
 export function estimateVideo(
-  model: { provider: string; model: string },
-  durationSec: number,
+  model: { provider: string; model: string; resolution?: VideoResolution },
+  seconds: number,
 ): number | null {
-  if (model.provider !== "openai") return null;
-  return videoCost(model.model, soraSeconds(durationSec));
+  const resolution = model.resolution ?? DEFAULT_VIDEO_RESOLUTION;
+  const lengths = modelEntry(model)?.seconds?.[resolution];
+  if (!lengths?.includes(seconds)) return null;
+  return videoCost(model, seconds);
 }
 
-// Official token prices, $ per 1M tokens (https://developers.openai.com/api/
-// docs/pricing, 2026-10-02): what a finished generation actually cost, from the
-// usage the API returns.
-const TOKEN_PRICES: Record<
-  string,
-  { textIn: number; imageIn: number; imageOut: number }
-> = {
-  "gpt-image-2": { textIn: 5, imageIn: 8, imageOut: 30 },
-  "gpt-image-1.5": { textIn: 5, imageIn: 8, imageOut: 32 },
-  "gpt-image-1-mini": { textIn: 2, imageIn: 2.5, imageOut: 8 },
-};
-
+// Token usage reported by the provider: what a finished call actually cost.
+// `outputTokens` is the model's main output — the image of an image model, the
+// text (thinking included) of a text model; `outputTextTokens` is the text and
+// thinking an image model writes beside its image.
 export interface GenerationUsage {
   inputTextTokens: number;
   inputImageTokens: number;
   outputTokens: number;
+  outputTextTokens?: number;
 }
 
 export function costFromUsage(
-  model: string,
+  model: { provider: string; model: string },
   usage: GenerationUsage,
 ): number | null {
-  const p = TOKEN_PRICES[model];
+  const p = TOKEN_PRICES[key(model)];
   if (!p) return null;
-  return (
-    (usage.inputTextTokens * p.textIn +
-      usage.inputImageTokens * p.imageIn +
-      usage.outputTokens * p.imageOut) /
-    1_000_000
+  const isText = modelEntry(model)?.kind === "text";
+  const input =
+    usage.inputTextTokens * p.textIn + usage.inputImageTokens * p.imageIn;
+  const output = isText
+    ? usage.outputTokens * p.textOut
+    : usage.outputTokens * p.imageOut +
+      (usage.outputTextTokens ?? 0) * p.textOut;
+  return (input + output) / 1_000_000;
+}
+
+// The most a text call (vision, art direction) can cost: its input allowance
+// and the output cap it is sent with (`max_output_tokens`, thinking included).
+export function textEstimate(
+  model: { provider: string; model: string },
+  budget: { inputTokens: number; outputTokens: number },
+): number | null {
+  if (modelEntry(model)?.kind !== "text") return null;
+  const p = TOKEN_PRICES[key(model)];
+  if (!p) return null;
+  return round(
+    (budget.inputTokens * Math.max(p.textIn, p.imageIn) +
+      budget.outputTokens * p.textOut) /
+      1_000_000,
   );
 }
 

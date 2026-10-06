@@ -35,14 +35,16 @@ export {
   costFromUsage,
   estimateGeneration,
   estimateScenes,
+  estimateVideo,
   fromMicros,
   type GenerationUsage,
-  IMAGE_PRICES,
   type ImagePrice,
   imagePrice,
   PRICES_AS_OF,
   type SceneEstimate,
+  textEstimate,
   toMicros,
+  videoCost,
 } from "@/domain/generation-cost";
 export {
   buildGenerationRequest,

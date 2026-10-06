@@ -577,8 +577,38 @@ describe("video slots", () => {
       motion: "push-in",
       seconds: 8,
       orientation: "portrait",
-      allowed: [8, 12],
+      allowed: [6, 8],
     });
+  });
+
+  it("offers the lengths the card's model renders at its resolution", () => {
+    const plan = withVideoChoice(approveSlot(withVideo(), hero, card), video, {
+      seconds: 12,
+    });
+    const rules = { minSec: 5, maxSec: 15 };
+    // A 12 s saved for Sora reads as 8 on Veo; 1080p renders only 8 s.
+    expect(
+      videoSettings(shopOf(plan), slotOf(plan, "video"), rules, {
+        provider: "google",
+        model: "veo-3.1-lite-generate-preview",
+      }),
+    ).toMatchObject({ seconds: 8, allowed: [6, 8] });
+    expect(
+      videoSettings(shopOf(plan), slotOf(plan, "video"), rules, {
+        provider: "google",
+        model: "veo-3.1-fast-generate-preview",
+        resolution: "1080p",
+      }),
+    ).toMatchObject({ seconds: 8, allowed: [8] });
+    // No length fits a 10-20 s destination: the nearest one the model renders.
+    expect(
+      videoSettings(
+        shopOf(plan),
+        slotOf(plan, "video"),
+        { minSec: 10, maxSec: 20 },
+        { provider: "google", model: "veo-3.1-fast-generate-preview" },
+      ),
+    ).toMatchObject({ seconds: 8, allowed: [8] });
   });
 
   it("keeps the maker's choices, within what the destination accepts", () => {

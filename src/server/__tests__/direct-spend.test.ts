@@ -19,10 +19,15 @@ const { imageCall, videoCall, withDirectSpend } = await import(
   "@/server/direct-spend"
 );
 
+const VEO = {
+  provider: "google" as const,
+  model: "veo-3.1-fast-generate-preview",
+};
+
 const video = {
   assets: [{ id: "v", url: "https://x/v.mp4", mime: "video/mp4" }],
-  provider: "openai",
-  model: "sora-2",
+  provider: "google",
+  model: VEO.model,
 };
 
 afterEach(() => vi.clearAllMocks());
@@ -30,7 +35,7 @@ afterEach(() => vi.clearAllMocks());
 describe("direct spend", () => {
   it("a video reserves its pinned max and records the seconds it generated", async () => {
     const result = await withDirectSpend(
-      videoCall({ provider: "openai", model: "sora-2" }, 8),
+      videoCall(VEO, 8),
       async (beforeCall) => {
         await beforeCall();
         return video;
@@ -39,7 +44,7 @@ describe("direct spend", () => {
     expect(result).toBe(video);
     expect(reserveDirectCall).toHaveBeenCalledWith({
       makerId: "maker-1",
-      model: "sora-2",
+      model: VEO.model,
       estimateMicros: 800_000,
     });
     expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
@@ -48,14 +53,11 @@ describe("direct spend", () => {
     });
   });
 
-  it("a model without a pinned price is refused before anything is reserved", async () => {
+  it("a length the model does not render has no price, so nothing is reserved", async () => {
     const call = vi.fn();
-    await expect(
-      withDirectSpend(
-        videoCall({ provider: "google", model: "veo-3.1-generate-preview" }, 8),
-        call,
-      ),
-    ).rejects.toThrow("No pinned price");
+    await expect(withDirectSpend(videoCall(VEO, 12), call)).rejects.toThrow(
+      "No pinned price",
+    );
     expect(reserveDirectCall).not.toHaveBeenCalled();
     expect(call).not.toHaveBeenCalled();
   });
@@ -75,10 +77,7 @@ describe("direct spend", () => {
   });
 
   it("a call that never went out (a stub) records no cost", async () => {
-    await withDirectSpend(
-      videoCall({ provider: "openai", model: "sora-2" }, 8),
-      async () => video,
-    );
+    await withDirectSpend(videoCall(VEO, 8), async () => video);
     expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
       usage: undefined,
       actualMicros: null,

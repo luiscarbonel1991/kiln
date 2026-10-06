@@ -140,7 +140,12 @@ async function callImage(
     deps,
     job,
     result.usage,
-    result.usage ? costFromUsage(result.model, result.usage) : null,
+    result.usage
+      ? costFromUsage(
+          { provider: request.model.provider, model: result.model },
+          result.usage,
+        )
+      : null,
   );
   return result;
 }
@@ -174,8 +179,15 @@ async function callVideo(
   await recordPaidCost(
     deps,
     job,
-    { seconds: clip.seconds },
-    videoCost(clip.model, clip.seconds),
+    { seconds: clip.seconds, resolution: request.model.resolution },
+    videoCost(
+      {
+        provider: request.model.provider,
+        model: clip.model,
+        resolution: request.model.resolution,
+      },
+      clip.seconds,
+    ),
   );
   return clip;
 }

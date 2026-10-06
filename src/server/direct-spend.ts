@@ -2,10 +2,10 @@ import {
   costFromUsage,
   estimateGeneration,
   estimateVideo,
-  soraSeconds,
   toMicros,
   videoCost,
 } from "@/domain/generation-cost";
+import type { ImageQuality, VideoResolution } from "@/domain/model-defaults";
 import { errorMessage, hadResponse } from "@/domain/queue";
 import { hasDatabase } from "@/lib/db";
 import { providerMode } from "@/providers/mode";
@@ -32,27 +32,40 @@ export interface PricedCall {
 // `model` is the one the adapter will run (already resolved), so an id the
 // adapter would swap for its default is never priced at $0.
 export function imageCall(
-  model: { provider: string; model: string },
+  model: { provider: string; model: string; quality?: ImageQuality },
   aspect: string,
 ): PricedCall {
   return {
     model: model.model,
     estimateMax: estimateGeneration(model, aspect)?.max ?? null,
     costOf: (result) =>
-      result.usage ? costFromUsage(result.model, result.usage) : null,
+      result.usage
+        ? costFromUsage(
+            { provider: result.provider, model: result.model },
+            result.usage,
+          )
+        : null,
   };
 }
 
-// Sora bills the seconds generated, so a finished video costs its estimate.
+// Video bills the seconds rendered, so a finished video costs its estimate. A
+// length the model does not render has no estimate, so it never runs.
 export function videoCall(
-  model: { provider: string; model: string },
+  model: { provider: string; model: string; resolution?: VideoResolution },
   durationSec: number,
 ): PricedCall {
-  const seconds = soraSeconds(durationSec);
   return {
     model: model.model,
     estimateMax: estimateVideo(model, durationSec),
-    costOf: (result) => videoCost(result.model, seconds),
+    costOf: (result) =>
+      videoCost(
+        {
+          provider: result.provider,
+          model: result.model,
+          resolution: model.resolution,
+        },
+        durationSec,
+      ),
   };
 }
 

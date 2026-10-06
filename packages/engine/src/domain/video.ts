@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { soraSeconds } from "@/domain/generation-cost";
+import {
+  DEFAULT_MAKER_MODELS,
+  DEFAULT_VIDEO_RESOLUTION,
+  modelEntry,
+  type VideoResolution,
+} from "@/domain/model-defaults";
 
 // A video slot animates a scene the maker already approved (never a new
 // image): how the camera moves, how long it runs and its orientation are the
@@ -26,11 +31,9 @@ export const VIDEO_MOTIONS: Record<
   },
 };
 
-export const VideoSeconds = z.union([
-  z.literal(4),
-  z.literal(8),
-  z.literal(12),
-]);
+// A clip's length in seconds; which lengths are valid depends on the model and
+// its resolution (the catalog) and on the destination.
+export const VideoSeconds = z.number().int().min(1).max(60);
 export type VideoSeconds = z.infer<typeof VideoSeconds>;
 
 export const VideoOrientation = z.enum(["portrait", "landscape"]);
@@ -47,17 +50,39 @@ export const VideoChoice = z.object({
 });
 export type VideoChoice = z.infer<typeof VideoChoice>;
 
-// The lengths a destination accepts among the ones Sora renders (Etsy wants
-// 5-15 s: 8 or 12).
-export function videoSecondsFor(rules?: {
-  minSec: number;
-  maxSec: number;
-}): VideoSeconds[] {
-  const all: VideoSeconds[] = [4, 8, 12];
-  const ok = rules
-    ? all.filter((s) => s >= rules.minSec && s <= rules.maxSec)
-    : all;
-  return ok.length > 0 ? ok : [soraSeconds(rules?.minSec ?? 8)];
+// The lengths the model renders at its resolution that the destination
+// accepts (Veo on Etsy, 5-15 s: 6 or 8; at 1080p only 8). When none fits, the
+// model's length nearest to the destination's range.
+export function videoSecondsFor(
+  rules?: { minSec: number; maxSec: number },
+  model: {
+    provider: string;
+    model: string;
+    resolution?: VideoResolution;
+  } = DEFAULT_MAKER_MODELS.video,
+): VideoSeconds[] {
+  const resolution = model.resolution ?? DEFAULT_VIDEO_RESOLUTION;
+  const all = [...(modelEntry(model)?.seconds?.[resolution] ?? [8])];
+  if (!rules) return all;
+  const ok = all.filter((s) => s >= rules.minSec && s <= rules.maxSec);
+  if (ok.length > 0) return ok;
+  const distance = (s: number) =>
+    s < rules.minSec ? rules.minSec - s : s - rules.maxSec;
+  return [all.reduce((a, b) => (distance(b) < distance(a) ? b : a))];
+}
+
+// A wanted length on the allowed ones: kept when allowed, else 8 when allowed,
+// else the nearest.
+export function snapSeconds(
+  wanted: number | undefined,
+  allowed: VideoSeconds[],
+): VideoSeconds {
+  if (wanted !== undefined && allowed.includes(wanted)) return wanted;
+  if (allowed.includes(8)) return 8;
+  const target = wanted ?? 8;
+  return allowed.reduce((a, b) =>
+    Math.abs(b - target) < Math.abs(a - target) ? b : a,
+  );
 }
 
 export function aspectOf(orientation: VideoOrientation): "9:16" | "16:9" {
