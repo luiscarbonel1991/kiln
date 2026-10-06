@@ -3,6 +3,7 @@ import {
   GENERIC_SURFACE,
   GENERIC_USE,
   inSentence,
+  placeObjects,
   sceneCues,
   sceneVariants,
   surfaceCue,
@@ -107,10 +108,48 @@ describe("sceneCues", () => {
     expect(size).toBe(
       "the product true to its real size (5 x 3 in, about the size of a phone) against every object around it",
     );
-    expect(legible).toContain("text and design to read clearly");
+    expect(legible).toBe(
+      "never enlarged beyond its real size: frame closer to it instead, so its text and design still read",
+    );
     expect(contrast).toBe(
       "its dark face set against a lighter background, so it stands out",
     );
+  });
+
+  it("sizes the product against the objects its place names", () => {
+    const plaque = {
+      ...CUTTING_BOARD,
+      dimensions: { w: 5, h: 3, unit: "in" as const },
+    };
+    // The longest name wins ("video doorbell", not "door" + "doorbell"),
+    // and both objects of a place are used, in order.
+    expect(
+      sceneCues(plaque, "an exterior front door, beside a video doorbell")[0],
+    ).toBe(
+      "the product true to its real size: 5 x 3 in, about 1/7 as wide as the door and about twice as wide as the video doorbell",
+    );
+    expect(sceneCues(plaque, "the whole front door")[0]).toContain(
+      "about 1/7 as wide as the door",
+    );
+    const coaster = {
+      ...CUTTING_BOARD,
+      dimensions: { w: 4, h: 4, unit: "in" as const },
+    };
+    expect(sceneCues(coaster, "a coffee table, under a steaming mug")[0]).toBe(
+      "the product true to its real size: 4 x 4 in, about 1/10 as wide as the coffee table and about as wide as the mug",
+    );
+    // Millimetres are compared in inches.
+    expect(
+      sceneCues(
+        { ...plaque, dimensions: { w: 127, h: 76, unit: "mm" as const } },
+        "a door",
+      )[0],
+    ).toContain("about 1/7 as wide as the door");
+  });
+
+  it("a place naming no known object keeps the everyday reference", () => {
+    expect(placeObjects("a sunny reading nook")).toEqual([]);
+    expect(placeObjects("a doorway")).toEqual([]);
   });
 
   it("only scenes set in a place of use carry them", () => {

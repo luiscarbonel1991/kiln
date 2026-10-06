@@ -51,25 +51,109 @@ export function inSentence(text: string): string {
   return trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
 }
 
+// Everyday objects a place of use often names, with a typical size (inches,
+// width x height), so a scene can size the product against what is really
+// beside it. Matched in the place's words, the longest name first ("video
+// doorbell" before "door").
+const PLACE_OBJECTS: {
+  names: string[];
+  label: string;
+  w: number;
+  h: number;
+}[] = [
+  { names: ["front door", "door"], label: "door", w: 36, h: 80 },
+  { names: ["video doorbell"], label: "video doorbell", w: 2.4, h: 5 },
+  { names: ["doorbell"], label: "doorbell", w: 1.5, h: 3 },
+  { names: ["doorknob", "door knob"], label: "doorknob", w: 2.5, h: 2.5 },
+  { names: ["light switch"], label: "light switch", w: 2.75, h: 4.5 },
+  { names: ["window"], label: "window", w: 36, h: 48 },
+  { names: ["mug", "cup"], label: "mug", w: 3.5, h: 4 },
+  { names: ["wine glass"], label: "wine glass", w: 3.5, h: 8 },
+  { names: ["book", "books"], label: "book", w: 6, h: 9 },
+  { names: ["laptop"], label: "laptop", w: 12, h: 8.5 },
+  { names: ["phone", "smartphone"], label: "phone", w: 2.8, h: 5.8 },
+  { names: ["picture frame"], label: "picture frame", w: 8, h: 10 },
+  { names: ["candle"], label: "candle", w: 3, h: 4 },
+  { names: ["vase"], label: "vase", w: 6, h: 10 },
+  { names: ["armchair"], label: "armchair", w: 32, h: 36 },
+  { names: ["sofa", "couch"], label: "sofa", w: 84, h: 34 },
+  { names: ["coffee table"], label: "coffee table", w: 40, h: 18 },
+  { names: ["dining table"], label: "dining table", w: 72, h: 30 },
+  { names: ["nightstand"], label: "nightstand", w: 20, h: 24 },
+];
+
+// The objects a place names, in the order they appear (at most two).
+export function placeObjects(
+  place: string,
+): { label: string; w: number; h: number }[] {
+  const text = place.toLowerCase();
+  const names = PLACE_OBJECTS.flatMap((o) =>
+    o.names.map((name) => ({ name, object: o })),
+  ).sort((a, b) => b.name.length - a.name.length);
+  const taken: [number, number][] = [];
+  const found: { at: number; object: (typeof PLACE_OBJECTS)[number] }[] = [];
+  for (const { name, object } of names) {
+    const match = new RegExp(`\\b${name}\\b`).exec(text);
+    if (!match) continue;
+    const span: [number, number] = [match.index, match.index + name.length];
+    if (taken.some(([a, b]) => span[0] < b && a < span[1])) continue;
+    if (found.some((f) => f.object === object)) continue;
+    taken.push(span);
+    found.push({ at: match.index, object });
+  }
+  return found
+    .sort((a, b) => a.at - b.at)
+    .slice(0, 2)
+    .map(({ object: { label, w, h } }) => ({ label, w, h }));
+}
+
+// "about 1/7 as wide as the door", "about twice as wide as the video doorbell".
+function widthAgainst(
+  productWidthIn: number,
+  object: { label: string; w: number },
+) {
+  const r = productWidthIn / object.w;
+  if (r >= 0.85 && r <= 1.15) return `about as wide as the ${object.label}`;
+  if (r < 0.85) {
+    const n = Math.round(1 / r);
+    if (n < 2) return `a little narrower than the ${object.label}`;
+    if (n > 30) return `tiny beside the ${object.label}`;
+    return `about 1/${n} as wide as the ${object.label}`;
+  }
+  const k = Math.round(r * 2) / 2;
+  return k === 2
+    ? `about twice as wide as the ${object.label}`
+    : `about ${k} times as wide as the ${object.label}`;
+}
+
 // What a scene in a real place must keep true of this product: its size
-// against the everyday objects there (the nearest everyday reference, as in
-// the exact scale frame), a size in the frame that keeps its text and design
-// readable, and a background its face stands out from.
-export function sceneCues(product: Product): string[] {
+// against the objects its place names (else the nearest everyday reference,
+// as in the exact scale frame), never enlarged to fill the frame (the frame
+// comes closer instead, so its text reads), and a background its face stands
+// out from.
+export function sceneCues(product: Product, place = ""): string[] {
   const dims = product.dimensions;
-  const ref = scaleReference(dims);
-  const ratio = Math.max(dims.w, dims.h) / Math.max(ref.width, ref.height);
-  const compared =
-    ratio < 0.85
-      ? "smaller than"
-      : ratio > 1.15
-        ? "larger than"
-        : "about the size of";
+  const widthIn = dims.unit === "mm" ? dims.w / 25.4 : dims.w;
+  const objects = placeObjects(place);
+  let size: string;
+  if (objects.length > 0) {
+    size = `the product true to its real size: ${dimensionsLabel(dims)}, ${objects.map((o) => widthAgainst(widthIn, o)).join(" and ")}`;
+  } else {
+    const ref = scaleReference(dims);
+    const ratio = Math.max(dims.w, dims.h) / Math.max(ref.width, ref.height);
+    const compared =
+      ratio < 0.85
+        ? "smaller than"
+        : ratio > 1.15
+          ? "larger than"
+          : "about the size of";
+    size = `the product true to its real size (${dimensionsLabel(dims)}, ${compared} ${ref.name}) against every object around it`;
+  }
   const dark =
     contrastInk(colourOf(product, product.defaultColour).face) === "#ffffff";
   return [
-    `the product true to its real size (${dimensionsLabel(dims)}, ${compared} ${ref.name}) against every object around it`,
-    "large enough in the frame for its text and design to read clearly, at least a quarter of the frame's width",
+    size,
+    "never enlarged beyond its real size: frame closer to it instead, so its text and design still read",
     dark
       ? "its dark face set against a lighter background, so it stands out"
       : "its light face set against a darker background, so it stands out",
@@ -94,7 +178,10 @@ export function surfaceCue(product: Product): string {
 }
 
 export function productSceneCues(product: Product): ProductSceneCues {
-  return { inPlace: () => sceneCues(product), surface: surfaceCue(product) };
+  return {
+    inPlace: (place) => sceneCues(product, place),
+    surface: surfaceCue(product),
+  };
 }
 
 export function sceneVariants(

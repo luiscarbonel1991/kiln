@@ -128,7 +128,9 @@ describe("slotCards", () => {
     expect(composition).toContain(
       "the product true to its real size (16 x 10 in, larger than a letter sheet) against every object around it",
     );
-    expect(composition).toContain("at least a quarter of the frame's width");
+    expect(composition).toContain(
+      "never enlarged beyond its real size: frame closer to it instead",
+    );
     // Maple is a light face.
     expect(composition).toContain(
       "its light face set against a darker background",
