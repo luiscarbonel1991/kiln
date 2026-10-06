@@ -100,14 +100,34 @@ card; its saved defaults live in the module's own `ModuleSettings` row.
 KILN_MODULES=laser-pricing pnpm dev
 ```
 
-## System dependencies ("Centerline" vectorize)
+## Deliver
+
+Each destination on a project's board ends with **Export <destination> (.zip)**, ready
+once every slot switched on is exact or approved. The zip holds the photos in the
+board's order (`01-in-use.jpg`, `02-hero.jpg`, `03-colours.png`, …; photo 1 is the
+listing's thumbnail, chosen with "Make photo 1"), each at the destination's pixel target
+on its short side (Etsy: 2000), plus `README.txt` and `manifest.json` (each file's slot
+and, for a scene, the prompt, model and measured cost that produced it). A human posts
+it. Exported slots read "delivered" until an approval or the order changes.
+
+- Exact frames are the board's own SVG rendered by resvg with the fonts in
+  `assets/fonts` (static TTFs under the SIL Open Font License, licenses alongside); the
+  product's own typography comes from the system's fonts. A deployment must ship
+  `assets/fonts`.
+- Scenes are the approved image, cropped to the slot's aspect and upscaled with
+  ImageMagick (Lanczos, light unsharp, JPEG 92): free, and the image is the approved
+  one.
+- Scenes with text on the image (Instagram's hook) are not exported yet.
+
+## System dependencies (vectorize, Deliver)
 
 The line-art **Centerline** trace — a single path per drawn stroke — shells out to two
-native binaries. Install them on any machine or deploy image that runs the app:
+native binaries, and **Deliver** upscales scenes with one of them. Install them on any
+machine or deploy image that runs the app:
 
 - **autotrace** — centerline tracing (`brew install autotrace` · `apt-get install autotrace`)
-- **ImageMagick** (`magick`) — flattens the raster to a clean B&W bitmap first
-  (`brew install imagemagick` · `apt-get install imagemagick`)
+- **ImageMagick** (`magick`) — flattens the raster to a clean B&W bitmap first, and
+  upscales scenes for delivery (`brew install imagemagick` · `apt-get install imagemagick`)
 
 The **Outline** trace (and everything else) is pure-npm via `@neplex/vectorizer` and needs
 nothing extra; if the binaries are missing, only the Centerline button fails (it's caught,
