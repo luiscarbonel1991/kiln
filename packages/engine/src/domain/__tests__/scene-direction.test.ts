@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  GENERIC_SURFACE,
   GENERIC_USE,
   inSentence,
   sceneCues,
   sceneVariants,
+  surfaceCue,
 } from "@/domain/scene-direction";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
@@ -120,9 +122,39 @@ describe("sceneCues", () => {
       { composition: "centered" },
       understanding,
       ["a kitchen counter"],
-      ["cue one", "cue two"],
+      { inPlace: () => ["cue one", "cue two"], surface: "x" },
     );
     expect(studio.composition).toBe("centered");
     expect(inPlace.composition).toBe("centered; cue one; cue two");
+  });
+});
+
+describe("{surface}", () => {
+  const macro = {
+    label: "Detail",
+    purpose: "detail",
+    scene: "a macro close-up",
+    composition: "a tight crop, {surface}, shallow depth of field",
+  };
+
+  it("a raised product is seen at a low raking angle, an engraved one flush", () => {
+    expect(surfaceCue({ ...CUTTING_BOARD, treatment: "raised" })).toContain(
+      "low raking angle across the face so the raised elements' side walls and short shadows show",
+    );
+    expect(surfaceCue(CUTTING_BOARD)).toContain(
+      "the engraving flush with the face",
+    );
+    const [detail] = sceneVariants([macro], {}, understanding, [], {
+      inPlace: () => [],
+      surface: surfaceCue({ ...CUTTING_BOARD, treatment: "raised" }),
+    });
+    expect(detail.composition).toContain("a tight crop, seen at a low raking");
+  });
+
+  it("without a product the macro still reads", () => {
+    const [detail] = sceneVariants([macro], {}, understanding, []);
+    expect(detail.composition).toBe(
+      `a tight crop, ${GENERIC_SURFACE}, shallow depth of field`,
+    );
   });
 });

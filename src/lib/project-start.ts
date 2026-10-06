@@ -7,7 +7,7 @@ import { type ProjectPlan, slotCardId, slotRecipeId } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import type { ProjectType } from "@/domain/project";
-import { sceneCues, sceneVariants } from "@/domain/scene-direction";
+import { productSceneCues, sceneVariants } from "@/domain/scene-direction";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { projectTypeLabel } from "@/lib/project-types";
@@ -69,7 +69,7 @@ export function slotCards(
             recipe.fieldDefaults,
             understanding,
             product.useContexts,
-            sceneCues(product),
+            productSceneCues(product),
           );
     const slotRecipe = {
       ...recipe,

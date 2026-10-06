@@ -168,7 +168,7 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         scene:
           "a macro close-up of the material, texture and edges, nothing else in the frame",
         composition:
-          "a tight macro crop on the finish, shallow depth of field, the product filling the frame",
+          "a tight macro crop on the finish, {surface}, shallow depth of field; any words on the product whole inside the frame (or one whole word on purpose), never cut at the frame's edge",
         lighting: "raking side light that reveals the texture",
       },
       {
@@ -313,7 +313,8 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         purpose: "A close look at the finish that proves the craft.",
         aspect: "4:5",
         scene: "a close look at the material and the finish",
-        composition: "a tight crop on the finish, shallow depth of field",
+        composition:
+          "a tight crop on the finish, {surface}, shallow depth of field; any words on the product whole inside the frame (or one whole word on purpose), never cut at the frame's edge",
         lighting: "raking side light that reveals the texture",
       },
       {

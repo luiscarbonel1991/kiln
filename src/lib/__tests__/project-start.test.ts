@@ -140,6 +140,15 @@ describe("slotCards", () => {
     }
   });
 
+  it("the macro shows the product's treatment and keeps its words whole", () => {
+    const detail = cards.find((c) => c.id === "etsy.detail");
+    const composition = detail?.fields.composition.value ?? "";
+    // The board is engraved: seen nearly straight on, flush.
+    expect(composition).toContain("the engraving flush with the face");
+    expect(composition).toContain("never cut at the frame's edge");
+    expect(composition).not.toContain("{surface}");
+  });
+
   it("follows the plan's own slots, even when the shot list has changed since", () => {
     const etsy = plan.destinations[0];
     const edited = {

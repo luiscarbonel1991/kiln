@@ -5,7 +5,9 @@ import legacy from "./fixtures/legacy-recipes.json";
 // Golden: the recipes the studio editor consumes change only on purpose. The
 // fixture was the verbatim output of SEED_RECIPES before the destination /
 // shot-list split (2026-10-02, parity); since then it is regenerated only by an
-// intended change: M4 (2026-10-05) added each Etsy scene's own art direction.
+// intended change: M4 (2026-10-05) added each Etsy scene's own art direction;
+// M5 (2026-10-05) made the macro show the treatment ({surface}) and keep words
+// whole.
 describe("legacy recipes (golden)", () => {
   it("SEED_RECIPES equals the frozen pre-split recipes, in order", () => {
     expect(SEED_RECIPES).toEqual(legacy);

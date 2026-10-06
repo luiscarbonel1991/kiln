@@ -11,6 +11,9 @@ import type { VariantDirection } from "@/domain/variant-direction";
 // and lifestyle shots land where buyers really use the product. Those scenes
 // also carry the product's cues (sceneCues): in a real place a model draws
 // the product too big, too small to read, or lost against its wall.
+// `{surface}` (the close looks) takes how the product's treatment must show:
+// raised elements from a low angle that reveals their side walls, an
+// engraving flush with the face.
 
 export interface SceneSlot {
   label: string;
@@ -28,7 +31,18 @@ export interface SceneDefaults {
 // Where a `{use}` scene goes when the product names no place of use.
 export const GENERIC_USE = "the place a customer actually uses it";
 
+// Where `{surface}` goes when no product is known (a photo project).
+export const GENERIC_SURFACE = "the surface's texture and edges in focus";
+
 const USE = "{use}";
+const SURFACE = "{surface}";
+
+// What the product adds to its scenes' direction: the cues of a scene set in
+// a place of use, and how a close look shows its surface.
+export interface ProductSceneCues {
+  inPlace(place: string): string[];
+  surface: string;
+}
 
 // "Show it gift-ready." -> "show it gift-ready": a purpose read inside a
 // sentence. Only the first letter is lowered, so names ("Etsy") keep their case.
@@ -62,33 +76,57 @@ export function sceneCues(product: Product): string[] {
   ];
 }
 
+// How a close look must show the product's surface for its treatment to
+// read: a frontal plate cannot show relief, so the camera has to.
+export function surfaceCue(product: Product): string {
+  switch (product.treatment) {
+    case "raised":
+      return "seen at a low raking angle across the face so the raised elements' side walls and short shadows show";
+    case "engraved":
+      return "seen nearly straight on, the engraving flush with the face, its textured cut surface catching the light";
+    case "inlaid":
+      return "seen nearly straight on, the inlay flush with the face";
+    case "printed":
+      return "seen nearly straight on, the print flat on the face";
+    case "cut":
+      return "the cut edges sharp and in focus";
+  }
+}
+
+export function productSceneCues(product: Product): ProductSceneCues {
+  return { inPlace: () => sceneCues(product), surface: surfaceCue(product) };
+}
+
 export function sceneVariants(
   slots: SceneSlot[],
   defaults: SceneDefaults,
   understanding: BaseUnderstanding,
   useContexts: string[],
-  cues: string[] = [],
+  cues?: ProductSceneCues,
 ): VariantDirection[] {
   const places = useContexts.map((c) => c.trim()).filter(Boolean);
   let next = 0;
   const place = () =>
     places.length > 0 ? places[next++ % places.length] : GENERIC_USE;
   const baseScene = defaults.scene ?? "soft neutral sweep";
+  const surface = (text: string) =>
+    text.replaceAll(SURFACE, cues?.surface ?? GENERIC_SURFACE);
   return slots.map((slot) => {
-    const inPlace = slot.scene?.includes(USE) ?? false;
+    const where = slot.scene?.includes(USE) ? place() : null;
     const scene = slot.scene
-      ? inPlace
-        ? slot.scene.replaceAll(USE, place())
+      ? where
+        ? slot.scene.replaceAll(USE, where)
         : slot.scene
       : `${baseScene} — ${inSentence(slot.purpose)}`;
-    const composition =
-      slot.composition ?? defaults.composition ?? understanding.composition;
+    const composition = surface(
+      slot.composition ?? defaults.composition ?? understanding.composition,
+    );
     return {
       direction: slot.label,
-      scene,
+      scene: surface(scene),
       composition:
-        inPlace && cues.length > 0
-          ? [composition, ...cues].join("; ")
+        where && cues
+          ? [composition, ...cues.inPlace(where)].join("; ")
           : composition,
       lighting: slot.lighting ?? understanding.lighting,
     };
