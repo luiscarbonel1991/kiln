@@ -6,6 +6,7 @@ import { parseSlotCardId, planProject, withSlotOff } from "@/domain/plan";
 import { ProjectType } from "@/domain/project";
 import { startEditorState } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
+import { getMakerModels } from "@/server/maker-repository";
 import { productReference } from "@/server/product-reference";
 import { getProduct } from "@/server/product-repository";
 import { createProject } from "@/server/project-repository";
@@ -44,7 +45,13 @@ export async function createProjectAction(
       planProject({ product, type, destinationIds, catalog: CATALOG }),
     );
     const master = await productReference(product);
-    const editor = startEditorState({ product, type, plan, master });
+    const editor = startEditorState({
+      product,
+      type,
+      plan,
+      master,
+      models: await getMakerModels(),
+    });
     id = await createProject({ type, productId: product.id, plan, editor });
   } catch (error) {
     return {

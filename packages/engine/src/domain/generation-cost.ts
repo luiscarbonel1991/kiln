@@ -307,6 +307,27 @@ export function textEstimate(
   );
 }
 
+// Whether a model has a pinned price for what Kiln would ask of it: an image
+// at its quality, a video at some length at its resolution, a text call.
+export function modelPriced(
+  model: {
+    provider: string;
+    model: string;
+    quality?: ImageQuality;
+    resolution?: VideoResolution;
+  },
+  kind: "image" | "video" | "text",
+): boolean {
+  if (kind === "image") return imagePrice(model) !== undefined;
+  if (kind === "text") {
+    return textEstimate(model, { inputTokens: 1, outputTokens: 1 }) !== null;
+  }
+  const resolution = model.resolution ?? DEFAULT_VIDEO_RESOLUTION;
+  return (modelEntry(model)?.seconds?.[resolution] ?? []).some(
+    (s) => estimateVideo(model, s) !== null,
+  );
+}
+
 // Money in whole micro-dollars (no float drift in sums and comparisons).
 export const toMicros = (usd: number): number => Math.round(usd * 1_000_000);
 export const fromMicros = (micros: number): number => micros / 1_000_000;

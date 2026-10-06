@@ -13,6 +13,7 @@ import { VideoChoice } from "@/domain/video";
 import { slotCards, videoSlotCard } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { getStorageProvider } from "@/providers/registry";
+import { getMakerModels } from "@/server/maker-repository";
 import {
   addVideoToPlan,
   loadProjectBoard,
@@ -100,6 +101,7 @@ export async function addReferenceAction(formData: FormData): Promise<void> {
           master,
           productUnderstanding(loaded.product),
           loaded.product,
+          await getMakerModels(),
         )
       : [];
   await setProjectReference(projectId, master, cards);
@@ -145,12 +147,20 @@ export async function addVideoAction(
 ): Promise<{ error?: string }> {
   const { projectId, destinationId } = AddVideo.parse(input);
   try {
+    const models = await getMakerModels();
     await addVideoToPlan(
       projectId,
       destinationId,
       CATALOG.shotLists,
       (slot, shotListId, master, understanding) =>
-        videoSlotCard(destinationId, shotListId, slot, master, understanding),
+        videoSlotCard(
+          destinationId,
+          shotListId,
+          slot,
+          master,
+          understanding,
+          models,
+        ),
     );
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { modelPriced } from "@/domain/generation-cost";
 import {
   assertModel,
   catalogFor,
@@ -53,6 +54,28 @@ describe("model catalog", () => {
       "gpt-image-1-mini",
       "gpt-image-1.5",
     ]);
+  });
+
+  it("every model it offers has a pinned price (or the queue refuses it)", () => {
+    for (const m of MODEL_CATALOG.filter((e) => !e.retired)) {
+      const resolutions = m.seconds
+        ? (Object.keys(m.seconds) as ("720p" | "1080p")[])
+        : [undefined];
+      for (const resolution of resolutions) {
+        expect(
+          modelPriced(
+            { provider: m.provider, model: m.id, resolution },
+            m.kind,
+          ),
+          `${m.provider}/${m.id} ${resolution ?? ""}`,
+        ).toBe(true);
+      }
+      for (const quality of m.qualities ?? []) {
+        expect(
+          modelPriced({ provider: m.provider, model: m.id, quality }, m.kind),
+        ).toBe(true);
+      }
+    }
   });
 
   it("each model id appears once per provider", () => {

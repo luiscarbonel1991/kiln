@@ -10,7 +10,12 @@ import {
 } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
 import type { ModelConfig } from "@/domain/model-config";
-import { defaultVideoModel } from "@/domain/model-defaults";
+import {
+  DEFAULT_MAKER_MODELS,
+  defaultImageModel,
+  defaultVideoModel,
+  type MakerModels,
+} from "@/domain/model-defaults";
 import type {
   PersistedProject,
   PersistedProjectRecord,
@@ -53,6 +58,9 @@ interface ProjectState {
   jobs: Record<string, JobView>;
   lastEnqueueAt: number;
   serverMergeStamp: number;
+  // The maker's default models (Settings → Models): what new cards start on.
+  makerModels: MakerModels;
+  setMakerModels: (models: MakerModels) => void;
   setMaster: (master: MasterAsset) => void;
   setUnderstanding: (understanding: BaseUnderstanding) => void;
   editUnderstandingField: (
@@ -93,6 +101,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   jobs: {},
   lastEnqueueAt: 0,
   serverMergeStamp: 0,
+  makerModels: DEFAULT_MAKER_MODELS,
+  setMakerModels: (makerModels) => set({ makerModels }),
   // Re-capturing clears everything downstream of the new master.
   setMaster: (master) =>
     set({
@@ -145,11 +155,17 @@ export const useProject = create<ProjectState>((set, get) => ({
   // start in "draft" — generation is manual (a per-card Generate button), so
   // nothing hits the providers until the user asks for it (cost control).
   generateVariants: (variants) => {
-    const { understanding, master, recipeId, planning } = get();
+    const { understanding, master, recipeId, planning, makerModels } = get();
     if (!understanding || !master || !recipeId || !planning) return;
     const recipe = findRecipe(recipeId);
     if (!recipe) return;
-    const cards = buildCards({ master, recipe, planning, variants }).map(
+    const cards = buildCards({
+      master,
+      recipe,
+      planning,
+      variants,
+      imageModel: defaultImageModel(makerModels),
+    }).map(
       (card, i): StudioCard => ({
         ...card,
         renderSeed: i * 7 + 5,
@@ -304,10 +320,11 @@ export const useProject = create<ProjectState>((set, get) => ({
       type: "video",
       model: {
         ...source.model,
-        ...defaultVideoModel(),
+        ...defaultVideoModel(get().makerModels),
+        aspect: "9:16",
       },
       video: {
-        durationSec: 8, // Etsy accepts 5-15 s; Sora snaps 5 to 4 s (2026-09-16)
+        durationSec: 8, // Etsy accepts 5-15 s; Veo renders 4, 6 or 8
         motion: "subtle push-in",
         startFrameAssetId:
           source.outputs[0] ?? get().master?.assetUrl ?? source.masterAssetId,

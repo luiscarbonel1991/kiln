@@ -2,7 +2,12 @@ import { Card } from "@/domain/card";
 import { buildCards } from "@/domain/cards";
 import { buildPlanningContext } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
-import { defaultVideoModel } from "@/domain/model-defaults";
+import {
+  DEFAULT_MAKER_MODELS,
+  defaultImageModel,
+  defaultVideoModel,
+  type MakerModels,
+} from "@/domain/model-defaults";
 import type { PersistedProject } from "@/domain/persisted-project";
 import {
   type PlanSlot,
@@ -59,6 +64,7 @@ export function slotCards(
   master: MasterAsset,
   understanding: BaseUnderstanding,
   product: Product,
+  models: MakerModels = DEFAULT_MAKER_MODELS,
 ): Card[] {
   return plan.destinations.flatMap((d) => {
     const recipe = findRecipe(slotRecipeId(d.shotListId, d.destinationId));
@@ -90,6 +96,7 @@ export function slotCards(
       recipe: slotRecipe,
       planning,
       variants,
+      imageModel: defaultImageModel(models),
     }).map((card, i) => ({
       ...card,
       id: slotCardId(d.destinationId, scenes[i].key),
@@ -98,7 +105,14 @@ export function slotCards(
     const videoCards = d.slots
       .filter((s) => s.fill === "video")
       .map((s) =>
-        videoSlotCard(d.destinationId, d.shotListId, s, master, understanding),
+        videoSlotCard(
+          d.destinationId,
+          d.shotListId,
+          s,
+          master,
+          understanding,
+          models,
+        ),
       );
     return [...sceneCards, ...videoCards];
   });
@@ -113,6 +127,7 @@ export function videoSlotCard(
   slot: PlanSlot,
   master: MasterAsset,
   understanding: BaseUnderstanding,
+  models: MakerModels = DEFAULT_MAKER_MODELS,
 ): Card {
   const recipe = findRecipe(slotRecipeId(shotListId, destinationId));
   if (!recipe)
@@ -130,7 +145,7 @@ export function videoSlotCard(
     ...base,
     id: slotCardId(destinationId, slot.key),
     type: "video",
-    model: { ...base.model, ...defaultVideoModel(), aspect: "9:16" },
+    model: { ...base.model, ...defaultVideoModel(models), aspect: "9:16" },
     video: { durationSec: 8, motion: "push-in", startFrameAssetId: null },
     status: "draft",
   });
@@ -145,6 +160,7 @@ export function startEditorState(input: {
   type: ProjectType;
   plan: ProjectPlan;
   master: MasterAsset | null;
+  models?: MakerModels;
 }): PersistedProject {
   const { product, plan, master } = input;
   const understanding = productUnderstanding(product);
@@ -156,6 +172,8 @@ export function startEditorState(input: {
     understanding,
     recipeId: slotRecipeId(first.shotListId, first.destinationId),
     planning: null,
-    cards: master ? slotCards(plan, master, understanding, product) : [],
+    cards: master
+      ? slotCards(plan, master, understanding, product, input.models)
+      : [],
   };
 }

@@ -28,12 +28,15 @@ export function buildCards({
   planning,
   variants,
   n,
+  imageModel = defaultImageModel(),
 }: {
   master: MasterAsset;
   recipe: Recipe;
   planning: PlanningFields;
   variants?: VariantDirection[];
   n?: number;
+  // The maker's default image model (Settings → Models).
+  imageModel?: ReturnType<typeof defaultImageModel>;
 }): Card[] {
   // Card count follows the recipe's slot count (Etsy 6, Paid ads 5, Social 4); `n`
   // is a test-only override. Must match the slots so there are no orphan cards.
@@ -67,7 +70,7 @@ export function buildCards({
       },
       references: [],
       model: {
-        ...defaultImageModel(),
+        ...imageModel,
         aspect: recipe.directions[i]?.aspect ?? "4:5",
         guidance: 7.5,
         strength: 0.65,

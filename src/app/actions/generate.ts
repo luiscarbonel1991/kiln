@@ -6,6 +6,7 @@ import { defaultImageModel } from "@/domain/model-defaults";
 import { getImageProvider } from "@/providers/registry";
 import { GenerationResult, ImageGenInput } from "@/providers/types";
 import { imageCall, withDirectSpend } from "@/server/direct-spend";
+import { getMakerModels } from "@/server/maker-repository";
 
 const PromptInput = z.string().trim().min(1, "Describe the image to generate.");
 
@@ -15,7 +16,7 @@ export async function generateImage(prompt: string): Promise<GenerationResult> {
   const safePrompt = PromptInput.parse(prompt);
   const input = ImageGenInput.parse({
     prompt: safePrompt,
-    model: ModelConfig.parse(defaultImageModel()),
+    model: ModelConfig.parse(defaultImageModel(await getMakerModels())),
   });
   return withDirectSpend(
     imageCall(input.model, input.model.aspect),

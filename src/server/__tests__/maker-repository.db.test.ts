@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Integration test against the throwaway Postgres (see
 // project-repository.db.test.ts for the setup).
@@ -92,6 +92,54 @@ describe.skipIf(!enabled)("maker brand kit (database)", async () => {
     });
     await db.product.deleteMany({
       where: { makerId: maker.id, sku: "BT-01" },
+    });
+  });
+});
+
+describe.skipIf(!enabled)("maker models (database)", async () => {
+  const { db } = await import("@/lib/db");
+  const repo = await import("@/server/maker-repository");
+  const { DEFAULT_MAKER_MODELS } = await import("@/domain/model-defaults");
+  let maker: { id: string };
+  beforeAll(async () => {
+    maker = await repo.getCurrentMaker();
+  });
+
+  afterAll(async () => {
+    await db.$executeRaw`UPDATE "Maker" SET "models" = NULL WHERE "id" = ${maker.id}`;
+  });
+
+  it("reads Kiln's defaults until the maker saves their own", async () => {
+    await db.$executeRaw`UPDATE "Maker" SET "models" = NULL WHERE "id" = ${maker.id}`;
+    expect(await repo.getMakerModels()).toEqual(DEFAULT_MAKER_MODELS);
+    const mine = {
+      image: { provider: "google" as const, model: "gemini-3-pro-image" },
+      video: {
+        provider: "google" as const,
+        model: "veo-3.1-lite-generate-preview",
+        resolution: "1080p" as const,
+      },
+      text: { provider: "google" as const, model: "gemini-3.8-flash" },
+    };
+    await repo.saveMakerModels(mine);
+    expect(await repo.getMakerModels()).toEqual(mine);
+  });
+
+  it("refuses a retired or unknown model, and reads a stale saved kind as the default", async () => {
+    await expect(
+      repo.saveMakerModels({
+        ...DEFAULT_MAKER_MODELS,
+        video: { provider: "openai", model: "sora-2" },
+      }),
+    ).rejects.toThrow(/Sora 2 was shut down/);
+    await db.$executeRaw`UPDATE "Maker" SET "models" = ${JSON.stringify({
+      image: { provider: "openai", model: "gpt-image-1.5", quality: "high" },
+      video: { provider: "openai", model: "sora-2" },
+    })}::jsonb WHERE "id" = ${maker.id}`;
+    expect(await repo.getMakerModels()).toEqual({
+      image: { provider: "openai", model: "gpt-image-1.5", quality: "high" },
+      video: DEFAULT_MAKER_MODELS.video,
+      text: DEFAULT_MAKER_MODELS.text,
     });
   });
 });

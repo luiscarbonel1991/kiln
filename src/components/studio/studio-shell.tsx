@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnalysisPhase } from "@/components/studio/analysis-phase";
 import { GenerationPhase } from "@/components/studio/generation-phase";
 import { PlanningPhase } from "@/components/studio/planning-phase";
 import { ProjectGallery } from "@/components/studio/project-gallery";
 import { StudioHeader } from "@/components/studio/studio-header";
 import { UploadPhase } from "@/components/studio/upload-phase";
+import type { MakerModels } from "@/domain/model-defaults";
 import { useProject } from "@/store/project";
 import { useGenerationSync } from "@/store/use-generation-sync";
 import { useProjectPersistence } from "@/store/use-project-persistence";
@@ -18,11 +19,15 @@ export function StudioShell({
   fresh = false,
   projectId,
   focusCardId,
+  makerModels,
 }: {
   fresh?: boolean;
   projectId?: string;
   focusCardId?: string;
+  makerModels: MakerModels;
 }) {
+  const setMakerModels = useProject((s) => s.setMakerModels);
+  useEffect(() => setMakerModels(makerModels), [makerModels, setMakerModels]);
   const phase = useProject((s) => s.phase);
   const master = useProject((s) => s.master);
   const loadedId = useProject((s) => s.projectId);

@@ -40,6 +40,7 @@ export {
   type GenerationUsage,
   type ImagePrice,
   imagePrice,
+  modelPriced,
   PRICES_AS_OF,
   type SceneEstimate,
   textEstimate,

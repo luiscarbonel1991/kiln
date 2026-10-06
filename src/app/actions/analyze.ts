@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { defaultTextModel, ProviderId } from "@/domain/model-defaults";
 import type { BaseUnderstanding } from "@/domain/understanding";
+import { getMakerModels } from "@/server/maker-repository";
 import { type Degraded, readProduct } from "@/server/text-calls";
 
 const AnalyzeInput = z.object({
@@ -22,5 +23,8 @@ export async function analyzeMaster(input: {
   model?: { provider: ProviderId; model: string };
 }): Promise<{ understanding: BaseUnderstanding; degraded?: Degraded }> {
   const safe = AnalyzeInput.parse(input);
-  return readProduct(safe.assetUrl, safe.model ?? defaultTextModel());
+  return readProduct(
+    safe.assetUrl,
+    safe.model ?? defaultTextModel(await getMakerModels()),
+  );
 }

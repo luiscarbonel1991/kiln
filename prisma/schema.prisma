@@ -21,12 +21,16 @@ datasource db {
 // default "default"). `monthlyCapCents` caps what Kiln may spend on paid
 // generations per calendar month (UTC). `brand` is the maker's brand kit for
 // text layers (Zod BrandKit, hardened on read), from the product package.
+// `models` is the maker's default model per kind — image, video, text — from
+// Settings → Models (Zod MakerModels, read leniently: a stale kind reads as
+// Kiln's default).
 model Maker {
   id              String           @id @default(cuid())
   slug            String           @unique
   name            String
   monthlyCapCents Int              @default(2500)
   brand           Json?
+  models          Json?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   projects        Project[]

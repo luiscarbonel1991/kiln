@@ -6,6 +6,7 @@ import { SEED_BRAND } from "@/domain/seed";
 import { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
+import { getMakerModels } from "@/server/maker-repository";
 import { type Degraded, directScenes } from "@/server/text-calls";
 
 const ProposeInput = z.object({
@@ -33,6 +34,6 @@ export async function proposeVariants(
       brand: SEED_BRAND,
       n: recipe.directions.length,
     },
-    model ?? defaultTextModel(),
+    model ?? defaultTextModel(await getMakerModels()),
   );
 }
