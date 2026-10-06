@@ -1,4 +1,5 @@
 import type { BrandProfile } from "@/domain/brand";
+import type { ProviderId } from "@/domain/model-defaults";
 import type { PlateRequest, PlateResult, Product } from "@/domain/product";
 import type { Recipe } from "@/domain/recipe";
 import type { BaseUnderstanding } from "@/domain/understanding";
@@ -12,7 +13,7 @@ import type {
   ImageGenInput,
 } from "@/providers/types";
 
-export type ProviderId = "google" | "openai";
+export type { ProviderId };
 
 // (a) Vision / analysis: MasterAsset -> BaseUnderstanding (structured, Zod-validated).
 export interface VisionProvider {

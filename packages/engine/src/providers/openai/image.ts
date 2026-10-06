@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { toFile } from "openai";
-import { OPENAI_IMAGE_QUALITY } from "@/domain/model-defaults";
+import {
+  assertModel,
+  DEFAULT_IMAGE_QUALITY,
+  type ImageQuality,
+} from "@/domain/model-defaults";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { assertCapability, OPENAI_CAPS } from "@/providers/capabilities";
 import type {
@@ -9,7 +13,6 @@ import type {
   ImageProvider,
 } from "@/providers/interfaces";
 import { mockDelay, providerMode } from "@/providers/mode";
-import { MODELS, resolveImageModel } from "@/providers/models";
 import { getOpenAI, hasOpenAIKey } from "@/providers/openai/client";
 import {
   GenerationResult,
@@ -21,7 +24,7 @@ import {
 
 // Mock fallback when OPENAI_API_KEY is absent or KILN_PROVIDERS=mock. Each stub
 // URL is unique, so a re-roll is a new output (approvals compare URLs).
-function mockResult(label: string): GenerationResult {
+function mockResult(label: string, model: string): GenerationResult {
   return GenerationResult.parse({
     assets: [
       {
@@ -31,7 +34,7 @@ function mockResult(label: string): GenerationResult {
       },
     ],
     provider: "openai",
-    model: MODELS.openai.image,
+    model,
   });
 }
 
@@ -68,6 +71,13 @@ function usageOf(usage: unknown): GenerationUsage | undefined {
   };
 }
 
+// The model a request runs: refused (never swapped) when Kiln does not offer it.
+const modelOf = (input: { model: { model: string } }) =>
+  assertModel({ provider: "openai", model: input.model.model }, "image").id;
+
+const qualityOf = (input: { model: { quality?: ImageQuality } }) =>
+  input.model.quality ?? DEFAULT_IMAGE_QUALITY;
+
 function editParams(input: ImageEditInput, model: string) {
   return {
     model,
@@ -75,7 +85,7 @@ function editParams(input: ImageEditInput, model: string) {
       ? `${input.prompt}\nAvoid: ${input.negative}`
       : input.prompt,
     size: sizeFor(input.model.aspect),
-    quality: OPENAI_IMAGE_QUALITY,
+    quality: qualityOf(input),
   };
 }
 
@@ -105,18 +115,18 @@ export const openaiImageProvider: ImageProvider = {
   // Direct calls make one request (no SDK retries): one call, one cost.
   async generate(input: ImageGenInput, options?: DirectCallOptions) {
     assertCapability(this, "generate");
+    const model = modelOf(input);
     if (!hasOpenAIKey()) {
       await mockDelay();
-      return mockResult("generate");
+      return mockResult("generate", model);
     }
-    const model = resolveImageModel("openai", input.model.model);
     await options?.beforeCall?.();
     const r = await getOpenAI().images.generate(
       {
         model,
         prompt: input.prompt,
         size: sizeFor(input.model.aspect),
-        quality: OPENAI_IMAGE_QUALITY,
+        quality: qualityOf(input),
       },
       { maxRetries: 0 },
     );
@@ -124,11 +134,11 @@ export const openaiImageProvider: ImageProvider = {
   },
   async edit(input: ImageEditInput, options?: DirectCallOptions) {
     assertCapability(this, "edit", input.imageInputs.length);
+    const model = modelOf(input);
     if (!hasOpenAIKey()) {
       await mockDelay();
-      return mockResult("edit");
+      return mockResult("edit", model);
     }
-    const model = resolveImageModel("openai", input.model.model);
     const master = await fetchAsset(input.masterAssetUrl);
     const image = await toFile(master.bytes, "master.png", {
       type: master.mime,
@@ -145,12 +155,14 @@ export const openaiImageProvider: ImageProvider = {
     options: { timeoutMs: number; beforeCall?: () => Promise<void> },
   ): Promise<EditBytesResult> {
     assertCapability(this, "edit", input.imageInputs.length);
-    const model = resolveImageModel("openai", input.model.model);
+    const model = modelOf(input);
     const master = await fetchAsset(input.masterAssetUrl);
-    await options.beforeCall?.();
     if (!hasOpenAIKey()) {
       // The stub "edit" returns the reference itself: a real, storable image,
-      // so mock runs fill the board with something to look at.
+      // so mock runs fill the board with something to look at. Only a mock run
+      // marks its call (mock jobs never count); a live run without a key makes
+      // no call, so nothing is counted.
+      if (providerMode() === "mock") await options.beforeCall?.();
       await mockDelay();
       return {
         bytes: new Uint8Array(master.bytes),
@@ -162,6 +174,7 @@ export const openaiImageProvider: ImageProvider = {
     const image = await toFile(master.bytes, "master.png", {
       type: master.mime,
     });
+    await options.beforeCall?.();
     const r = await getOpenAI().images.edit(
       { ...editParams(input, model), image },
       { timeout: options.timeoutMs, maxRetries: 0 },
@@ -177,6 +190,6 @@ export const openaiImageProvider: ImageProvider = {
   async compose(input: ImageComposeInput) {
     // Gated: OPENAI_CAPS.compose === false -> assertCapability throws CapabilityError.
     assertCapability(this, "compose", input.imageInputs.length);
-    return mockResult("compose");
+    return mockResult("compose", input.model.model);
   },
 };

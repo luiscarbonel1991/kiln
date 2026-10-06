@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// The engine's OWN runtime config — provider keys, model-id overrides, and object
+// The engine's OWN runtime config — provider keys and object
 // storage. Read from process.env, all optional with safe defaults so key-free
 // builds and tests never throw (adapters assert what they need at call time and
 // fall back to mocks when a key is absent). NO DATABASE_URL — persistence is the
@@ -11,13 +11,6 @@ const blankAsUnset = (v: unknown) => (v === "" ? undefined : v);
 const EnvSchema = z.object({
   GOOGLE_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
-
-  // Optional model-id overrides (see providers/models.ts).
-  GOOGLE_IMAGE_MODEL: z.string().min(1).optional(),
-  GOOGLE_VISION_MODEL: z.string().min(1).optional(),
-  OPENAI_IMAGE_MODEL: z.string().min(1).optional(),
-  GOOGLE_VIDEO_MODEL: z.string().min(1).optional(),
-  OPENAI_VIDEO_MODEL: z.string().min(1).optional(),
 
   // "mock" forces every adapter onto its stub, even with keys set (UI work and
   // demos without paid calls); KILN_MOCK_DELAY_MS makes stubs take that long.

@@ -83,13 +83,18 @@ describe("slotCards", () => {
     expect(cards.every((c) => c.status === "draft")).toBe(true);
   });
 
-  it("the video slot gets a video card, drafted for Sora at 9:16", () => {
+  it("the video slot gets a video card, drafted on the default video model at 9:16", () => {
     const video = cards.find((c) => c.id === "etsy.video");
     expect(video).toMatchObject({
       type: "video",
       direction: "Listing video",
       status: "draft",
-      model: { provider: "openai", model: "sora-2", aspect: "9:16" },
+      model: {
+        provider: "google",
+        model: "veo-3.1-fast-generate-preview",
+        resolution: "720p",
+        aspect: "9:16",
+      },
       video: { durationSec: 8, startFrameAssetId: null },
     });
   });

@@ -4,7 +4,7 @@ import type { Card } from "@/domain/card";
 import { assemblePrompt } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
 import { ModelConfig } from "@/domain/model-config";
-import { defaultVideoModel, generationModel } from "@/domain/model-defaults";
+import { defaultVideoModel } from "@/domain/model-defaults";
 import type { VideoSettings } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
@@ -64,7 +64,7 @@ export function buildGenerationRequest(input: {
     prompt: card.promptOverride ?? assembled.prompt,
     imageInputs: card.references,
     negative: assembled.negative,
-    model: generationModel(card.model, "image"),
+    model: card.model,
   };
 }
 
@@ -108,10 +108,8 @@ export function buildVideoRequest(input: {
     motion: VIDEO_MOTIONS[settings.motion].text,
     durationSec: settings.seconds,
     model: ModelConfig.parse({
-      ...generationModel(
-        { ...defaultVideoModel(), ...input.model, aspect: "9:16" },
-        "video",
-      ),
+      ...defaultVideoModel(),
+      ...input.model,
       aspect: aspectOf(settings.orientation),
     }),
   };

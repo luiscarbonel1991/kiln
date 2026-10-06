@@ -1,31 +1,27 @@
 "use server";
 
-import { generationModel } from "@/domain/model-defaults";
-import { resolveImageModel } from "@/providers/models";
+import { assertModel } from "@/domain/model-defaults";
 import { getImageProvider } from "@/providers/registry";
 import { GenerationResult, ImageEditInput } from "@/providers/types";
 import { imageCall, withDirectSpend } from "@/server/direct-spend";
 
 // Server Function: the only client path into @/providers for image editing. The
-// provider comes from the card's model under the generation policy (OpenAI only:
-// a card saved on Google runs on the OpenAI default). Mirrors generate.ts; the
-// Zod parse is the trust boundary. It reserves against the monthly cap and
-// records its cost (the queue does the same for planned projects).
+// provider is the card's own; a model Kiln does not offer is refused, never
+// swapped. Mirrors generate.ts; the Zod parse is the trust boundary. It
+// reserves against the monthly cap and records its cost (the queue does the
+// same for planned projects).
 export async function editImage(
   input: ImageEditInput,
 ): Promise<GenerationResult> {
   const parsed = ImageEditInput.parse(input);
-  const model = generationModel(parsed.model, "image");
-  // Priced on the model the adapter really runs (an unknown id falls back).
-  const safe = {
-    ...parsed,
-    model: { ...model, model: resolveImageModel(model.provider, model.model) },
-  };
+  assertModel(parsed.model, "image");
   return withDirectSpend(
-    imageCall(safe.model, safe.model.aspect),
+    imageCall(parsed.model, parsed.model.aspect),
     async (beforeCall) =>
       GenerationResult.parse(
-        await getImageProvider(safe.model.provider).edit(safe, { beforeCall }),
+        await getImageProvider(parsed.model.provider).edit(parsed, {
+          beforeCall,
+        }),
       ),
   );
 }

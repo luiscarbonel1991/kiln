@@ -12,7 +12,6 @@ import type {
   VisionProvider,
 } from "@/providers/interfaces";
 import { openaiImageProvider } from "@/providers/openai/image";
-import { openaiVideoProvider } from "@/providers/openai/video";
 import type { Capabilities } from "@/providers/types";
 
 const IMAGE_PROVIDERS: Record<ProviderId, ImageProvider> = {
@@ -20,10 +19,10 @@ const IMAGE_PROVIDERS: Record<ProviderId, ImageProvider> = {
   openai: openaiImageProvider,
 };
 
-// Video: Veo (google) and Sora (openai), switchable per card like images.
+// Video: Veo only. OpenAI shut Sora down on 2026-09-24 and has no other video
+// model; Sora outputs keep their label (the catalog), never a call.
 const VIDEO_PROVIDERS: Partial<Record<ProviderId, VideoProvider>> = {
   google: googleVideoProvider,
-  openai: openaiVideoProvider,
 };
 
 // Vision: real Gemini (mock-falls-back without GOOGLE_API_KEY). Analysis is a

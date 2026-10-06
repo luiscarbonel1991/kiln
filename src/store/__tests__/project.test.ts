@@ -2,8 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { buildPlanningContext } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
 import {
-  DEFAULT_MODEL_IDS,
-  DEFAULT_PROVIDER,
+  DEFAULT_MAKER_MODELS,
   defaultVideoModel,
 } from "@/domain/model-defaults";
 import type { PersistedProjectRecord } from "@/domain/persisted-project";
@@ -235,7 +234,7 @@ describe("useProject promoteToVideo", () => {
     expect(cardsOf()[sourceIndex + 1].id).toBe(`${source.id}-video`);
   });
 
-  it("targets the default provider's video model and seeds the start frame from the source output", () => {
+  it("targets the maker's default video model and seeds the start frame from the source output", () => {
     generate();
     const source = cardsOf()[0];
     useProject
@@ -245,8 +244,7 @@ describe("useProject promoteToVideo", () => {
 
     const video = cardsOf().find((c) => c.id === `${source.id}-video`);
     expect(video?.model).toMatchObject(defaultVideoModel());
-    expect(video?.model.provider).toBe(DEFAULT_PROVIDER);
-    expect(video?.model.model).toBe(DEFAULT_MODEL_IDS[DEFAULT_PROVIDER].video);
+    expect(video?.model).toMatchObject(DEFAULT_MAKER_MODELS.video);
     expect(video?.video?.startFrameAssetId).toBe("https://stub.local/o.png");
     expect(video?.video?.durationSec).toBe(8);
     expect(video?.video?.motion).toBe("subtle push-in");
@@ -344,8 +342,8 @@ describe("useProject hydrate safety", () => {
   });
 });
 
-describe("useProject generation policy", () => {
-  it("a card saved on Google moves to OpenAI when it generates again", () => {
+describe("useProject card models", () => {
+  it("a card generates on the model it carries, whatever the provider", () => {
     useProject.getState().setMaster(sampleMaster);
     useProject.getState().setUnderstanding(sampleUnderstanding);
     useProject.getState().goToPlanning();
@@ -358,8 +356,8 @@ describe("useProject generation policy", () => {
     useProject.getState().regenerateCard(id);
     const card = useProject.getState().cards?.find((c) => c.id === id);
     expect(card?.model).toMatchObject({
-      provider: "openai",
-      model: "gpt-image-2",
+      provider: "google",
+      model: "gemini-3.1-flash-image",
     });
     expect(card?.status).toBe("rendering");
   });

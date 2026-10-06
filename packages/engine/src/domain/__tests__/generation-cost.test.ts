@@ -10,10 +10,7 @@ import {
   toMicros,
   videoCost,
 } from "@/domain/generation-cost";
-import {
-  DEFAULT_MODEL_IDS,
-  OPENAI_IMAGE_QUALITY,
-} from "@/domain/model-defaults";
+import { catalogFor, DEFAULT_IMAGE_QUALITY } from "@/domain/model-defaults";
 
 describe("video cost", () => {
   it("snaps a duration to Sora's 4 / 8 / 12 seconds", () => {
@@ -38,23 +35,12 @@ describe("video cost", () => {
       estimateVideo({ provider: "openai", model: "sora-9" }, 8),
     ).toBeNull();
   });
-
-  it("prices every video model the catalog offers on OpenAI", () => {
-    expect(
-      estimateVideo(
-        { provider: "openai", model: DEFAULT_MODEL_IDS.openai.video },
-        8,
-      ),
-    ).not.toBeNull();
-  });
 });
 
 describe("generation cost", () => {
-  it("prices every catalog default image model", () => {
-    for (const provider of ["openai", "google"] as const) {
-      expect(
-        imagePrice({ provider, model: DEFAULT_MODEL_IDS[provider].image }),
-      ).toBeDefined();
+  it("prices every image model the catalog offers", () => {
+    for (const m of catalogFor("image")) {
+      expect(imagePrice({ provider: m.provider, model: m.id })).toBeDefined();
     }
   });
 
@@ -75,11 +61,11 @@ describe("generation cost", () => {
   });
 
   it("reads the row of the quality the requests are sent with", () => {
-    expect(OPENAI_IMAGE_QUALITY).toBe("medium");
+    expect(DEFAULT_IMAGE_QUALITY).toBe("medium");
     expect(
       imagePrice({ provider: "openai", model: "gpt-image-2" }),
     ).toMatchObject({
-      quality: OPENAI_IMAGE_QUALITY,
+      quality: DEFAULT_IMAGE_QUALITY,
       output: { square: 0.053, nonSquare: 0.041 },
     });
     expect(

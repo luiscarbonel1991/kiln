@@ -61,7 +61,7 @@ describe("buildGenerationRequest", () => {
     expect(request.prompt).toBe("hand-written");
   });
 
-  it("applies the generation policy to the model (OpenAI only)", () => {
+  it("keeps the card's own model, whatever its provider (never swapped)", () => {
     const request = buildGenerationRequest({
       card: {
         ...card,
@@ -74,8 +74,8 @@ describe("buildGenerationRequest", () => {
       ...context,
     });
     expect(request.model).toMatchObject({
-      provider: "openai",
-      model: "gpt-image-2",
+      provider: "google",
+      model: "gemini-3.1-flash-image",
     });
   });
 });

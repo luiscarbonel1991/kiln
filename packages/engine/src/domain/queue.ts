@@ -31,8 +31,8 @@ export function isActiveJob(job: { status: JobStatus } | undefined): boolean {
 }
 
 // Errors a second identical request cannot fix fail at once: a refused or
-// invalid request (4xx, moderation), a capability the provider lacks, input
-// that does not validate. Rate limits, server errors, timeouts, network and
+// invalid request (4xx, moderation), a capability the provider lacks, a model
+// Kiln does not offer, input that does not validate. Rate limits, server errors, timeouts, network and
 // storage failures get the retry; so does anything unrecognized.
 export function classifyGenerationError(
   error: unknown,
@@ -50,7 +50,11 @@ export function classifyGenerationError(
     if (e.status >= 500) return "transient";
     if (e.status >= 400) return "permanent";
   }
-  if (e?.name === "CapabilityError" || e?.name === "ZodError") {
+  if (
+    e?.name === "CapabilityError" ||
+    e?.name === "ModelRefused" ||
+    e?.name === "ZodError"
+  ) {
     return "permanent";
   }
   if (Array.isArray(e?.issues)) return "permanent";

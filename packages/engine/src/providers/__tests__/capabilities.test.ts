@@ -13,7 +13,7 @@ const composeInput: ImageComposeInput = {
   negative: "",
   model: {
     provider: "openai",
-    model: "x",
+    model: "gpt-image-2",
     aspect: "4:5",
     guidance: 7.5,
     strength: 0.65,
@@ -47,7 +47,11 @@ describe("compose gating", () => {
   it("google.compose succeeds and returns one asset", async () => {
     const result = await google.compose({
       ...composeInput,
-      model: { ...composeInput.model, provider: "google" },
+      model: {
+        ...composeInput.model,
+        provider: "google",
+        model: "gemini-3.1-flash-image",
+      },
     });
     expect(result.provider).toBe("google");
     expect(result.assets).toHaveLength(1);
@@ -63,7 +67,7 @@ describe("maxRefs gating", () => {
       negative: "",
       model: {
         provider: "openai",
-        model: "x",
+        model: "gpt-image-2",
         aspect: "4:5",
         guidance: 7.5,
         strength: 0.65,
@@ -82,7 +86,7 @@ describe("maxRefs gating", () => {
       negative: "",
       model: {
         provider: "google",
-        model: "x",
+        model: "gemini-3.1-flash-image",
         aspect: "4:5",
         guidance: 7.5,
         strength: 0.65,

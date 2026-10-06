@@ -47,7 +47,12 @@ describe("buildVideoRequest", () => {
       startFrameUrl: settings.startFrame,
       durationSec: 8,
       motion: "a subtle, slow push-in toward the product",
-      model: { provider: "openai", model: "sora-2", aspect: "9:16" },
+      model: {
+        provider: "google",
+        model: "veo-3.1-fast-generate-preview",
+        resolution: "720p",
+        aspect: "9:16",
+      },
     });
     expect(request.prompt).toContain(
       "white raised elements standing 1/8 in proud of the face",

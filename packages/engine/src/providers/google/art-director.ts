@@ -5,9 +5,9 @@ import type { ListingSlot } from "@/domain/recipe";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { VariantDirection } from "@/domain/variant-direction";
 import { getGenAI, hasGoogleKey } from "@/providers/google/client";
+import { GEMINI_TEXT_MODEL } from "@/providers/google/vision";
 import type { ArtDirector } from "@/providers/interfaces";
 import { fallbackVariants } from "@/providers/mock/art-director";
-import { MODELS } from "@/providers/models";
 
 function prompt(
   understanding: BaseUnderstanding,
@@ -83,7 +83,7 @@ export const googleArtDirector: ArtDirector = {
     const fallback = fallbackVariants(recipe, understanding, n);
     try {
       const res = await getGenAI().models.generateContent({
-        model: MODELS.google.vision,
+        model: GEMINI_TEXT_MODEL,
         contents: [{ text: prompt(understanding, brand, slots) }],
         config: {
           responseMimeType: "application/json",

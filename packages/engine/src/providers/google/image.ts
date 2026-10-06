@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { Modality, type Part } from "@google/genai";
+import { assertModel } from "@/domain/model-defaults";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { assertCapability, GOOGLE_CAPS } from "@/providers/capabilities";
 import { getGenAI, hasGoogleKey } from "@/providers/google/client";
 import type { ImageProvider } from "@/providers/interfaces";
-import { MODELS, resolveImageModel } from "@/providers/models";
 import {
   GenerationResult,
   type ImageComposeInput,
@@ -14,7 +14,7 @@ import {
 
 // Mock fallback when GOOGLE_API_KEY is absent (keeps the app + tests running
 // without credentials; the URL is a non-resolving stub the UI renders as a gradient).
-function mockResult(label: string): GenerationResult {
+function mockResult(label: string, model: string): GenerationResult {
   return GenerationResult.parse({
     assets: [
       {
@@ -24,7 +24,7 @@ function mockResult(label: string): GenerationResult {
       },
     ],
     provider: "google",
-    model: MODELS.google.image,
+    model,
   });
 }
 
@@ -52,7 +52,7 @@ export function aspectFor(aspect: string): string {
 // Call a Gemini image model, store the first returned image to object storage,
 // return a durable public URL. Image bytes are base64 inlineData parts. The
 // optional aspect pins the output frame (the model ignores it when absent).
-// `model` is the per-card choice, already vetted by resolveImageModel.
+// `model` is the per-card choice, already vetted against the catalog.
 async function runGemini(
   contents: string | Part[],
   model: string,
@@ -85,6 +85,10 @@ async function runGemini(
   throw new Error("Gemini returned no image");
 }
 
+// The model a request runs: refused (never swapped) when Kiln does not offer it.
+const modelOf = (input: { model: { model: string } }) =>
+  assertModel({ provider: "google", model: input.model.model }, "image").id;
+
 function editText(input: ImageEditInput): string {
   return input.negative
     ? `${input.prompt}\nAvoid: ${input.negative}`
@@ -96,13 +100,14 @@ export const googleImageProvider: ImageProvider = {
   capabilities: GOOGLE_CAPS,
   async generate(input: ImageGenInput) {
     assertCapability(this, "generate");
-    if (!hasGoogleKey()) return mockResult("generate");
-    const model = resolveImageModel("google", input.model.model);
+    const model = modelOf(input);
+    if (!hasGoogleKey()) return mockResult("generate", model);
     return runGemini(input.prompt, model, input.model.aspect);
   },
   async edit(input: ImageEditInput) {
     assertCapability(this, "edit", input.imageInputs.length);
-    if (!hasGoogleKey()) return mockResult("edit");
+    const model = modelOf(input);
+    if (!hasGoogleKey()) return mockResult("edit", model);
     const master = await fetchAsset(input.masterAssetUrl);
     const refs = await Promise.all(input.imageInputs.map((u) => fetchAsset(u)));
     const contents: Part[] = [
@@ -112,12 +117,12 @@ export const googleImageProvider: ImageProvider = {
         inlineData: { mimeType: r.mime, data: r.base64 },
       })),
     ];
-    const model = resolveImageModel("google", input.model.model);
     return runGemini(contents, model, input.model.aspect);
   },
   async compose(input: ImageComposeInput) {
     assertCapability(this, "compose", input.imageInputs.length);
-    if (!hasGoogleKey()) return mockResult("compose");
+    const model = modelOf(input);
+    if (!hasGoogleKey()) return mockResult("compose", model);
     const imgs = await Promise.all(input.imageInputs.map((u) => fetchAsset(u)));
     const contents: Part[] = [
       { text: input.prompt },
@@ -125,7 +130,6 @@ export const googleImageProvider: ImageProvider = {
         inlineData: { mimeType: i.mime, data: i.base64 },
       })),
     ];
-    const model = resolveImageModel("google", input.model.model);
     return runGemini(contents, model, input.model.aspect);
   },
 };

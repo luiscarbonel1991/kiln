@@ -34,8 +34,8 @@ describe("registry", () => {
     expect(getImageProvider(cardWith("google")).id).toBe("google");
   });
 
-  it("exposes video providers for both ids (Veo and Sora)", () => {
+  it("exposes Veo for video; OpenAI has none since Sora shut down", () => {
     expect(getVideoProvider("google")?.id).toBe("google");
-    expect(getVideoProvider("openai")?.id).toBe("openai");
+    expect(getVideoProvider("openai")).toBeUndefined();
   });
 });

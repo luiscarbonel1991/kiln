@@ -1,13 +1,12 @@
 "use client";
 
 import type { ModelConfig } from "@/domain/model-config";
-import { generationCatalog } from "@/domain/model-defaults";
+import { catalogFor, modelLabel } from "@/domain/model-defaults";
 
-// Per-card model picker — lists the exact models the generation policy allows
-// (OpenAI only, see model-defaults), grouped by provider, so the maker switches
-// by MODEL. Picking one applies provider + model together; a card still carrying
-// another id (a Google card made before the policy, an env override) stays
-// displayable and moves to the default on its next generation.
+// Per-card model picker — the catalog's models of both providers, grouped by
+// provider, so the maker switches by MODEL. Picking one applies provider +
+// model together; a card still on a model Kiln no longer offers (Sora) shows it
+// as its label until another is picked (the queue refuses it, never swaps it).
 // `kind` selects the catalog: image or video.
 export function ModelPicker({
   model,
@@ -18,8 +17,10 @@ export function ModelPicker({
   onEdit: (patch: Partial<ModelConfig>) => void;
   kind?: "image" | "video";
 }) {
-  const catalog = generationCatalog(kind);
-  const known = catalog.some((m) => m.id === model.model);
+  const catalog = catalogFor(kind);
+  const known = catalog.some(
+    (m) => m.provider === model.provider && m.id === model.model,
+  );
   const groups = [
     { label: "OpenAI", models: catalog.filter((m) => m.provider === "openai") },
     { label: "Google", models: catalog.filter((m) => m.provider === "google") },
@@ -44,7 +45,11 @@ export function ModelPicker({
             ))}
           </optgroup>
         ))}
-        {known ? null : <option value={model.model}>{model.model}</option>}
+        {known ? null : (
+          <option value={model.model} disabled>
+            {modelLabel(model)}
+          </option>
+        )}
       </select>
     </label>
   );

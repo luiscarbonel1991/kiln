@@ -17,19 +17,19 @@ const sampleInput: AnimateInput = {
 };
 
 describe("animateVideo", () => {
-  it("a video card saved on Google is animated on OpenAI (generation policy)", async () => {
+  it("animates a Veo card on Veo (mock without a key)", async () => {
     const result = await animateVideo(sampleInput);
-    expect(result.provider).toBe("openai");
+    expect(result.provider).toBe("google");
     expect(result.assets[0].mime).toBe("video/mp4");
   });
 
-  it("routes an openai card to the Sora provider (mock without a key)", async () => {
-    const result = await animateVideo({
-      ...sampleInput,
-      model: { ...sampleInput.model, provider: "openai", model: "sora-2" },
-    });
-    expect(result.provider).toBe("openai");
-    expect(result.assets[0].mime).toBe("video/mp4");
+  it("refuses Sora, which OpenAI shut down, instead of swapping it", async () => {
+    await expect(
+      animateVideo({
+        ...sampleInput,
+        model: { ...sampleInput.model, provider: "openai", model: "sora-2" },
+      }),
+    ).rejects.toThrow(/Sora 2 was shut down on 2026-09-24/);
   });
 
   it("rejects a payload missing the start frame", async () => {

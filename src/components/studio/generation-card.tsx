@@ -12,7 +12,6 @@ import { RenderCanvas } from "@/components/studio/render-canvas";
 import { assemblePrompt, type FieldKey } from "@/domain/cascade";
 import { estimateGeneration } from "@/domain/generation-cost";
 import type { MasterAsset } from "@/domain/master-asset";
-import { generationModel } from "@/domain/model-defaults";
 import { isActiveJob } from "@/domain/queue";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
@@ -113,10 +112,7 @@ export function GenerationCard({
     }
   }
 
-  const estimate = estimateGeneration(
-    generationModel(card.model, "image"),
-    card.model.aspect,
-  );
+  const estimate = estimateGeneration(card.model, card.model.aspect);
   const busyLabel =
     job?.status === "queued"
       ? job.attempt >= 1

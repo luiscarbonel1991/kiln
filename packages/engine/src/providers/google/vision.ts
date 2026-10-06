@@ -4,7 +4,9 @@ import { BaseUnderstanding } from "@/domain/understanding";
 import { fetchAsset } from "@/providers/asset-bytes";
 import { getGenAI, hasGoogleKey } from "@/providers/google/client";
 import type { VisionProvider } from "@/providers/interfaces";
-import { MODELS } from "@/providers/models";
+
+// The Gemini model vision and the art director run on.
+export const GEMINI_TEXT_MODEL = "gemini-3.5-flash";
 
 // Mock fallback when GOOGLE_API_KEY is absent (the original Phase 3 mock values).
 function mockUnderstanding(): BaseUnderstanding {
@@ -45,7 +47,7 @@ export const googleVisionProvider: VisionProvider = {
     try {
       const img = await fetchAsset(input.assetUrl);
       const res = await getGenAI().models.generateContent({
-        model: MODELS.google.vision,
+        model: GEMINI_TEXT_MODEL,
         contents: [
           {
             text: [

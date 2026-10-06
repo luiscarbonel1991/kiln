@@ -5,12 +5,6 @@ const EnvSchema = z.object({
   GOOGLE_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
 
-  // Optional model-id overrides (see src/providers/models.ts).
-  GOOGLE_IMAGE_MODEL: z.string().min(1).optional(),
-  GOOGLE_VISION_MODEL: z.string().min(1).optional(),
-  OPENAI_IMAGE_MODEL: z.string().min(1).optional(),
-  GOOGLE_VIDEO_MODEL: z.string().min(1).optional(),
-
   // Persistence — local Postgres (docker-compose). Optional so DB-free build/test
   // never throw; the repositories assert it at runtime.
   DATABASE_URL: z.string().url().optional(),

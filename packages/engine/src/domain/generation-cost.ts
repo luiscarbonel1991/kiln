@@ -1,6 +1,6 @@
 import {
+  DEFAULT_IMAGE_QUALITY,
   type ImageQuality,
-  OPENAI_IMAGE_QUALITY,
 } from "@/domain/model-defaults";
 
 // What a scene costs before anything is generated (ROADMAP principle 8, "cost
@@ -12,7 +12,7 @@ import {
 // - OpenAI: the output cost per image by quality and size from the image
 //   generation guide's cost table (https://developers.openai.com/api/docs/
 //   guides/image-generation, "Calculating costs"). Kiln pins the request
-//   quality (OPENAI_IMAGE_QUALITY), so the estimate reads that row. Measured
+//   quality (DEFAULT_IMAGE_QUALITY), so the estimate reads that row. Measured
 //   2026-10-04 on gpt-image-2 medium (6 live edits): exactly 1756 output tokens
 //   square and 1372 portrait every time ($0.0527 / $0.0412, the table's
 //   figures), so the output needs no margin once the quality is pinned ("auto"
@@ -54,11 +54,11 @@ const OPENAI_OUTPUT: Record<string, Record<ImageQuality, [number, number]>> = {
 };
 
 const openai = (model: string): ImagePrice => {
-  const [square, nonSquare] = OPENAI_OUTPUT[model][OPENAI_IMAGE_QUALITY];
+  const [square, nonSquare] = OPENAI_OUTPUT[model][DEFAULT_IMAGE_QUALITY];
   return {
     provider: "openai",
     model,
-    quality: OPENAI_IMAGE_QUALITY,
+    quality: DEFAULT_IMAGE_QUALITY,
     output: { square, nonSquare },
     input: { typical: 0.01, max: 0.02 },
     confidence: "official",
