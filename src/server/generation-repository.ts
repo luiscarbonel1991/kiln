@@ -18,8 +18,8 @@ import { assertDatabaseUrl, db } from "@/lib/db";
 // which is always recorded. A job pays for at most one call: "callStartedAt"
 // is stamped under the lease right before the paid request, and a job with it
 // set is never requeued; finished without a measured cost, it counts at its
-// estimate. A job whose batch was canceled never starts a call and is never
-// requeued. Money is in micro-dollars.
+// estimate. A job whose batch was canceled, or whose project was deleted,
+// never starts a call and is never requeued. Money is in micro-dollars.
 
 export type ProviderMode = "live" | "mock";
 
@@ -63,15 +63,20 @@ export interface Budget {
 
 const CENT_MICROS = 10_000;
 
-// A job that must not start again: its batch was canceled.
-const STOPPED = Prisma.sql`EXISTS (
-  SELECT 1 FROM "GenerationBatch" b
-  WHERE b."id" = j."batchId" AND b."canceledAt" IS NOT NULL)`;
+// A queue job that must not start again: its batch was canceled, or its
+// project deleted (the job outlives it with projectId NULL). Direct calls have
+// no batch and are never stopped.
+const STOPPED = Prisma.sql`(
+  (j."batchId" IS NOT NULL AND j."projectId" IS NULL)
+  OR EXISTS (
+    SELECT 1 FROM "GenerationBatch" b
+    WHERE b."id" = j."batchId" AND b."canceledAt" IS NOT NULL))`;
 
 type Tx = Prisma.TransactionClient;
 
 // What this calendar month (UTC) has spent on live generations, and what live
-// jobs in the queue have reserved (their recorded cost, else their estimate).
+// jobs in the queue have reserved (their recorded cost, else their estimate);
+// a queued job whose project is gone reserves nothing (it is never claimed).
 // A finished job counts its measured cost; without one, its estimate if its
 // paid call went out (the outcome is unknown), else nothing. One statement, so
 // a job moving to done mid-read is counted exactly once.
@@ -87,7 +92,8 @@ async function spend(
         THEN COALESCE("actualMicros", CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)
         ELSE 0 END), 0)::float8 AS "spent",
       COALESCE(SUM(CASE
-        WHEN "status" IN ('queued', 'running')
+        WHEN "status" = 'running'
+          OR ("status" = 'queued' AND "projectId" IS NOT NULL)
         THEN COALESCE("actualMicros", "estimateMicros")
         ELSE 0 END), 0)::float8 AS "reserved"
     FROM "GenerationJob"
@@ -135,14 +141,18 @@ export async function enqueueBatch(input: {
       WHERE "id" = ${projectId} AND "makerId" = ${makerId} FOR UPDATE`;
     if (!project) throw new Error("project not found");
     const plan = ProjectPlan.safeParse(project.plan);
-    if (plan.success) {
-      const allowed = new Set(sceneCardIds(plan.data));
-      if (input.jobs.some((j) => !allowed.has(j.cardId))) {
-        throw new QueueRefusal(
-          "not-in-plan",
-          "Only the scenes switched on in the plan can be generated.",
-        );
-      }
+    if (!plan.success) {
+      throw new QueueRefusal(
+        "not-in-plan",
+        "The project's plan could not be read, so nothing was queued.",
+      );
+    }
+    const allowed = new Set(sceneCardIds(plan.data));
+    if (input.jobs.some((j) => !allowed.has(j.cardId))) {
+      throw new QueueRefusal(
+        "not-in-plan",
+        "Only the scenes switched on in the plan can be generated.",
+      );
     }
     const busy = new Set(
       (
@@ -383,10 +393,11 @@ export async function failJob(
 // Jobs whose worker died (lease expired). One that died before its paid call
 // goes back to the queue under the retry rule, so a job that kills its process
 // every time is failed after its last attempt; one whose batch was canceled is
-// canceled instead. One that died during or after the call is never requeued —
+// canceled instead (so is one whose project is gone). One that died during or
+// after the call is never requeued —
 // it may have been charged: it fails, and counts at its estimate unless the
 // worker still records the real cost. The same sweep cancels queued jobs left
-// behind by a cancel. Returns how many expired jobs it closed or requeued.
+// behind by a cancel or a deleted project. Returns how many expired jobs it closed or requeued.
 export async function requeueExpired(mode: ProviderMode): Promise<number> {
   const [, expired] = await db.$transaction([
     db.$executeRaw`

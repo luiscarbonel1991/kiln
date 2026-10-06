@@ -30,8 +30,19 @@ describe.skipIf(!enabled)(
         strength: 0.65,
       },
     };
-    const job = (cardId: string, estimateMicros = 100_000) => ({
-      cardId,
+    // Every queued card is a scene slot of the project's plan ("q.<key>").
+    const KEYS = ["a", "b", "c", "d", "e", "f", "dup", "cx", "cy", "sx", "sy"];
+    const plan = {
+      destinations: [
+        {
+          destinationId: "q",
+          shotListId: "queue-test",
+          slots: KEYS.map((key) => ({ key, label: key, purpose: key })),
+        },
+      ],
+    };
+    const job = (key: string, estimateMicros = 100_000) => ({
+      cardId: `q.${key}`,
       request,
       estimateMicros,
     });
@@ -61,12 +72,12 @@ describe.skipIf(!enabled)(
           name: "Queue test",
           type: "listing-kit",
           phase: "generation",
-          plan: { destinations: [] },
+          plan,
         },
       });
       projectId = project.id;
       await db.card.createMany({
-        data: ["a", "b", "c", "d", "e", "f"].map(card),
+        data: ["a", "b", "c", "d", "e", "f"].map((k) => card(`q.${k}`)),
       });
     });
 
@@ -91,7 +102,7 @@ describe.skipIf(!enabled)(
         ...base(),
         jobs: [job("a"), job("b")],
       });
-      expect(second).toMatchObject({ queued: 1, skipped: ["a"] });
+      expect(second).toMatchObject({ queued: 1, skipped: ["q.a"] });
       await expect(
         repo.enqueueBatch({ ...base(), jobs: [job("b")] }),
       ).rejects.toMatchObject({ reason: "already-queued" });
@@ -127,7 +138,7 @@ describe.skipIf(!enabled)(
         jobs: [job("e", 5_000_000)],
       });
       const mock = await repo.claimJobs("mock", 10, 60);
-      expect(mock.map((j) => j.cardId)).toEqual(["e"]);
+      expect(mock.map((j) => j.cardId)).toEqual(["q.e"]);
       expect(
         await repo.completeJob(
           mock[0].id,
@@ -284,7 +295,7 @@ describe.skipIf(!enabled)(
         jobs: [job("cx", 1), job("cy", 1)],
       });
       const [running] = await repo.claimJobs(mode, 1, 60);
-      expect(running.cardId).toBe("cx");
+      expect(running.cardId).toBe("q.cx");
       // Only the queued job is canceled; the running one finishes.
       expect(await repo.cancelBatch(makerId, batchId)).toBe(1);
       expect(await repo.markCallStarted(running.id, running.leaseToken)).toBe(
@@ -315,7 +326,7 @@ describe.skipIf(!enabled)(
       await repo.cancelBatch(makerId, batchId);
       // A retry that slipped past the cancel, and a worker that died.
       await db.generationJob.updateMany({
-        where: { batchId, cardId: "sy" },
+        where: { batchId, cardId: "q.sy" },
         data: { status: "queued" },
       });
       await db.generationJob.update({
@@ -332,12 +343,12 @@ describe.skipIf(!enabled)(
 
     it("the polled state carries each card's latest job, the budget and a changing version", async () => {
       const before = await repo.projectGenerationState(makerId, projectId);
-      expect(before.jobs.f.status).toBe("canceled");
-      expect(before.cards.f.status).toBe("draft");
+      expect(before.jobs["q.f"].status).toBe("canceled");
+      expect(before.cards["q.f"].status).toBe("draft");
       expect(before.budget.capMicros).toBe(1_000_000);
       await repo.enqueueBatch({ ...base(), jobs: [job("f", 10_000)] });
       const after = await repo.projectGenerationState(makerId, projectId);
-      expect(after.jobs.f.status).toBe("queued");
+      expect(after.jobs["q.f"].status).toBe("queued");
       expect(after.batch?.queued).toBe(1);
       expect(after.version).not.toBe(before.version);
     });
@@ -356,7 +367,7 @@ describe.skipIf(!enabled)(
           data: {
             makerId,
             projectId,
-            cardId: "dup",
+            cardId: "q.dup",
             mode,
             status: "running",
             maxAttempts: 2,
@@ -365,7 +376,7 @@ describe.skipIf(!enabled)(
         }),
       ).rejects.toThrow();
       await db.generationJob.updateMany({
-        where: { makerId, cardId: "dup" },
+        where: { makerId, cardId: "q.dup" },
         data: { status: "canceled" },
       });
     });
@@ -422,6 +433,52 @@ describe.skipIf(!enabled)(
         await db.generationJob.deleteMany({ where: { makerId: solo.id } });
         await db.maker.delete({ where: { id: solo.id } });
       }
+    });
+
+    it("a plan that cannot be read refuses instead of letting every card through", async () => {
+      const broken = await db.project.create({
+        data: {
+          makerId,
+          name: "Broken plan",
+          type: "listing-kit",
+          phase: "generation",
+          plan: { destinations: [] },
+        },
+      });
+      await expect(
+        repo.enqueueBatch({
+          ...base(),
+          projectId: broken.id,
+          jobs: [job("a")],
+        }),
+      ).rejects.toMatchObject({ reason: "not-in-plan" });
+    });
+
+    it("a queued job whose project is gone reserves nothing, and the sweep cancels it", async () => {
+      const gone = await db.project.create({
+        data: {
+          makerId,
+          name: "Gone",
+          type: "listing-kit",
+          phase: "generation",
+          plan,
+        },
+      });
+      const before = (await repo.budget(makerId)).reservedMicros;
+      const { batchId } = await repo.enqueueBatch({
+        ...base(),
+        projectId: gone.id,
+        jobs: [job("b", 30_000)],
+      });
+      expect((await repo.budget(makerId)).reservedMicros).toBe(before + 30_000);
+      // The project goes without the delete path (a crash, a manual delete).
+      await db.project.delete({ where: { id: gone.id } });
+      expect((await repo.budget(makerId)).reservedMicros).toBe(before);
+      await repo.requeueExpired("live");
+      const orphan = await db.generationJob.findFirstOrThrow({
+        where: { batchId },
+      });
+      expect(orphan.status).toBe("canceled");
     });
 
     it("deleting the project keeps the month's spend", async () => {

@@ -282,6 +282,12 @@ export async function deleteProject(id: string): Promise<void> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
+    // The project row first (enqueueBatch locks it too): a concurrent enqueue
+    // waits, then finds the project gone, so no job is queued for it after
+    // the cancel below.
+    await tx.$queryRaw`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${id} AND "makerId" = ${maker.id} FOR UPDATE`;
     const now = new Date();
     await tx.generationJob.updateMany({
       where: { projectId: id, makerId: maker.id, status: "queued" },

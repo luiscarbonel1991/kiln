@@ -347,7 +347,50 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       data: { status: "queued" },
     });
     expect(await queueRepo.claimJobs(mode, 10, 60)).toEqual([]);
+    // The in-flight job's retry is canceled, and the sweep cancels the orphan.
+    await queueRepo.failJob(inFlight.id, inFlight.leaseToken, "503", {
+      retry: true,
+      mayBeCharged: false,
+    });
+    await queueRepo.requeueExpired(mode);
+    const closed = await db.generationJob.findMany({ where: { batchId } });
+    expect(closed.map((j) => j.status)).toEqual(["canceled", "canceled"]);
     await db.generationBatch.delete({ where: { id: batchId } });
+  });
+
+  it("a delete racing an enqueue leaves no job queued for the deleted project", async () => {
+    const { estimateProjectCards } = await import("@/server/generation-queue");
+    const queueRepo = await import("@/server/generation-repository");
+    const { getCurrentMaker } = await import("@/server/maker-repository");
+    const [saved] = await upsertProducts([product]);
+    const id = await repo.createProject({
+      type: "launch",
+      productId: saved.id,
+      plan,
+      editor,
+    });
+    created.push(id);
+    const maker = await getCurrentMaker();
+    const { cards, model } = await estimateProjectCards(id, ["etsy.hero"]);
+    const mode = "delete-race" as never;
+    await Promise.allSettled([
+      queueRepo.enqueueBatch({
+        makerId: maker.id,
+        projectId: id,
+        mode,
+        model,
+        jobs: cards.map((c) => ({
+          cardId: c.cardId,
+          request: c.request,
+          estimateMicros: c.maxMicros,
+        })),
+      }),
+      repo.deleteProject(id),
+    ]);
+    expect(await db.project.findUnique({ where: { id } })).toBeNull();
+    const left = await db.generationJob.findMany({ where: { mode } });
+    expect(left.every((j) => j.status === "canceled")).toBe(true);
+    await db.generationBatch.deleteMany({ where: { mode } });
   });
 
   it("a slot switched off is never queued, and a queued scene cannot be switched off", async () => {
