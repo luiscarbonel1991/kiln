@@ -71,16 +71,64 @@ KILN_DB_TESTS=1 DATABASE_URL=postgresql://kiln:kiln@localhost:5444/kiln_test pnp
   pnpm db:deploy
   ```
 
+## Models and providers
+
+Kiln generates with several models from two providers, OpenAI and Google:
+
+| Kind | Models |
+| --- | --- |
+| Images | gpt-image-2, gpt-image-1.5, gpt-image-1-mini (the last two retire 2026-12-01), Gemini 3 Pro Image, Gemini 3.1 Flash Image, Gemini 3.1 Flash-Lite Image |
+| Video | Veo 3.1, Veo 3.1 Fast, Veo 3.1 Lite (4, 6 or 8 s at 720p; 8 s at 1080p) |
+| Text (vision, art direction) | GPT-6.1 Sol, GPT-6 Luna, Gemini 3.5 Flash, Gemini 3.8 Flash |
+
+The catalog is `packages/engine/src/domain/model-defaults.ts`. Each model's
+pinned price, with its date and source, is in `generation-cost.ts`. A model
+without a price cannot be queued. OpenAI shut Sora down on 2026-09-24; its old
+outputs keep their label.
+
+Settings → Models (`/settings`) holds the maker's default per kind. The
+defaults are images on gpt-image-2 medium, video on Veo 3.1 Fast 720p, and text
+on GPT-6.1 Sol. Every board slot and editor card can pick its own model, and
+every generation names its model and price before it is paid.
+
+Kiln never switches provider on its own:
+
+- A retired or unknown model is refused with the reason.
+- A live job whose provider has no key is refused.
+- When vision or the art director cannot run, the studio says so and offers
+  the other provider, with its price, on a click.
+
+Settings → Providers shows each key and the provider's last calls (the last
+error, the last call that worked). It reads them from the job ledger, so it
+costs nothing.
+
+Keys: `OPENAI_API_KEY` and `GOOGLE_API_KEY` (`.env`). Tests drop both before
+any test runs (`vitest.setup.ts`), so a test never makes a paid call.
+
 ## Generation queue
 
 Planned projects generate in the background: the board's "Generate N scenes"
-(one confirmation with the estimate and the month's budget), the slot
-editor's Generate and a video slot's "Generate video" all queue jobs that a
-worker in the server process runs (started from `src/instrumentation.ts`).
-Every paid call counts against the maker's monthly cap
-(`Maker.monthlyCapCents`, $25 by default). A video animates a scene the maker
-approved (Sora, priced by the second: 8 s = $0.80); its prompt comes from the
-product's spec, and a render is never paid twice.
+(one confirmation listing each card's model and price, the total and the
+month's budget), the slot editor's Generate and a video slot's "Generate
+video" all queue jobs that a worker in the server process runs (started from
+`src/instrumentation.ts`). Every paid call counts against the maker's monthly
+cap (`Maker.monthlyCapCents`, $25 by default), one cap for both providers;
+vision and art direction count too. A video animates a scene the maker
+approved (Veo, priced by the second: 8 s on Veo 3.1 Fast 720p = $0.80); its
+prompt comes from the product's spec. The same rules hold on both providers:
+
+- The paid call is marked right before it goes out and is never retried by
+  the SDK.
+- An answered error (4xx), or a clip Google's safety filter blocked, costs
+  nothing.
+- A timeout or a failed render counts at its estimate.
+- A render is never paid twice.
+
+**Restart the dev server after changes to the worker or the queue.** The
+worker is a `globalThis` singleton started once from `src/instrumentation.ts`,
+so HMR never reloads it: it keeps running the code it started with. The same
+goes after a migration plus `prisma generate`, because a running server keeps
+the Prisma client it loaded (a new column reads as "Unknown field").
 
 ```bash
 pnpm db:mock:setup   # once (and after new migrations): the mock database

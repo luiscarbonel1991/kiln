@@ -17,9 +17,16 @@ function sources(dir: string): string[] {
     if (statSync(path).isDirectory()) {
       return name === "__tests__" ? [] : sources(path);
     }
-    return path.endsWith(".ts") ? [path] : [];
+    return path.endsWith(".ts") || path.endsWith(".tsx") ? [path] : [];
   });
 }
+
+// A provider SDK is imported only inside its own adapter folder (CLAUDE.md:
+// "never import an SDK outside its adapter"), in the engine and in the app.
+const SDK = [
+  { from: /from "openai(\/[^"]*)?"/, home: "providers/openai/" },
+  { from: /from "@google\/genai"/, home: "providers/google/" },
+];
 
 describe("engine boundaries", () => {
   it("no engine source names a maker, signs and their formats, acrylic or laser work", () => {
@@ -33,5 +40,17 @@ describe("engine boundaries", () => {
         .map(({ at, line }) => `${at} ${line.trim()}`),
     );
     expect(leaks).toEqual([]);
+  });
+
+  it("a provider SDK is imported only inside its adapter", () => {
+    const app = join(root, "..", "..", "..", "src");
+    const files = [...sources(root), ...sources(app)];
+    const strays = files.flatMap((path) => {
+      const text = readFileSync(path, "utf8");
+      return SDK.filter(
+        (sdk) => sdk.from.test(text) && !path.includes(sdk.home),
+      ).map(() => relative(join(root, "..", "..", ".."), path));
+    });
+    expect(strays).toEqual([]);
   });
 });
