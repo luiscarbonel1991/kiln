@@ -7,7 +7,7 @@ import { type ProjectPlan, slotCardId, slotRecipeId } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import type { ProjectType } from "@/domain/project";
-import { sceneVariants } from "@/domain/scene-direction";
+import { sceneCues, sceneVariants } from "@/domain/scene-direction";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { projectTypeLabel } from "@/lib/project-types";
@@ -52,7 +52,7 @@ export function slotCards(
   plan: ProjectPlan,
   master: MasterAsset,
   understanding: BaseUnderstanding,
-  useContexts: string[],
+  product: Product,
 ): Card[] {
   return plan.destinations.flatMap((d) => {
     const recipe = findRecipe(slotRecipeId(d.shotListId, d.destinationId));
@@ -68,7 +68,8 @@ export function slotCards(
             scenes,
             recipe.fieldDefaults,
             understanding,
-            useContexts,
+            product.useContexts,
+            sceneCues(product),
           );
     const slotRecipe = {
       ...recipe,
@@ -108,8 +109,6 @@ export function startEditorState(input: {
     understanding,
     recipeId: slotRecipeId(first.shotListId, first.destinationId),
     planning: null,
-    cards: master
-      ? slotCards(plan, master, understanding, product.useContexts)
-      : [],
+    cards: master ? slotCards(plan, master, understanding, product) : [],
   };
 }

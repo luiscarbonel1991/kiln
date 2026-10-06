@@ -63,12 +63,7 @@ describe("findRecipe for planned slots", () => {
 });
 
 describe("slotCards", () => {
-  const cards = slotCards(
-    plan,
-    master,
-    productUnderstanding(board),
-    board.useContexts,
-  );
+  const cards = slotCards(plan, master, productUnderstanding(board), board);
   const scene = (id: string) =>
     cards.find((c) => c.id === id)?.fields.scene.value ?? "";
 
@@ -99,9 +94,10 @@ describe("slotCards", () => {
   });
 
   it("the hook keeps the design in view, whatever its place of use holds", () => {
-    const coaster = slotCards(plan, master, productUnderstanding(board), [
-      "a coffee table, under a steaming mug",
-    ]);
+    const coaster = slotCards(plan, master, productUnderstanding(board), {
+      ...board,
+      useContexts: ["a coffee table, under a steaming mug"],
+    });
     const hook = coaster.find((c) => c.id === "instagram.hook");
     expect(hook?.fields.scene.value).toContain("under a steaming mug");
     expect(hook?.fields.scene.value).toContain(
@@ -126,6 +122,24 @@ describe("slotCards", () => {
     ).toBeGreaterThan(1);
   });
 
+  it("scenes in a place of use keep the product's real size, readable, standing out", () => {
+    const inUse = cards.find((c) => c.id === "etsy.in-use");
+    const composition = inUse?.fields.composition.value ?? "";
+    expect(composition).toContain(
+      "the product true to its real size (16 x 10 in, larger than a letter sheet) against every object around it",
+    );
+    expect(composition).toContain("at least a quarter of the frame's width");
+    // Maple is a light face.
+    expect(composition).toContain(
+      "its light face set against a darker background",
+    );
+    // The studio shots (hero, detail) are not set in a place: no cues.
+    for (const id of ["etsy.hero", "etsy.detail"]) {
+      const c = cards.find((card) => card.id === id);
+      expect(c?.fields.composition.value).not.toContain("real size");
+    }
+  });
+
   it("follows the plan's own slots, even when the shot list has changed since", () => {
     const etsy = plan.destinations[0];
     const edited = {
@@ -144,7 +158,10 @@ describe("slotCards", () => {
         },
       ],
     };
-    const built = slotCards(edited, master, productUnderstanding(board), []);
+    const built = slotCards(edited, master, productUnderstanding(board), {
+      ...board,
+      useContexts: [],
+    });
     expect(built.map((c) => c.id)).toContain("etsy.retired");
     expect(built.map((c) => c.id)).not.toContain("etsy.gift");
     expect(built.find((c) => c.id === "etsy.retired")?.direction).toBe(

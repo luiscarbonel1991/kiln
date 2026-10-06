@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   GENERIC_USE,
   inSentence,
+  sceneCues,
   sceneVariants,
 } from "@/domain/scene-direction";
 import type { BaseUnderstanding } from "@/domain/understanding";
+import { CUTTING_BOARD } from "./fixtures/cutting-board";
 
 const understanding: BaseUnderstanding = {
   subject: "a coaster",
@@ -87,5 +89,39 @@ describe("sceneVariants", () => {
 describe("inSentence", () => {
   it("lowers only the first letter and drops the final period", () => {
     expect(inSentence("Show it on Etsy.")).toBe("show it on Etsy");
+  });
+});
+
+describe("sceneCues", () => {
+  it("compares the product with the nearest everyday object and picks the background by its face", () => {
+    const small = {
+      ...CUTTING_BOARD,
+      dimensions: { w: 5, h: 3, unit: "in" as const },
+      colours: [{ key: "k", name: "Black", face: "#1A1A1A", inStock: true }],
+      defaultColour: "k",
+    };
+    const [size, legible, contrast] = sceneCues(small);
+    expect(size).toBe(
+      "the product true to its real size (5 x 3 in, about the size of a phone) against every object around it",
+    );
+    expect(legible).toContain("text and design to read clearly");
+    expect(contrast).toBe(
+      "its dark face set against a lighter background, so it stands out",
+    );
+  });
+
+  it("only scenes set in a place of use carry them", () => {
+    const [studio, inPlace] = sceneVariants(
+      [
+        { label: "Hero", purpose: "hero", scene: "a seamless sweep" },
+        { label: "In use", purpose: "in use", scene: "in use at {use}" },
+      ],
+      { composition: "centered" },
+      understanding,
+      ["a kitchen counter"],
+      ["cue one", "cue two"],
+    );
+    expect(studio.composition).toBe("centered");
+    expect(inPlace.composition).toBe("centered; cue one; cue two");
   });
 });
