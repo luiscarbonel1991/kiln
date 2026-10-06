@@ -7,8 +7,10 @@ import type {
   ProjectSummary,
 } from "@/domain/persisted-project";
 import {
+  addVideoSlot,
   approveSlot,
   moveSlot,
+  type PlanSlot,
   ProjectPlan,
   type SlotMove,
   type SlotRef,
@@ -16,10 +18,14 @@ import {
   unapproveSlot,
   withDelivered,
   withSlotOff,
+  withVideoChoice,
 } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
 import { ACTIVE_JOB_STATUSES } from "@/domain/queue";
+import type { ShotList } from "@/domain/shot-list";
+import { BaseUnderstanding } from "@/domain/understanding";
+import type { VideoChoice } from "@/domain/video";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
@@ -497,6 +503,97 @@ export async function setSlotOff(
       data: {
         plan: withSlotOff(plan, ref, off) as unknown as Prisma.InputJsonValue,
       },
+    });
+  });
+}
+
+// Change a video slot's choices (start frame, motion, length, orientation).
+// Locked like approvals.
+export async function setVideoChoice(
+  projectId: string,
+  ref: SlotRef,
+  choice: VideoChoice,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true },
+    });
+    const plan = ProjectPlan.parse(project.plan);
+    await tx.project.update({
+      where: { id: projectId },
+      data: {
+        plan: withVideoChoice(
+          plan,
+          ref,
+          choice,
+        ) as unknown as Prisma.InputJsonValue,
+      },
+    });
+  });
+}
+
+// Give a plan made before video its destination's video slot and the slot's
+// card (built by `makeCard` from the project's reference and understanding).
+// Locked like approvals; refused without a reference image.
+export async function addVideoToPlan(
+  projectId: string,
+  destinationId: string,
+  shotLists: ShotList[],
+  makeCard: (
+    slot: PlanSlot,
+    shotListId: string,
+    master: MasterAsset,
+    understanding: BaseUnderstanding,
+  ) => Card,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true, understanding: true, master: true },
+    });
+    const plan = ProjectPlan.parse(project.plan);
+    const added = addVideoSlot(plan, destinationId, shotLists);
+    if (!added) throw new Error("This destination already has its video.");
+    const understanding = BaseUnderstanding.safeParse(project.understanding);
+    if (!project.master || !understanding.success) {
+      throw new Error("Add the product's reference image first.");
+    }
+    const destination = plan.destinations.find(
+      (d) => d.destinationId === destinationId,
+    );
+    const card = makeCard(
+      added.slot,
+      destination?.shotListId ?? "",
+      {
+        id: project.master.assetId,
+        origin: project.master.origin as MasterAsset["origin"],
+        sourcePrompt: project.master.sourcePrompt,
+        assetUrl: project.master.assetUrl,
+        mime: project.master.mime,
+      },
+      understanding.data,
+    );
+    const sortOrder = await tx.card.count({ where: { projectId } });
+    const [row] = cardData(projectId, cardsToRows([card]));
+    await tx.card.create({ data: { ...row, sortOrder } });
+    await tx.project.update({
+      where: { id: projectId },
+      data: { plan: added.plan as unknown as Prisma.InputJsonValue },
     });
   });
 }

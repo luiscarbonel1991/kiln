@@ -9,14 +9,18 @@ import {
 } from "@/components/studio/constants";
 import { SlotMove } from "@/domain/plan";
 import { productUnderstanding } from "@/domain/product-understanding";
-import { slotCards } from "@/lib/project-start";
+import { VideoChoice } from "@/domain/video";
+import { slotCards, videoSlotCard } from "@/lib/project-start";
+import { CATALOG } from "@/lib/recipes";
 import { getStorageProvider } from "@/providers/registry";
 import {
+  addVideoToPlan,
   loadProjectBoard,
   setProjectReference,
   setSlotApproval,
   setSlotOff,
   setSlotOrder,
+  setVideoChoice,
 } from "@/server/project-repository";
 
 // Board mutations. Server Functions are POST-reachable: Zod is the trust
@@ -114,4 +118,43 @@ export async function moveSlotAction(input: z.infer<typeof Move>) {
   const { projectId, destinationId, slotKey, move } = Move.parse(input);
   await setSlotOrder(projectId, { destinationId, slotKey }, move);
   refresh();
+}
+
+const Video = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  slotKey: z.string().min(1),
+  choice: VideoChoice,
+});
+
+// Change a video slot's start frame, motion, length or orientation.
+export async function setVideoChoiceAction(input: z.infer<typeof Video>) {
+  const { projectId, destinationId, slotKey, choice } = Video.parse(input);
+  await setVideoChoice(projectId, { destinationId, slotKey }, choice);
+  refresh();
+}
+
+const AddVideo = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+});
+
+// Give a project made before video its destination's video slot.
+export async function addVideoAction(
+  input: z.infer<typeof AddVideo>,
+): Promise<{ error?: string }> {
+  const { projectId, destinationId } = AddVideo.parse(input);
+  try {
+    await addVideoToPlan(
+      projectId,
+      destinationId,
+      CATALOG.shotLists,
+      (slot, shotListId, master, understanding) =>
+        videoSlotCard(destinationId, shotListId, slot, master, understanding),
+    );
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+  refresh();
+  return {};
 }

@@ -359,15 +359,22 @@ export function NewProjectFlow({
                     {d.slots.map((slot, i) => {
                       const id = slotCardId(d.destinationId, slot.key);
                       const isOff = off.includes(id);
+                      // A video takes no photo number.
                       const place = onIndexes(
-                        d.slots.map((s) =>
-                          off.includes(slotCardId(d.destinationId, s.key)),
+                        d.slots.map(
+                          (s) =>
+                            s.fill === "video" ||
+                            off.includes(slotCardId(d.destinationId, s.key)),
                         ),
                       )[i];
                       return (
                         <SlotFrame
                           key={slot.key}
-                          position={slotPosition(destination, place)}
+                          position={
+                            slot.fill === "video"
+                              ? `${destination.name} video`
+                              : slotPosition(destination, place)
+                          }
                           label={slot.label}
                           purpose={slot.purpose}
                           aspect={slot.aspect}

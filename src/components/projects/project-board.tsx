@@ -20,6 +20,11 @@ import {
   SlotGrid,
   slotPosition,
 } from "@/components/projects/slot-frame";
+import { VideoArt } from "@/components/projects/video-art";
+import {
+  AddVideoButton,
+  VideoControls,
+} from "@/components/projects/video-controls";
 import type { BrandKit } from "@/domain/brand";
 import type { Card } from "@/domain/card";
 import {
@@ -27,16 +32,21 @@ import {
   renderTextTemplate,
   textLayerColours,
 } from "@/domain/exact";
+import { fromMicros } from "@/domain/generation-cost";
 import {
+  addVideoSlot,
   deliveryBlockers,
   type PlanSlot,
   type ProjectPlan,
   type SlotView,
   slotCardId,
   slotState,
+  type VideoSettings,
+  videoSettings,
 } from "@/domain/plan";
 import { dimensionsLabel, type Product } from "@/domain/product";
 import type { JobView } from "@/domain/queue";
+import { VIDEO_MOTIONS } from "@/domain/video";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { plateHref } from "@/lib/plate-href";
 import { projectTypeLabel } from "@/lib/project-types";
@@ -88,6 +98,8 @@ export function waitingCardIds(rows: ReturnType<typeof boardRows>): string[] {
     )
     .map((s) => s.cardId);
 }
+
+const money = (micros: number) => `$${fromMicros(micros).toFixed(2)}`;
 
 // Why a destination cannot be exported yet, in a line; null when it can.
 function deliveryBlocker(
@@ -166,8 +178,25 @@ export function ProjectBoard({
               </p>
             );
           }
-          const places = onIndexes(slots.map((s) => s.slot.off === true));
+          // A video is not a photo: it takes no photo number and never moves.
+          const places = onIndexes(
+            slots.map((s) => s.slot.off === true || s.slot.fill === "video"),
+          );
           const last = places.filter((p) => p !== null).length - 1;
+          const approvedScenes = slots
+            .filter(
+              (s) =>
+                s.slot.fill === "scene" && !s.slot.off && s.slot.approvedOutput,
+            )
+            .map((s) => ({ key: s.slot.key, label: s.slot.label }));
+          const canAddVideo =
+            board.master !== null &&
+            addVideoSlot(board.plan, plan.destinationId, CATALOG.shotLists) !==
+              null;
+          const budgetLine =
+            mode === "mock"
+              ? "mock mode, not counted"
+              : `${money(generation.budget.spentMicros + generation.budget.reservedMicros)} of ${money(generation.budget.capMicros)} used`;
           return (
             <section key={plan.destinationId} className="flex flex-col gap-3">
               <h2 className="flex items-baseline gap-3">
@@ -182,64 +211,108 @@ export function ProjectBoard({
                     : ""}{" "}
                   · {destination.formats.map((f) => f.aspect).join(" / ")}
                 </span>
+                {canAddVideo ? (
+                  <AddVideoButton
+                    projectId={projectId}
+                    destinationId={plan.destinationId}
+                  />
+                ) : null}
               </h2>
               <SlotGrid>
-                {slots.map(({ slot, cardId, card, view }, i) => (
-                  <SlotFrame
-                    key={slot.key}
-                    position={slotPosition(destination, places[i])}
-                    label={slot.label}
-                    purpose={slot.purpose}
-                    aspect={slot.aspect}
-                    view={view}
-                    actions={
-                      <SlotActions
-                        projectId={projectId}
-                        destinationId={plan.destinationId}
-                        slot={slot}
-                        cardId={cardId}
-                        view={view}
-                        hasReference={board.master !== null}
-                        order={
-                          places[i] === null
-                            ? null
-                            : {
-                                place: places[i] ?? 0,
-                                last,
-                                firstLabel:
-                                  destination.kind === "sale"
-                                    ? "Make photo 1"
-                                    : "Make slide 1",
-                              }
-                        }
-                      />
-                    }
-                  >
-                    {slot.exact ? (
-                      <ExactSlotArt
-                        view={exactView(
-                          slot.exact,
-                          product,
-                          slot.textTemplate,
-                          brand,
-                        )}
-                        aspect={slot.aspect}
-                        plate={plateHref(product)}
-                      />
-                    ) : (
-                      <SceneArt
-                        seed={cardId}
-                        output={card?.outputs[0]}
-                        text={
-                          slot.textTemplate
-                            ? renderTextTemplate(slot.textTemplate, product)
-                            : undefined
-                        }
-                        band={textLayerColours(brand)}
-                      />
-                    )}
-                  </SlotFrame>
-                ))}
+                {slots.map(({ slot, cardId, card, view }, i) => {
+                  const video =
+                    slot.fill === "video"
+                      ? videoSettings(plan, slot, destination.video)
+                      : null;
+                  return (
+                    <SlotFrame
+                      key={slot.key}
+                      position={
+                        video
+                          ? `${destination.name} video`
+                          : slotPosition(destination, places[i])
+                      }
+                      label={slot.label}
+                      purpose={slot.purpose}
+                      aspect={
+                        video
+                          ? video.orientation === "landscape"
+                            ? "16:9"
+                            : "9:16"
+                          : slot.aspect
+                      }
+                      view={view}
+                      actions={
+                        <SlotActions
+                          projectId={projectId}
+                          destinationId={plan.destinationId}
+                          slot={slot}
+                          cardId={cardId}
+                          view={view}
+                          hasReference={board.master !== null}
+                          video={
+                            video && card
+                              ? {
+                                  settings: video,
+                                  scenes: approvedScenes,
+                                  model: card.model.model,
+                                  rendered: card.outputs.length > 0,
+                                  budgetLine,
+                                }
+                              : null
+                          }
+                          order={
+                            places[i] === null
+                              ? null
+                              : {
+                                  place: places[i] ?? 0,
+                                  last,
+                                  firstLabel:
+                                    destination.kind === "sale"
+                                      ? "Make photo 1"
+                                      : "Make slide 1",
+                                }
+                          }
+                        />
+                      }
+                    >
+                      {video ? (
+                        <VideoArt
+                          seed={cardId}
+                          output={card?.outputs[0]}
+                          startFrame={video.startFrame}
+                          caption={
+                            video.startFrame
+                              ? `${VIDEO_MOTIONS[video.motion].label} · ${video.seconds} s`
+                              : "Approve a scene to animate"
+                          }
+                        />
+                      ) : slot.exact ? (
+                        <ExactSlotArt
+                          view={exactView(
+                            slot.exact,
+                            product,
+                            slot.textTemplate,
+                            brand,
+                          )}
+                          aspect={slot.aspect}
+                          plate={plateHref(product)}
+                        />
+                      ) : (
+                        <SceneArt
+                          seed={cardId}
+                          output={card?.outputs[0]}
+                          text={
+                            slot.textTemplate
+                              ? renderTextTemplate(slot.textTemplate, product)
+                              : undefined
+                          }
+                          band={textLayerColours(brand)}
+                        />
+                      )}
+                    </SlotFrame>
+                  );
+                })}
               </SlotGrid>
             </section>
           );
@@ -364,6 +437,7 @@ function SlotActions({
   view,
   hasReference,
   order,
+  video,
 }: {
   projectId: string;
   destinationId: string;
@@ -372,6 +446,13 @@ function SlotActions({
   view: SlotView;
   hasReference: boolean;
   order: { place: number; last: number; firstLabel: string } | null;
+  video: {
+    settings: VideoSettings;
+    scenes: { key: string; label: string }[];
+    model: string;
+    rendered: boolean;
+    budgetLine: string;
+  } | null;
 }) {
   const toggle = (
     <SlotSwitch
@@ -390,6 +471,39 @@ function SlotActions({
     />
   ) : null;
   if (view.state === "off") return toggle;
+  if (slot.fill === "video") {
+    return (
+      <div className="flex flex-col gap-2">
+        {view.state === "to-review" || view.state === "approved" ? (
+          <ApproveButton
+            projectId={projectId}
+            destinationId={destinationId}
+            slotKey={slot.key}
+            approved={view.state === "approved"}
+          />
+        ) : null}
+        {video ? (
+          <VideoControls
+            projectId={projectId}
+            destinationId={destinationId}
+            slotKey={slot.key}
+            cardId={cardId}
+            model={video.model}
+            settings={video.settings}
+            scenes={video.scenes}
+            busy={view.inBatch === true || view.state === "generating"}
+            rendered={video.rendered}
+            budgetLine={video.budgetLine}
+          />
+        ) : (
+          <span className="font-mono text-[0.6rem] text-on-surface-dim">
+            needs a reference image
+          </span>
+        )}
+        {view.inBatch ? null : toggle}
+      </div>
+    );
+  }
   if (slot.fill === "exact") {
     return (
       <div className="flex flex-wrap items-center gap-2">

@@ -215,7 +215,7 @@ export function GenerationCard({
         canPromote={!projectMode}
         disabledReason={
           projectMode && card.type === "video"
-            ? "Video is not in the queue yet."
+            ? "The video is made on the board, from an approved scene."
             : undefined
         }
       />

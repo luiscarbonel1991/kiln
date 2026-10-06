@@ -579,6 +579,45 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     ).rejects.toMatchObject({ reason: "not-in-plan" });
   });
 
+  it("a project made before video gets its video slot and card, once; its choices persist", async () => {
+    const { CATALOG } = await import("@/lib/recipes");
+    const { videoSlotCard } = await import("@/lib/project-start");
+    const [saved] = await upsertProducts([product]);
+    const id = await repo.createProject({
+      type: "launch",
+      productId: saved.id,
+      plan,
+      editor,
+    });
+    created.push(id);
+    const add = () =>
+      repo.addVideoToPlan(
+        id,
+        "etsy",
+        CATALOG.shotLists,
+        (slot, shotListId, m, understanding) =>
+          videoSlotCard("etsy", shotListId, slot, m, understanding),
+      );
+    await add();
+    const loaded = await repo.loadProjectBoard(id);
+    const slots = loaded?.board.plan?.destinations[0].slots ?? [];
+    expect(slots.at(-1)).toMatchObject({ key: "video", fill: "video" });
+    const video = loaded?.board.cards.find((c) => c.id === "etsy.video");
+    expect(video).toMatchObject({ type: "video", status: "draft" });
+    await expect(add()).rejects.toThrow("already has its video");
+
+    await repo.setVideoChoice(
+      id,
+      { destinationId: "etsy", slotKey: "video" },
+      { motion: "pan", seconds: 12 },
+    );
+    const after = await repo.loadProjectBoard(id);
+    expect(after?.board.plan?.destinations[0].slots.at(-1)?.video).toEqual({
+      motion: "pan",
+      seconds: 12,
+    });
+  });
+
   it("the batch estimate names every model its cards run", async () => {
     const { estimateProjectCards } = await import("@/server/generation-queue");
     const [saved] = await upsertProducts([product]);
