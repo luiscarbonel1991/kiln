@@ -9,7 +9,7 @@ import {
   videoCost,
 } from "@/domain/generation-cost";
 import type { ImageQuality, VideoResolution } from "@/domain/model-defaults";
-import { errorMessage, hadResponse } from "@/domain/queue";
+import { describeProviderError, hadResponse } from "@/domain/queue";
 import { hasDatabase } from "@/lib/db";
 import type { TextResult } from "@/providers/interfaces";
 import { providerMode } from "@/providers/mode";
@@ -125,7 +125,10 @@ export async function withDirectSpend<T extends { usage?: unknown }>(
     });
   } catch (error) {
     await closeDirectCall(id, {
-      error: errorMessage(error),
+      error:
+        priced.provider === "google" || priced.provider === "openai"
+          ? describeProviderError(priced.provider, error)
+          : String(error),
       mayBeCharged: callStarted && !hadResponse(error),
     }).catch((e) => console.warn("[kiln spend] could not close a call", e));
     throw error;

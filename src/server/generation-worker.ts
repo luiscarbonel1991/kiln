@@ -91,11 +91,14 @@ async function storeWithRetries(
 
 // The job lost its lease, its project was deleted or its batch canceled
 // before the paid call: nothing was spent, and there is nothing to retry.
+// Failures that are Kiln's, not a provider's (provider health skips them).
+export const CAP_REACHED = "This month's spending cap was reached.";
+export const NOT_STARTED =
+  "The job was canceled, or lost its lease or its project, before the paid call; nothing was spent.";
+
 class CallNotStarted extends Error {
   constructor() {
-    super(
-      "The job was canceled, or lost its lease or its project, before the paid call; nothing was spent.",
-    );
+    super(NOT_STARTED);
     this.name = "CallNotStarted";
   }
 }
@@ -211,12 +214,10 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
   }, deps.renewMs);
   try {
     if (deps.mode === "live" && (await deps.overCap(job.makerId))) {
-      await deps.failJob(
-        job.id,
-        job.leaseToken,
-        "This month's spending cap was reached.",
-        { retry: false, mayBeCharged: false },
-      );
+      await deps.failJob(job.id, job.leaseToken, CAP_REACHED, {
+        retry: false,
+        mayBeCharged: false,
+      });
       return;
     }
     const request = GenerationRequest.parse(job.request);
