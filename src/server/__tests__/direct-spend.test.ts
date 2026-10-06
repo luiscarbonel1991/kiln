@@ -62,6 +62,20 @@ describe("direct spend", () => {
     expect(call).not.toHaveBeenCalled();
   });
 
+  it("an image model without a pinned price reserves nothing (never $0)", async () => {
+    await expect(
+      withDirectSpend(
+        imageCall({ provider: "openai", model: "gpt-image-0" }, "1:1"),
+        vi.fn(),
+      ),
+    ).rejects.toThrow("No pinned price for gpt-image-0");
+    expect(reserveDirectCall).not.toHaveBeenCalled();
+    expect(
+      imageCall({ provider: "openai", model: "gpt-image-2" }, "4:5")
+        .estimateMax,
+    ).toBe(0.061);
+  });
+
   it("a call that never went out (a stub) records no cost", async () => {
     await withDirectSpend(
       videoCall({ provider: "openai", model: "sora-2" }, 8),

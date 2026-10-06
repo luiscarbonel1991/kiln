@@ -29,13 +29,15 @@ export interface PricedCall {
   costOf(result: GenerationResult): number | null;
 }
 
+// `model` is the one the adapter will run (already resolved), so an id the
+// adapter would swap for its default is never priced at $0.
 export function imageCall(
   model: { provider: string; model: string },
   aspect: string,
 ): PricedCall {
   return {
     model: model.model,
-    estimateMax: estimateGeneration(model, aspect)?.max ?? 0,
+    estimateMax: estimateGeneration(model, aspect)?.max ?? null,
     costOf: (result) =>
       result.usage ? costFromUsage(result.model, result.usage) : null,
   };

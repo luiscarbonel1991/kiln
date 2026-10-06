@@ -1,6 +1,7 @@
 "use server";
 
 import { generationModel } from "@/domain/model-defaults";
+import { resolveImageModel } from "@/providers/models";
 import { getImageProvider } from "@/providers/registry";
 import { GenerationResult, ImageEditInput } from "@/providers/types";
 import { imageCall, withDirectSpend } from "@/server/direct-spend";
@@ -14,7 +15,12 @@ export async function editImage(
   input: ImageEditInput,
 ): Promise<GenerationResult> {
   const parsed = ImageEditInput.parse(input);
-  const safe = { ...parsed, model: generationModel(parsed.model, "image") };
+  const model = generationModel(parsed.model, "image");
+  // Priced on the model the adapter really runs (an unknown id falls back).
+  const safe = {
+    ...parsed,
+    model: { ...model, model: resolveImageModel(model.provider, model.model) },
+  };
   return withDirectSpend(
     imageCall(safe.model, safe.model.aspect),
     async (beforeCall) =>
