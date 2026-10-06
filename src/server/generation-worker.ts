@@ -110,7 +110,7 @@ async function recordPaidCost(
 }
 
 // One paid call, marked right before it goes out; its output's bytes.
-type Paid = { bytes: Uint8Array | null; mime: string };
+type Paid = { bytes: Uint8Array | null; mime: string; refusal?: string };
 
 async function callImage(
   deps: WorkerDeps,
@@ -147,7 +147,11 @@ async function callImage(
         )
       : null,
   );
-  return result;
+  return {
+    bytes: result.bytes,
+    mime: result.mime,
+    refusal: result.refusal,
+  };
 }
 
 // A video: the approved start frame animated; billed by the seconds rendered.
@@ -171,6 +175,7 @@ async function callVideo(
       prompt: request.prompt,
       motion: request.motion,
       durationSec: request.durationSec,
+      negative: request.negative,
       model: request.model,
     },
     { beforeCall },
@@ -222,7 +227,13 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
       request.kind === "video"
         ? await callVideo(deps, job, request, beforeCall, onPaid)
         : await callImage(deps, job, request, beforeCall, onPaid);
-    if (!result.bytes) throw new Error("The provider returned no image.");
+    if (!result.bytes) {
+      throw new Error(
+        result.refusal
+          ? `${result.refusal}.`
+          : "The provider returned no image.",
+      );
+    }
     const url = await storeWithRetries(deps, result.bytes, result.mime);
     await deps.completeJob(job.id, job.leaseToken, url);
   } catch (error) {

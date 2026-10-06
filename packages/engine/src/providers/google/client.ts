@@ -10,6 +10,15 @@ export function hasGoogleKey(): boolean {
   return env.KILN_PROVIDERS !== "mock" && Boolean(env.GOOGLE_API_KEY);
 }
 
+// The key the Files API needs to download a finished video (server only).
+export function googleApiKey(): string {
+  if (!env.GOOGLE_API_KEY) throw new Error("GOOGLE_API_KEY is not set");
+  return env.GOOGLE_API_KEY;
+}
+
+// No retryOptions: the SDK then makes a single request (checked on
+// @google/genai 2.7.0), so a paid call is never repeated behind the queue's
+// back; the queue and the direct-spend row own retries.
 export function getGenAI(): GoogleGenAI {
   if (!env.GOOGLE_API_KEY) {
     throw new Error("GOOGLE_API_KEY is not set");

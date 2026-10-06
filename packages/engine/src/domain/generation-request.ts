@@ -32,6 +32,9 @@ export const VideoGenerationRequest = z.object({
   prompt: z.string().min(1),
   motion: z.string().min(1),
   durationSec: VideoSeconds,
+  // What the clip must never show, sent where the model takes a negative
+  // prompt (Veo); the prompt says it too.
+  negative: z.string().default(""),
   model: ModelConfig,
 });
 export type VideoGenerationRequest = z.infer<typeof VideoGenerationRequest>;
@@ -74,7 +77,7 @@ export class VideoNeedsScene extends Error {}
 // product as the spec says it is (material, treatment with its relief, the
 // colour of its marks), the scene the frame shows, and locks the model must
 // keep — the product never moves or morphs, nothing is added. What the
-// treatment must never look like goes in the prompt (Sora takes no negative).
+// treatment must never look like goes in the prompt and in the negative.
 export function buildVideoRequest(input: {
   product: Product;
   settings: VideoSettings;
@@ -107,6 +110,12 @@ export function buildVideoRequest(input: {
     prompt,
     motion: VIDEO_MOTIONS[settings.motion].text,
     durationSec: settings.seconds,
+    negative: [
+      u.avoid,
+      "text, captions, logos, watermarks, people, hands, speech, music",
+    ]
+      .filter(Boolean)
+      .join(", "),
     model: ModelConfig.parse({
       ...defaultVideoModel(),
       ...input.model,

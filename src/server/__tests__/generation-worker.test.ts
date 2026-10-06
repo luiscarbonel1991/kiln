@@ -247,6 +247,75 @@ describe("runJob", () => {
     );
   });
 
+  it("a Gemini job records its measured cost from Gemini's usage", async () => {
+    const gemini = {
+      bytes: new Uint8Array([1]),
+      mime: "image/png",
+      model: "gemini-3.1-flash-image",
+      usage: {
+        inputTextTokens: 300,
+        inputImageTokens: 1100,
+        outputTokens: 1120,
+        outputTextTokens: 80,
+      },
+    };
+    const editBytes = vi.fn(async (_i: unknown, o: EditOptions) => {
+      await o.beforeCall?.();
+      return gemini;
+    });
+    const { d } = deps({
+      provider: () => ({ id: "google", editBytes }) as unknown as ImageProvider,
+    });
+    await runJob(d, {
+      ...claimed("g"),
+      request: {
+        ...request,
+        model: { ...request.model, provider: "google", model: gemini.model },
+      },
+    });
+    // 1,400 in at $0.50, 1,120 image out at $60, 80 text out at $3 per 1M.
+    expect(d.recordCost).toHaveBeenCalledWith("g", gemini.usage, 68_140);
+    expect(d.completeJob).toHaveBeenCalled();
+  });
+
+  it("a blocked Gemini image keeps its cost and says why", async () => {
+    const editBytes = vi.fn(async (_i: unknown, o: EditOptions) => {
+      await o.beforeCall?.();
+      return {
+        bytes: null,
+        mime: "image/png",
+        model: "gemini-3.1-flash-image",
+        usage: {
+          inputTextTokens: 300,
+          inputImageTokens: 1100,
+          outputTokens: 0,
+        },
+        refusal: "Gemini returned no image: IMAGE_SAFETY",
+      };
+    });
+    const { d } = deps({
+      provider: () => ({ id: "google", editBytes }) as unknown as ImageProvider,
+    });
+    await runJob(d, {
+      ...claimed("b"),
+      request: {
+        ...request,
+        model: {
+          ...request.model,
+          provider: "google",
+          model: "gemini-3.1-flash-image",
+        },
+      },
+    });
+    expect(d.recordCost).toHaveBeenCalledWith("b", expect.anything(), 700);
+    expect(d.failJob).toHaveBeenCalledWith(
+      "b",
+      "t-b",
+      "Gemini returned no image: IMAGE_SAFETY.",
+      { retry: false, mayBeCharged: true },
+    );
+  });
+
   it("over the monthly cap, a live job fails without calling the provider", async () => {
     const { d, editBytes } = deps({ overCap: vi.fn(async () => true) });
     await runJob(d, claimed("a"));
@@ -338,10 +407,12 @@ describe("video jobs", () => {
     prompt: "animate the start frame",
     motion: "a subtle, slow push-in toward the product",
     durationSec: 8,
+    negative: "text, people",
     model: {
-      provider: "openai",
-      model: "sora-2",
+      provider: "google",
+      model: "veo-3.1-fast-generate-preview",
       aspect: "9:16",
+      resolution: "720p",
       guidance: 7.5,
       strength: 0.65,
     },
@@ -354,7 +425,7 @@ describe("video jobs", () => {
   const clip: VideoBytesResult = {
     bytes: new Uint8Array([9, 9]),
     mime: "video/mp4",
-    model: "sora-2",
+    model: "veo-3.1-fast-generate-preview",
     seconds: 8,
   };
 
@@ -370,7 +441,7 @@ describe("video jobs", () => {
         options: { beforeCall?: () => Promise<void> } = {},
       ) => animate(options),
     );
-    const video = { id: "openai", animateBytes } as unknown as VideoProvider;
+    const video = { id: "google", animateBytes } as unknown as VideoProvider;
     const made = deps({ videoProvider: () => video, ...overrides });
     return { ...made, animateBytes };
   }
@@ -384,16 +455,22 @@ describe("video jobs", () => {
     expect(animateBytes.mock.calls[0][0]).toMatchObject({
       startFrameAssetId: videoRequest.startFrameUrl,
       durationSec: 8,
+      negative: "text, people",
     });
     expect(calls).toEqual(["mark", "cost", "store", "complete"]);
-    expect(d.recordCost).toHaveBeenCalledWith("v", { seconds: 8 }, 800_000);
+    // Veo 3.1 Fast at 720p: $0.10 a second.
+    expect(d.recordCost).toHaveBeenCalledWith(
+      "v",
+      { seconds: 8, resolution: "720p" },
+      800_000,
+    );
     expect(d.storeAsset).toHaveBeenCalledWith(clip.bytes, "video/mp4", "cards");
   });
 
   it("a render that fails after its call is final: never a second paid render", async () => {
     const { d, animateBytes } = videoDeps(async (options) => {
       await options.beforeCall?.();
-      throw new Error("Sora did not finish within 12 minutes");
+      throw new Error("Veo did not finish within 10 minutes");
     });
     await runJob(d, videoJob());
     expect(animateBytes).toHaveBeenCalledTimes(1);
@@ -402,6 +479,26 @@ describe("video jobs", () => {
       "t-v",
       expect.stringContaining("may have been charged"),
       { retry: false, mayBeCharged: true },
+    );
+  });
+
+  it("a clip the provider refused (safety filter) counts nothing and is not retried", async () => {
+    const { d, animateBytes } = videoDeps(async (options) => {
+      await options.beforeCall?.();
+      throw Object.assign(
+        new Error(
+          "Google's safety filter blocked this video (not charged): people.",
+        ),
+        { name: "VideoRefused", status: 422 },
+      );
+    });
+    await runJob(d, videoJob());
+    expect(animateBytes).toHaveBeenCalledTimes(1);
+    expect(d.failJob).toHaveBeenCalledWith(
+      "v",
+      "t-v",
+      "Google's safety filter blocked this video (not charged): people.",
+      { retry: false, mayBeCharged: false },
     );
   });
 

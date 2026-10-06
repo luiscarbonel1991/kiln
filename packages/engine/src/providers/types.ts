@@ -12,12 +12,15 @@ export const GeneratedAsset = z.object({
 });
 export type GeneratedAsset = z.infer<typeof GeneratedAsset>;
 
-// Token usage reported by the provider (OpenAI image models): what a finished
-// generation actually cost (domain costFromUsage).
+// Token usage reported by the provider: what a finished call actually cost
+// (domain costFromUsage). `outputTokens` is the model's main output (an image
+// model's image, a text model's text and thinking); `outputTextTokens` is the
+// text and thinking an image model writes beside its image.
 export const GenerationUsage = z.object({
   inputTextTokens: z.number().int().min(0),
   inputImageTokens: z.number().int().min(0),
   outputTokens: z.number().int().min(0),
+  outputTextTokens: z.number().int().min(0).optional(),
 });
 export type GenerationUsage = z.infer<typeof GenerationUsage>;
 
@@ -56,12 +59,14 @@ export const ImageComposeInput = z.object({
 export type ImageComposeInput = z.infer<typeof ImageComposeInput>;
 
 // start frame + prompt -> video (image-to-video / promote-to-video). `model`
-// carries the card's provider + video model choice (Veo variants / Sora).
+// carries the card's provider, video model and resolution; `negative` is what
+// the clip must never show (sent where the model takes one).
 export const AnimateInput = z.object({
   startFrameAssetId: z.string(),
   prompt: z.string(),
   motion: z.string(),
   durationSec: z.number(),
+  negative: z.string().optional(),
   model: ModelConfig,
 });
 export type AnimateInput = z.infer<typeof AnimateInput>;
