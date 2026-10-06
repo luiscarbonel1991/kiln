@@ -7,7 +7,7 @@ import {
   videoCost,
 } from "@/domain/generation-cost";
 import { errorMessage, hadResponse } from "@/domain/queue";
-import { env } from "@/lib/env";
+import { hasDatabase } from "@/lib/db";
 import { providerMode } from "@/providers/mode";
 import type { GenerationResult } from "@/providers/types";
 import {
@@ -66,7 +66,7 @@ export async function withDirectSpend(
   priced: PricedCall,
   call: (beforeCall: () => Promise<void>) => Promise<GenerationResult>,
 ): Promise<GenerationResult> {
-  if (!env.DATABASE_URL || providerMode() === "mock") {
+  if (!hasDatabase() || providerMode() === "mock") {
     return call(async () => {});
   }
   if (priced.estimateMax === null) {

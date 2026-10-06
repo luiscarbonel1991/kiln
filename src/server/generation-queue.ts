@@ -10,7 +10,7 @@ import {
   type GenerationRequest,
 } from "@/domain/generation-request";
 import { SEED_BRAND } from "@/domain/seed";
-import { db } from "@/lib/db";
+import { db, hasDatabase } from "@/lib/db";
 import { env } from "@/lib/env";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { storeAsset } from "@/providers/asset-bytes";
@@ -129,7 +129,7 @@ const globalForWorker = globalThis as unknown as {
 // The process's worker (started from instrumentation, or lazily on the first
 // enqueue). null without a database.
 export function ensureGenerationWorker(): Worker | null {
-  if (!env.DATABASE_URL) return null;
+  if (!hasDatabase()) return null;
   if (!globalForWorker.kilnGenerationWorker) {
     const worker = createWorker({
       mode: providerMode(),

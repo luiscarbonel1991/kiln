@@ -4,9 +4,7 @@ const reserveDirectCall = vi.fn(async () => "row-1");
 const markDirectCall = vi.fn(async () => {});
 const closeDirectCall = vi.fn(async () => {});
 
-vi.mock("@/lib/env", () => ({
-  env: { DATABASE_URL: "postgresql://test/kiln" },
-}));
+vi.mock("@/lib/db", () => ({ hasDatabase: () => true }));
 vi.mock("@/providers/mode", () => ({ providerMode: () => "live" }));
 vi.mock("@/server/generation-repository", () => ({
   reserveDirectCall,

@@ -14,6 +14,9 @@ const EnvSchema = z.object({
   // Persistence — local Postgres (docker-compose). Optional so DB-free build/test
   // never throw; the repositories assert it at runtime.
   DATABASE_URL: z.string().url().optional(),
+  // The database of mock runs (KILN_PROVIDERS=mock); default: DATABASE_URL's
+  // database with "_mock" appended (src/lib/database-url.ts).
+  KILN_MOCK_DATABASE_URL: z.string().url().optional(),
   // The maker this app instance works for (Maker.slug). One maker per instance
   // until accounts exist; headless runs pick theirs the same way.
   KILN_MAKER: z.string().min(1).default("default"),

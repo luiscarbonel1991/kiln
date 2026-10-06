@@ -42,8 +42,14 @@ editor's Generate both queue jobs that a worker in the server process runs
 maker's monthly cap (`Maker.monthlyCapCents`, $25 by default).
 
 ```bash
-pnpm dev:mock   # stubs only (no paid calls, nothing counted), 4 s per stub
+pnpm db:mock:setup   # once (and after new migrations): the mock database
+pnpm dev:mock        # stubs only (no paid calls, nothing counted), 4 s per stub
 ```
+
+Mock runs use their own database (`KILN_MOCK_DATABASE_URL`, by default
+`DATABASE_URL`'s database with `_mock` appended, e.g. `kiln_mock`), so a stub
+never lands on a real card or holds a real card's place in the queue. Import a
+product package there to try a flow.
 
 ## Optional modules
 

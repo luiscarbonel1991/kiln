@@ -19,6 +19,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
+    "db:mock:setup": "node scripts/mock-db.mjs",
     "postinstall": "prisma generate",
     "brief": "node scripts/brief.mjs",
     "engine:build": "pnpm --filter @kiln/engine build"
