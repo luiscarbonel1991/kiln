@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import { GenerationRequest } from "@/domain/generation-request";
+import { modelLabel } from "@/domain/model-defaults";
 import { generableCardIds, ProjectPlan } from "@/domain/plan";
 import {
   ACTIVE_JOB_STATUSES,
@@ -30,7 +31,9 @@ export class QueueRefusal extends Error {
       | "estimate-changed"
       | "already-queued"
       | "not-in-plan"
-      | "needs-scene",
+      | "needs-scene"
+      | "model"
+      | "provider",
     message: string,
   ) {
     super(message);
@@ -639,12 +642,16 @@ export async function projectGenerationState(
 
 export interface OutputSource {
   prompt: string;
+  provider: string;
   model: string;
+  // "Veo 3.1 Fast", "Sora 2 (retired)".
+  label: string;
   costMicros: number | null;
   generatedAt: string | null;
-  // A video's length and aspect, as it was rendered.
+  // A video's length, aspect and resolution, as it was rendered.
   seconds?: number;
   aspect?: string;
+  resolution?: string;
 }
 
 // What produced each of these outputs: the queue job that finished with it
@@ -670,13 +677,16 @@ export async function outputSources(
     if (!job.outputUrl || !request.success) continue;
     sources.set(job.outputUrl, {
       prompt: request.data.prompt,
+      provider: request.data.model.provider,
       model: request.data.model.model,
+      label: modelLabel(request.data.model),
       costMicros: job.actualMicros,
       generatedAt: job.finishedAt?.toISOString() ?? null,
       ...(request.data.kind === "video"
         ? {
             seconds: request.data.durationSec,
             aspect: request.data.model.aspect,
+            resolution: request.data.model.resolution ?? "720p",
           }
         : {}),
     });

@@ -12,6 +12,7 @@ export type {
   VideoProvider,
   VisionProvider,
 } from "@/providers/interfaces";
+export { hasProviderKey } from "@/providers/keys";
 export { mockArtDirector } from "@/providers/mock/art-director";
 export { mockVisionProvider } from "@/providers/mock/vision";
 export {

@@ -1,4 +1,10 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
+
+// The queue refuses a live job whose provider has no key; these tests run
+// key-free (stubs), so the key check is stubbed — and switched off where a
+// test checks the refusal.
+const keys = vi.hoisted(() => ({ present: true }));
+vi.mock("@/providers/keys", () => ({ hasProviderKey: () => keys.present }));
 
 // Integration test against a real, throwaway Postgres. Skipped unless
 // KILN_DB_TESTS=1 and DATABASE_URL points at a migrated test database:
@@ -513,7 +519,13 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
             ...card("etsy.video", []),
             type: "video" as const,
             status: "draft" as const,
-            model: { ...card("x", []).model, model: "sora-2", aspect: "9:16" },
+            model: {
+              ...card("x", []).model,
+              provider: "google" as const,
+              model: "veo-3.1-fast-generate-preview",
+              resolution: "720p" as const,
+              aspect: "9:16",
+            },
             video: {
               durationSec: 8,
               motion: "push-in",
@@ -533,6 +545,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       true,
     );
     const { cards, model } = await estimateProjectCards(id, ["etsy.video"]);
+    // Veo 3.1 Fast at 720p: $0.10 a second.
     expect(cards[0]).toMatchObject({
       typicalMicros: 800_000,
       maxMicros: 800_000,
@@ -540,9 +553,27 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
         kind: "video",
         startFrameUrl: "https://stub.local/in-use.png",
         durationSec: 8,
-        model: { model: "sora-2", aspect: "9:16" },
+        model: {
+          provider: "google",
+          model: "veo-3.1-fast-generate-preview",
+          aspect: "9:16",
+        },
       },
     });
+    expect(model).toBe("google veo-3.1-fast-generate-preview 720p ×1");
+    // Its provider without a key: refused before anything is queued.
+    keys.present = false;
+    try {
+      await expect(
+        estimateProjectCards(id, ["etsy.video"]),
+      ).rejects.toMatchObject({
+        reason: "provider",
+        message:
+          "etsy.video uses Veo 3.1 Fast, but Google has no API key (GOOGLE_API_KEY).",
+      });
+    } finally {
+      keys.present = true;
+    }
     const maker = await getCurrentMaker();
     const mode = "video-test" as never;
     const { queued, batchId } = await queueRepo.enqueueBatch({
@@ -630,7 +661,14 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     created.push(id);
     const one = await estimateProjectCards(id, ["etsy.hero", "etsy.in-use"]);
     expect(one.models).toEqual([
-      { model: "gpt-image-2", quality: "medium", count: 2 },
+      {
+        provider: "openai",
+        model: "gpt-image-2",
+        label: "GPT Image 2",
+        quality: "medium",
+        resolution: null,
+        count: 2,
+      },
     ]);
     const card = await db.card.findUniqueOrThrow({
       where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
@@ -638,15 +676,31 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     await db.card.update({
       where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
       data: {
-        model: { ...(card.model as object), model: "gpt-image-1.5" },
+        model: {
+          ...(card.model as object),
+          provider: "google",
+          model: "gemini-3.1-flash-image",
+        },
       },
     });
     const two = await estimateProjectCards(id, ["etsy.hero", "etsy.in-use"]);
-    expect(two.models.map((m) => [m.model, m.count])).toEqual([
-      ["gpt-image-2", 1],
-      ["gpt-image-1.5", 1],
+    expect(two.models.map((m) => [m.provider, m.model, m.count])).toEqual([
+      ["openai", "gpt-image-2", 1],
+      ["google", "gemini-3.1-flash-image", 1],
     ]);
-    expect(two.model).toBe("gpt-image-2, gpt-image-1.5");
+    expect(two.model).toBe(
+      "openai gpt-image-2 medium ×1, google gemini-3.1-flash-image ×1",
+    );
+    // A card left on a model Kiln no longer offers is refused, never swapped.
+    await db.card.update({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
+      data: {
+        model: { ...(card.model as object), model: "gpt-image-1" },
+      },
+    });
+    await expect(
+      estimateProjectCards(id, ["etsy.hero", "etsy.in-use"]),
+    ).rejects.toMatchObject({ reason: "model" });
   });
 
   it("reordering photos and approving at once both persist", async () => {

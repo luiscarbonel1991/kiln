@@ -189,6 +189,39 @@ describe.skipIf(!hasMagick)("buildDelivery", () => {
     ]);
   });
 
+  it("a Veo clip keeps its size by resolution and names its model", async () => {
+    const result = await buildDelivery(
+      input({
+        sourceOf: (url: string) =>
+          url === CLIP
+            ? {
+                prompt: "animate the start frame",
+                provider: "google",
+                model: "veo-3.1-fast-generate-preview",
+                label: "Veo 3.1 Fast",
+                costMicros: 960_000,
+                generatedAt: "2026-10-06T09:00:00.000Z",
+                seconds: 8,
+                aspect: "9:16",
+                resolution: "1080p",
+              }
+            : undefined,
+      }),
+    );
+    const files = unzipSync(result.zip);
+    const folder = "botanical-coaster-launch-etsy";
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    expect(manifest.files[4]).toMatchObject({
+      file: "video.mp4",
+      width: 1080,
+      height: 1920,
+      seconds: 8,
+    });
+    expect(strFromU8(files[`${folder}/README.txt`])).toContain(
+      "(approved, 8 s, Veo 3.1 Fast), 1080 x 1920 px",
+    );
+  });
+
   it("refuses until every scene switched on is approved", async () => {
     await expect(
       buildDelivery(

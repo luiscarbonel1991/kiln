@@ -264,6 +264,8 @@ export function parseSlotRecipeId(
 export interface CardLike {
   status: "draft" | "rendering" | "done" | "error";
   outputs: string[];
+  // What it renders on (a video's model and resolution decide its lengths).
+  model?: { provider: string; model: string; resolution?: VideoResolution };
 }
 
 export interface SlotView {

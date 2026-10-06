@@ -4,7 +4,12 @@ import {
   type ImageGenerationRequest,
   type VideoGenerationRequest,
 } from "@/domain/generation-request";
-import { errorMessage, hadResponse, retryDecision } from "@/domain/queue";
+import {
+  describeProviderError,
+  errorMessage,
+  hadResponse,
+  retryDecision,
+} from "@/domain/queue";
 import type { ImageProvider, VideoProvider } from "@/providers/interfaces";
 import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 
@@ -200,6 +205,7 @@ async function callVideo(
 export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
   let callStarted = false;
   let paid = false;
+  let provider: "google" | "openai" | undefined;
   const renew = setInterval(() => {
     void deps.renewLease(job.id, job.leaseToken, deps.leaseSec).catch(() => {});
   }, deps.renewMs);
@@ -214,6 +220,7 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
       return;
     }
     const request = GenerationRequest.parse(job.request);
+    provider = request.model.provider;
     const beforeCall = async () => {
       if (!(await deps.markCallStarted(job.id, job.leaseToken))) {
         throw new CallNotStarted();
@@ -243,9 +250,14 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
       !mayBeCharged &&
       !(error instanceof CallNotStarted) &&
       retryDecision(job.attempt, error, job.maxAttempts).retry;
-    const message = unanswered
-      ? `The call got no answer (${errorMessage(error)}); it may have been charged, so it was not retried.`
+    // The provider's failure in words the maker can act on (Google's spend
+    // cap, a rejected key), naming the other provider as the way out.
+    const said = provider
+      ? describeProviderError(provider, error)
       : errorMessage(error);
+    const message = unanswered
+      ? `The call got no answer (${said}); it may have been charged, so it was not retried.`
+      : said;
     deps.log(`generation job ${job.id} failed (retry: ${retry})`, error);
     await deps
       .failJob(job.id, job.leaseToken, message, { retry, mayBeCharged })

@@ -27,11 +27,14 @@ import {
 
 export interface SceneSource {
   prompt: string;
+  provider?: string;
   model: string;
+  label?: string;
   costMicros: number | null;
   generatedAt: string | null;
   seconds?: number;
   aspect?: string;
+  resolution?: string;
 }
 
 export interface DeliveryInput {
@@ -64,10 +67,19 @@ export interface DeliveredFile {
   source?: SceneSource;
 }
 
-// Sora renders 720 x 1280 (vertical) or 1280 x 720 (landscape).
-const VIDEO_SIZE = {
-  portrait: { width: 720, height: 1280 },
-  landscape: { width: 1280, height: 720 },
+// A clip's pixel size by resolution and orientation (Veo; Sora rendered 720p).
+const VIDEO_SIZE: Record<
+  string,
+  Record<"portrait" | "landscape", { width: number; height: number }>
+> = {
+  "720p": {
+    portrait: { width: 720, height: 1280 },
+    landscape: { width: 1280, height: 720 },
+  },
+  "1080p": {
+    portrait: { width: 1080, height: 1920 },
+    landscape: { width: 1920, height: 1080 },
+  },
 };
 
 const extensionOf = (url: string) =>
@@ -98,8 +110,8 @@ function readme(
     "",
     ...files.map((f) =>
       f.kind === "video"
-        ? `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.model}` : ""}), ${f.width} x ${f.height} px`
-        : `${f.photo}. ${folder}/${f.file} — ${f.label} (${f.kind === "exact" ? "drawn from the product spec" : `approved scene${f.source ? `, ${f.source.model}` : ""}`}), ${f.width} x ${f.height} px`,
+        ? `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.label ?? f.source.model}` : ""}), ${f.width} x ${f.height} px`
+        : `${f.photo}. ${folder}/${f.file} — ${f.label} (${f.kind === "exact" ? "drawn from the product spec" : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}`}), ${f.width} x ${f.height} px`,
     ),
     "",
     "manifest.json lists each file with its source (the prompt and model of each",
@@ -136,9 +148,21 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       if (!output) {
         throw new DeliveryRefusal(`"${slot.label}" is not approved.`);
       }
-      const settings = videoSettings(input.plan, slot, input.destination.video);
+      const model = input.cardOf(slot.key)?.model;
+      const settings = videoSettings(
+        input.plan,
+        slot,
+        input.destination.video,
+        model,
+      );
       const file = `video.${extensionOf(output)}`;
       const source = input.sourceOf(output);
+      const orientation = source?.aspect
+        ? source.aspect === "16:9"
+          ? "landscape"
+          : "portrait"
+        : settings.orientation;
+      const resolution = source?.resolution ?? model?.resolution ?? "720p";
       entries[`${folder}/${file}`] = await input.fetchOutput(output);
       files.push({
         file,
@@ -147,13 +171,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
         label: slot.label,
         kind: "video",
         // As rendered (the choices may have changed since).
-        ...VIDEO_SIZE[
-          source?.aspect
-            ? source.aspect === "16:9"
-              ? "landscape"
-              : "portrait"
-            : settings.orientation
-        ],
+        ...(VIDEO_SIZE[resolution] ?? VIDEO_SIZE["720p"])[orientation],
         seconds: source?.seconds ?? settings.seconds,
         output,
         source,
