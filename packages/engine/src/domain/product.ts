@@ -145,7 +145,7 @@ export const Product = z.object({
 });
 export type Product = z.infer<typeof Product>;
 
-// One physical piece on the plate: a bar, a disc, a plaque.
+// One physical piece on the plate: a bar, a disc, a tile.
 export const PlatePiece = z.object({
   colour: z.string().min(1),
   wording: z.array(z.string()).default([]),

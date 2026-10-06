@@ -4,9 +4,12 @@ import { describe, expect, it } from "vitest";
 
 // The engine is generic (CLAUDE.md "Boundaries", ROADMAP "Domain model":
 // nothing in Kiln's code may know about signs or a particular maker). Its
-// sources, comments included, never name a maker, signs, acrylic or laser work.
+// sources, comments included, never name a maker, signs or their formats
+// (plaques, door hangers, house numbers, "no soliciting"), acrylic or laser
+// work. "Engraved" stays: a generic treatment (wood, metal, jewellery).
 const root = join(import.meta.dirname, "..");
-const LEAK = /maker1|\bsigns?\b|acrylic|laser/i;
+const LEAK =
+  /maker1|\bsigns?\b|acrylic|laser|hanger|plaque|house.?numbers?|no.?soliciting/i;
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -19,7 +22,7 @@ function sources(dir: string): string[] {
 }
 
 describe("engine boundaries", () => {
-  it("no engine source names a maker, signs, acrylic or laser work", () => {
+  it("no engine source names a maker, signs and their formats, acrylic or laser work", () => {
     const files = sources(root);
     expect(files.length).toBeGreaterThan(40);
     const leaks = files.flatMap((path) =>

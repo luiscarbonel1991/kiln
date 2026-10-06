@@ -63,7 +63,7 @@ export function GenerationCard({
   const inQueue = projectMode && isActiveJob(job);
 
   const recipe = findRecipe(card.recipeId) ?? SEED_RECIPES[0];
-  const laserPricing = useModule("laser-pricing");
+  const costModule = useModule("laser-pricing");
   const purpose = recipe.directions.find(
     (s) => s.label === card.direction,
   )?.purpose;
@@ -268,7 +268,7 @@ export function GenerationCard({
               <Download className="size-3" /> Download .svg
             </button>
           ) : null}
-          {laserPricing && card.vectorUrl && !vectorizing ? (
+          {costModule && card.vectorUrl && !vectorizing ? (
             <CostPanel vectorUrl={card.vectorUrl} />
           ) : null}
         </>
