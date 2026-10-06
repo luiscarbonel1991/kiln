@@ -1,21 +1,21 @@
 {
-  "id": "recipe-laser-lineart",
-  "name": "Laser / line",
+  "id": "recipe-line-art",
+  "name": "Line art",
   "style": "line-art",
   "directions": [
     {
-      "label": "Cut outline",
-      "purpose": "A bold single continuous outline of the whole shape — the clean silhouette to cut.",
+      "label": "Outline",
+      "purpose": "A bold single continuous outline of the whole shape — a clean silhouette.",
       "aspect": "1:1"
     },
     {
-      "label": "Engrave detail",
-      "purpose": "Fine interior line work for engraving — decorative detail, no solid fills.",
+      "label": "Interior detail",
+      "purpose": "Fine interior line work — decorative detail, no solid fills.",
       "aspect": "1:1"
     },
     {
-      "label": "Framed badge",
-      "purpose": "The motif inside a circular badge frame — coaster or sign ready.",
+      "label": "Badge",
+      "purpose": "The motif inside a circular badge frame.",
       "aspect": "1:1"
     },
     {
@@ -36,7 +36,7 @@
   },
   "targets": [
     {
-      "name": "Laser",
+      "name": "Line art",
       "aspect": "1:1"
     }
   ],

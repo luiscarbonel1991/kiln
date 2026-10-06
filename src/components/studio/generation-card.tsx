@@ -130,8 +130,8 @@ export function GenerationCard({
 
   // Vectorize: trace the rendered line-art into a REAL SVG. Only exposed for
   // line-art recipes (tracing a photo produces a bloated, posterized file).
-  // centerline = single cut path per stroke (laser cut); outline = region borders
-  // (engrave / cut solid shapes).
+  // centerline = a single path per stroke; outline = region borders (solid
+  // shapes).
   async function handleVectorize(mode: "outline" | "centerline") {
     const src = card.outputs[0];
     if (!src) return;

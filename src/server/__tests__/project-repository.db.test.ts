@@ -145,7 +145,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
 
   it("an editor autosave keeps a planned project's type and plan", async () => {
     const id = created[0];
-    await repo.saveProject({ ...editor, recipeId: "recipe-laser-lineart" }, id);
+    await repo.saveProject({ ...editor, recipeId: "recipe-line-art" }, id);
     const row = await db.project.findUniqueOrThrow({ where: { id } });
     expect(row.type).toBe("launch");
     expect(row.plan).not.toBeNull();
@@ -469,7 +469,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       recipeId: "recipe-etsy-hero",
     });
     created.push(id);
-    await repo.saveProject({ ...editor, recipeId: "recipe-laser-lineart" }, id);
+    await repo.saveProject({ ...editor, recipeId: "recipe-line-art" }, id);
     const row = await db.project.findUniqueOrThrow({ where: { id } });
     expect(row.type).toBe("design");
     expect(row.plan).toBeNull();

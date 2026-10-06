@@ -73,9 +73,10 @@ export interface ProjectSummaryRow {
 
 // The project type of a studio-driven project follows its recipe. The SQL CASE
 // in prisma/migrations/20261002230000_maker_project_product mirrors this for the
-// workspaces that existed before projects.
+// workspaces that existed before projects (with the line-art recipe's id of the
+// time, renamed by 20261005030000_line_art_recipe_ids).
 export function studioProjectType(recipeId: string | null): ProjectType {
-  if (recipeId === "recipe-laser-lineart") return "design";
+  if (recipeId === "recipe-line-art") return "design";
   if (recipeId === "recipe-social-launch" || recipeId === "recipe-ads") {
     return "content";
   }

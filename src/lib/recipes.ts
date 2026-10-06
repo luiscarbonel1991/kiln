@@ -13,15 +13,15 @@ import {
 } from "@/domain/seed";
 import { ShotList } from "@/domain/shot-list";
 
-// The proprietary laser / line-art shot list (the maker IP) lives in the APP, NOT
-// in the open-source @kiln/engine: the engine ships the line-art STYLE capability
-// (the `style` + the assemblePrompt branch), this ships the laser-specific
-// cut/engrave/centerline treatments. Black strokes on white, one motif in five
-// laser-ready slots; skips the ArtDirector (the slot purpose drives each). It is
-// a Design brief: no destination.
-export const SHOT_LIST_LASER = ShotList.parse({
-  id: "laser-line",
-  name: "Laser / line",
+// The line-art design shot list: one motif redrawn as black strokes on white
+// in five takes, the art a Design project traces into an SVG (vectorize). The
+// engine ships the line-art STYLE (the `style` + the assemblePrompt branch);
+// this list lives in the app with the Design flow. Generic for any maker: the
+// takes say nothing about how the art is produced. Skips the ArtDirector (the
+// slot purpose drives each). A Design brief: no destination.
+export const SHOT_LIST_LINE_ART = ShotList.parse({
+  id: "line-art",
+  name: "Line art",
   destinationId: null,
   projectTypes: ["design"],
   style: "line-art",
@@ -42,24 +42,22 @@ export const SHOT_LIST_LASER = ShotList.parse({
   ],
   slots: [
     {
-      key: "cut-outline",
-      label: "Cut outline",
+      key: "outline",
+      label: "Outline",
       purpose:
-        "A bold single continuous outline of the whole shape — the clean silhouette to cut.",
+        "A bold single continuous outline of the whole shape — a clean silhouette.",
       aspect: "1:1",
     },
     {
-      key: "engrave-detail",
-      label: "Engrave detail",
-      purpose:
-        "Fine interior line work for engraving — decorative detail, no solid fills.",
+      key: "detail",
+      label: "Interior detail",
+      purpose: "Fine interior line work — decorative detail, no solid fills.",
       aspect: "1:1",
     },
     {
-      key: "framed-badge",
-      label: "Framed badge",
-      purpose:
-        "The motif inside a circular badge frame — coaster or sign ready.",
+      key: "badge",
+      label: "Badge",
+      purpose: "The motif inside a circular badge frame.",
       aspect: "1:1",
     },
     {
@@ -78,31 +76,31 @@ export const SHOT_LIST_LASER = ShotList.parse({
   ],
 });
 
-export const PRESET_LASER = RecipePreset.parse({
-  id: "recipe-laser-lineart",
-  name: "Laser / line",
-  shotListId: SHOT_LIST_LASER.id,
+export const PRESET_LINE_ART = RecipePreset.parse({
+  id: "recipe-line-art",
+  name: "Line art",
+  shotListId: SHOT_LIST_LINE_ART.id,
   destinationId: null,
-  targets: [{ name: "Laser", aspect: "1:1" }],
+  targets: [{ name: "Line art", aspect: "1:1" }],
 });
 
-// The app's catalog = the engine's generic seeds + the laser shot list.
-export const SHOT_LISTS: ShotList[] = [...SEED_SHOT_LISTS, SHOT_LIST_LASER];
+// The app's catalog = the engine's generic seeds + the line-art shot list.
+export const SHOT_LISTS: ShotList[] = [...SEED_SHOT_LISTS, SHOT_LIST_LINE_ART];
 export const DESTINATIONS = SEED_DESTINATIONS;
 export const RECIPE_PRESETS: RecipePreset[] = [
   ...SEED_RECIPE_PRESETS,
-  PRESET_LASER,
+  PRESET_LINE_ART,
 ];
 
-export const SEED_RECIPE_LASER = composePreset(PRESET_LASER, {
+export const SEED_RECIPE_LINE_ART = composePreset(PRESET_LINE_ART, {
   shotLists: SHOT_LISTS,
   destinations: DESTINATIONS,
 });
 
-// The app's full recipe list = the engine's generic recipes + the laser recipe.
-// App code imports THIS (not the engine's SEED_RECIPES) so the laser recipe shows
-// in Planning and resolves on restore.
-export const SEED_RECIPES: Recipe[] = [...ENGINE_RECIPES, SEED_RECIPE_LASER];
+// The app's full recipe list = the engine's generic recipes + the line-art
+// recipe. App code imports THIS (not the engine's SEED_RECIPES) so the line-art
+// recipe shows in Planning and resolves on restore.
+export const SEED_RECIPES: Recipe[] = [...ENGINE_RECIPES, SEED_RECIPE_LINE_ART];
 
 export const CATALOG: Catalog = {
   destinations: DESTINATIONS,

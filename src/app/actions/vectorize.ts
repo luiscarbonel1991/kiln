@@ -18,9 +18,9 @@ const execFileP = promisify(execFile);
 
 const VectorizeInput = z.object({
   imageUrl: z.string().url(),
-  // "outline" (vtracer): traces region boundaries — engraving / cutting solid
-  // shapes. "centerline" (autotrace): traces stroke midlines — one cut path per
-  // drawn line, the right choice for laser-cutting line art.
+  // "outline" (vtracer): traces region boundaries — solid shapes. "centerline"
+  // (autotrace): traces stroke midlines — one path per drawn line, the right
+  // choice for line art drawn as strokes.
   mode: z.enum(["outline", "centerline"]).default("outline"),
 });
 

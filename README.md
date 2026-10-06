@@ -62,9 +62,9 @@ card; its saved defaults live in the module's own `ModuleSettings` row.
 KILN_MODULES=laser-pricing pnpm dev
 ```
 
-## System dependencies (laser "Centerline" vectorize)
+## System dependencies ("Centerline" vectorize)
 
-The line-art **Centerline** trace — single cut paths for laser cutting — shells out to two
+The line-art **Centerline** trace — a single path per drawn stroke — shells out to two
 native binaries. Install them on any machine or deploy image that runs the app:
 
 - **autotrace** — centerline tracing (`brew install autotrace` · `apt-get install autotrace`)

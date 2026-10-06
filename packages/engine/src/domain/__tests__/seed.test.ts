@@ -50,11 +50,9 @@ describe("seed data", () => {
   it("style defaults to photographic; the OSS engine ships NO line-art recipe", () => {
     expect(SEED_RECIPE.style).toBe("photographic");
     expect(SEED_RECIPE_ADS.style).toBe("photographic");
-    // Guardrail: the engine ships the line-art STYLE capability, but the laser
-    // recipe itself is the app's IP — no engine recipe is line-art.
+    // Guardrail: the engine ships the line-art STYLE capability; the line-art
+    // design recipe lives in the app — no engine recipe is line-art.
     expect(SEED_RECIPES.every((r) => r.style === "photographic")).toBe(true);
-    expect(SEED_RECIPES.some((r) => r.id === "recipe-laser-lineart")).toBe(
-      false,
-    );
+    expect(SEED_RECIPES.some((r) => r.id === "recipe-line-art")).toBe(false);
   });
 });

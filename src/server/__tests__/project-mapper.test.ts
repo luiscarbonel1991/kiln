@@ -235,7 +235,7 @@ describe("toProjectSummary", () => {
 describe("toProjectSummary type", () => {
   const row: ProjectSummaryRow = {
     id: "p-1",
-    name: "Laser motif",
+    name: "Line-art motif",
     type: "design",
     plan: null,
     phase: "generation",
@@ -254,7 +254,7 @@ describe("toProjectSummary type", () => {
 
 describe("studioProjectType", () => {
   it.each([
-    ["recipe-laser-lineart", "design"],
+    ["recipe-line-art", "design"],
     ["recipe-social-launch", "content"],
     ["recipe-ads", "content"],
     ["recipe-etsy-hero", "listing-kit"],
