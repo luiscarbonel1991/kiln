@@ -4,9 +4,10 @@ import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
 import type { ArtDirector } from "@/providers/interfaces";
 
-// Deterministic fallback (no GOOGLE_API_KEY / tests): the recipe's per-slot art
-// direction (domain sceneVariants), with the analysis's place of use for
-// `{use}`. Slots past the recipe's own get a numbered direction.
+// The recipe's own per-slot art direction (domain sceneVariants), with the
+// analysis's place of use for `{use}`: what mock runs return, and what a maker
+// can choose when no model could direct the scenes. Slots past the recipe's
+// own get a numbered direction.
 export function fallbackVariants(
   recipe: Recipe,
   understanding: BaseUnderstanding,
@@ -29,7 +30,10 @@ export function fallbackVariants(
 }
 
 export const mockArtDirector: ArtDirector = {
-  async proposeDirections({ recipe, understanding, n }) {
-    return fallbackVariants(recipe, understanding, n);
+  async proposeDirections({ recipe, understanding, n }, options) {
+    return {
+      value: fallbackVariants(recipe, understanding, n),
+      model: options.model,
+    };
   },
 };

@@ -4,7 +4,7 @@ export {
   GOOGLE_CAPS,
   OPENAI_CAPS,
 } from "@/providers/capabilities";
-export { CapabilityError } from "@/providers/errors";
+export { CapabilityError, ProviderKeyMissing } from "@/providers/errors";
 export type {
   ArtDirector,
   ImageProvider,
@@ -26,6 +26,7 @@ export {
   getCapabilities,
   getImageProvider,
   getVideoProvider,
+  getVisionProvider,
 } from "@/providers/registry";
 export {
   Capabilities,

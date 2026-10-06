@@ -2,17 +2,21 @@ import { SEED_BRAND } from "@/domain/seed";
 import { BaseUnderstanding } from "@/domain/understanding";
 import type { VisionProvider } from "@/providers/interfaces";
 
-// MOCK: returns a fixed understanding (mockup EXTRACTED values). Replaced by a real
-// VisionProvider in Phase 3.
+// What mock runs (KILN_PROVIDERS=mock) and key-free tests read a photo as.
+export const MOCK_UNDERSTANDING: BaseUnderstanding = BaseUnderstanding.parse({
+  subject: "glazed stoneware pitcher, matte cream finish",
+  productType: "ceramic pitcher",
+  useContext: "sits on a kitchen counter, dining table or open shelf",
+  sceneProps: "",
+  materials: "stoneware, reactive glaze",
+  lighting: "soft directional light, upper-left",
+  composition: "centered, slight high angle",
+  mood: "calm, handmade, editorial",
+  palette: SEED_BRAND.palette,
+});
+
 export const mockVisionProvider: VisionProvider = {
-  async analyze(_input) {
-    return BaseUnderstanding.parse({
-      subject: "glazed stoneware pitcher, matte cream finish",
-      materials: "stoneware, reactive glaze",
-      lighting: "soft directional light, upper-left",
-      composition: "centered, slight high angle",
-      mood: "calm, handmade, editorial",
-      palette: SEED_BRAND.palette,
-    });
+  async analyze(_input, options) {
+    return { value: MOCK_UNDERSTANDING, model: options.model };
   },
 };

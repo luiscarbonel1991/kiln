@@ -3,12 +3,14 @@
 import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { analyzeMaster } from "@/app/actions/analyze";
+import { DegradedNotice } from "@/components/studio/degraded-notice";
 import { MasterPreview } from "@/components/studio/master-preview";
 import { PaletteSwatches } from "@/components/studio/palette-swatches";
 import { ProvenanceBadge } from "@/components/studio/provenance-badge";
 import type { MasterAsset } from "@/domain/master-asset";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { cn } from "@/lib/utils";
+import type { Degraded } from "@/server/text-calls";
 import { useProject } from "@/store/project";
 
 // Drives the attribute rows: each reads understanding[key]; palette is special-
@@ -32,6 +34,24 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
   // (network/DNS blip). Without it, clearing `error` alone never re-fetches
   // because the effect's other deps are unchanged.
   const [attempt, setAttempt] = useState(0);
+  // Set when no model could read the photo: the neutral understanding is shown
+  // and the other provider offered.
+  const [degraded, setDegraded] = useState<Degraded | null>(null);
+  const [asking, setAsking] = useState(false);
+
+  const askOther = (model: {
+    provider: "google" | "openai";
+    model: string;
+  }) => {
+    setAsking(true);
+    analyzeMaster({ assetUrl: master.assetUrl, model })
+      .then((result) => {
+        setUnderstanding(result.understanding);
+        setDegraded(result.degraded ?? null);
+      })
+      .catch(() => setError(true))
+      .finally(() => setAsking(false));
+  };
 
   // Run the vision action once per master (guard on understanding null). The
   // server action is the only path into @/providers.
@@ -42,7 +62,9 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
     setError(false);
     analyzeMaster({ assetUrl: master.assetUrl })
       .then((result) => {
-        if (active) setUnderstanding(result);
+        if (!active) return;
+        setUnderstanding(result.understanding);
+        setDegraded(result.degraded ?? null);
       })
       .catch(() => {
         if (active) setError(true);
@@ -84,6 +106,16 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
           <span className="font-semibold text-prov-image">image-sourced</span>{" "}
           context and travels through the rest of the flow.
         </p>
+
+        {degraded && !error ? (
+          <DegradedNotice
+            degraded={degraded}
+            fellBackTo="a neutral description; edit the fields in planning"
+            verb="Read it"
+            pending={asking}
+            onAlternative={askOther}
+          />
+        ) : null}
 
         {error ? (
           <div className="mb-5 rounded-card border border-dashed border-border bg-secondary/60 p-5">

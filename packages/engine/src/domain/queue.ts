@@ -44,6 +44,8 @@ export function classifyGenerationError(
     issues?: unknown;
   } | null;
   if (e && typeof e.status === "number") {
+    // An exhausted spend cap or quota does not clear in 30 s.
+    if (isOutOfCredit(error)) return "permanent";
     if (e.status === 408 || e.status === 409 || e.status === 429) {
       return "transient";
     }
@@ -53,6 +55,7 @@ export function classifyGenerationError(
   if (
     e?.name === "CapabilityError" ||
     e?.name === "ModelRefused" ||
+    e?.name === "ProviderKeyMissing" ||
     e?.name === "ZodError"
   ) {
     return "permanent";
@@ -88,4 +91,39 @@ export function retryDecision(
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message.slice(0, 500);
   return String(error).slice(0, 500);
+}
+
+const PROVIDER_LABEL = { google: "Google", openai: "OpenAI" } as const;
+const PROVIDER_KEY = { google: "GOOGLE_API_KEY", openai: "OPENAI_API_KEY" };
+
+// A 429 that is not a rate limit: the provider's spend cap or quota is used up
+// (Google: "spending cap ... ai.studio/spend"; OpenAI: "insufficient_quota").
+export function isOutOfCredit(error: unknown): boolean {
+  const e = error as { status?: unknown; code?: unknown } | null;
+  if (e?.status !== 429) return false;
+  const text = `${errorMessage(error)} ${typeof e.code === "string" ? e.code : ""}`;
+  return /spend|spending cap|quota|billing/i.test(text);
+}
+
+// A provider failure in words the maker can act on, naming the other provider
+// as the way out (never taken on its own).
+export function describeProviderError(
+  provider: "google" | "openai",
+  error: unknown,
+): string {
+  const status = (error as { status?: unknown } | null)?.status;
+  const label = PROVIDER_LABEL[provider];
+  const other = PROVIDER_LABEL[provider === "google" ? "openai" : "google"];
+  if (isOutOfCredit(error)) {
+    return provider === "google"
+      ? "Google is at its spend cap — raise it at ai.studio/spend or use OpenAI."
+      : "OpenAI is out of quota — check billing at platform.openai.com or use Google.";
+  }
+  if (status === 429) {
+    return `${label} is rate-limiting requests — try again in a minute or use ${other}.`;
+  }
+  if (status === 401 || status === 403) {
+    return `${label} rejected the API key (${status}) — check ${PROVIDER_KEY[provider]} or use ${other}.`;
+  }
+  return errorMessage(error);
 }

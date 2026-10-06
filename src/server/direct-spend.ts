@@ -2,12 +2,16 @@ import {
   costFromUsage,
   estimateGeneration,
   estimateVideo,
+  TEXT_CALL_BUDGETS,
+  type TextCallKind,
+  textEstimate,
   toMicros,
   videoCost,
 } from "@/domain/generation-cost";
 import type { ImageQuality, VideoResolution } from "@/domain/model-defaults";
 import { errorMessage, hadResponse } from "@/domain/queue";
 import { hasDatabase } from "@/lib/db";
+import type { TextResult } from "@/providers/interfaces";
 import { providerMode } from "@/providers/mode";
 import type { GenerationResult } from "@/providers/types";
 import {
@@ -22,11 +26,12 @@ import { getCurrentMaker } from "@/server/maker-repository";
 // no-ops.
 
 // What a direct call may cost, and how to measure what it did cost.
-export interface PricedCall {
+export interface PricedCall<T extends { usage?: unknown }> {
+  provider: string;
   model: string;
   // The most the call can cost; null when the model has no pinned price.
   estimateMax: number | null;
-  costOf(result: GenerationResult): number | null;
+  costOf(result: T): number | null;
 }
 
 // `model` is the one the adapter will run (already resolved), so an id the
@@ -34,8 +39,9 @@ export interface PricedCall {
 export function imageCall(
   model: { provider: string; model: string; quality?: ImageQuality },
   aspect: string,
-): PricedCall {
+): PricedCall<GenerationResult> {
   return {
+    provider: model.provider,
     model: model.model,
     estimateMax: estimateGeneration(model, aspect)?.max ?? null,
     costOf: (result) =>
@@ -53,8 +59,9 @@ export function imageCall(
 export function videoCall(
   model: { provider: string; model: string; resolution?: VideoResolution },
   durationSec: number,
-): PricedCall {
+): PricedCall<GenerationResult> {
   return {
+    provider: model.provider,
     model: model.model,
     estimateMax: estimateVideo(model, durationSec),
     costOf: (result) =>
@@ -69,16 +76,31 @@ export function videoCall(
   };
 }
 
+// A text call (vision, art direction): bounded by its budget, measured from
+// the usage it reports.
+export function textCall<T>(
+  model: { provider: string; model: string },
+  kind: TextCallKind,
+): PricedCall<TextResult<T>> {
+  return {
+    provider: model.provider,
+    model: model.model,
+    estimateMax: textEstimate(model, TEXT_CALL_BUDGETS[kind]),
+    costOf: (result) =>
+      result.usage ? costFromUsage(model, result.usage) : null,
+  };
+}
+
 // Run one direct (studio) call against the cap. Its estimated max is reserved
 // first, under the maker lock, so parallel calls cannot pass the cap together;
 // the row then carries the measured cost. The provider marks the row right
 // before its paid request (`beforeCall`): an error it answered counts nothing,
 // a call with no answer counts at its estimate, and a call never made (a stub)
 // records nothing.
-export async function withDirectSpend(
-  priced: PricedCall,
-  call: (beforeCall: () => Promise<void>) => Promise<GenerationResult>,
-): Promise<GenerationResult> {
+export async function withDirectSpend<T extends { usage?: unknown }>(
+  priced: PricedCall<T>,
+  call: (beforeCall: () => Promise<void>) => Promise<T>,
+): Promise<T> {
   if (!hasDatabase() || providerMode() === "mock") {
     return call(async () => {});
   }
@@ -90,11 +112,12 @@ export async function withDirectSpend(
   const maker = await getCurrentMaker();
   const id = await reserveDirectCall({
     makerId: maker.id,
+    provider: priced.provider,
     model: priced.model,
     estimateMicros: toMicros(priced.estimateMax),
   });
   let callStarted = false;
-  let result: GenerationResult;
+  let result: T;
   try {
     result = await call(async () => {
       await markDirectCall(id);

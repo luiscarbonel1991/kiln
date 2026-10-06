@@ -3,6 +3,7 @@
 import { ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { proposeVariants } from "@/app/actions/art-direct";
+import { DegradedNotice } from "@/components/studio/degraded-notice";
 import {
   PaletteSwatches,
   parseHexList,
@@ -11,10 +12,12 @@ import { ProvenanceBadge } from "@/components/studio/provenance-badge";
 import { Input } from "@/components/ui/input";
 import type { FieldKey } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
+import type { VariantDirection } from "@/domain/variant-direction";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { gradientForPrompt } from "@/lib/gradient";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
+import type { Degraded } from "@/server/text-calls";
 import { useProject } from "@/store/project";
 
 // The five editable rows, in cascade/prompt order, with their UI labels.
@@ -86,14 +89,23 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
   const generateVariants = useProject((s) => s.generateVariants);
   const understanding = useProject((s) => s.understanding);
   const [busy, setBusy] = useState(false);
+  // Set when no model could direct the scenes: the maker picks the recipe's own
+  // directions or asks the other provider (never switched on its own).
+  const [degraded, setDegraded] = useState<{
+    degraded: Degraded;
+    variants: VariantDirection[];
+  } | null>(null);
 
   // Guard: planning is always set on entry (goToPlanning), but stay defensive.
   if (planning === null) return null;
 
-  // Ask the ArtDirector (Gemini text) for diverse per-direction scenes, then build
-  // the cards. Line-art recipes skip it (its photographic scenes don't apply — the
-  // slot purpose drives each variant). Falls back to shared planning on no key/error.
-  async function handleGenerate() {
+  // Ask the ArtDirector (the maker's text model) for diverse per-direction
+  // scenes, then build the cards. Line-art recipes skip it (its photographic
+  // scenes don't apply — the slot purpose drives each variant).
+  async function handleGenerate(model?: {
+    provider: "google" | "openai";
+    model: string;
+  }) {
     const recipe = recipeId ? findRecipe(recipeId) : undefined;
     if (!recipeId || !understanding || recipe?.style === "line-art") {
       generateVariants();
@@ -101,8 +113,13 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
     }
     setBusy(true);
     try {
-      const variants = await proposeVariants({ understanding, recipeId });
-      generateVariants(variants);
+      const result = await proposeVariants({ understanding, recipeId, model });
+      if (result.degraded) {
+        setDegraded({ degraded: result.degraded, variants: result.variants });
+        return;
+      }
+      setDegraded(null);
+      generateVariants(result.variants);
     } catch {
       generateVariants();
     } finally {
@@ -242,9 +259,31 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
       </div>
 
       <div className="mt-7">
+        {degraded ? (
+          <DegradedNotice
+            degraded={degraded.degraded}
+            fellBackTo="nothing yet: pick how to direct the scenes"
+            verb="Ask"
+            pending={busy}
+            onAlternative={(model) => void handleGenerate(model)}
+          >
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                const variants = degraded.variants;
+                setDegraded(null);
+                generateVariants(variants);
+              }}
+              className="inline-flex items-center gap-2 rounded-field border border-border bg-card px-4 py-2 font-sans text-sm font-semibold text-foreground disabled:opacity-60"
+            >
+              Use the recipe&apos;s directions
+            </button>
+          </DegradedNotice>
+        ) : null}
         <button
           type="button"
-          onClick={handleGenerate}
+          onClick={() => void handleGenerate()}
           disabled={busy}
           className="inline-flex w-fit items-center gap-2 rounded-field bg-primary px-5 py-[11px] font-sans text-sm font-semibold text-primary-foreground shadow-button transition-colors hover:bg-primary/90 disabled:opacity-60"
         >

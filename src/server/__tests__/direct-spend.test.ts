@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { GenerationResult } from "@/providers/types";
 
 const reserveDirectCall = vi.fn(async () => "row-1");
 const markDirectCall = vi.fn(async () => {});
@@ -24,7 +25,7 @@ const VEO = {
   model: "veo-3.1-fast-generate-preview",
 };
 
-const video = {
+const video: GenerationResult = {
   assets: [{ id: "v", url: "https://x/v.mp4", mime: "video/mp4" }],
   provider: "google",
   model: VEO.model,
@@ -44,6 +45,7 @@ describe("direct spend", () => {
     expect(result).toBe(video);
     expect(reserveDirectCall).toHaveBeenCalledWith({
       makerId: "maker-1",
+      provider: "google",
       model: VEO.model,
       estimateMicros: 800_000,
     });

@@ -15,21 +15,43 @@ import type {
 
 export type { ProviderId };
 
-// (a) Vision / analysis: MasterAsset -> BaseUnderstanding (structured, Zod-validated).
+// A text call (vision, art direction): the provider's text model to run (from
+// the catalog) and `beforeCall`, run right before the one paid request, like
+// the image and video calls. The answer carries the usage it reported.
+export interface TextCallOptions {
+  model: string;
+  beforeCall?: () => Promise<void>;
+}
+
+export interface TextResult<T> {
+  value: T;
+  model: string;
+  usage?: GenerationUsage;
+}
+
+// (a) Vision / analysis: MasterAsset -> BaseUnderstanding (structured,
+// Zod-validated). A failed call throws; the caller decides and says it
+// degraded (never a silent stand-in).
 export interface VisionProvider {
-  analyze(input: { assetUrl: string }): Promise<BaseUnderstanding>;
+  analyze(
+    input: { assetUrl: string },
+    options: TextCallOptions,
+  ): Promise<TextResult<BaseUnderstanding>>;
 }
 
 // (b) Art director: text model -> diverse per-direction creative specs (scene,
 // composition, lighting), orthogonal not variations. buildCards combines these
 // with the shared planning (subject + palette) into the cards.
 export interface ArtDirector {
-  proposeDirections(input: {
-    understanding: BaseUnderstanding;
-    recipe: Recipe;
-    brand: BrandProfile;
-    n: number;
-  }): Promise<VariantDirection[]>;
+  proposeDirections(
+    input: {
+      understanding: BaseUnderstanding;
+      recipe: Recipe;
+      brand: BrandProfile;
+      n: number;
+    },
+    options: TextCallOptions,
+  ): Promise<TextResult<VariantDirection[]>>;
 }
 
 // A direct (studio) paid call: `beforeCall` runs right before the paid request

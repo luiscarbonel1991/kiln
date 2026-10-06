@@ -20,3 +20,20 @@ export const BaseUnderstanding = z.object({
   palette: z.array(z.string()),
 });
 export type BaseUnderstanding = z.infer<typeof BaseUnderstanding>;
+
+// What a product reads as when no model could read its photo (no key, a spend
+// cap, an error): nothing product-specific is invented — the maker edits the
+// fields by hand or asks another provider, and the flow says it degraded.
+export function neutralUnderstanding(palette: string[]): BaseUnderstanding {
+  return BaseUnderstanding.parse({
+    subject: "the exact product shown in the master image",
+    productType: "product",
+    useContext: "",
+    sceneProps: "",
+    materials: "as shown in the master image",
+    lighting: "soft directional light, upper-left",
+    composition: "centered, eye-level",
+    mood: "clean, modern",
+    palette,
+  });
+}

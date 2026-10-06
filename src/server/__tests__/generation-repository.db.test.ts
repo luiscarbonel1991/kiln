@@ -393,6 +393,7 @@ describe.skipIf(!enabled)(
         const reserve = () =>
           repo.reserveDirectCall({
             makerId: solo.id,
+            provider: "openai",
             model: "gpt-image-2",
             estimateMicros: 60_000,
           });

@@ -458,6 +458,7 @@ const DIRECT_LEASE_MS = 15 * 60 * 1000;
 // enqueueBatch) it must fit the cap with what is spent and reserved.
 export async function reserveDirectCall(input: {
   makerId: string;
+  provider: string;
   model: string;
   estimateMicros: number;
 }): Promise<string> {
@@ -487,7 +488,11 @@ export async function reserveDirectCall(input: {
         attempt: 1,
         maxAttempts: 1,
         estimateMicros: input.estimateMicros,
-        request: { kind: "direct", model: input.model },
+        request: {
+          kind: "direct",
+          provider: input.provider,
+          model: input.model,
+        },
         startedAt: now,
         leaseUntil: new Date(now.getTime() + DIRECT_LEASE_MS),
       },

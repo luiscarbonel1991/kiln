@@ -280,6 +280,17 @@ export function costFromUsage(
   return (input + output) / 1_000_000;
 }
 
+// What each text call may read and write: the adapters send the output cap
+// (`max_output_tokens` / `maxOutputTokens`, thinking included) and the cap
+// reservation prices both, so a text call's cost is bounded before it runs.
+export const TEXT_CALL_BUDGETS = {
+  // The prompt and one product photo.
+  vision: { inputTokens: 4_000, outputTokens: 3_000 },
+  // The prompt, the understanding and the slots; one direction per slot.
+  artDirection: { inputTokens: 3_000, outputTokens: 6_000 },
+} as const;
+export type TextCallKind = keyof typeof TEXT_CALL_BUDGETS;
+
 // The most a text call (vision, art direction) can cost: its input allowance
 // and the output cap it is sent with (`max_output_tokens`, thinking included).
 export function textEstimate(

@@ -11,7 +11,9 @@ import type {
   VideoProvider,
   VisionProvider,
 } from "@/providers/interfaces";
+import { openaiArtDirector } from "@/providers/openai/art-director";
 import { openaiImageProvider } from "@/providers/openai/image";
+import { openaiVisionProvider } from "@/providers/openai/vision";
 import type { Capabilities } from "@/providers/types";
 
 const IMAGE_PROVIDERS: Record<ProviderId, ImageProvider> = {
@@ -25,11 +27,15 @@ const VIDEO_PROVIDERS: Partial<Record<ProviderId, VideoProvider>> = {
   google: googleVideoProvider,
 };
 
-// Vision: real Gemini (mock-falls-back without GOOGLE_API_KEY). Analysis is a
-// single step, not per-card switchable, so both ids map to the same provider.
+// Vision and art direction: the maker's text model, on either provider.
 const VISION_PROVIDERS: Record<ProviderId, VisionProvider> = {
   google: googleVisionProvider,
-  openai: googleVisionProvider,
+  openai: openaiVisionProvider,
+};
+
+const ART_DIRECTORS: Record<ProviderId, ArtDirector> = {
+  google: googleArtDirector,
+  openai: openaiArtDirector,
 };
 
 function resolveId(idOrCard: ProviderId | Card): ProviderId {
@@ -46,8 +52,7 @@ export function getVideoProvider(
   return VIDEO_PROVIDERS[resolveId(idOrCard)];
 }
 
-// Vision defaults to google; returns a VisionProvider, never undefined.
-export function getVisionProvider(id: ProviderId = "google"): VisionProvider {
+export function getVisionProvider(id: ProviderId): VisionProvider {
   return VISION_PROVIDERS[id];
 }
 
@@ -61,9 +66,8 @@ export const CAPABILITY_MAP: Record<ProviderId, Capabilities> = {
   openai: openaiImageProvider.capabilities,
 };
 
-// Art director — one provider (Gemini text; mock-falls-back without a key).
-export function getArtDirector(): ArtDirector {
-  return googleArtDirector;
+export function getArtDirector(id: ProviderId): ArtDirector {
+  return ART_DIRECTORS[id];
 }
 
 export { getStorageProvider } from "@/providers/storage";

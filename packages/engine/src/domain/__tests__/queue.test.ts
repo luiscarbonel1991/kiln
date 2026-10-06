@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyGenerationError,
+  describeProviderError,
   hadResponse,
   retryDecision,
 } from "@/domain/queue";
@@ -70,5 +71,53 @@ describe("hadResponse", () => {
       hadResponse(Object.assign(new Error("aborted"), { name: "AbortError" })),
     ).toBe(false);
     expect(hadResponse(null)).toBe(false);
+  });
+});
+
+describe("provider errors in plain words", () => {
+  const spendCap = Object.assign(
+    new Error(
+      "Your project has exceeded its monthly spending cap. Manage it at https://ai.studio/spend",
+    ),
+    { status: 429 },
+  );
+  const quota = Object.assign(new Error("You exceeded your current quota"), {
+    status: 429,
+    code: "insufficient_quota",
+  });
+
+  it("Google's spend cap names the fix and OpenAI, and is never retried", () => {
+    expect(describeProviderError("google", spendCap)).toBe(
+      "Google is at its spend cap — raise it at ai.studio/spend or use OpenAI.",
+    );
+    expect(classifyGenerationError(spendCap)).toBe("permanent");
+  });
+
+  it("OpenAI out of quota is never retried; a plain 429 is a rate limit, retried", () => {
+    expect(describeProviderError("openai", quota)).toMatch(
+      /^OpenAI is out of quota/,
+    );
+    expect(classifyGenerationError(quota)).toBe("permanent");
+    expect(describeProviderError("google", withStatus(429))).toBe(
+      "Google is rate-limiting requests — try again in a minute or use OpenAI.",
+    );
+    expect(classifyGenerationError(withStatus(429))).toBe("transient");
+  });
+
+  it("a rejected key names the variable; anything else keeps the provider's words", () => {
+    expect(describeProviderError("openai", withStatus(401))).toBe(
+      "OpenAI rejected the API key (401) — check OPENAI_API_KEY or use Google.",
+    );
+    expect(describeProviderError("google", new Error("socket hang up"))).toBe(
+      "socket hang up",
+    );
+  });
+
+  it("a missing key or a model Kiln does not offer is permanent", () => {
+    for (const name of ["ProviderKeyMissing", "ModelRefused"]) {
+      expect(
+        classifyGenerationError(Object.assign(new Error("x"), { name })),
+      ).toBe("permanent");
+    }
   });
 });
