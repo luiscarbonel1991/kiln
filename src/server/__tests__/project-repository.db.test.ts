@@ -435,6 +435,37 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     await db.generationBatch.delete({ where: { id: batchId } });
   });
 
+  it("the batch estimate names every model its cards run", async () => {
+    const { estimateProjectCards } = await import("@/server/generation-queue");
+    const [saved] = await upsertProducts([product]);
+    const id = await repo.createProject({
+      type: "launch",
+      productId: saved.id,
+      plan,
+      editor,
+    });
+    created.push(id);
+    const one = await estimateProjectCards(id, ["etsy.hero", "etsy.in-use"]);
+    expect(one.models).toEqual([
+      { model: "gpt-image-2", quality: "medium", count: 2 },
+    ]);
+    const card = await db.card.findUniqueOrThrow({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
+    });
+    await db.card.update({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
+      data: {
+        model: { ...(card.model as object), model: "gpt-image-1.5" },
+      },
+    });
+    const two = await estimateProjectCards(id, ["etsy.hero", "etsy.in-use"]);
+    expect(two.models.map((m) => [m.model, m.count])).toEqual([
+      ["gpt-image-2", 1],
+      ["gpt-image-1.5", 1],
+    ]);
+    expect(two.model).toBe("gpt-image-2, gpt-image-1.5");
+  });
+
   it("reordering photos and approving at once both persist", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({

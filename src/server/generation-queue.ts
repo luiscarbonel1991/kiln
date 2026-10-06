@@ -34,6 +34,13 @@ import { loadProject } from "@/server/project-repository";
 // The queue's entry points for the app: estimate and enqueue a planned
 // project's cards, and the per-process worker.
 
+// A model the batch runs, with its pinned quality and how many cards use it.
+export interface BatchModel {
+  model: string;
+  quality: ImagePrice["quality"];
+  count: number;
+}
+
 export interface CardEstimate {
   cardId: string;
   request: GenerationRequest;
@@ -48,8 +55,10 @@ export async function estimateProjectCards(
   cardIds: string[],
 ): Promise<{
   cards: CardEstimate[];
+  // Every model the cards run (not only the first card's), and the batch's
+  // label for them.
+  models: BatchModel[];
   model: string;
-  quality: ImagePrice["quality"];
 }> {
   const project = await loadProject(projectId);
   if (!project?.master || !project.understanding) {
@@ -80,12 +89,20 @@ export async function estimateProjectCards(
       maxMicros: toMicros(estimate.max),
     };
   });
-  const first = cards[0]?.request.model;
-  return {
-    cards,
-    model: first?.model ?? "",
-    quality: first ? (imagePrice(first)?.quality ?? null) : null,
-  };
+  const models = new Map<string, BatchModel>();
+  for (const { request } of cards) {
+    const seen = models.get(request.model.model);
+    if (seen) seen.count++;
+    else {
+      models.set(request.model.model, {
+        model: request.model.model,
+        quality: imagePrice(request.model)?.quality ?? null,
+        count: 1,
+      });
+    }
+  }
+  const list = [...models.values()];
+  return { cards, models: list, model: list.map((m) => m.model).join(", ") };
 }
 
 // Queue a planned project's cards as one batch and wake the worker.

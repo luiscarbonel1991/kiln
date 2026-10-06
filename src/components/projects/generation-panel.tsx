@@ -16,8 +16,8 @@ export interface BatchEstimate {
   count: number;
   typicalMicros: number;
   maxMicros: number;
-  model: string;
-  quality: string | null;
+  // Every model the batch runs, with its quality and card count.
+  models: { model: string; quality: string | null; count: number }[];
 }
 
 // The board's generate panel (ROADMAP principle 8, "cost before spend, one
@@ -130,7 +130,7 @@ export function GenerationPanel({
       <p className="font-mono text-[0.65rem] leading-snug text-on-surface-mid">
         {mode === "mock"
           ? "Mock mode: nothing is paid or counted."
-          : `This month: ${money(budget.spentMicros)} spent${budget.reservedMicros > 0 ? ` + ${money(budget.reservedMicros)} queued` : ""} of ${money(budget.capMicros)} (counted since 2026-10-04).`}
+          : `This month: ${money(budget.spentMicros)} spent${budget.reservedMicros > 0 ? ` + ${money(budget.reservedMicros)} queued` : ""} of ${money(budget.capMicros)} (this calendar month, UTC).`}
       </p>
 
       {confirming && estimate ? (
@@ -149,10 +149,16 @@ export function GenerationPanel({
               Generate {estimate.count} scene{estimate.count === 1 ? "" : "s"}?
             </h3>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 font-sans text-sm">
-              <dt className="text-on-surface-mid">Model</dt>
+              <dt className="text-on-surface-mid">
+                {estimate.models.length === 1 ? "Model" : "Models"}
+              </dt>
               <dd className="font-mono text-[0.8rem] text-foreground">
-                {estimate.model}
-                {estimate.quality ? `, quality ${estimate.quality}` : ""}
+                {estimate.models
+                  .map(
+                    (m) =>
+                      `${m.model}${m.quality ? `, quality ${m.quality}` : ""}${estimate.models.length > 1 ? ` × ${m.count}` : ""}`,
+                  )
+                  .join("; ")}
               </dd>
               <dt className="text-on-surface-mid">Estimated</dt>
               <dd className="text-foreground">
