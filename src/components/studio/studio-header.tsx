@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, LayoutGrid, Plus } from "lucide-react";
+import { ArrowLeft, LayoutGrid, Plus, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { AutosaveStatus } from "@/components/studio/autosave-status";
 import { PhaseIndicator } from "@/components/studio/phase-indicator";
@@ -53,6 +53,11 @@ export function StudioHeader({
         ) : (
           <>
             <ProjectsButton onOpen={onOpenGallery} />
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/settings">
+                <Settings2 /> Settings
+              </Link>
+            </Button>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/projects/new">
                 <Plus /> New project
