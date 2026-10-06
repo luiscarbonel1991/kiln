@@ -8,7 +8,9 @@ import type {
 } from "@/domain/persisted-project";
 import {
   approveSlot,
+  moveSlot,
   ProjectPlan,
+  type SlotMove,
   type SlotRef,
   slotCardId,
   unapproveSlot,
@@ -483,6 +485,34 @@ export async function setSlotOff(
       where: { id: projectId },
       data: {
         plan: withSlotOff(plan, ref, off) as unknown as Prisma.InputJsonValue,
+      },
+    });
+  });
+}
+
+// Reorder a destination's slots (the photo order). Locked like approvals.
+export async function setSlotOrder(
+  projectId: string,
+  ref: SlotRef,
+  move: SlotMove,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true },
+    });
+    const plan = ProjectPlan.parse(project.plan);
+    await tx.project.update({
+      where: { id: projectId },
+      data: {
+        plan: moveSlot(plan, ref, move) as unknown as Prisma.InputJsonValue,
       },
     });
   });

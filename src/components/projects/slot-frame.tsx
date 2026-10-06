@@ -71,12 +71,24 @@ export function SlotFrame({
   );
 }
 
-// "Etsy photo 3" on a sale destination, "Slide 3" on a content one.
+// "Etsy photo 3" on a sale destination, "Slide 3" on a content one; the
+// number counts only the slots switched on (`index` null = off).
 export function slotPosition(
   destination: { name: string; kind: "sale" | "content" },
-  index: number,
+  index: number | null,
 ): string {
+  if (index === null) {
+    return destination.kind === "sale"
+      ? `${destination.name} · off`
+      : "Slide · off";
+  }
   return destination.kind === "sale"
     ? `${destination.name} photo ${index + 1}`
     : `Slide ${index + 1}`;
+}
+
+// Each slot's place among the slots switched on (null when off).
+export function onIndexes(off: boolean[]): (number | null)[] {
+  let next = 0;
+  return off.map((isOff) => (isOff ? null : next++));
 }

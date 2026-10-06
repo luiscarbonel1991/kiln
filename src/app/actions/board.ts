@@ -7,6 +7,7 @@ import {
   ACCEPTED_IMAGE_MIME,
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
+import { SlotMove } from "@/domain/plan";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { slotCards } from "@/lib/project-start";
 import { getStorageProvider } from "@/providers/registry";
@@ -15,6 +16,7 @@ import {
   setProjectReference,
   setSlotApproval,
   setSlotOff,
+  setSlotOrder,
 } from "@/server/project-repository";
 
 // Board mutations. Server Functions are POST-reachable: Zod is the trust
@@ -97,5 +99,19 @@ export async function addReferenceAction(formData: FormData): Promise<void> {
         )
       : [];
   await setProjectReference(projectId, master, cards);
+  refresh();
+}
+
+const Move = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  slotKey: z.string().min(1),
+  move: SlotMove,
+});
+
+// Reorder a destination's photos: make a slot photo 1, or move it one place.
+export async function moveSlotAction(input: z.infer<typeof Move>) {
+  const { projectId, destinationId, slotKey, move } = Move.parse(input);
+  await setSlotOrder(projectId, { destinationId, slotKey }, move);
   refresh();
 }

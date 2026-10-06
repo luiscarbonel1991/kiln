@@ -435,6 +435,40 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     await db.generationBatch.delete({ where: { id: batchId } });
   });
 
+  it("reordering photos and approving at once both persist", async () => {
+    const [saved] = await upsertProducts([product]);
+    const id = await repo.createProject({
+      type: "launch",
+      productId: saved.id,
+      plan,
+      editor,
+    });
+    created.push(id);
+    await db.card.update({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.hero" } },
+      data: { status: "done", outputs: ["https://x/hero.png"] },
+    });
+    await Promise.all([
+      repo.setSlotOrder(
+        id,
+        { destinationId: "etsy", slotKey: "in-use" },
+        "first",
+      ),
+      repo.setSlotApproval(
+        id,
+        { destinationId: "etsy", slotKey: "hero" },
+        true,
+      ),
+    ]);
+    const slots = (
+      (await db.project.findUniqueOrThrow({ where: { id } })).plan as {
+        destinations: { slots: { key: string; approvedOutput?: string }[] }[];
+      }
+    ).destinations[0].slots;
+    expect(slots.map((s) => s.key)).toEqual(["in-use", "hero"]);
+    expect(slots[1].approvedOutput).toBe("https://x/hero.png");
+  });
+
   it("a delivery stamps what it exported; a new approval clears the stamp", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({

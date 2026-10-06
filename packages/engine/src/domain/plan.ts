@@ -254,6 +254,47 @@ export function unapproveSlot(plan: ProjectPlan, ref: SlotRef): ProjectPlan {
   );
 }
 
+export const SlotMove = z.enum(["first", "earlier", "later"]);
+export type SlotMove = z.infer<typeof SlotMove>;
+
+// Reorder a destination's slots (the order is the photo order: the first is
+// the listing's thumbnail). "first" puts the slot first; "earlier" / "later"
+// swap it with the nearest slot switched on before / after it, so switched-off
+// slots never take a turn. A move with nowhere to go returns the plan as is;
+// a real move renumbers the photos, so the destination's last export no
+// longer matches and its delivery stamps are cleared.
+export function moveSlot(
+  plan: ProjectPlan,
+  ref: SlotRef,
+  move: SlotMove,
+): ProjectPlan {
+  return {
+    destinations: plan.destinations.map((d) => {
+      if (d.destinationId !== ref.destinationId) return d;
+      const from = d.slots.findIndex((s) => s.key === ref.slotKey);
+      if (from < 0) {
+        throw new Error(`no slot "${ref.slotKey}" on "${ref.destinationId}"`);
+      }
+      const slots = [...d.slots];
+      if (move === "first") {
+        if (from === 0) return d;
+        const [slot] = slots.splice(from, 1);
+        slots.unshift(slot);
+      } else {
+        const step = move === "earlier" ? -1 : 1;
+        let to = from + step;
+        while (to >= 0 && to < slots.length && slots[to].off) to += step;
+        if (to < 0 || to >= slots.length) return d;
+        [slots[from], slots[to]] = [slots[to], slots[from]];
+      }
+      return {
+        ...d,
+        slots: slots.map(({ deliveredAt: _d, ...slot }) => slot),
+      };
+    }),
+  };
+}
+
 // What keeps a destination from being delivered: the slots switched on that
 // are not ready (an exact frame always is; a scene once its current output is
 // approved), and scenes that carry text on the image (composited at export

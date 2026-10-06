@@ -4,6 +4,7 @@ import {
   ApproveButton,
   DeliverButton,
   ReferenceUpload,
+  SlotOrder,
   SlotSwitch,
 } from "@/components/projects/board-actions";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
@@ -14,6 +15,7 @@ import {
 import { GenerationPoller } from "@/components/projects/generation-poller";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
+  onIndexes,
   SlotFrame,
   SlotGrid,
   slotPosition,
@@ -146,8 +148,20 @@ export function ProjectBoard({
           </p>
         </div>
 
-        {rows.map(({ plan, destination, slots }) =>
-          destination ? (
+        {rows.map(({ plan, destination, slots }) => {
+          if (!destination) {
+            return (
+              <p
+                key={plan.destinationId}
+                className="font-mono text-[0.7rem] text-on-surface-dim"
+              >
+                Destination "{plan.destinationId}" is no longer in the catalog.
+              </p>
+            );
+          }
+          const places = onIndexes(slots.map((s) => s.slot.off === true));
+          const last = places.filter((p) => p !== null).length - 1;
+          return (
             <section key={plan.destinationId} className="flex flex-col gap-3">
               <h2 className="flex items-baseline gap-3">
                 <span className="font-serif text-xl italic text-foreground">
@@ -166,7 +180,7 @@ export function ProjectBoard({
                 {slots.map(({ slot, cardId, card, view }, i) => (
                   <SlotFrame
                     key={slot.key}
-                    position={slotPosition(destination, i)}
+                    position={slotPosition(destination, places[i])}
                     label={slot.label}
                     purpose={slot.purpose}
                     aspect={slot.aspect}
@@ -179,6 +193,18 @@ export function ProjectBoard({
                         cardId={cardId}
                         view={view}
                         hasReference={board.master !== null}
+                        order={
+                          places[i] === null
+                            ? null
+                            : {
+                                place: places[i] ?? 0,
+                                last,
+                                firstLabel:
+                                  destination.kind === "sale"
+                                    ? "Make photo 1"
+                                    : "Make slide 1",
+                              }
+                        }
                       />
                     }
                   >
@@ -209,15 +235,8 @@ export function ProjectBoard({
                 ))}
               </SlotGrid>
             </section>
-          ) : (
-            <p
-              key={plan.destinationId}
-              className="font-mono text-[0.7rem] text-on-surface-dim"
-            >
-              Destination "{plan.destinationId}" is no longer in the catalog.
-            </p>
-          ),
-        )}
+          );
+        })}
       </div>
 
       <aside className="flex w-full flex-shrink-0 flex-col gap-5 lg:w-[300px]">
@@ -295,6 +314,9 @@ export function ProjectBoard({
                 />
               </div>
               <ul className="flex flex-col gap-1 pt-1 font-mono text-[0.65rem] text-on-surface-mid">
+                {count("delivered") > 0 ? (
+                  <li>{count("delivered")} delivered</li>
+                ) : null}
                 <li>{count("exact")} exact, from the spec</li>
                 <li>
                   {count("approved")} of {scenes} scenes approved
@@ -334,6 +356,7 @@ function SlotActions({
   cardId,
   view,
   hasReference,
+  order,
 }: {
   projectId: string;
   destinationId: string;
@@ -341,6 +364,7 @@ function SlotActions({
   cardId: string;
   view: SlotView;
   hasReference: boolean;
+  order: { place: number; last: number; firstLabel: string } | null;
 }) {
   const toggle = (
     <SlotSwitch
@@ -350,9 +374,26 @@ function SlotActions({
       off={view.state === "off"}
     />
   );
-  if (slot.fill === "exact" || view.state === "off") return toggle;
+  const ordering = order ? (
+    <SlotOrder
+      projectId={projectId}
+      destinationId={destinationId}
+      slotKey={slot.key}
+      {...order}
+    />
+  ) : null;
+  if (view.state === "off") return toggle;
+  if (slot.fill === "exact") {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {toggle}
+        {ordering}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {ordering}
       {view.state === "to-review" || view.state === "approved" ? (
         <ApproveButton
           projectId={projectId}

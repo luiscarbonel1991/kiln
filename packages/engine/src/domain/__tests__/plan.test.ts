@@ -4,6 +4,7 @@ import {
   approveSlot,
   deliveryBlockers,
   destinationsFor,
+  moveSlot,
   parseSlotCardId,
   parseSlotRecipeId,
   planCounts,
@@ -428,5 +429,74 @@ describe("delivery", () => {
     expect(
       unapproveSlot(stamped, hero).destinations[0].slots[0],
     ).not.toHaveProperty("deliveredAt");
+  });
+});
+
+describe("photo order", () => {
+  const launch = () =>
+    planProject({
+      product: CUTTING_BOARD,
+      type: "launch",
+      destinationIds: ["shop", "social"],
+      catalog,
+    });
+  const keys = (p: ReturnType<typeof launch>) =>
+    p.destinations[0].slots.map((s) => s.key);
+  const ref = (slotKey: string) => ({ destinationId: "shop", slotKey });
+
+  it("makes a slot photo 1, and moves one place at a time", () => {
+    expect(keys(launch())).toEqual(["hero", "colours", "personalize"]);
+    expect(keys(moveSlot(launch(), ref("personalize"), "first"))).toEqual([
+      "personalize",
+      "hero",
+      "colours",
+    ]);
+    expect(keys(moveSlot(launch(), ref("hero"), "later"))).toEqual([
+      "colours",
+      "hero",
+      "personalize",
+    ]);
+    expect(keys(moveSlot(launch(), ref("colours"), "earlier"))).toEqual([
+      "colours",
+      "hero",
+      "personalize",
+    ]);
+    // Nowhere to go: unchanged; the other destination is untouched.
+    expect(keys(moveSlot(launch(), ref("hero"), "earlier"))).toEqual(
+      keys(launch()),
+    );
+    const moved = moveSlot(launch(), ref("hero"), "later");
+    expect(moved.destinations[1]).toEqual(launch().destinations[1]);
+  });
+
+  it("a move renumbers the photos, so the last export's stamps are cleared", () => {
+    const stamped = withDelivered(
+      launch(),
+      "shop",
+      [{ key: "colours" }, { key: "personalize" }],
+      "2026-10-06T10:00:00.000Z",
+    );
+    const moved = moveSlot(stamped, ref("personalize"), "first");
+    expect(
+      moved.destinations[0].slots.every((s) => s.deliveredAt === undefined),
+    ).toBe(true);
+    // No real move, nothing cleared.
+    const still = moveSlot(stamped, ref("hero"), "first");
+    expect(still.destinations[0].slots[1].deliveredAt).toBeDefined();
+  });
+
+  it("a move steps over switched-off slots", () => {
+    const off = withSlotOff(launch(), ref("colours"), true);
+    expect(keys(moveSlot(off, ref("hero"), "later"))).toEqual([
+      "personalize",
+      "colours",
+      "hero",
+    ]);
+  });
+
+  it("an unknown slot is refused", () => {
+    expect(() => moveSlot(launch(), ref("nope"), "first")).toThrow(
+      'no slot "nope"',
+    );
   });
 });

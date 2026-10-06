@@ -1,17 +1,21 @@
 "use client";
 
 import {
+  ArrowLeft,
+  ArrowRight,
   Check,
   Eye,
   EyeOff,
   ImagePlus,
   Loader2,
   PackageCheck,
+  Star,
   Undo2,
 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import {
   addReferenceAction,
+  moveSlotAction,
   setSlotApprovalAction,
   setSlotOffAction,
 } from "@/app/actions/board";
@@ -213,5 +217,64 @@ export function DeliverButton({
         </p>
       ) : null}
     </div>
+  );
+}
+
+// The photo order: make a slot the first (the listing's thumbnail: often the
+// in-use shot, not the studio hero), or move it one place.
+export function SlotOrder({
+  projectId,
+  destinationId,
+  slotKey,
+  place,
+  last,
+  firstLabel,
+}: {
+  projectId: string;
+  destinationId: string;
+  slotKey: string;
+  place: number;
+  last: number;
+  firstLabel: string;
+}) {
+  const [pending, startTransition] = useTransition();
+  const move = (to: "first" | "earlier" | "later") =>
+    startTransition(() =>
+      moveSlotAction({ projectId, destinationId, slotKey, move: to }),
+    );
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {place > 0 ? (
+        <Button
+          variant="ghost"
+          size="xs"
+          disabled={pending}
+          onClick={() => move("first")}
+        >
+          {pending ? <Loader2 className="animate-spin" /> : <Star />}
+          {firstLabel}
+        </Button>
+      ) : null}
+      <Button
+        variant="ghost"
+        size="xs"
+        aria-label="Move earlier"
+        title="Move earlier"
+        disabled={pending || place === 0}
+        onClick={() => move("earlier")}
+      >
+        <ArrowLeft />
+      </Button>
+      <Button
+        variant="ghost"
+        size="xs"
+        aria-label="Move later"
+        title="Move later"
+        disabled={pending || place >= last}
+        onClick={() => move("later")}
+      >
+        <ArrowRight />
+      </Button>
+    </span>
   );
 }

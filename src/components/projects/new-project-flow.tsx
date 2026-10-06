@@ -8,6 +8,7 @@ import { importProductsAction } from "@/app/actions/products";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
+  onIndexes,
   SlotFrame,
   SlotGrid,
   slotPosition,
@@ -358,10 +359,15 @@ export function NewProjectFlow({
                     {d.slots.map((slot, i) => {
                       const id = slotCardId(d.destinationId, slot.key);
                       const isOff = off.includes(id);
+                      const place = onIndexes(
+                        d.slots.map((s) =>
+                          off.includes(slotCardId(d.destinationId, s.key)),
+                        ),
+                      )[i];
                       return (
                         <SlotFrame
                           key={slot.key}
-                          position={slotPosition(destination, i)}
+                          position={slotPosition(destination, place)}
                           label={slot.label}
                           purpose={slot.purpose}
                           aspect={slot.aspect}
