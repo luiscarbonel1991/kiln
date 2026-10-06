@@ -275,6 +275,61 @@ describe.skipIf(!enabled)(
       expect(f.status).toBe("canceled");
     });
 
+    it("a canceled batch never pays: no claim, no call mark, no retry", async () => {
+      // A mode no other test claims, so only these rows are in play.
+      const mode = "cancel-test" as never;
+      const { batchId } = await repo.enqueueBatch({
+        ...base(),
+        mode,
+        jobs: [job("cx", 1), job("cy", 1)],
+      });
+      const [running] = await repo.claimJobs(mode, 1, 60);
+      expect(running.cardId).toBe("cx");
+      // Only the queued job is canceled; the running one finishes.
+      expect(await repo.cancelBatch(makerId, batchId)).toBe(1);
+      expect(await repo.markCallStarted(running.id, running.leaseToken)).toBe(
+        false,
+      );
+      expect(
+        await repo.failJob(running.id, running.leaseToken, "503", {
+          retry: true,
+          mayBeCharged: false,
+        }),
+      ).toBe(true);
+      const after = await db.generationJob.findUniqueOrThrow({
+        where: { id: running.id },
+      });
+      expect(after.status).toBe("canceled");
+      expect(after.finishedAt).not.toBeNull();
+      expect(await repo.claimJobs(mode, 10, 60)).toEqual([]);
+    });
+
+    it("the sweep cancels a canceled batch's expired and leftover jobs", async () => {
+      const mode = "cancel-sweep" as never;
+      const { batchId } = await repo.enqueueBatch({
+        ...base(),
+        mode,
+        jobs: [job("sx", 1), job("sy", 1)],
+      });
+      const [running] = await repo.claimJobs(mode, 1, 60);
+      await repo.cancelBatch(makerId, batchId);
+      // A retry that slipped past the cancel, and a worker that died.
+      await db.generationJob.updateMany({
+        where: { batchId, cardId: "sy" },
+        data: { status: "queued" },
+      });
+      await db.generationJob.update({
+        where: { id: running.id },
+        data: { leaseUntil: new Date(Date.now() - 1000) },
+      });
+      expect(await repo.requeueExpired(mode)).toBe(1);
+      const jobs = await db.generationJob.findMany({ where: { batchId } });
+      expect(jobs.map((j) => j.status).sort()).toEqual([
+        "canceled",
+        "canceled",
+      ]);
+    });
+
     it("the polled state carries each card's latest job, the budget and a changing version", async () => {
       const before = await repo.projectGenerationState(makerId, projectId);
       expect(before.jobs.f.status).toBe("canceled");

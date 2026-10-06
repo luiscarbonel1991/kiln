@@ -78,12 +78,12 @@ async function storeWithRetries(
   throw last;
 }
 
-// The job lost its lease, or its project was deleted, before the paid call:
-// nothing was spent, and there is nothing to retry from here.
+// The job lost its lease, its project was deleted or its batch canceled
+// before the paid call: nothing was spent, and there is nothing to retry.
 class CallNotStarted extends Error {
   constructor() {
     super(
-      "The job lost its lease or its project before the paid call; nothing was spent.",
+      "The job was canceled, or lost its lease or its project, before the paid call; nothing was spent.",
     );
     this.name = "CallNotStarted";
   }

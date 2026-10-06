@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import type { GenerationRequest } from "@/domain/generation-request";
 import { ProjectPlan, sceneCardIds } from "@/domain/plan";
@@ -18,7 +18,8 @@ import { assertDatabaseUrl, db } from "@/lib/db";
 // which is always recorded. A job pays for at most one call: "callStartedAt"
 // is stamped under the lease right before the paid request, and a job with it
 // set is never requeued; finished without a measured cost, it counts at its
-// estimate. Money is in micro-dollars.
+// estimate. A job whose batch was canceled never starts a call and is never
+// requeued. Money is in micro-dollars.
 
 export type ProviderMode = "live" | "mock";
 
@@ -61,6 +62,11 @@ export interface Budget {
 }
 
 const CENT_MICROS = 10_000;
+
+// A job that must not start again: its batch was canceled.
+const STOPPED = Prisma.sql`EXISTS (
+  SELECT 1 FROM "GenerationBatch" b
+  WHERE b."id" = j."batchId" AND b."canceledAt" IS NOT NULL)`;
 
 type Tx = Prisma.TransactionClient;
 
@@ -208,7 +214,8 @@ export async function enqueueBatch(input: {
 }
 
 // Claim up to `limit` queued jobs of this process's mode, oldest batch first,
-// in slot order; never one whose project is gone. SKIP LOCKED: concurrent
+// in slot order; never one whose project is gone or whose batch was canceled.
+// SKIP LOCKED: concurrent
 // claimers (two processes) never take the same job. Each claim gets a fresh lease token and lease. A new job's
 // availableAt is stamped by the app's clock, so the comparison tolerates a few
 // seconds of skew against the database's; retry backoffs (30 s) are stamped by
@@ -221,11 +228,12 @@ export async function claimJobs(
   assertDatabaseUrl();
   const claimed = await db.$queryRaw<{ id: string; leaseToken: string }[]>`
     WITH next AS (
-      SELECT "id" FROM "GenerationJob"
-      WHERE "status" = 'queued' AND "mode" = ${mode}
-        AND "projectId" IS NOT NULL
-        AND "availableAt" <= now() + interval '5 seconds'
-      ORDER BY "createdAt", "position"
+      SELECT j."id" FROM "GenerationJob" j
+      WHERE j."status" = 'queued' AND j."mode" = ${mode}
+        AND j."projectId" IS NOT NULL
+        AND j."availableAt" <= now() + interval '5 seconds'
+        AND NOT ${STOPPED}
+      ORDER BY j."createdAt", j."position"
       LIMIT ${limit}::int
       FOR UPDATE SKIP LOCKED
     )
@@ -271,17 +279,17 @@ export async function renewLease(
   return count === 1;
 }
 
-// Mark that the paid call is going out, right before it. Guarded by the lease
-// and the project: false = the lease was lost or the project deleted, and the
-// caller must not make the call.
+// Mark that the paid call is going out, right before it. Guarded by the lease,
+// the project and the batch: false = the lease was lost, the project deleted
+// or the batch canceled, and the caller must not make the call.
 export async function markCallStarted(
   id: string,
   token: string,
 ): Promise<boolean> {
   const count = await db.$executeRaw`
-    UPDATE "GenerationJob" SET "callStartedAt" = now()
-    WHERE "id" = ${id} AND "leaseToken" = ${token} AND "status" = 'running'
-      AND "projectId" IS NOT NULL`;
+    UPDATE "GenerationJob" AS j SET "callStartedAt" = now()
+    WHERE j."id" = ${id} AND j."leaseToken" = ${token} AND j."status" = 'running'
+      AND j."projectId" IS NOT NULL AND NOT ${STOPPED}`;
   return count === 1;
 }
 
@@ -341,7 +349,8 @@ export async function completeJob(
 // `mayBeCharged` keeps the call mark (the call was paid, or its outcome is
 // unknown), so the job counts at its estimate until a cost is recorded; such a
 // job is never retried. Otherwise the provider answered with an error, nothing
-// was generated, and the mark is cleared.
+// was generated, and the mark is cleared. A job whose batch was canceled is
+// not retried: it is canceled, unless its call may have been charged.
 export async function failJob(
   id: string,
   token: string,
@@ -351,54 +360,65 @@ export async function failJob(
   if (outcome.retry && outcome.mayBeCharged) {
     throw new Error("a job that may have been charged is never retried");
   }
-  const count = outcome.retry
-    ? await db.$executeRaw`
-        UPDATE "GenerationJob"
-        SET "status" = 'queued', "error" = ${error}, "callStartedAt" = NULL,
-            "availableAt" = now() + make_interval(secs => ${RETRY_BACKOFF_MS / 1000}::int),
-            "leaseToken" = NULL, "leaseUntil" = NULL
-        WHERE "id" = ${id} AND "leaseToken" = ${token} AND "status" = 'running'`
-    : (
-        await db.generationJob.updateMany({
-          where: { id, leaseToken: token, status: "running" },
-          data: {
-            status: "failed",
-            error,
-            finishedAt: new Date(),
-            leaseToken: null,
-            leaseUntil: null,
-            ...(outcome.mayBeCharged ? {} : { callStartedAt: null }),
-          },
-        })
-      ).count;
+  const { retry, mayBeCharged } = outcome;
+  const count = await db.$executeRaw`
+    UPDATE "GenerationJob" AS j
+    SET "status" = CASE
+          WHEN ${mayBeCharged}::boolean THEN 'failed'
+          WHEN ${STOPPED} THEN 'canceled'
+          WHEN ${retry}::boolean THEN 'queued'
+          ELSE 'failed' END,
+        "finishedAt" = CASE
+          WHEN ${retry}::boolean AND NOT ${STOPPED} THEN NULL
+          ELSE now() END,
+        "error" = ${error},
+        "callStartedAt" = CASE WHEN ${mayBeCharged}::boolean THEN j."callStartedAt" END,
+        "availableAt" = now() + make_interval(secs => ${RETRY_BACKOFF_MS / 1000}::int),
+        "leaseToken" = NULL,
+        "leaseUntil" = NULL
+    WHERE j."id" = ${id} AND j."leaseToken" = ${token} AND j."status" = 'running'`;
   return count === 1;
 }
 
 // Jobs whose worker died (lease expired). One that died before its paid call
 // goes back to the queue under the retry rule, so a job that kills its process
-// every time is failed after its last attempt. One that died during or after
-// the call is never requeued — it may have been charged: it fails, and counts
-// at its estimate unless the worker still records the real cost.
+// every time is failed after its last attempt; one whose batch was canceled is
+// canceled instead. One that died during or after the call is never requeued —
+// it may have been charged: it fails, and counts at its estimate unless the
+// worker still records the real cost. The same sweep cancels queued jobs left
+// behind by a cancel. Returns how many expired jobs it closed or requeued.
 export async function requeueExpired(mode: ProviderMode): Promise<number> {
-  return db.$executeRaw`
-    UPDATE "GenerationJob"
-    SET "status" = CASE
-          WHEN "callStartedAt" IS NULL AND "attempt" < "maxAttempts" THEN 'queued'
-          ELSE 'failed' END,
-        "error" = CASE
-          WHEN "callStartedAt" IS NOT NULL
-            THEN 'The worker stopped during the paid call; it may have been charged, so it was not retried.'
-          ELSE COALESCE("error", 'the worker stopped (lease expired)') END,
-        "availableAt" = now() + make_interval(secs => ${RETRY_BACKOFF_MS / 1000}::int),
-        "finishedAt" = CASE
-          WHEN "callStartedAt" IS NULL AND "attempt" < "maxAttempts" THEN NULL
-          ELSE now() END,
-        "leaseToken" = NULL,
-        "leaseUntil" = NULL
-    WHERE "status" = 'running' AND "mode" = ${mode} AND "leaseUntil" < now()`;
+  const [, expired] = await db.$transaction([
+    db.$executeRaw`
+      UPDATE "GenerationJob" AS j
+      SET "status" = 'canceled', "finishedAt" = now()
+      WHERE j."status" = 'queued' AND j."mode" = ${mode} AND ${STOPPED}`,
+    db.$executeRaw`
+      UPDATE "GenerationJob" AS j
+      SET "status" = CASE
+            WHEN j."callStartedAt" IS NOT NULL THEN 'failed'
+            WHEN ${STOPPED} THEN 'canceled'
+            WHEN j."attempt" < j."maxAttempts" THEN 'queued'
+            ELSE 'failed' END,
+          "error" = CASE
+            WHEN j."callStartedAt" IS NOT NULL
+              THEN 'The worker stopped during the paid call; it may have been charged, so it was not retried.'
+            ELSE COALESCE(j."error", 'the worker stopped (lease expired)') END,
+          "availableAt" = now() + make_interval(secs => ${RETRY_BACKOFF_MS / 1000}::int),
+          "finishedAt" = CASE
+            WHEN j."callStartedAt" IS NULL AND NOT ${STOPPED}
+              AND j."attempt" < j."maxAttempts" THEN NULL
+            ELSE now() END,
+          "leaseToken" = NULL,
+          "leaseUntil" = NULL
+      WHERE j."status" = 'running' AND j."mode" = ${mode} AND j."leaseUntil" < now()`,
+  ]);
+  return expired;
 }
 
-// Cancel what has not started; running jobs finish.
+// Cancel what has not started. A running job finishes its call if the call
+// already went out; otherwise it never starts it (markCallStarted) and is
+// never retried (failJob, requeueExpired).
 export async function cancelBatch(
   makerId: string,
   batchId: string,
