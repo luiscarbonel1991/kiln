@@ -1,5 +1,11 @@
 import { Resvg } from "@resvg/resvg-js";
-import type { PlateRequest, PlateResult, Product } from "@/domain/product";
+import type {
+  Dimensions,
+  OutlineBox,
+  PlateRequest,
+  PlateResult,
+  Product,
+} from "@/domain/product";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import type { PlateRenderer } from "@/providers/interfaces";
 
@@ -33,6 +39,54 @@ export function svgBox(svg: string): SvgBox {
   const h = svg.match(/<svg[^>]*\sheight\s*=\s*["']([\d.]+)(px)?["']/i);
   if (w && h) return { x: 0, y: 0, w: +w[1], h: +h[1] };
   throw new Error("SVG has neither a viewBox nor px width/height");
+}
+
+// How far a drawing's proportions (or its calibrated width) may stray from the
+// product's declared dimensions and still be drawn to scale.
+const OUTLINE_TOLERANCE = 0.03;
+
+const ratio = (n: number) => `${n.toFixed(2)}:1`;
+
+// Measure where a vector product's outline sits in its SVG's frame: the bounding
+// box of everything drawn (strokes included), as fractions of the viewBox. It is
+// refused when the drawing does not match the product's declared proportions
+// (or, when calibrated, its width): a frame drawn to scale from it would lie.
+export function measureOutline(
+  svg: string,
+  dimensions: Pick<Dimensions, "w" | "h">,
+  scalePxPerUnit?: number,
+): { box: OutlineBox } | { mismatch: string } {
+  const frame = svgBox(svg);
+  const resvg = new Resvg(svg);
+  const drawn = resvg.getBBox() ?? resvg.innerBBox();
+  if (!drawn || drawn.width <= 0 || drawn.height <= 0) {
+    return { mismatch: "its SVG draws nothing" };
+  }
+  const drawnRatio = drawn.width / drawn.height;
+  const declaredRatio = dimensions.w / dimensions.h;
+  if (Math.abs(drawnRatio / declaredRatio - 1) > OUTLINE_TOLERANCE) {
+    return {
+      mismatch: `its SVG's drawing is ${ratio(drawnRatio)} but the product is ${dimensions.w} x ${dimensions.h} (${ratio(declaredRatio)})`,
+    };
+  }
+  if (
+    scalePxPerUnit &&
+    Math.abs(drawn.width / scalePxPerUnit / dimensions.w - 1) >
+      OUTLINE_TOLERANCE
+  ) {
+    return {
+      mismatch: `its SVG's drawing measures ${(drawn.width / scalePxPerUnit).toFixed(2)} wide at its calibration, not ${dimensions.w}`,
+    };
+  }
+  const clamp = (n: number) => Math.min(1, Math.max(0, n));
+  return {
+    box: {
+      x: clamp((drawn.x - frame.x) / frame.w),
+      y: clamp((drawn.y - frame.y) / frame.h),
+      w: clamp(drawn.width / frame.w),
+      h: clamp(drawn.height / frame.h),
+    },
+  };
 }
 
 // Wraps n copies of the drawing in a square document: ground rect + one nested

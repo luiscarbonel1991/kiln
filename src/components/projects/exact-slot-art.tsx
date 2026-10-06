@@ -5,6 +5,7 @@ import {
   type ProductOutline,
   type ScaleReference,
 } from "@/domain/exact";
+import type { PlateImage } from "@/lib/plate-href";
 
 // Draws an exact slot from its view model: plain SVG, no image model, the same
 // pixels every time. Product colours are the spec's hex values (render content);
@@ -20,8 +21,9 @@ const SERIF = { fontFamily: "var(--font-fraunces)" };
 const SANS = { fontFamily: "var(--font-hanken)" };
 const MONO = { fontFamily: "var(--font-jetbrains-mono)" };
 
-// `plate` is the product's own plate image (a vector product's SVG) for the
-// frames drawn to scale; without it they draw the product's outline.
+// `plate` is the product's own plate image (a vector product's SVG, cropped to
+// its measured outline) for the frames drawn to scale; without it they draw
+// the product's outline from the spec.
 export function ExactSlotArt({
   view,
   aspect,
@@ -29,7 +31,7 @@ export function ExactSlotArt({
 }: {
   view: ExactView;
   aspect?: string;
-  plate?: string | null;
+  plate?: PlateImage | null;
 }) {
   const height = heightFor(aspect);
   return (
@@ -164,22 +166,28 @@ function ProductShape({
   h,
 }: {
   outline: ProductOutline;
-  plate: string | null;
+  plate: PlateImage | null;
   x: number;
   y: number;
   w: number;
   h: number;
 }) {
   if (plate) {
+    // The image is scaled so its measured outline fills (x, y, w, h); the
+    // nested viewport crops the drawing's margin away.
+    const iw = w / plate.box.w;
+    const ih = h / plate.box.h;
     return (
-      <image
-        href={plate}
-        x={x}
-        y={y}
-        width={w}
-        height={h}
-        preserveAspectRatio="xMidYMid meet"
-      />
+      <svg x={x} y={y} width={w} height={h} overflow="hidden">
+        <image
+          href={plate.href}
+          x={-plate.box.x * iw}
+          y={-plate.box.y * ih}
+          width={iw}
+          height={ih}
+          preserveAspectRatio="none"
+        />
+      </svg>
     );
   }
   const ink = contrastInk(outline.face);
@@ -371,7 +379,7 @@ function ScaleDrawing({
 }: {
   view: Extract<ExactView, { kind: "scale" }>;
   height: number;
-  plate: string | null;
+  plate: PlateImage | null;
 }) {
   const { product: p, reference: r } = view;
   const gapU = Math.max(p.width, r.width) * 0.3;
@@ -500,7 +508,7 @@ function SizeSpec({
 }: {
   view: Extract<ExactView, { kind: "size-spec" }>;
   height: number;
-  plate: string | null;
+  plate: PlateImage | null;
 }) {
   const boxMaxW = WIDTH - 140;
   const boxMaxH = height * 0.3;

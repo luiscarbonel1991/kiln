@@ -69,6 +69,7 @@ export function NewProjectFlow({
   // Slot card ids ("etsy.gift") the maker switched off for this product.
   const [offSlots, setOffSlots] = useState<string[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [starting, startTransition] = useTransition();
@@ -119,6 +120,7 @@ export function NewProjectFlow({
   async function importFile(file: File) {
     setImporting(true);
     setImportErrors([]);
+    setImportWarnings([]);
     try {
       let json: unknown;
       try {
@@ -139,6 +141,7 @@ export function NewProjectFlow({
       });
       setProductId(result.products[0]?.id ?? null);
       if (result.brand) setBrand(result.brand);
+      setImportWarnings(result.warnings ?? []);
     } catch {
       setImportErrors(["The import failed. Is the database running?"]);
     } finally {
@@ -242,6 +245,13 @@ export function NewProjectFlow({
           <ul className="mt-3 flex flex-col gap-1 rounded-field bg-prov-local/10 px-4 py-3 font-mono text-[0.7rem] text-prov-local">
             {importErrors.map((e) => (
               <li key={e}>{e}</li>
+            ))}
+          </ul>
+        ) : null}
+        {importWarnings.length > 0 ? (
+          <ul className="mt-3 flex flex-col gap-1 rounded-field bg-surface-soft px-4 py-3 font-mono text-[0.7rem] text-on-surface-mid">
+            {importWarnings.map((w) => (
+              <li key={w}>{w}</li>
             ))}
           </ul>
         ) : null}

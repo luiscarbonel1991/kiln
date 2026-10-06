@@ -81,6 +81,18 @@ export const VariantAxis = z.object({
 });
 export type VariantAxis = z.infer<typeof VariantAxis>;
 
+// Where a vector product's outline sits in its SVG's frame (the viewBox), as
+// fractions of that frame. Kiln measures it at import (a package's own value
+// is never kept), so exact frames draw the product to scale whatever margin
+// the drawing carries around it.
+export const OutlineBox = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  w: z.number().positive().max(1),
+  h: z.number().positive().max(1),
+});
+export type OutlineBox = z.infer<typeof OutlineBox>;
+
 // Where the product definition comes from. `catalog` = a maker's code catalog,
 // exported as a product package; `vector` = a traced or drawn SVG
 // (the maker on-ramp, see PRODUCT-MODEL.md); `photo` = only a photo exists
@@ -95,6 +107,7 @@ export const ProductSource = z.discriminatedUnion("kind", [
     kind: z.literal("vector"),
     svgUrl: z.string().min(1),
     scalePxPerUnit: z.number().positive().optional(),
+    outlineBox: OutlineBox.optional(),
   }),
   z.object({ kind: z.literal("photo"), assetUrl: z.string().min(1) }),
   z.object({ kind: z.literal("form") }),

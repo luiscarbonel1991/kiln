@@ -9,7 +9,7 @@ import { Product } from "@/domain/product";
 // kit for text layers). Example: src/lib/__fixtures__/product-package.json.
 
 export type PackageResult =
-  | { ok: true; products: Product[]; brand?: BrandKit }
+  | { ok: true; products: Product[]; brand?: BrandKit; warnings?: string[] }
   | { ok: false; errors: string[] };
 
 const MAX_ERRORS = 12;

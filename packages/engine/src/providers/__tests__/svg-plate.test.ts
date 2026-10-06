@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { PlateRequest } from "@/domain/product";
-import { composePlateSvg, rasterize, svgBox } from "@/providers/plates/svg";
+import {
+  composePlateSvg,
+  measureOutline,
+  rasterize,
+  svgBox,
+} from "@/providers/plates/svg";
 
 const disc = `<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 250"><circle cx="125" cy="125" r="125" fill="#4B5F50"/><text x="125" y="150" font-size="80" text-anchor="middle" fill="#fff">01</text></svg>`;
 
@@ -18,6 +23,53 @@ describe("svgBox", () => {
   });
   it("throws without a size", () => {
     expect(() => svgBox("<svg></svg>")).toThrow();
+  });
+});
+
+describe("measureOutline", () => {
+  // A 4 in coaster drawn with a margin: the circle (stroke included) spans
+  // 2.5..97.5 of a 100-unit frame.
+  const coaster = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#D9B98C" stroke="#5B3A29" stroke-width="3"/></svg>`;
+
+  it("finds the drawing inside its margin, as fractions of the frame", () => {
+    const measured = measureOutline(coaster, { w: 4, h: 4 });
+    expect("box" in measured && measured.box).toEqual({
+      x: 0.025,
+      y: 0.025,
+      w: 0.95,
+      h: 0.95,
+    });
+  });
+
+  it("works in the frame's own units, whatever its origin or rendered size", () => {
+    const offset = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 20 200 100" width="400" height="200"><rect x="30" y="40" width="100" height="50"/></svg>`;
+    const measured = measureOutline(offset, { w: 6, h: 3 });
+    expect("box" in measured && measured.box).toEqual({
+      x: 0.1,
+      y: 0.2,
+      w: 0.5,
+      h: 0.5,
+    });
+  });
+
+  it("refuses a drawing whose proportions are not the product's", () => {
+    const measured = measureOutline(coaster, { w: 5, h: 3 });
+    expect("mismatch" in measured && measured.mismatch).toContain(
+      "is 1.00:1 but the product is 5 x 3 (1.67:1)",
+    );
+  });
+
+  it("checks the calibrated width when the drawing has one", () => {
+    expect("box" in measureOutline(coaster, { w: 4, h: 4 }, 23.75)).toBe(true);
+    const off = measureOutline(coaster, { w: 4, h: 4 }, 10);
+    expect("mismatch" in off && off.mismatch).toContain("9.50 wide");
+  });
+
+  it("an empty drawing has no outline", () => {
+    const empty = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"></svg>`;
+    expect(measureOutline(empty, { w: 1, h: 1 })).toEqual({
+      mismatch: "its SVG draws nothing",
+    });
   });
 });
 
