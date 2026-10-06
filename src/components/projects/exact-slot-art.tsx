@@ -178,7 +178,14 @@ function ProductShape({
     const iw = w / plate.box.w;
     const ih = h / plate.box.h;
     return (
-      <svg x={x} y={y} width={w} height={h} overflow="hidden">
+      <svg
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        overflow="hidden"
+        aria-hidden="true"
+      >
         <image
           href={plate.href}
           x={-plate.box.x * iw}
