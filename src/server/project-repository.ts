@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { Card } from "@/domain/card";
+import { modelPriced } from "@/domain/generation-cost";
 import type { MasterAsset } from "@/domain/master-asset";
+import { assertModel, ModelRefused } from "@/domain/model-defaults";
 import type {
   PersistedProject,
   PersistedProjectRecord,
@@ -535,6 +537,62 @@ export async function setVideoChoice(
           ref,
           choice,
         ) as unknown as Prisma.InputJsonValue,
+      },
+    });
+  });
+}
+
+// Switch one card to another model (the board's per-slot choice): one Kiln
+// offers for the card's kind, with a pinned price. Only the model's identity
+// and what prices it change (quality, resolution); its aspect and tuning stay.
+// A job already queued keeps the request it snapshotted.
+export async function setCardModel(
+  projectId: string,
+  cardId: string,
+  model: {
+    provider: "google" | "openai";
+    model: string;
+    quality?: "low" | "medium" | "high";
+    resolution?: "720p" | "1080p";
+  },
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const row = await tx.card.findUnique({
+      where: { projectId_cardId: { projectId, cardId } },
+      select: { type: true, model: true },
+    });
+    if (!row) throw new Error(`card "${cardId}" not found`);
+    const kind = row.type === "video" ? "video" : "image";
+    const entry = assertModel(model, kind);
+    if (!modelPriced(model, kind)) {
+      throw new ModelRefused(`${entry.label} has no pinned price.`);
+    }
+    const {
+      quality: _q,
+      resolution: _r,
+      ...kept
+    } = row.model as Record<string, unknown>;
+    await tx.card.update({
+      where: { projectId_cardId: { projectId, cardId } },
+      data: {
+        model: {
+          ...kept,
+          provider: model.provider,
+          model: model.model,
+          ...(entry.qualities && model.quality
+            ? { quality: model.quality }
+            : {}),
+          ...(entry.seconds && model.resolution
+            ? { resolution: model.resolution }
+            : {}),
+        } as Prisma.InputJsonValue,
       },
     });
   });

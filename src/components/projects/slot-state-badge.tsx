@@ -41,6 +41,7 @@ export function SlotStateBadge({ view }: { view: SlotView }) {
         : STYLE[view.state];
   return (
     <span
+      title={view.failed ? view.error : undefined}
       className={cn(
         "inline-flex items-center gap-1 rounded-badge px-[7px] py-0.5 font-mono text-[0.59375rem]",
         style.className,

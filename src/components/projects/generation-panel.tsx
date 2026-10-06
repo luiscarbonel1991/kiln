@@ -16,25 +16,48 @@ export interface BatchEstimate {
   count: number;
   typicalMicros: number;
   maxMicros: number;
-  // Every model the batch runs, with its quality and card count.
-  models: { model: string; quality: string | null; count: number }[];
+  // Every model the batch runs, with what prices it and its card count.
+  models: {
+    label: string;
+    quality: string | null;
+    resolution: string | null;
+    count: number;
+  }[];
+  // Each card with its model and price, as the confirmation lists them.
+  cards: {
+    cardId: string;
+    label: string;
+    model: string;
+    typicalMicros: number;
+    maxMicros: number;
+  }[];
+  // A provider the batch uses that may not answer (no key, a failed last
+  // call), in a line each. Nothing is switched on its own.
+  warnings: string[];
 }
+
+const range = (typical: number, max: number) =>
+  money(typical) === money(max)
+    ? money(max)
+    : `≈ ${money(typical)}–${money(max)}`;
 
 // The board's generate panel (ROADMAP principle 8, "cost before spend, one
 // approval per batch"): one button for every waiting scene, a confirmation
-// that states the count, model, estimated range and the month's budget, then
-// the running batch's progress with Cancel. Generation runs in the background.
+// that names every card's model and price, the total and the month's budget,
+// then the running batch's progress with Cancel. Generation runs in the
+// background. When the queue would refuse the batch (a retired model, a
+// provider without a key), the panel says why instead of offering it.
 export function GenerationPanel({
   projectId,
   cardIds,
-  estimate,
+  estimate: given,
   batch,
   budget,
   mode,
 }: {
   projectId: string;
   cardIds: string[];
-  estimate: BatchEstimate | null;
+  estimate: BatchEstimate | { refusal: string } | null;
   batch: BatchProgress | null;
   budget: Budget;
   mode: "live" | "mock";
@@ -42,6 +65,8 @@ export function GenerationPanel({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const estimate = given && "refusal" in given ? null : given;
+  const refusal = given && "refusal" in given ? given.refusal : null;
   const fits =
     mode === "mock" ||
     (estimate !== null &&
@@ -121,11 +146,25 @@ export function GenerationPanel({
           {estimate.count === 1 ? "" : "s"} · ≈ {money(estimate.typicalMicros)}–
           {money(estimate.maxMicros)}
         </Button>
+      ) : refusal ? (
+        <p className="font-mono text-[0.68rem] leading-snug text-prov-local">
+          {refusal}
+        </p>
       ) : batch ? null : (
         <p className="font-sans text-[0.75rem] text-on-surface-mid">
           No scene is waiting.
         </p>
       )}
+      {estimate && estimate.warnings.length > 0
+        ? estimate.warnings.map((w) => (
+            <p
+              key={w}
+              className="font-mono text-[0.65rem] leading-snug text-prov-local"
+            >
+              {w}
+            </p>
+          ))
+        : null}
 
       <p className="font-mono text-[0.65rem] leading-snug text-on-surface-mid">
         {mode === "mock"
@@ -148,15 +187,37 @@ export function GenerationPanel({
             >
               Generate {estimate.count} scene{estimate.count === 1 ? "" : "s"}?
             </h3>
+            <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto font-sans text-[0.8rem]">
+              {estimate.cards.map((c) => (
+                <li
+                  key={c.cardId}
+                  className="flex items-baseline justify-between gap-3 border-b border-border-soft pb-1"
+                >
+                  <span className="min-w-0 truncate text-foreground">
+                    {c.label}
+                    <span className="text-on-surface-mid"> — {c.model}</span>
+                  </span>
+                  <span className="flex-shrink-0 font-mono text-[0.72rem] text-on-surface-mid">
+                    {range(c.typicalMicros, c.maxMicros)}
+                  </span>
+                </li>
+              ))}
+            </ul>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 font-sans text-sm">
               <dt className="text-on-surface-mid">
                 {estimate.models.length === 1 ? "Model" : "Models"}
               </dt>
-              <dd className="font-mono text-[0.8rem] text-foreground">
+              <dd className="text-foreground">
                 {estimate.models
-                  .map(
-                    (m) =>
-                      `${m.model}${m.quality ? `, quality ${m.quality}` : ""}${estimate.models.length > 1 ? ` × ${m.count}` : ""}`,
+                  .map((m) =>
+                    [
+                      m.label,
+                      m.quality,
+                      m.resolution,
+                      estimate.models.length > 1 ? `× ${m.count}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" "),
                   )
                   .join("; ")}
               </dd>
@@ -174,9 +235,14 @@ export function GenerationPanel({
             </dl>
             <p className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
               Kiln runs them in the background, one retry each if a call fails;
-              you can leave this page. The cost is measured from what OpenAI
-              reports.
+              you can leave this page. The cost is measured from what each
+              provider reports.
             </p>
+            {estimate.warnings.map((w) => (
+              <p key={w} className="font-mono text-[0.7rem] text-prov-local">
+                {w}
+              </p>
+            ))}
             {!fits ? (
               <p className="font-mono text-[0.7rem] text-prov-local">
                 This batch would go over the monthly cap.

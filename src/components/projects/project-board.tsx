@@ -1,5 +1,9 @@
 import { ImageIcon, PenLine } from "lucide-react";
 import Link from "next/link";
+import type {
+  ModelValue,
+  ProviderNote,
+} from "@/components/models/model-choice";
 import {
   ApproveButton,
   DeliverButton,
@@ -20,6 +24,7 @@ import {
   SlotGrid,
   slotPosition,
 } from "@/components/projects/slot-frame";
+import { SlotModel } from "@/components/projects/slot-model";
 import { VideoArt } from "@/components/projects/video-art";
 import {
   AddVideoButton,
@@ -135,15 +140,19 @@ export function ProjectBoard({
   estimate,
   mode,
   brand,
+  notes,
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
   product: Product;
   jobs: Record<string, JobView>;
   generation: { version: string; batch: BatchProgress | null; budget: Budget };
-  estimate: BatchEstimate | null;
+  estimate: BatchEstimate | { refusal: string } | null;
   mode: "live" | "mock";
   brand: BrandKit | null;
+  // Each provider's health (free to read): the pickers mark a provider with
+  // no key or a failed last call.
+  notes: ProviderNote[];
 }) {
   const rows = boardRows(board, jobs);
   const waiting = waitingCardIds(rows);
@@ -222,7 +231,12 @@ export function ProjectBoard({
                 {slots.map(({ slot, cardId, card, view }, i) => {
                   const video =
                     slot.fill === "video"
-                      ? videoSettings(plan, slot, destination.video)
+                      ? videoSettings(
+                          plan,
+                          slot,
+                          destination.video,
+                          card?.model,
+                        )
                       : null;
                   return (
                     <SlotFrame
@@ -250,12 +264,13 @@ export function ProjectBoard({
                           cardId={cardId}
                           view={view}
                           hasReference={board.master !== null}
+                          model={card ? (card.model as ModelValue) : null}
+                          notes={notes}
                           video={
                             video && card
                               ? {
                                   settings: video,
                                   scenes: approvedScenes,
-                                  model: card.model.model,
                                   rendered: card.outputs.length > 0,
                                   budgetLine,
                                 }
@@ -438,6 +453,8 @@ function SlotActions({
   hasReference,
   order,
   video,
+  model,
+  notes,
 }: {
   projectId: string;
   destinationId: string;
@@ -449,10 +466,11 @@ function SlotActions({
   video: {
     settings: VideoSettings;
     scenes: { key: string; label: string }[];
-    model: string;
     rendered: boolean;
     budgetLine: string;
   } | null;
+  model: ModelValue | null;
+  notes: ProviderNote[];
 }) {
   const toggle = (
     <SlotSwitch
@@ -482,13 +500,14 @@ function SlotActions({
             approved={view.state === "approved"}
           />
         ) : null}
-        {video ? (
+        {video && model ? (
           <VideoControls
             projectId={projectId}
             destinationId={destinationId}
             slotKey={slot.key}
             cardId={cardId}
-            model={video.model}
+            model={model}
+            notes={notes}
             settings={video.settings}
             scenes={video.scenes}
             busy={view.inBatch === true || view.state === "generating"}
@@ -536,6 +555,20 @@ function SlotActions({
         </span>
       )}
       {view.inBatch ? null : toggle}
+      {hasReference && model ? (
+        <SlotModel
+          projectId={projectId}
+          cardId={cardId}
+          kind="image"
+          value={model}
+          notes={notes}
+          disabled={
+            view.inBatch === true ||
+            view.state === "generating" ||
+            view.state === "retrying"
+          }
+        />
+      ) : null}
       {slot.key === "scale" ? (
         // Plans from before M4 kept an AI scale scene; its size cue can lie
         // (new plans draw the scale exactly).

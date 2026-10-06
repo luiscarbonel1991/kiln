@@ -7,6 +7,11 @@ import {
   ACCEPTED_IMAGE_MIME,
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
+import {
+  ImageQuality,
+  ProviderId,
+  VideoResolution,
+} from "@/domain/model-defaults";
 import { SlotMove } from "@/domain/plan";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { VideoChoice } from "@/domain/video";
@@ -17,6 +22,7 @@ import { getMakerModels } from "@/server/maker-repository";
 import {
   addVideoToPlan,
   loadProjectBoard,
+  setCardModel,
   setProjectReference,
   setSlotApproval,
   setSlotOff,
@@ -162,6 +168,32 @@ export async function addVideoAction(
           models,
         ),
     );
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+  refresh();
+  return {};
+}
+
+const CardModel = z.object({
+  projectId: z.string().min(1),
+  cardId: z.string().min(1),
+  model: z.object({
+    provider: ProviderId,
+    model: z.string().min(1),
+    quality: ImageQuality.optional(),
+    resolution: VideoResolution.optional(),
+  }),
+});
+
+// A slot's own model (the board's picker): refused with the reason when Kiln
+// does not offer it or has no price for it.
+export async function setCardModelAction(
+  input: z.infer<typeof CardModel>,
+): Promise<{ error?: string }> {
+  const { projectId, cardId, model } = CardModel.parse(input);
+  try {
+    await setCardModel(projectId, cardId, model);
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }

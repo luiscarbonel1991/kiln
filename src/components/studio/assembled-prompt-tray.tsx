@@ -1,14 +1,14 @@
 "use client";
 
 import { ChevronDown, RotateCcw } from "lucide-react";
+import { ModelChoice } from "@/components/models/model-choice";
 import { ModelParams } from "@/components/studio/model-params";
-import { ModelPicker } from "@/components/studio/model-picker";
 import { canUse, PROVIDER_CAPABILITIES } from "@/domain/capabilities";
 import type { ModelConfig } from "@/domain/model-config";
 import { cn } from "@/lib/utils";
 
 // Collapsible tray: the editable prompt (override of the assembled prompt) + the
-// per-card provider switch (image cards only) + editable model params + an
+// card's model (both providers, with prices) + editable model params + an
 // optional video meta row. Capability data comes from @/domain (no providers
 // import on the client). Edits apply on the next Generate/Re-roll.
 export function AssembledPromptTray({
@@ -69,10 +69,10 @@ export function AssembledPromptTray({
               </button>
             ) : null}
           </div>
-          <ModelPicker
-            model={model}
-            onEdit={onEditModel}
+          <ModelChoice
             kind={video ? "video" : "image"}
+            value={model}
+            onChange={(next) => onEditModel(next)}
           />
           <ModelParams model={model} onEdit={onEditModel} />
           {video ? (

@@ -20,7 +20,6 @@ export function VideoArt({
 }) {
   if (isRenderableUrl(output)) {
     return isVideo(output) ? (
-      // biome-ignore lint/a11y/useMediaCaption: a silent product clip, no speech to caption
       <video
         src={output}
         className="h-full w-full object-cover"

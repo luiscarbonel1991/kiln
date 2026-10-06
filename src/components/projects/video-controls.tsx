@@ -4,8 +4,14 @@ import { Film, Loader2, Plus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { addVideoAction, setVideoChoiceAction } from "@/app/actions/board";
 import { enqueueGenerationAction } from "@/app/actions/generation";
+import type {
+  ModelValue,
+  ProviderNote,
+} from "@/components/models/model-choice";
+import { SlotModel } from "@/components/projects/slot-model";
 import { Button } from "@/components/ui/button";
 import { estimateVideo, toMicros } from "@/domain/generation-cost";
+import { modelLabel } from "@/domain/model-defaults";
 import type { VideoSettings } from "@/domain/plan";
 import {
   VIDEO_MOTIONS,
@@ -20,17 +26,19 @@ const money = (usd: number) => `$${usd.toFixed(2)}`;
 const SELECT =
   "w-full rounded-field border border-border bg-card px-2 py-1 font-sans text-[0.72rem] text-foreground disabled:opacity-50";
 
-// A video slot's choices and its Generate: the start frame among the approved
-// scenes, the motion, the length the destination accepts, the orientation.
-// Generating opens one confirmation with the pinned price and the month's
-// budget, then queues this card alone (the queue re-derives the request and
-// refuses if its price is higher than the one shown).
+// A video slot's choices and its Generate: the model and its resolution, the
+// start frame among the approved scenes, the motion, the length the model and
+// the destination accept, the orientation. Generating opens one confirmation
+// with the model, its pinned price and the month's budget, then queues this
+// card alone (the queue re-derives the request and refuses if its price is
+// higher than the one shown).
 export function VideoControls({
   projectId,
   destinationId,
   slotKey,
   cardId,
   model,
+  notes,
   settings,
   scenes,
   busy,
@@ -41,7 +49,8 @@ export function VideoControls({
   destinationId: string;
   slotKey: string;
   cardId: string;
-  model: string;
+  model: ModelValue;
+  notes: ProviderNote[];
   settings: VideoSettings;
   scenes: { key: string; label: string }[];
   busy: boolean;
@@ -51,7 +60,7 @@ export function VideoControls({
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const usd = estimateVideo({ provider: "openai", model }, settings.seconds);
+  const usd = estimateVideo(model, settings.seconds);
   const choose = (choice: VideoChoice) =>
     startTransition(() =>
       setVideoChoiceAction({ projectId, destinationId, slotKey, choice }),
@@ -71,6 +80,14 @@ export function VideoControls({
     scenes.find((s) => s.key === settings.from)?.label ?? "an approved scene";
   return (
     <div className="flex w-full flex-col gap-1.5">
+      <SlotModel
+        projectId={projectId}
+        cardId={cardId}
+        kind="video"
+        value={model}
+        notes={notes}
+        disabled={pending || busy}
+      />
       <label className="flex flex-col gap-0.5 font-mono text-[0.58rem] text-on-surface-dim">
         Starts from
         <select
@@ -171,8 +188,9 @@ export function VideoControls({
                   : "vertical 9:16"}
               </dd>
               <dt className="text-on-surface-mid">Model</dt>
-              <dd className="font-mono text-[0.8rem] text-foreground">
-                {model}
+              <dd className="text-foreground">
+                {modelLabel(model)}
+                {model.resolution ? `, ${model.resolution}` : ""}
               </dd>
               <dt className="text-on-surface-mid">Estimated</dt>
               <dd className="text-foreground">

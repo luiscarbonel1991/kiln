@@ -10,11 +10,16 @@ import { CardActions } from "@/components/studio/card-actions";
 import { CardFieldRow } from "@/components/studio/card-field-row";
 import { RenderCanvas } from "@/components/studio/render-canvas";
 import { assemblePrompt, type FieldKey } from "@/domain/cascade";
-import { estimateGeneration } from "@/domain/generation-cost";
+import {
+  estimateGeneration,
+  estimateVideo,
+  toMicros,
+} from "@/domain/generation-cost";
 import type { MasterAsset } from "@/domain/master-asset";
 import { isActiveJob } from "@/domain/queue";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
+import { snapSeconds, videoSecondsFor } from "@/domain/video";
 import { assetFilename, downloadAsset } from "@/lib/download";
 import { gradientForSeed } from "@/lib/gradient";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
@@ -105,6 +110,9 @@ export function GenerationCard({
       const result = await enqueueGenerationAction({
         projectId,
         cardIds: [card.id],
+        // The price shown on the button: the queue refuses if its own is
+        // higher (the card changed since).
+        ...(estimate ? { shownMaxMicros: toMicros(estimate.max) } : {}),
       });
       if ("error" in result) setQueueError(result.error);
     } catch {
@@ -112,7 +120,24 @@ export function GenerationCard({
     }
   }
 
-  const estimate = estimateGeneration(card.model, card.model.aspect);
+  // What one generation of this card costs on its own model: an image at its
+  // aspect and quality, a video at the length its model renders.
+  const videoUsd =
+    card.type === "video"
+      ? estimateVideo(
+          card.model,
+          snapSeconds(
+            card.video?.durationSec,
+            videoSecondsFor(undefined, card.model),
+          ),
+        )
+      : null;
+  const estimate =
+    card.type === "video"
+      ? videoUsd === null
+        ? null
+        : { typical: videoUsd, max: videoUsd }
+      : estimateGeneration(card.model, card.model.aspect);
   const busyLabel =
     job?.status === "queued"
       ? job.attempt >= 1

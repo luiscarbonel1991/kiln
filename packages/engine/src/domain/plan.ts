@@ -271,6 +271,8 @@ export interface CardLike {
 export interface SlotView {
   state: SlotState;
   failed: boolean;
+  // Why the last try failed (the provider's words), when it did.
+  error?: string;
   // Queued or running in the background generation queue.
   inBatch?: boolean;
 }
@@ -278,6 +280,7 @@ export interface SlotView {
 interface JobLike {
   status: "queued" | "running" | "done" | "failed" | "canceled";
   attempt: number;
+  error?: string;
 }
 
 // The state the board shows for a slot, from its card and its latest job. A
@@ -309,14 +312,15 @@ export function slotState(
     };
   }
   const jobFailed = job?.status === "failed";
+  const why = jobFailed && job?.error ? { error: job.error } : {};
   if (!card || card.status === "draft") {
-    return { state: "queued", failed: jobFailed };
+    return { state: "queued", failed: jobFailed, ...why };
   }
   if (card.status === "rendering")
     return { state: "generating", failed: false };
   const output = card.outputs[0];
   if (card.status === "error" || !output) {
-    return { state: "queued", failed: true };
+    return { state: "queued", failed: true, ...why };
   }
   if (slot.approvedOutput !== output) {
     return { state: "to-review", failed: false };

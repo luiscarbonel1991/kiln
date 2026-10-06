@@ -10,7 +10,7 @@ const fieldClass =
   "min-w-0 bg-transparent text-right font-medium text-foreground outline-none focus:text-primary";
 
 // Editable model parameters (aspect, guidance, strength). The model itself is
-// chosen via ModelPicker (image cards) or fixed (video). Persisted via the card's
+// chosen via ModelChoice (image and video cards). Persisted via the card's
 // model; applied on the next Generate/Re-roll.
 export function ModelParams({
   model,

@@ -68,20 +68,19 @@ export function ModelChoice({
   const pick = (next: string) => {
     const choice = catalog.find((m) => `${m.provider}/${m.id}` === next);
     if (!choice) return;
+    // What prices the new model is carried over when it applies, else
+    // cleared (a Gemini image has no quality).
     onChange({
       provider: choice.provider,
       model: choice.id,
-      ...(choice.qualities
-        ? { quality: value.quality ?? DEFAULT_IMAGE_QUALITY }
-        : {}),
-      ...(choice.seconds
-        ? {
-            resolution:
-              value.resolution && choice.seconds[value.resolution]
-                ? value.resolution
-                : DEFAULT_VIDEO_RESOLUTION,
-          }
-        : {}),
+      quality: choice.qualities
+        ? (value.quality ?? DEFAULT_IMAGE_QUALITY)
+        : undefined,
+      resolution: choice.seconds
+        ? value.resolution && choice.seconds[value.resolution]
+          ? value.resolution
+          : DEFAULT_VIDEO_RESOLUTION
+        : undefined,
     });
   };
   const providers: ProviderId[] = ["openai", "google"];
@@ -91,7 +90,7 @@ export function ModelChoice({
     >
       <select
         aria-label={`${kind} model`}
-        className={cn(SELECT, "flex-1")}
+        className={cn(SELECT, "w-0 min-w-0 flex-1 basis-0")}
         value={key}
         disabled={disabled}
         onChange={(e) => pick(e.target.value)}
