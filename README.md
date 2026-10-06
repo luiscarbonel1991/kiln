@@ -74,10 +74,13 @@ KILN_DB_TESTS=1 DATABASE_URL=postgresql://kiln:kiln@localhost:5444/kiln_test pnp
 ## Generation queue
 
 Planned projects generate in the background: the board's "Generate N scenes"
-(one confirmation with the estimate and the month's budget) and the slot
-editor's Generate both queue jobs that a worker in the server process runs
-(started from `src/instrumentation.ts`). Every paid call counts against the
-maker's monthly cap (`Maker.monthlyCapCents`, $25 by default).
+(one confirmation with the estimate and the month's budget), the slot
+editor's Generate and a video slot's "Generate video" all queue jobs that a
+worker in the server process runs (started from `src/instrumentation.ts`).
+Every paid call counts against the maker's monthly cap
+(`Maker.monthlyCapCents`, $25 by default). A video animates a scene the maker
+approved (Sora, priced by the second: 8 s = $0.80); its prompt comes from the
+product's spec, and a render is never paid twice.
 
 ```bash
 pnpm db:mock:setup   # once (and after new migrations): the mock database
@@ -117,6 +120,8 @@ it. Exported slots read "delivered" until an approval or the order changes.
 - Scenes are the approved image, cropped to the slot's aspect and upscaled with
   ImageMagick (Lanczos, light unsharp, JPEG 92): free, and the image is the approved
   one.
+- The approved listing video goes in as `video.mp4`, as rendered, outside the photo
+  numbering.
 - Scenes with text on the image (Instagram's hook) are not exported yet.
 
 ## System dependencies (vectorize, Deliver)
