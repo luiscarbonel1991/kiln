@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DestinationProfile } from "@/domain/destination";
 import {
   approveSlot,
+  deliveryBlockers,
   destinationsFor,
   parseSlotCardId,
   parseSlotRecipeId,
@@ -12,6 +13,7 @@ import {
   slotRecipeId,
   slotState,
   unapproveSlot,
+  withDelivered,
   withSlotOff,
 } from "@/domain/plan";
 import { ShotList } from "@/domain/shot-list";
@@ -333,5 +335,98 @@ describe("switching slots off", () => {
     expect(parseSlotCardId("etsy")).toBeNull();
     expect(parseSlotCardId(".gift")).toBeNull();
     expect(parseSlotCardId("etsy.")).toBeNull();
+  });
+});
+
+describe("delivery", () => {
+  const launch = () =>
+    planProject({
+      product: CUTTING_BOARD,
+      type: "launch",
+      destinationIds: ["shop", "social"],
+      catalog,
+    });
+  const hero = { destinationId: "shop", slotKey: "hero" };
+  const card = { status: "done" as const, outputs: ["https://x/1.png"] };
+
+  it("a destination is ready when every slot switched on is exact or approved", () => {
+    const plan = launch();
+    const shopPlan = () => plan.destinations[0];
+    expect(deliveryBlockers(shopPlan(), () => card)).toEqual({
+      notReady: ["Hero"],
+      textOnScenes: [],
+    });
+    const approved = approveSlot(plan, hero, card);
+    expect(
+      deliveryBlockers(approved.destinations[0], () => card).notReady,
+    ).toEqual([]);
+    // A slot switched off is not part of the deliverable.
+    const off = withSlotOff(plan, hero, true);
+    expect(deliveryBlockers(off.destinations[0], () => undefined)).toEqual({
+      notReady: [],
+      textOnScenes: [],
+    });
+    // A re-rolled card is not approved any more.
+    expect(
+      deliveryBlockers(approved.destinations[0], () => ({
+        status: "done" as const,
+        outputs: ["https://x/2.png"],
+      })).notReady,
+    ).toEqual(["Hero"]);
+  });
+
+  it("scenes with text on the image are not exported yet", () => {
+    const plan = launch();
+    const withText = {
+      ...plan.destinations[0],
+      slots: plan.destinations[0].slots.map((s) =>
+        s.key === "hero" ? { ...s, textTemplate: "{product.hook}" } : s,
+      ),
+    };
+    expect(deliveryBlockers(withText, () => card).textOnScenes).toEqual([
+      "Hero",
+    ]);
+  });
+
+  it("stamps what was exported; a scene only if its approval did not change", () => {
+    const approved = approveSlot(launch(), hero, card);
+    const at = "2026-10-06T10:00:00.000Z";
+    const stamped = withDelivered(
+      approved,
+      "shop",
+      [{ key: "hero", approvedOutput: "https://x/1.png" }, { key: "colours" }],
+      at,
+    );
+    const [h, colours, personalize] = stamped.destinations[0].slots;
+    expect(h.deliveredAt).toBe(at);
+    expect(slotState(h, card).state).toBe("delivered");
+    expect(colours.deliveredAt).toBe(at);
+    expect(personalize.deliveredAt).toBeUndefined();
+    // An unapproved scene is never stamped.
+    const unapproved = withDelivered(launch(), "shop", [{ key: "hero" }], at);
+    expect(unapproved.destinations[0].slots[0].deliveredAt).toBeUndefined();
+    // Exported an older output: not stamped.
+    const stale = withDelivered(
+      approved,
+      "shop",
+      [{ key: "hero", approvedOutput: "https://x/0.png" }],
+      at,
+    );
+    expect(stale.destinations[0].slots[0].deliveredAt).toBeUndefined();
+  });
+
+  it("a new approval is not delivered yet", () => {
+    const stamped = withDelivered(
+      approveSlot(launch(), hero, card),
+      "shop",
+      [{ key: "hero", approvedOutput: "https://x/1.png" }],
+      "2026-10-06T10:00:00.000Z",
+    );
+    const next = { status: "done" as const, outputs: ["https://x/2.png"] };
+    const reapproved = approveSlot(stamped, hero, next);
+    expect(reapproved.destinations[0].slots[0].deliveredAt).toBeUndefined();
+    expect(
+      unapproveSlot(stamped, hero).destinations[0].slots[0],
+    ).not.toHaveProperty("deliveredAt");
   });
 });

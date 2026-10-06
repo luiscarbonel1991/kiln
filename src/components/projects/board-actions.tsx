@@ -1,13 +1,23 @@
 "use client";
 
-import { Check, Eye, EyeOff, ImagePlus, Loader2, Undo2 } from "lucide-react";
+import {
+  Check,
+  Eye,
+  EyeOff,
+  ImagePlus,
+  Loader2,
+  PackageCheck,
+  Undo2,
+} from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import {
   addReferenceAction,
   setSlotApprovalAction,
   setSlotOffAction,
 } from "@/app/actions/board";
+import { deliverAction } from "@/app/actions/deliver";
 import { Button } from "@/components/ui/button";
+import { downloadAsset } from "@/lib/download";
 
 export function ApproveButton({
   projectId,
@@ -138,6 +148,69 @@ export function ReferenceUpload({ projectId }: { projectId: string }) {
       </Button>
       {error ? (
         <p className="font-mono text-[0.65rem] text-prov-local">{error}</p>
+      ) : null}
+    </div>
+  );
+}
+
+// Export a destination's deliverable as a zip (every slot switched on, in
+// order, at its pixel target) and download it. Ready only when every slot is
+// exact or approved; otherwise it says what is missing.
+export function DeliverButton({
+  projectId,
+  destinationId,
+  destinationName,
+  blocker,
+  delivered,
+}: {
+  projectId: string;
+  destinationId: string;
+  destinationName: string;
+  blocker: string | null;
+  delivered: boolean;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="flex flex-col gap-1.5 pt-2">
+      <Button
+        variant={delivered ? "secondary" : "default"}
+        size="sm"
+        disabled={pending || blocker !== null}
+        onClick={() =>
+          startTransition(async () => {
+            setMessage(null);
+            const result = await deliverAction({ projectId, destinationId });
+            if ("error" in result) {
+              setFailed(true);
+              setMessage(result.error);
+              return;
+            }
+            try {
+              await downloadAsset(result.url, result.filename);
+              setFailed(false);
+              setMessage(`${result.count} files in ${result.filename}`);
+            } catch {
+              setFailed(true);
+              setMessage("The zip is ready but the download failed.");
+            }
+          })
+        }
+      >
+        {pending ? <Loader2 className="animate-spin" /> : <PackageCheck />}
+        {pending
+          ? "Exporting…"
+          : delivered
+            ? `Export ${destinationName} again (.zip)`
+            : `Export ${destinationName} (.zip)`}
+      </Button>
+      {blocker || message ? (
+        <p
+          className={`font-mono text-[0.6rem] leading-snug ${failed ? "text-prov-local" : "text-on-surface-mid"}`}
+        >
+          {message ?? blocker}
+        </p>
       ) : null}
     </div>
   );

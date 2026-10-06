@@ -125,6 +125,7 @@ const EXTENSION: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/webp": "webp",
   "image/svg+xml": "svg",
+  "application/zip": "zip",
   "video/mp4": "mp4",
 };
 

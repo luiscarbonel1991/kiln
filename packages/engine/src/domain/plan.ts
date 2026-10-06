@@ -160,7 +160,7 @@ export function parseSlotRecipeId(
     : null;
 }
 
-interface CardLike {
+export interface CardLike {
   status: "draft" | "rendering" | "done" | "error";
   outputs: string[];
 }
@@ -228,7 +228,8 @@ export interface SlotRef {
 
 // Approve the output a scene slot's card shows now. Refuses anything but a
 // finished card with a real output; re-rolling the card later un-approves it
-// (the approved output no longer matches).
+// (the approved output no longer matches). A new approval is not delivered
+// yet, so it clears the delivery stamp.
 export function approveSlot(
   plan: ProjectPlan,
   ref: SlotRef,
@@ -240,12 +241,69 @@ export function approveSlot(
     if (card?.status !== "done" || !output) {
       throw new Error("nothing to approve: the slot has no finished output");
     }
-    return { ...slot, approvedOutput: output };
+    const { deliveredAt: _d, ...rest } = slot;
+    return { ...rest, approvedOutput: output };
   });
 }
 
 export function unapproveSlot(plan: ProjectPlan, ref: SlotRef): ProjectPlan {
-  return updateSlot(plan, ref, ({ approvedOutput: _a, ...slot }) => slot);
+  return updateSlot(
+    plan,
+    ref,
+    ({ approvedOutput: _a, deliveredAt: _d, ...slot }) => slot,
+  );
+}
+
+// What keeps a destination from being delivered: the slots switched on that
+// are not ready (an exact frame always is; a scene once its current output is
+// approved), and scenes that carry text on the image (composited at export
+// later; none on a sale destination today).
+export function deliveryBlockers(
+  destination: PlanDestination,
+  cardOf: (slotKey: string) => CardLike | undefined,
+): { notReady: string[]; textOnScenes: string[] } {
+  const on = destination.slots.filter((s) => !s.off);
+  const ready = (s: PlanSlot) =>
+    ["exact", "approved", "delivered"].includes(
+      slotState(s, cardOf(s.key)).state,
+    );
+  return {
+    notReady: on.filter((s) => !ready(s)).map((s) => s.label),
+    textOnScenes: on
+      .filter((s) => s.fill === "scene" && s.textTemplate)
+      .map((s) => s.label),
+  };
+}
+
+// Stamp the slots an export delivered. A scene is stamped only if the output
+// it exported is still the approved one (an approval may land meanwhile).
+export function withDelivered(
+  plan: ProjectPlan,
+  destinationId: string,
+  delivered: { key: string; approvedOutput?: string }[],
+  at: string,
+): ProjectPlan {
+  const byKey = new Map(delivered.map((d) => [d.key, d]));
+  return {
+    destinations: plan.destinations.map((d) =>
+      d.destinationId !== destinationId
+        ? d
+        : {
+            ...d,
+            slots: d.slots.map((s) => {
+              const done = byKey.get(s.key);
+              if (!done || s.off) return s;
+              if (
+                s.fill === "scene" &&
+                (!s.approvedOutput || s.approvedOutput !== done.approvedOutput)
+              ) {
+                return s;
+              }
+              return { ...s, deliveredAt: at };
+            }),
+          },
+    ),
+  };
 }
 
 // Switch a slot off or back on. An approval survives the round trip.

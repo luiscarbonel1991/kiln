@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
-import type { GenerationRequest } from "@/domain/generation-request";
+import { GenerationRequest } from "@/domain/generation-request";
 import { ProjectPlan, sceneCardIds } from "@/domain/plan";
 import {
   ACTIVE_JOB_STATUSES,
@@ -629,4 +629,42 @@ export async function projectGenerationState(
     .digest("hex")
     .slice(0, 16);
   return { version, ...state };
+}
+
+export interface OutputSource {
+  prompt: string;
+  model: string;
+  costMicros: number | null;
+  generatedAt: string | null;
+}
+
+// What produced each of these outputs: the queue job that finished with it
+// (its prompt, model and measured cost), for a delivery's manifest.
+export async function outputSources(
+  projectId: string,
+  outputs: string[],
+): Promise<Map<string, OutputSource>> {
+  assertDatabaseUrl();
+  if (outputs.length === 0) return new Map();
+  const jobs = await db.generationJob.findMany({
+    where: { projectId, status: "done", outputUrl: { in: outputs } },
+    select: {
+      outputUrl: true,
+      request: true,
+      actualMicros: true,
+      finishedAt: true,
+    },
+  });
+  const sources = new Map<string, OutputSource>();
+  for (const job of jobs) {
+    const request = GenerationRequest.safeParse(job.request);
+    if (!job.outputUrl || !request.success) continue;
+    sources.set(job.outputUrl, {
+      prompt: request.data.prompt,
+      model: request.data.model.model,
+      costMicros: job.actualMicros,
+      generatedAt: job.finishedAt?.toISOString() ?? null,
+    });
+  }
+  return sources;
 }

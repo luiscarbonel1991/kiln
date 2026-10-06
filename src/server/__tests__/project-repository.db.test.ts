@@ -435,6 +435,53 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     await db.generationBatch.delete({ where: { id: batchId } });
   });
 
+  it("a delivery stamps what it exported; a new approval clears the stamp", async () => {
+    const [saved] = await upsertProducts([product]);
+    const id = await repo.createProject({
+      type: "launch",
+      productId: saved.id,
+      plan,
+      editor,
+    });
+    created.push(id);
+    const hero = { destinationId: "etsy", slotKey: "hero" };
+    const setOutput = (url: string) =>
+      db.card.update({
+        where: { projectId_cardId: { projectId: id, cardId: "etsy.hero" } },
+        data: { status: "done", outputs: [url] },
+      });
+    await setOutput("https://x/hero-1.png");
+    await repo.setSlotApproval(id, hero, true);
+    const at = "2026-10-06T10:00:00.000Z";
+    await repo.setDelivered(
+      id,
+      "etsy",
+      [
+        { key: "hero", approvedOutput: "https://x/hero-1.png" },
+        { key: "in-use" },
+      ],
+      at,
+    );
+    const slots = async () =>
+      (
+        (await db.project.findUniqueOrThrow({ where: { id } })).plan as {
+          destinations: { slots: { key: string; deliveredAt?: string }[] }[];
+        }
+      ).destinations[0].slots;
+    const stamped = await slots();
+    expect(stamped.find((s) => s.key === "hero")?.deliveredAt).toBe(at);
+    // A scene that was never approved is never stamped.
+    expect(stamped.find((s) => s.key === "in-use")).not.toHaveProperty(
+      "deliveredAt",
+    );
+
+    await setOutput("https://x/hero-2.png");
+    await repo.setSlotApproval(id, hero, true);
+    expect((await slots()).find((s) => s.key === "hero")).not.toHaveProperty(
+      "deliveredAt",
+    );
+  });
+
   it("switching a slot off and approving another at once both persist", async () => {
     const id = created[0];
     await repo.setSlotApproval(

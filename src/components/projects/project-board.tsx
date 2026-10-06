@@ -2,6 +2,7 @@ import { ImageIcon, PenLine } from "lucide-react";
 import Link from "next/link";
 import {
   ApproveButton,
+  DeliverButton,
   ReferenceUpload,
   SlotSwitch,
 } from "@/components/projects/board-actions";
@@ -25,6 +26,7 @@ import {
   textLayerColours,
 } from "@/domain/exact";
 import {
+  deliveryBlockers,
   type PlanSlot,
   type ProjectPlan,
   type SlotView,
@@ -76,6 +78,24 @@ export function waitingCardIds(rows: ReturnType<typeof boardRows>): string[] {
     .flatMap((r) => r.slots)
     .filter((s) => s.card && s.view.state === "queued" && !s.view.inBatch)
     .map((s) => s.cardId);
+}
+
+// Why a destination cannot be exported yet, in a line; null when it can.
+function deliveryBlocker(
+  plan: ProjectPlan["destinations"][number],
+  slots: BoardSlot[],
+): string | null {
+  const cards = new Map(slots.map((s) => [s.slot.key, s.card]));
+  const { notReady, textOnScenes } = deliveryBlockers(plan, (key) =>
+    cards.get(key),
+  );
+  if (textOnScenes.length > 0) {
+    return "Scenes with text on the image are not exported yet.";
+  }
+  if (notReady.length > 0) {
+    return `Approve ${notReady.length === 1 ? "1 scene" : `${notReady.length} scenes`} to export: ${notReady.join(", ")}.`;
+  }
+  return null;
 }
 
 // The storyboard (ROADMAP "Experience design"): one row per destination, one
@@ -285,6 +305,15 @@ export function ProjectBoard({
                   waiting or in progress
                 </li>
               </ul>
+              <DeliverButton
+                projectId={projectId}
+                destinationId={plan.destinationId}
+                destinationName={destination.name}
+                blocker={deliveryBlocker(plan, slots)}
+                delivered={
+                  on.length > 0 && on.every((s) => s.view.state === "delivered")
+                }
+              />
             </div>
           );
         })}

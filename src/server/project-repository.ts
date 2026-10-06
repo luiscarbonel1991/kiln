@@ -12,6 +12,7 @@ import {
   type SlotRef,
   slotCardId,
   unapproveSlot,
+  withDelivered,
   withSlotOff,
 } from "@/domain/plan";
 import type { Product } from "@/domain/product";
@@ -482,6 +483,41 @@ export async function setSlotOff(
       where: { id: projectId },
       data: {
         plan: withSlotOff(plan, ref, off) as unknown as Prisma.InputJsonValue,
+      },
+    });
+  });
+}
+
+// Stamp the slots a delivery exported (withDelivered: a scene only if the
+// output it exported is still the approved one). Locked like approvals.
+export async function setDelivered(
+  projectId: string,
+  destinationId: string,
+  delivered: { key: string; approvedOutput?: string }[],
+  at: string,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true },
+    });
+    const plan = ProjectPlan.parse(project.plan);
+    await tx.project.update({
+      where: { id: projectId },
+      data: {
+        plan: withDelivered(
+          plan,
+          destinationId,
+          delivered,
+          at,
+        ) as unknown as Prisma.InputJsonValue,
       },
     });
   });
