@@ -96,6 +96,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       productType: "board",
       useContext: "",
       sceneProps: "",
+      avoid: "",
       materials: "hardwood",
       lighting: "soft",
       composition: "centered",

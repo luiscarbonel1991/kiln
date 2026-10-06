@@ -25,6 +25,7 @@ const understanding: BaseUnderstanding = {
   productType: "",
   useContext: "",
   sceneProps: "",
+  avoid: "",
   materials: "stoneware",
   lighting: "soft",
   composition: "centered",

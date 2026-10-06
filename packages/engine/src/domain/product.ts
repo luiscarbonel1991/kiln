@@ -17,6 +17,10 @@ export const Dimensions = z.object({
   w: z.number().positive(),
   h: z.number().positive(),
   d: z.number().positive().optional(),
+  // How far raised elements stand proud of the face, or how deep an engraving
+  // goes, in the same unit. Prompts name it ("1/8 in"): a frontal plate cannot
+  // show relief, so the words have to.
+  relief: z.number().positive().optional(),
   unit: Unit.default("in"),
 });
 export type Dimensions = z.infer<typeof Dimensions>;
@@ -201,6 +205,24 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
 export function dimensionsLabel(d: Dimensions): string {
   return `${fmt(d.w)} x ${fmt(d.h)} ${d.unit}`;
+}
+
+// A relief as a maker says it: inches as a fraction when one fits (0.125 ->
+// "1/8 in"), else the number with its unit ("3 mm", "0.30 in").
+export function reliefLabel(relief: number, unit: Unit): string {
+  if (unit === "in") {
+    for (const den of [2, 4, 8, 16, 32, 64]) {
+      const num = relief * den;
+      if (Math.abs(num - Math.round(num)) < 1e-6) {
+        const n = Math.round(num);
+        const whole = Math.floor(n / den);
+        const rest = n % den;
+        const frac = rest === 0 ? "" : `${rest}/${den}`;
+        return `${[whole || "", frac].filter(Boolean).join(" ")} in`;
+      }
+    }
+  }
+  return `${fmt(relief)} ${unit}`;
 }
 
 export function colourOf(product: Product, key: string): ColourOption {

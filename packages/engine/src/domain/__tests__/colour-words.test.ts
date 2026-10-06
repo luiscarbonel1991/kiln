@@ -47,7 +47,7 @@ describe("the marks' colour in the prompt", () => {
   it("names the raised marks' colour, and says matte once", () => {
     const u = productUnderstanding(plate);
     expect(u.materials).toBe(
-      "black matte panel, white raised elements on the face",
+      "black matte panel, white raised elements standing clearly proud of the face, their side walls visible, a short soft shadow under each",
     );
     expect(u.subject).toContain("in black matte panel");
   });
@@ -62,7 +62,7 @@ describe("the marks' colour in the prompt", () => {
 
   it("an engraved board says what colour its engraving reads", () => {
     expect(productUnderstanding(CUTTING_BOARD).materials).toBe(
-      "maple solid hardwood, engraved detail in dark brown",
+      "maple solid hardwood, dark brown engraved detail cut into the face and flush with it, a slightly textured engraved surface, no relief above the face",
     );
   });
 });

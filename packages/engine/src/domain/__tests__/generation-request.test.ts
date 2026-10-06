@@ -18,6 +18,7 @@ const understanding: BaseUnderstanding = {
   productType: "cutting board",
   useContext: "",
   sceneProps: "",
+  avoid: "",
   materials: "maple",
   lighting: "soft",
   composition: "centered",

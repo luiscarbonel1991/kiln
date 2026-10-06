@@ -13,6 +13,7 @@ const understanding: BaseUnderstanding = {
   productType: "coaster",
   useContext: "",
   sceneProps: "",
+  avoid: "",
   materials: "cork",
   lighting: "soft natural light",
   composition: "the product centered",

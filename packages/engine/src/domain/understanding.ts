@@ -9,6 +9,10 @@ export const BaseUnderstanding = z.object({
   productType: z.string().default(""),
   useContext: z.string().default(""),
   sceneProps: z.string().default(""),
+  // What the product must never be rendered as (its treatment's opposite:
+  // "flat printed lettering" for raised letters); joins the negative prompt.
+  // Default "" so older snapshots still parse.
+  avoid: z.string().default(""),
   materials: z.string(),
   lighting: z.string(),
   composition: z.string(),

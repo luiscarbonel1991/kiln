@@ -1,0 +1,88 @@
+import { describe, expect, it } from "vitest";
+import { assemblePrompt } from "@/domain/cascade";
+import { reliefLabel } from "@/domain/product";
+import { productUnderstanding } from "@/domain/product-understanding";
+import { SEED_BRAND, SEED_RECIPE } from "@/domain/seed";
+import { CUTTING_BOARD } from "./fixtures/cutting-board";
+
+// Two plates that look alike from the front: one with raised lettering, one
+// engraved flush. The treatment decides how each is drawn, never the model.
+const plate = {
+  ...CUTTING_BOARD,
+  material: "matte panel",
+  dimensions: { w: 5, h: 3, relief: 0.125, unit: "in" as const },
+  colours: [
+    {
+      key: "black",
+      name: "Black Matte",
+      face: "#1A1A1A",
+      inlay: "#FFFFFF",
+      inStock: true,
+    },
+  ],
+  defaultColour: "black",
+};
+const raised = { ...plate, treatment: "raised" as const };
+const engraved = {
+  ...plate,
+  treatment: "engraved" as const,
+  dimensions: { w: 5, h: 3, unit: "in" as const },
+};
+
+const master = {
+  id: "m",
+  origin: "product" as const,
+  sourcePrompt: null,
+  assetUrl: "https://stub.local/plate.png",
+  mime: "image/png",
+};
+
+describe("reliefLabel", () => {
+  it("says a relief the way a maker does", () => {
+    expect(reliefLabel(0.125, "in")).toBe("1/8 in");
+    expect(reliefLabel(0.25, "in")).toBe("1/4 in");
+    expect(reliefLabel(1.5, "in")).toBe("1 1/2 in");
+    expect(reliefLabel(0.3, "in")).toBe("0.30 in");
+    expect(reliefLabel(3, "mm")).toBe("3 mm");
+  });
+});
+
+describe("the treatment drives the prompt", () => {
+  it("raised lettering stands proud, with side walls and shadows, never flat", () => {
+    const u = productUnderstanding(raised);
+    expect(u.materials).toContain(
+      "white raised elements standing 1/8 in proud of the face, their side walls visible, a short soft shadow under each",
+    );
+    expect(u.avoid).toBe(
+      "flat printed lettering, lettering flush with the face",
+    );
+  });
+
+  it("engraved lettering is flush, never raised", () => {
+    const u = productUnderstanding(engraved);
+    expect(u.materials).toContain(
+      "white engraved detail cut into the face and flush with it, a slightly textured engraved surface, no relief above the face",
+    );
+    expect(u.avoid).toBe("raised lettering, shadows under the lettering");
+  });
+
+  it("the negative prompt carries what the treatment must never look like", () => {
+    const { negative } = assemblePrompt(
+      undefined,
+      master,
+      productUnderstanding(raised),
+      SEED_RECIPE,
+      SEED_BRAND,
+    );
+    expect(negative).toContain("flat printed lettering");
+    // An older snapshot without `avoid` adds nothing.
+    const older = assemblePrompt(
+      undefined,
+      master,
+      { ...productUnderstanding(raised), avoid: "" },
+      SEED_RECIPE,
+      SEED_BRAND,
+    );
+    expect(older.negative).not.toContain("lettering");
+  });
+});

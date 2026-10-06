@@ -80,6 +80,7 @@ const sample: PersistedProject = {
     productType: "ceramic pitcher",
     useContext: "sits on a kitchen counter or shelf",
     sceneProps: "",
+    avoid: "",
     materials: "stoneware",
     lighting: "soft directional light",
     composition: "centered",

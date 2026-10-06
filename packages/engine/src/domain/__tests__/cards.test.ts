@@ -15,6 +15,7 @@ const understanding: BaseUnderstanding = {
   productType: "ceramic pitcher",
   useContext: "sits on a kitchen counter or shelf",
   sceneProps: "",
+  avoid: "",
   materials: "stoneware, reactive glaze",
   lighting: "soft directional light, upper-left",
   composition: "centered, slight high angle",

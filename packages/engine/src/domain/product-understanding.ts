@@ -2,22 +2,48 @@ import { colourMaterial, colourWord } from "@/domain/colour-words";
 import {
   type ColourOption,
   colourOf,
+  type Dimensions,
   dimensionsLabel,
   type Product,
+  reliefLabel,
   type Treatment,
 } from "@/domain/product";
 import type { BaseUnderstanding } from "@/domain/understanding";
 
 // What the treatment puts on the face, in the colour of its marks when the
-// spec gives one ("white raised elements on the face"): without it a model
-// guesses, and a macro once rendered white letters as brushed silver.
-const TREATMENT_DETAIL: Record<Treatment, (ink: string | null) => string> = {
-  raised: (ink) => `${ink ? `${ink} ` : ""}raised elements on the face`,
-  inlaid: (ink) => `${ink ? `${ink} ` : ""}inlaid elements flush with the face`,
-  engraved: (ink) => `engraved detail${ink ? ` in ${ink}` : ""}`,
-  printed: (ink) => `a printed design${ink ? ` in ${ink}` : ""}`,
+// spec gives one ("white raised elements ...") and with its relief: without
+// them a model guesses — a macro once rendered white letters as brushed
+// silver, and raised letters flush with the face. The treatment decides how
+// the product looks, never the model's default.
+const TREATMENT_DETAIL: Record<
+  Treatment,
+  (ink: string | null, relief: string | null) => string
+> = {
+  raised: (ink, relief) =>
+    `${ink ? `${ink} ` : ""}raised elements standing ${relief ?? "clearly"} proud of the face, their side walls visible, a short soft shadow under each`,
+  inlaid: (ink) =>
+    `${ink ? `${ink} ` : ""}inlaid elements flush with the face, no relief`,
+  engraved: (ink) =>
+    `${ink ? `${ink} ` : ""}engraved detail cut into the face and flush with it, a slightly textured engraved surface, no relief above the face`,
+  printed: (ink) =>
+    `a printed design${ink ? ` in ${ink}` : ""}, flat on the face, no relief`,
   cut: () => "a cut-out silhouette",
 };
+
+// What each treatment must never be rendered as: its opposite.
+const TREATMENT_AVOID: Record<Treatment, string> = {
+  raised: "flat printed lettering, lettering flush with the face",
+  inlaid: "raised lettering, shadows under the lettering",
+  engraved: "raised lettering, shadows under the lettering",
+  printed: "raised lettering, engraved lettering",
+  cut: "",
+};
+
+function reliefOf(dimensions: Dimensions): string | null {
+  return dimensions.relief
+    ? reliefLabel(dimensions.relief, dimensions.unit)
+    : null;
+}
 
 function inkOf(colour: ColourOption): string | null {
   if (colour.inlayName) return colour.inlayName.toLowerCase();
@@ -49,7 +75,8 @@ export function productUnderstanding(product: Product): BaseUnderstanding {
     productType: `${product.family.toLowerCase()}, ${product.shape}`,
     useContext: product.useContexts[0] ?? "",
     sceneProps: "",
-    materials: `${material}, ${TREATMENT_DETAIL[product.treatment](inkOf(colour))}`,
+    materials: `${material}, ${TREATMENT_DETAIL[product.treatment](inkOf(colour), reliefOf(product.dimensions))}`,
+    avoid: TREATMENT_AVOID[product.treatment],
     lighting: "soft natural light",
     composition: "the product centered, filling most of the frame",
     mood: "clean and true to the product",

@@ -204,8 +204,13 @@ export function assemblePrompt(
   return {
     prompt,
     imageInputs: [master.assetUrl, ...(current?.references ?? [])],
-    // The mount/prop is also a negative so providers that honor one drop it too.
-    negative: [recipe.constraints.negative.join(", "), props]
+    // The mount/prop is also a negative so providers that honor one drop it
+    // too; so is what the product's treatment must never look like.
+    negative: [
+      recipe.constraints.negative.join(", "),
+      props,
+      understanding.avoid.trim(),
+    ]
       .filter(Boolean)
       .join(", "),
   };
