@@ -53,6 +53,18 @@ describe("parseProductPackage", () => {
     expect(!result.ok && result.errors.join(" ")).toMatch(/maker\.handle/);
   });
 
+  it("the brand link is a web address, never a script or data URL", () => {
+    for (const url of ["javascript:alert(1)", "data:text/html,hi"]) {
+      const result = parseProductPackage({ maker: { url }, products: [board] });
+      expect(!result.ok && result.errors.join(" ")).toMatch(/maker\.url/);
+    }
+    const ok = parseProductPackage({
+      maker: { url: "http://shop.example" },
+      products: [board],
+    });
+    expect(ok.ok).toBe(true);
+  });
+
   it("the example package is generic: no maker's catalog, no signs", () => {
     expect(JSON.stringify(pkg).toLowerCase()).not.toMatch(
       /maker1|\bsigns?\b|acrylic/,
