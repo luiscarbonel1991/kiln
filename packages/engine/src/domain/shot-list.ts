@@ -9,7 +9,9 @@ export type RenderStyle = z.infer<typeof RenderStyle>;
 
 // How a slot gets filled. "exact" = rendered from the product spec (free,
 // instant, never an image model); "scene" = staged by an image model.
-export const SlotFill = z.enum(["exact", "scene"]);
+// "exact" is drawn from the spec; "scene" is an image model's edit of the
+// product; "video" animates an approved scene.
+export const SlotFill = z.enum(["exact", "scene", "video"]);
 export type SlotFill = z.infer<typeof SlotFill>;
 
 export const ExactKind = z.enum([

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DestinationProfile } from "@/domain/destination";
 import {
+  addVideoSlot,
   approveSlot,
   deliveryBlockers,
   destinationsFor,
+  generableCardIds,
   moveSlot,
   parseSlotCardId,
   parseSlotRecipeId,
@@ -14,8 +16,10 @@ import {
   slotRecipeId,
   slotState,
   unapproveSlot,
+  videoSettings,
   withDelivered,
   withSlotOff,
+  withVideoChoice,
 } from "@/domain/plan";
 import { ShotList } from "@/domain/shot-list";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
@@ -94,7 +98,7 @@ describe("planProject", () => {
       "colours",
       "personalize",
     ]);
-    expect(planCounts(plan)).toEqual({ exact: 2, scene: 2, off: 0 });
+    expect(planCounts(plan)).toEqual({ exact: 2, scene: 2, video: 0, off: 0 });
   });
 
   it("skips editor-only presets and offers destinations by project type", () => {
@@ -302,7 +306,7 @@ describe("switching slots off", () => {
     const slot = plan.destinations[0].slots[0];
     expect(slot).toMatchObject({ key: "hero", off: true });
     expect(slotState(slot).state).toBe("off");
-    expect(planCounts(plan)).toEqual({ exact: 2, scene: 1, off: 1 });
+    expect(planCounts(plan)).toEqual({ exact: 2, scene: 1, video: 0, off: 1 });
     expect(sceneCardIds(plan)).toEqual(["social.hook"]);
   });
 
@@ -498,5 +502,139 @@ describe("photo order", () => {
     expect(() => moveSlot(launch(), ref("nope"), "first")).toThrow(
       'no slot "nope"',
     );
+  });
+});
+
+describe("video slots", () => {
+  // The same shot list, now with a video slot (as the Etsy seed gained one).
+  const videoKit = ShotList.parse({
+    ...shopKit,
+    slots: [
+      ...shopKit.slots,
+      {
+        key: "video",
+        label: "Video",
+        purpose: "In motion.",
+        aspect: "9:16",
+        fill: "video",
+      },
+    ],
+  });
+  const videoCatalog = {
+    destinations: [shop, social],
+    shotLists: [videoKit, socialEditorOnly, socialCarousel],
+  };
+  const withVideo = () =>
+    planProject({
+      product: CUTTING_BOARD,
+      type: "launch",
+      destinationIds: ["shop", "social"],
+      catalog: videoCatalog,
+    });
+  // A plan made before video existed (the old shot list).
+  const launch = () =>
+    planProject({
+      product: CUTTING_BOARD,
+      type: "launch",
+      destinationIds: ["shop", "social"],
+      catalog,
+    });
+  const hero = { destinationId: "shop", slotKey: "hero" };
+  const video = { destinationId: "shop", slotKey: "video" };
+  const card = { status: "done" as const, outputs: ["https://x/hero.png"] };
+  const shopOf = (p: ReturnType<typeof withVideo>) => p.destinations[0];
+  const slotOf = (p: ReturnType<typeof withVideo>, key: string) =>
+    shopOf(p).slots.find((s) => s.key === key)!;
+
+  it("the queue may run scenes and videos switched on, never exact frames", () => {
+    expect(generableCardIds(withVideo())).toEqual([
+      "shop.hero",
+      "shop.video",
+      "social.hook",
+    ]);
+    expect(
+      generableCardIds(withSlotOff(withVideo(), video, true)),
+    ).not.toContain("shop.video");
+    expect(planCounts(withVideo())).toMatchObject({ scene: 2, video: 1 });
+  });
+
+  it("starts from the first approved scene, a push-in, 8 s, vertical", () => {
+    const plan = withVideo();
+    const none = videoSettings(shopOf(plan), slotOf(plan, "video"), {
+      minSec: 5,
+      maxSec: 15,
+    });
+    expect(none).toMatchObject({ from: null, startFrame: null });
+    const approved = approveSlot(plan, hero, card);
+    expect(
+      videoSettings(shopOf(approved), slotOf(approved, "video"), {
+        minSec: 5,
+        maxSec: 15,
+      }),
+    ).toEqual({
+      from: "hero",
+      startFrame: "https://x/hero.png",
+      motion: "push-in",
+      seconds: 8,
+      orientation: "portrait",
+      allowed: [8, 12],
+    });
+  });
+
+  it("keeps the maker's choices, within what the destination accepts", () => {
+    const plan = withVideoChoice(approveSlot(withVideo(), hero, card), video, {
+      motion: "light",
+      seconds: 4,
+      orientation: "landscape",
+    });
+    const s = videoSettings(shopOf(plan), slotOf(plan, "video"), {
+      minSec: 5,
+      maxSec: 15,
+    });
+    // 4 s is too short for a 5-15 s destination: back to 8.
+    expect(s).toMatchObject({
+      motion: "light",
+      seconds: 8,
+      orientation: "landscape",
+    });
+    expect(() => withVideoChoice(plan, hero, { motion: "pan" })).toThrow(
+      "not a video slot",
+    );
+  });
+
+  it("is approved like a scene and must be for delivery; it is not a photo", () => {
+    let plan = approveSlot(withVideo(), hero, card);
+    const clip = { status: "done" as const, outputs: ["https://x/v.mp4"] };
+    expect(
+      deliveryBlockers(shopOf(plan), (key) => (key === "video" ? clip : card))
+        .notReady,
+    ).toEqual(["Video"]);
+    plan = approveSlot(plan, video, clip);
+    expect(
+      deliveryBlockers(shopOf(plan), (key) => (key === "video" ? clip : card))
+        .notReady,
+    ).toEqual([]);
+    // A video never moves, and photo moves step over it.
+    expect(moveSlot(plan, video, "first")).toEqual(plan);
+    const last = moveSlot(
+      plan,
+      { destinationId: "shop", slotKey: "personalize" },
+      "later",
+    );
+    expect(shopOf(last).slots.map((s) => s.key)).toEqual(
+      shopOf(plan).slots.map((s) => s.key),
+    );
+  });
+
+  it("a plan made before video gets its slot added once", () => {
+    const old = launch();
+    const added = addVideoSlot(old, "shop", videoCatalog.shotLists);
+    expect(added?.slot).toMatchObject({ key: "video", fill: "video" });
+    expect(shopOf(added!.plan).slots.at(-1)?.key).toBe("video");
+    expect(
+      addVideoSlot(added!.plan, "shop", videoCatalog.shotLists),
+    ).toBeNull();
+    // A destination whose shot list has no video.
+    expect(addVideoSlot(old, "social", videoCatalog.shotLists)).toBeNull();
   });
 });

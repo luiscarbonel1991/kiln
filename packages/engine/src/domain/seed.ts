@@ -46,6 +46,7 @@ export const SEED_DESTINATIONS: DestinationProfile[] = [
       negative: ["text overlay", "watermark"],
     },
     delivery: { mode: "draft-api" },
+    video: { minSec: 5, maxSec: 15 },
   },
   {
     id: "amazon",
@@ -181,6 +182,14 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         composition:
           "the product and its packaging arranged together, the product in front and unmistakable",
         lighting: "soft daylight",
+      },
+      {
+        key: "video",
+        label: "Listing video",
+        purpose:
+          "Bring an approved scene to life: the listing's video, 5-15 s, the product exactly as photographed.",
+        aspect: "9:16",
+        fill: "video",
       },
     ],
   },

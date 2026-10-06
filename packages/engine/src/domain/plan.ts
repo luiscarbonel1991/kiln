@@ -7,6 +7,14 @@ import {
   type ShotList,
   ShotSlotFields,
 } from "@/domain/shot-list";
+import {
+  type VideoChoice,
+  VideoChoice as VideoChoiceSchema,
+  type VideoMotion,
+  type VideoOrientation,
+  type VideoSeconds,
+  videoSecondsFor,
+} from "@/domain/video";
 
 // A project's plan (ROADMAP "Experience design"): one storyboard row per
 // destination, one slot per frame of its shot list, snapshotted at Start so the
@@ -19,6 +27,8 @@ export const PlanSlot = ShotSlotFields.extend({
   // slot stays in the plan, so the plan keeps its shape, but leaves the
   // deliverable — never generated, never counted. Absent = on.
   off: z.boolean().optional(),
+  // A video slot's choices (start frame, motion, length, orientation).
+  video: VideoChoiceSchema.optional(),
 }).refine(exactKindMatchesFill.check, {
   message: exactKindMatchesFill.message,
 });
@@ -151,6 +161,97 @@ export function sceneCardIds(plan: ProjectPlan): string[] {
   );
 }
 
+// What the queue may run for a plan: its scenes and videos switched on.
+export function generableCardIds(plan: ProjectPlan): string[] {
+  return plan.destinations.flatMap((d) =>
+    d.slots
+      .filter((s) => s.fill !== "exact" && !s.off)
+      .map((s) => slotCardId(d.destinationId, s.key)),
+  );
+}
+
+export interface VideoSettings {
+  // The slot whose approved scene starts the video (null: none approved yet).
+  from: string | null;
+  startFrame: string | null;
+  motion: VideoMotion;
+  seconds: VideoSeconds;
+  orientation: VideoOrientation;
+  // The lengths the destination accepts.
+  allowed: VideoSeconds[];
+}
+
+// A video slot's choices with their defaults: the start frame is the chosen
+// slot's approved scene, else the first approved scene in photo order (photo 1
+// when it is a scene); a push-in; 8 s (or the destination's nearest
+// accepted length); vertical.
+export function videoSettings(
+  destination: PlanDestination,
+  slot: PlanSlot,
+  rules?: { minSec: number; maxSec: number },
+): VideoSettings {
+  const choice: VideoChoice = slot.video ?? {};
+  const scenes = destination.slots.filter(
+    (s) => s.fill === "scene" && !s.off && s.approvedOutput,
+  );
+  const chosen = scenes.find((s) => s.key === choice.from) ?? scenes[0];
+  const allowed = videoSecondsFor(rules);
+  const seconds =
+    choice.seconds && allowed.includes(choice.seconds)
+      ? choice.seconds
+      : allowed.includes(8)
+        ? 8
+        : allowed[0];
+  return {
+    from: chosen?.key ?? null,
+    startFrame: chosen?.approvedOutput ?? null,
+    motion: choice.motion ?? "push-in",
+    seconds,
+    orientation: choice.orientation ?? "portrait",
+    allowed,
+  };
+}
+
+// Change a video slot's choices (only the fields given).
+export function withVideoChoice(
+  plan: ProjectPlan,
+  ref: SlotRef,
+  choice: VideoChoice,
+): ProjectPlan {
+  return updateSlot(plan, ref, (slot) => {
+    if (slot.fill !== "video") throw new Error("not a video slot");
+    return { ...slot, video: { ...slot.video, ...choice } };
+  });
+}
+
+// Add the destination's video slot to a plan made before video existed (the
+// plan is a snapshot of its shot list). Null when the shot list has no video
+// slot or the plan already has one.
+export function addVideoSlot(
+  plan: ProjectPlan,
+  destinationId: string,
+  shotLists: ShotList[],
+): { plan: ProjectPlan; slot: PlanSlot } | null {
+  const destination = plan.destinations.find(
+    (d) => d.destinationId === destinationId,
+  );
+  if (!destination || destination.slots.some((s) => s.fill === "video")) {
+    return null;
+  }
+  const list = shotLists.find((l) => l.id === destination.shotListId);
+  const video = list?.slots.find((s) => s.fill === "video");
+  if (!video) return null;
+  const slot = PlanSlot.parse(video);
+  return {
+    slot,
+    plan: {
+      destinations: plan.destinations.map((d) =>
+        d === destination ? { ...d, slots: [...d.slots, slot] } : d,
+      ),
+    },
+  };
+}
+
 export function parseSlotRecipeId(
   id: string,
 ): { shotListId: string; destinationId: string } | null {
@@ -236,7 +337,7 @@ export function approveSlot(
   card: CardLike | undefined,
 ): ProjectPlan {
   return updateSlot(plan, ref, (slot) => {
-    if (slot.fill !== "scene") throw new Error("exact slots need no approval");
+    if (slot.fill === "exact") throw new Error("exact slots need no approval");
     const output = card?.outputs[0];
     if (card?.status !== "done" || !output) {
       throw new Error("nothing to approve: the slot has no finished output");
@@ -260,9 +361,10 @@ export type SlotMove = z.infer<typeof SlotMove>;
 // Reorder a destination's slots (the order is the photo order: the first is
 // the listing's thumbnail). "first" puts the slot first; "earlier" / "later"
 // swap it with the nearest slot switched on before / after it, so switched-off
-// slots never take a turn. A move with nowhere to go returns the plan as is;
-// a real move renumbers the photos, so the destination's last export no
-// longer matches and its delivery stamps are cleared.
+// slots never take a turn. A video is not a photo: it never moves and is
+// stepped over. A move with nowhere to go returns the plan as is; a real move
+// renumbers the photos, so the destination's last export no longer matches
+// and its delivery stamps are cleared.
 export function moveSlot(
   plan: ProjectPlan,
   ref: SlotRef,
@@ -276,6 +378,7 @@ export function moveSlot(
         throw new Error(`no slot "${ref.slotKey}" on "${ref.destinationId}"`);
       }
       const slots = [...d.slots];
+      if (slots[from].fill === "video") return d;
       if (move === "first") {
         if (from === 0) return d;
         const [slot] = slots.splice(from, 1);
@@ -283,7 +386,12 @@ export function moveSlot(
       } else {
         const step = move === "earlier" ? -1 : 1;
         let to = from + step;
-        while (to >= 0 && to < slots.length && slots[to].off) to += step;
+        while (
+          to >= 0 &&
+          to < slots.length &&
+          (slots[to].off || slots[to].fill === "video")
+        )
+          to += step;
         if (to < 0 || to >= slots.length) return d;
         [slots[from], slots[to]] = [slots[to], slots[from]];
       }
@@ -335,7 +443,7 @@ export function withDelivered(
               const done = byKey.get(s.key);
               if (!done || s.off) return s;
               if (
-                s.fill === "scene" &&
+                s.fill !== "exact" &&
                 (!s.approvedOutput || s.approvedOutput !== done.approvedOutput)
               ) {
                 return s;
@@ -382,15 +490,22 @@ function updateSlot(
   return { destinations };
 }
 
-// The deliverable's size: the slots that are on, exact vs scene, and how many
-// the maker switched off.
+// The deliverable's size: the slots that are on, exact vs scene vs video, and
+// how many the maker switched off.
 export function planCounts(plan: ProjectPlan): {
   exact: number;
   scene: number;
+  video: number;
   off: number;
 } {
   const slots = plan.destinations.flatMap((d) => d.slots);
   const on = slots.filter((s) => !s.off);
-  const exact = on.filter((s) => s.fill === "exact").length;
-  return { exact, scene: on.length - exact, off: slots.length - on.length };
+  const count = (fill: PlanSlot["fill"]) =>
+    on.filter((s) => s.fill === fill).length;
+  return {
+    exact: count("exact"),
+    scene: count("scene"),
+    video: count("video"),
+    off: slots.length - on.length,
+  };
 }

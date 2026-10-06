@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import { GenerationRequest } from "@/domain/generation-request";
-import { ProjectPlan, sceneCardIds } from "@/domain/plan";
+import { generableCardIds, ProjectPlan } from "@/domain/plan";
 import {
   ACTIVE_JOB_STATUSES,
   type JobStatus,
@@ -147,7 +147,7 @@ export async function enqueueBatch(input: {
         "The project's plan could not be read, so nothing was queued.",
       );
     }
-    const allowed = new Set(sceneCardIds(plan.data));
+    const allowed = new Set(generableCardIds(plan.data));
     if (input.jobs.some((j) => !allowed.has(j.cardId))) {
       throw new QueueRefusal(
         "not-in-plan",

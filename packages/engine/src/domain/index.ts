@@ -67,9 +67,11 @@ export {
   PersistedProjectRecord,
 } from "@/domain/persisted-project";
 export {
+  addVideoSlot,
   approveSlot,
   type Catalog,
   destinationsFor,
+  generableCardIds,
   offeredDestinations,
   PlanDestination,
   PlanSlot,
@@ -87,7 +89,10 @@ export {
   slotRecipeId,
   slotState,
   unapproveSlot,
+  type VideoSettings,
+  videoSettings,
   withSlotOff,
+  withVideoChoice,
 } from "@/domain/plan";
 export {
   ColourOption,
@@ -168,3 +173,12 @@ export {
   sceneSlots,
 } from "@/domain/shot-list";
 export { BaseUnderstanding } from "@/domain/understanding";
+export {
+  aspectOf,
+  VIDEO_MOTIONS,
+  VideoChoice,
+  VideoMotion,
+  VideoOrientation,
+  VideoSeconds,
+  videoSecondsFor,
+} from "@/domain/video";

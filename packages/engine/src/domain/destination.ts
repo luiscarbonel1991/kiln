@@ -32,6 +32,12 @@ export const Delivery = z.object({
   mode: z.enum(["export", "draft-api"]),
 });
 
+// The listing video a destination takes, when it takes one (Etsy: 5-15 s).
+export const DestinationVideo = z.object({
+  minSec: z.number().positive(),
+  maxSec: z.number().positive(),
+});
+
 export const DestinationProfile = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -39,5 +45,6 @@ export const DestinationProfile = z.object({
   formats: z.array(DestinationFormat).min(1),
   rules: DestinationRules,
   delivery: Delivery,
+  video: DestinationVideo.optional(),
 });
 export type DestinationProfile = z.infer<typeof DestinationProfile>;
