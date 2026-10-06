@@ -33,6 +33,44 @@ pnpm db:migrate --create-only --name <change>         # draft a new migration, r
 Never edit a migration that has been applied; add a new one. Restart the dev
 server after migrating (the Prisma client is cached across hot reloads).
 
+Other databases:
+
+```bash
+pnpm db:mock:setup                                    # the mock runs' own database (kiln_mock)
+docker exec kiln-postgres createdb -U kiln kiln_test  # once: the DB tests' throwaway database
+DATABASE_URL=postgresql://kiln:kiln@localhost:5444/kiln_test pnpm db:deploy
+KILN_DB_TESTS=1 DATABASE_URL=postgresql://kiln:kiln@localhost:5444/kiln_test pnpm test
+```
+
+### An existing database
+
+- **Created before migrations** (by `prisma db push`, before `0_init`): tell Migrate the
+  baseline is already there, then apply the rest.
+
+  ```bash
+  pnpm prisma migrate resolve --applied 0_init
+  pnpm db:deploy
+  ```
+
+- **`20261005000100_one_active_job_per_card` fails** because the queue already holds two
+  active jobs for one card (only possible before that migration): cancel the extra ones,
+  keeping the running one (else the newest) per card, mark the failed attempt rolled back
+  and deploy again. The migration itself is never edited.
+
+  ```sql
+  UPDATE "GenerationJob" SET "status" = 'canceled', "finishedAt" = now()
+  WHERE "status" IN ('queued', 'running') AND "projectId" IS NOT NULL
+    AND "id" NOT IN (
+      SELECT DISTINCT ON ("projectId", "cardId") "id" FROM "GenerationJob"
+      WHERE "status" IN ('queued', 'running') AND "projectId" IS NOT NULL
+      ORDER BY "projectId", "cardId", ("status" = 'running') DESC, "createdAt" DESC);
+  ```
+
+  ```bash
+  pnpm prisma migrate resolve --rolled-back 20261005000100_one_active_job_per_card
+  pnpm db:deploy
+  ```
+
 ## Generation queue
 
 Planned projects generate in the background: the board's "Generate N scenes"
