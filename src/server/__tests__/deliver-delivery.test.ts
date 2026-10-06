@@ -25,6 +25,7 @@ const etsy = DestinationProfile.parse({
 
 const IN_USE = "https://storage.test/cards/in-use.png";
 const HERO = "https://storage.test/cards/hero.png";
+const CLIP = "https://storage.test/cards/clip.mp4";
 
 const plan = PlanDestination.parse({
   destinationId: "etsy",
@@ -61,6 +62,14 @@ const plan = PlanDestination.parse({
       exact: "scale",
     },
     { key: "gift", label: "Gift", purpose: "p", aspect: "4:5", off: true },
+    {
+      key: "video",
+      label: "Listing video",
+      purpose: "p",
+      aspect: "9:16",
+      fill: "video",
+      approvedOutput: CLIP,
+    },
   ],
 });
 
@@ -93,19 +102,33 @@ const input = (overrides = {}) => ({
     ({
       "in-use": { status: "done" as const, outputs: [IN_USE] },
       hero: { status: "done" as const, outputs: [HERO] },
+      video: { status: "done" as const, outputs: [CLIP] },
     })[key],
   plate: null,
   fetchOutput: async (url: string) =>
-    url === IN_USE ? png("1024x1536") : png("1024x1024"),
+    url === CLIP
+      ? new TextEncoder().encode("mp4 bytes")
+      : url === IN_USE
+        ? png("1024x1536")
+        : png("1024x1024"),
   sourceOf: (url: string) =>
-    url === HERO
+    url === CLIP
       ? {
-          prompt: "a hero",
-          model: "gpt-image-2",
-          costMicros: 61_000,
-          generatedAt: "2026-10-04T12:00:00.000Z",
+          prompt: "animate the start frame",
+          model: "sora-2",
+          costMicros: 800_000,
+          generatedAt: "2026-10-06T09:00:00.000Z",
+          seconds: 8,
+          aspect: "9:16",
         }
-      : undefined,
+      : url === HERO
+        ? {
+            prompt: "a hero",
+            model: "gpt-image-2",
+            costMicros: 61_000,
+            generatedAt: "2026-10-04T12:00:00.000Z",
+          }
+        : undefined,
   now: new Date("2026-10-06T10:00:00.000Z"),
   ...overrides,
 });
@@ -124,6 +147,7 @@ describe.skipIf(!hasMagick)("buildDelivery", () => {
         "04-scale.png",
         "README.txt",
         "manifest.json",
+        "video.mp4",
       ].map((f) => `${folder}/${f}`),
     );
     const size = (bytes: Uint8Array) =>
@@ -134,9 +158,21 @@ describe.skipIf(!hasMagick)("buildDelivery", () => {
     expect(size(files[`${folder}/02-hero.jpg`])).toBe("2000 2000");
     expect(size(files[`${folder}/03-colours.png`])).toBe("2000 2000");
     const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
-    expect(manifest.files.map((f: { photo: number }) => f.photo)).toEqual([
-      1, 2, 3, 4,
-    ]);
+    expect(
+      manifest.files.map((f: { photo: number | null }) => f.photo),
+    ).toEqual([1, 2, 3, 4, null]);
+    expect(manifest.files[4]).toMatchObject({
+      file: "video.mp4",
+      kind: "video",
+      width: 720,
+      height: 1280,
+      seconds: 8,
+      source: { model: "sora-2", costMicros: 800_000 },
+    });
+    expect(strFromU8(files[`${folder}/video.mp4`])).toBe("mp4 bytes");
+    expect(strFromU8(files[`${folder}/README.txt`])).toContain(
+      "Listing video: botanical-coaster-launch-etsy/video.mp4",
+    );
     expect(manifest.files[1].source).toMatchObject({
       model: "gpt-image-2",
       costMicros: 61_000,
@@ -149,6 +185,7 @@ describe.skipIf(!hasMagick)("buildDelivery", () => {
       { key: "hero", approvedOutput: HERO },
       { key: "colours" },
       { key: "scale" },
+      { key: "video", approvedOutput: CLIP },
     ]);
   });
 

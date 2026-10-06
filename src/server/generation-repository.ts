@@ -637,6 +637,9 @@ export interface OutputSource {
   model: string;
   costMicros: number | null;
   generatedAt: string | null;
+  // A video's length and aspect, as it was rendered.
+  seconds?: number;
+  aspect?: string;
 }
 
 // What produced each of these outputs: the queue job that finished with it
@@ -665,6 +668,12 @@ export async function outputSources(
       model: request.data.model.model,
       costMicros: job.actualMicros,
       generatedAt: job.finishedAt?.toISOString() ?? null,
+      ...(request.data.kind === "video"
+        ? {
+            seconds: request.data.durationSec,
+            aspect: request.data.model.aspect,
+          }
+        : {}),
     });
   }
   return sources;
