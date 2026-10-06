@@ -30,6 +30,20 @@ const EnvSchema = z.object({
     z.coerce.number().int().min(0).default(0),
   ),
 
+  // Origins (besides Kiln's own storage and data: images) the server may fetch
+  // asset bytes from, comma-separated — e.g. a maker's CDN that a product
+  // package's svgUrl or assetUrl points at (providers/asset-bytes.ts).
+  KILN_ASSET_ORIGINS: z.preprocess(
+    (v) =>
+      typeof v === "string"
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [],
+    z.array(z.string().url()),
+  ),
+
   // Object storage — selectable provider (S3 / S3-compatible like MinIO). Optional
   // with local defaults; the storage adapter asserts what it needs at runtime.
   STORAGE_PROVIDER: z.enum(["s3"]).default("s3"),
