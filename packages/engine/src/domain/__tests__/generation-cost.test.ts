@@ -4,13 +4,50 @@ import {
   costFromUsage,
   estimateGeneration,
   estimateScenes,
+  estimateVideo,
   imagePrice,
+  soraSeconds,
   toMicros,
+  videoCost,
 } from "@/domain/generation-cost";
 import {
   DEFAULT_MODEL_IDS,
   OPENAI_IMAGE_QUALITY,
 } from "@/domain/model-defaults";
+
+describe("video cost", () => {
+  it("snaps a duration to Sora's 4 / 8 / 12 seconds", () => {
+    expect([1, 5, 6, 7, 8, 10, 11, 15].map(soraSeconds)).toEqual([
+      4, 4, 4, 8, 8, 8, 12, 12,
+    ]);
+  });
+
+  it("prices the seconds Sora generates, per model; Veo and unknown ids have no price", () => {
+    expect(estimateVideo({ provider: "openai", model: "sora-2" }, 8)).toBe(0.8);
+    expect(estimateVideo({ provider: "openai", model: "sora-2-pro" }, 5)).toBe(
+      1.2,
+    );
+    expect(videoCost("sora-2", 12)).toBe(1.2);
+    expect(
+      estimateVideo(
+        { provider: "google", model: "veo-3.1-generate-preview" },
+        8,
+      ),
+    ).toBeNull();
+    expect(
+      estimateVideo({ provider: "openai", model: "sora-9" }, 8),
+    ).toBeNull();
+  });
+
+  it("prices every video model the catalog offers on OpenAI", () => {
+    expect(
+      estimateVideo(
+        { provider: "openai", model: DEFAULT_MODEL_IDS.openai.video },
+        8,
+      ),
+    ).not.toBeNull();
+  });
+});
 
 describe("generation cost", () => {
   it("prices every catalog default image model", () => {

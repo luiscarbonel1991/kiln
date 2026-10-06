@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { toFile } from "openai";
+import { soraSeconds } from "@/domain/generation-cost";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import type { VideoProvider } from "@/providers/interfaces";
 import { MODELS, resolveVideoModel } from "@/providers/models";
@@ -32,12 +33,12 @@ function isFetchable(ref: string): boolean {
   return /^(https?:|data:)/.test(ref) && !ref.includes("stub.local");
 }
 
-// Sora accepts a fixed seconds enum; snap the card's duration to the nearest.
-function secondsFor(durationSec: number): "4" | "8" | "12" {
-  if (durationSec <= 6) return "4";
-  if (durationSec <= 10) return "8";
-  return "12";
-}
+// The paid create is never retried by the SDK (a retry after a timeout could
+// start a second render); the polls and the download are free and keep the
+// SDK's retries. The poll stops before the direct-spend row's 15 min lease.
+const CREATE_TIMEOUT_MS = 120_000;
+const POLL_MS = 10_000;
+export const VIDEO_POLL_DEADLINE_MS = 12 * 60_000;
 
 // 720x1280 / 1280x720 are valid on both sora-2 and sora-2-pro (the 1024x1792
 // pair is pro-only, so we stay on the shared sizes). Portrait-ish aspects map to
@@ -84,9 +85,11 @@ async function frameSizedTo(
 
 // Real Sora (image->video). Like Veo it is a long-running operation: create,
 // poll until it leaves the queue, then download the mp4 bytes and store them.
+// A render that fails or outlives the deadline throws without an HTTP status:
+// the spend row counts it at its estimate (it may still be charged).
 export const openaiVideoProvider: VideoProvider = {
   id: "openai",
-  async animate(input) {
+  async animate(input, options) {
     if (!hasOpenAIKey()) return mockResult();
     const client = getOpenAI();
     const model = resolveVideoModel("openai", input.model.model);
@@ -99,15 +102,25 @@ export const openaiVideoProvider: VideoProvider = {
       inputReference = await toFile(sized, "frame.png", { type: "image/png" });
     }
 
-    let video = await client.videos.create({
-      model,
-      prompt: `${input.prompt}. Motion: ${input.motion}.`,
-      seconds: secondsFor(input.durationSec),
-      size,
-      ...(inputReference ? { input_reference: inputReference } : {}),
-    });
+    await options?.beforeCall?.();
+    let video = await client.videos.create(
+      {
+        model,
+        prompt: `${input.prompt}. Motion: ${input.motion}.`,
+        seconds: String(soraSeconds(input.durationSec)) as "4" | "8" | "12",
+        size,
+        ...(inputReference ? { input_reference: inputReference } : {}),
+      },
+      { maxRetries: 0, timeout: CREATE_TIMEOUT_MS },
+    );
+    const deadline = Date.now() + VIDEO_POLL_DEADLINE_MS;
     while (video.status === "queued" || video.status === "in_progress") {
-      await new Promise((resolve) => setTimeout(resolve, 10_000));
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `Sora did not finish within ${VIDEO_POLL_DEADLINE_MS / 60_000} minutes; the render may still be charged.`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
       video = await client.videos.retrieve(video.id);
     }
     if (video.status !== "completed") {

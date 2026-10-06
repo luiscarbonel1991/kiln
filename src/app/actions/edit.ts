@@ -3,7 +3,7 @@
 import { generationModel } from "@/domain/model-defaults";
 import { getImageProvider } from "@/providers/registry";
 import { GenerationResult, ImageEditInput } from "@/providers/types";
-import { withDirectSpend } from "@/server/direct-spend";
+import { imageCall, withDirectSpend } from "@/server/direct-spend";
 
 // Server Function: the only client path into @/providers for image editing. The
 // provider comes from the card's model under the generation policy (OpenAI only:
@@ -15,9 +15,11 @@ export async function editImage(
 ): Promise<GenerationResult> {
   const parsed = ImageEditInput.parse(input);
   const safe = { ...parsed, model: generationModel(parsed.model, "image") };
-  return withDirectSpend(safe.model, safe.model.aspect, async (beforeCall) =>
-    GenerationResult.parse(
-      await getImageProvider(safe.model.provider).edit(safe, { beforeCall }),
-    ),
+  return withDirectSpend(
+    imageCall(safe.model, safe.model.aspect),
+    async (beforeCall) =>
+      GenerationResult.parse(
+        await getImageProvider(safe.model.provider).edit(safe, { beforeCall }),
+      ),
   );
 }

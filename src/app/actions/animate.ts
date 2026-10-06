@@ -1,23 +1,31 @@
 "use server";
 
 import { generationModel } from "@/domain/model-defaults";
+import { resolveVideoModel } from "@/providers/models";
 import { getVideoProvider } from "@/providers/registry";
 import { AnimateInput, GenerationResult } from "@/providers/types";
-import { assertUnderCap } from "@/server/direct-spend";
+import { videoCall, withDirectSpend } from "@/server/direct-spend";
 
 // Server Function: the only client path into @/providers for video. The provider
 // comes from the card's model under the generation policy (OpenAI only: Sora);
 // the guard stays for any id without a video adapter. Mirrors edit.ts; Zod is
-// the trust boundary.
+// the trust boundary. The video reserves its pinned max against the monthly cap
+// and records what it cost, like the image calls; the model is resolved first,
+// so the price and the call are for the same model.
 export async function animateVideo(
   input: AnimateInput,
 ): Promise<GenerationResult> {
   const parsed = AnimateInput.parse(input);
-  const safe = { ...parsed, model: generationModel(parsed.model, "video") };
-  // Video respects the cap; its cost is not recorded yet (no pinned Sora price).
-  await assertUnderCap();
-  const provider = getVideoProvider(safe.model.provider);
+  const model = generationModel(parsed.model, "video");
+  const provider = getVideoProvider(model.provider);
   if (!provider) throw new Error("No video provider available");
-  const result = await provider.animate(safe);
-  return GenerationResult.parse(result);
+  const safe = {
+    ...parsed,
+    model: { ...model, model: resolveVideoModel(model.provider, model.model) },
+  };
+  return withDirectSpend(
+    videoCall(safe.model, safe.durationSec),
+    async (beforeCall) =>
+      GenerationResult.parse(await provider.animate(safe, { beforeCall })),
+  );
 }

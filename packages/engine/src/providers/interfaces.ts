@@ -71,16 +71,20 @@ export interface EditBytesResult {
   usage?: GenerationUsage;
 }
 
-// (d) Video executor (image-to-video).
+// (d) Video executor (image-to-video). `beforeCall` runs right before the paid
+// request (the spend row marks it), like the image edit's.
 export interface VideoProvider {
   readonly id: ProviderId;
-  animate(input: {
-    startFrameAssetId: string;
-    prompt: string;
-    motion: string;
-    durationSec: number;
-    model: ModelConfigLike;
-  }): Promise<GenerationResult>;
+  animate(
+    input: {
+      startFrameAssetId: string;
+      prompt: string;
+      motion: string;
+      durationSec: number;
+      model: ModelConfigLike;
+    },
+    options?: { beforeCall?: () => Promise<void> },
+  ): Promise<GenerationResult>;
 }
 
 // Structural mirror of ModelConfig's fields the video adapters read — keeps this

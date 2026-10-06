@@ -140,6 +140,41 @@ export function estimateScenes(
   };
 }
 
+// Video: OpenAI bills Sora by the second generated, at a price per size
+// (https://developers.openai.com/api/docs/models/sora-2 and .../sora-2-pro,
+// checked 2026-10-05). Kiln renders only 720x1280 / 1280x720, the size both
+// models share, so one price per second per model.
+export const VIDEO_PRICES_AS_OF = "2026-10-05";
+
+const VIDEO_PER_SECOND: Record<string, number> = {
+  "sora-2": 0.1,
+  "sora-2-pro": 0.3,
+};
+
+// Sora takes 4, 8 or 12 seconds; a card's duration snaps to the nearest. The
+// adapter sends this and the estimate prices it, so they always agree.
+export function soraSeconds(durationSec: number): 4 | 8 | 12 {
+  if (durationSec <= 6) return 4;
+  if (durationSec <= 10) return 8;
+  return 12;
+}
+
+// What `seconds` of video cost on this model; null when it has no pinned price.
+export function videoCost(model: string, seconds: number): number | null {
+  const perSecond = VIDEO_PER_SECOND[model];
+  return perSecond === undefined ? null : round(perSecond * seconds);
+}
+
+// What one video at this duration costs. Billing is by the seconds generated,
+// so the estimate is also the measured cost of a finished video.
+export function estimateVideo(
+  model: { provider: string; model: string },
+  durationSec: number,
+): number | null {
+  if (model.provider !== "openai") return null;
+  return videoCost(model.model, soraSeconds(durationSec));
+}
+
 // Official token prices, $ per 1M tokens (https://developers.openai.com/api/
 // docs/pricing, 2026-10-02): what a finished generation actually cost, from the
 // usage the API returns.

@@ -1,15 +1,16 @@
 import {
   costFromUsage,
   estimateGeneration,
-  fromMicros,
+  estimateVideo,
+  soraSeconds,
   toMicros,
+  videoCost,
 } from "@/domain/generation-cost";
 import { errorMessage, hadResponse } from "@/domain/queue";
 import { env } from "@/lib/env";
 import { providerMode } from "@/providers/mode";
 import type { GenerationResult } from "@/providers/types";
 import {
-  budget,
   closeDirectCall,
   markDirectCall,
   reserveDirectCall,
@@ -20,25 +21,62 @@ import { getCurrentMaker } from "@/server/maker-repository";
 // Mock runs neither reserve nor count. Without a database (tests) both are
 // no-ops.
 
-// Run one direct (studio) image call against the cap. Its estimated max is
-// reserved first, under the maker lock, so parallel calls cannot pass the cap
-// together; the row then carries the measured cost. The provider marks the
-// row right before its paid request (`beforeCall`): an error it answered
-// counts nothing, a call with no answer counts at its estimate.
-export async function withDirectSpend(
+// What a direct call may cost, and how to measure what it did cost.
+export interface PricedCall {
+  model: string;
+  // The most the call can cost; null when the model has no pinned price.
+  estimateMax: number | null;
+  costOf(result: GenerationResult): number | null;
+}
+
+export function imageCall(
   model: { provider: string; model: string },
   aspect: string,
+): PricedCall {
+  return {
+    model: model.model,
+    estimateMax: estimateGeneration(model, aspect)?.max ?? 0,
+    costOf: (result) =>
+      result.usage ? costFromUsage(result.model, result.usage) : null,
+  };
+}
+
+// Sora bills the seconds generated, so a finished video costs its estimate.
+export function videoCall(
+  model: { provider: string; model: string },
+  durationSec: number,
+): PricedCall {
+  const seconds = soraSeconds(durationSec);
+  return {
+    model: model.model,
+    estimateMax: estimateVideo(model, durationSec),
+    costOf: (result) => videoCost(result.model, seconds),
+  };
+}
+
+// Run one direct (studio) call against the cap. Its estimated max is reserved
+// first, under the maker lock, so parallel calls cannot pass the cap together;
+// the row then carries the measured cost. The provider marks the row right
+// before its paid request (`beforeCall`): an error it answered counts nothing,
+// a call with no answer counts at its estimate, and a call never made (a stub)
+// records nothing.
+export async function withDirectSpend(
+  priced: PricedCall,
   call: (beforeCall: () => Promise<void>) => Promise<GenerationResult>,
 ): Promise<GenerationResult> {
   if (!env.DATABASE_URL || providerMode() === "mock") {
     return call(async () => {});
   }
+  if (priced.estimateMax === null) {
+    throw new Error(
+      `No pinned price for ${priced.model}, so it cannot run under the cap.`,
+    );
+  }
   const maker = await getCurrentMaker();
-  const estimate = estimateGeneration(model, aspect);
   const id = await reserveDirectCall({
     makerId: maker.id,
-    model: model.model,
-    estimateMicros: toMicros(estimate?.max ?? 0),
+    model: priced.model,
+    estimateMicros: toMicros(priced.estimateMax),
   });
   let callStarted = false;
   let result: GenerationResult;
@@ -54,23 +92,10 @@ export async function withDirectSpend(
     }).catch((e) => console.warn("[kiln spend] could not close a call", e));
     throw error;
   }
-  const usd = result.usage ? costFromUsage(result.model, result.usage) : null;
+  const usd = callStarted ? priced.costOf(result) : null;
   await closeDirectCall(id, {
     usage: result.usage,
     actualMicros: usd === null ? null : toMicros(usd),
   }).catch((e) => console.warn("[kiln spend] could not record a call", e));
   return result;
-}
-
-// For calls without a pinned price (video): refuse once the month's spend and
-// what is reserved reach the cap.
-export async function assertUnderCap(): Promise<void> {
-  if (!env.DATABASE_URL || providerMode() === "mock") return;
-  const maker = await getCurrentMaker();
-  const b = await budget(maker.id);
-  if (b.spentMicros + b.reservedMicros >= b.capMicros) {
-    throw new Error(
-      `This month's spending cap ($${fromMicros(b.capMicros).toFixed(2)}) was reached.`,
-    );
-  }
 }
