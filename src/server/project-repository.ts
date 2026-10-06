@@ -99,6 +99,9 @@ function cardData(projectId: string, cards: CardRow[]) {
 // the server and its generation state is written by the queue, so the editor
 // only updates the columns it owns on cards that exist (editorCardColumns) —
 // a stale editor tab can never revert a result, the reference or the card set.
+// A card's vector belongs to the output it traced: it is written only while
+// the card still shows the outputs the editor saw, so a stale tab cannot put
+// back a vector the worker cleared with a new output.
 export async function saveProject(
   input: PersistedProject,
   id?: string,
@@ -122,7 +125,7 @@ export async function saveProject(
 
     if (project.plan !== null) {
       for (const card of rows.cards) {
-        const columns = editorCardColumns(card);
+        const { vectorUrl, ...columns } = editorCardColumns(card);
         await tx.card.updateMany({
           where: { projectId: project.id, cardId: card.cardId },
           data: {
@@ -132,6 +135,14 @@ export async function saveProject(
             model: columns.model as Prisma.InputJsonValue,
             video: nullableJson(columns.video),
           },
+        });
+        await tx.card.updateMany({
+          where: {
+            projectId: project.id,
+            cardId: card.cardId,
+            outputs: { equals: card.outputs as Prisma.InputJsonValue },
+          },
+          data: { vectorUrl },
         });
       }
       return project.id;

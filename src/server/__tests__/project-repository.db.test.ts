@@ -191,6 +191,46 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     expect(anchor.assetUrl).toBe(master.assetUrl);
   });
 
+  it("a stale tab never writes back a vector the worker cleared", async () => {
+    const [saved] = await upsertProducts([product]);
+    const id = await repo.createProject({
+      type: "launch",
+      productId: saved.id,
+      plan,
+      editor,
+    });
+    created.push(id);
+    const where = {
+      projectId_cardId: { projectId: id, cardId: "etsy.in-use" },
+    };
+    // The queue re-rolled the card: a new output, its old vector cleared.
+    await db.card.update({
+      where,
+      data: {
+        outputs: ["https://stub.local/new.png"],
+        status: "done",
+        vectorUrl: null,
+      },
+    });
+    const [, inUse] = editor.cards;
+    const save = (outputs: string[], vectorUrl: string) =>
+      repo.saveProject(
+        {
+          ...editor,
+          cards: [{ ...inUse, outputs, status: "done", vectorUrl }],
+        },
+        id,
+      );
+    // A tab still showing the old output and its vector.
+    await save(["https://stub.local/old.png"], "https://stub.local/old.svg");
+    expect((await db.card.findUniqueOrThrow({ where })).vectorUrl).toBeNull();
+    // A tab that traced the new output.
+    await save(["https://stub.local/new.png"], "https://stub.local/new.svg");
+    expect((await db.card.findUniqueOrThrow({ where })).vectorUrl).toBe(
+      "https://stub.local/new.svg",
+    );
+  });
+
   it("the editor's direct output write does not apply to a planned project", async () => {
     const id = created[0];
     await repo.saveCardOutput(
