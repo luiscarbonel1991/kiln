@@ -9,8 +9,22 @@ import type { PlateImage } from "@/lib/plate-href";
 
 // Draws an exact slot from its view model: plain SVG, no image model, the same
 // pixels every time. Product colours are the spec's hex values (render content);
-// chrome uses the DESIGN tokens. The viewBox follows the slot's aspect.
+// chrome uses the DESIGN tokens as explicit colours (a deliverable never follows
+// the app's theme), so the same markup renders in the board and, through
+// src/lib/svg-markup.ts and resvg, as an exported file. The viewBox follows the
+// slot's aspect.
 const WIDTH = 400;
+
+// DESIGN.md's light tokens: on-surface, on-surface-mid, on-surface-dim,
+// surface, surface-soft, line.
+const INK = {
+  foreground: "#241f18",
+  mid: "#6f6657",
+  dim: "#a89e8c",
+  card: "#fffdf9",
+  soft: "#faf5ec",
+  border: "#ebe2d2",
+} as const;
 
 function heightFor(aspect: string | undefined): number {
   const [w, h] = (aspect ?? "1:1").split(":").map(Number);
@@ -44,7 +58,7 @@ export function ExactSlotArt({
       {view.kind === "text-card" ? (
         <rect width={WIDTH} height={height} fill={view.background} />
       ) : (
-        <rect width={WIDTH} height={height} className="fill-card" />
+        <rect width={WIDTH} height={height} fill={INK.card} />
       )}
       {view.kind === "colour-grid" ? (
         <ColourGrid view={view} height={height} />
@@ -71,7 +85,7 @@ function Title({ text, y = 58 }: { text: string; y?: number }) {
       x={WIDTH / 2}
       y={y}
       textAnchor="middle"
-      className="fill-foreground"
+      fill={INK.foreground}
       style={{ ...SERIF, fontSize: 26, fontStyle: "italic" }}
     >
       {text}
@@ -108,7 +122,7 @@ function ColourGrid({
               height={swatch}
               rx={Math.min(14, swatch / 5)}
               fill={s.face}
-              className="stroke-border"
+              stroke={INK.border}
               strokeWidth={1}
             />
             {s.inlay ? (
@@ -128,7 +142,7 @@ function ColourGrid({
                 x={cell.cx}
                 y={cell.nameY + l * lineHeight}
                 textAnchor="middle"
-                className="fill-foreground"
+                fill={INK.foreground}
                 style={{ ...SANS, fontSize, fontWeight: 600 }}
               >
                 {line}
@@ -139,7 +153,7 @@ function ColourGrid({
                 x={cell.cx}
                 y={cell.stockY}
                 textAnchor="middle"
-                className="fill-on-surface-mid"
+                fill={INK.mid}
                 style={{ ...MONO, fontSize: 10 }}
               >
                 out of stock
@@ -216,7 +230,7 @@ function ProductShape({
           rx={w / 2}
           ry={h / 2}
           fill={outline.face}
-          className="stroke-on-surface-mid"
+          stroke={INK.mid}
           strokeWidth={1}
         />
       ) : (
@@ -227,7 +241,7 @@ function ProductShape({
           height={h}
           rx={Math.min(w, h) * 0.08}
           fill={outline.face}
-          className="stroke-on-surface-mid"
+          stroke={INK.mid}
           strokeWidth={1}
         />
       )}
@@ -266,8 +280,8 @@ function ReferenceShape({
   w: number;
   h: number;
 }) {
-  const body = "fill-surface-soft stroke-on-surface-mid";
-  const detail = "fill-on-surface-dim/25";
+  const body = { fill: INK.soft, stroke: INK.mid };
+  const detail = { fill: INK.dim, fillOpacity: 0.25 };
   switch (reference.key) {
     case "card":
       return (
@@ -278,7 +292,7 @@ function ReferenceShape({
             width={w}
             height={h}
             rx={w * 0.05}
-            className={body}
+            {...body}
             strokeWidth={1}
           />
           <rect
@@ -287,7 +301,7 @@ function ReferenceShape({
             width={w * 0.17}
             height={h * 0.24}
             rx={2}
-            className={detail}
+            {...detail}
           />
           <rect
             x={x + w * 0.1}
@@ -295,7 +309,7 @@ function ReferenceShape({
             width={w * 0.6}
             height={h * 0.07}
             rx={1}
-            className={detail}
+            {...detail}
           />
         </g>
       );
@@ -308,7 +322,7 @@ function ReferenceShape({
             width={w}
             height={h}
             rx={w * 0.16}
-            className={body}
+            {...body}
             strokeWidth={1}
           />
           <rect
@@ -317,7 +331,7 @@ function ReferenceShape({
             width={w * 0.86}
             height={h * 0.9}
             rx={w * 0.1}
-            className={detail}
+            {...detail}
           />
         </g>
       );
@@ -326,7 +340,7 @@ function ReferenceShape({
         <g>
           <path
             d={`M${x} ${y} H${x + w * 0.86} L${x + w} ${y + w * 0.14} V${y + h} H${x} Z`}
-            className={body}
+            {...body}
             strokeWidth={1}
           />
           {[0.22, 0.3, 0.38, 0.46, 0.54].map((f) => (
@@ -336,7 +350,7 @@ function ReferenceShape({
               y={y + h * f}
               width={w * (f === 0.54 ? 0.45 : 0.76)}
               height={Math.max(1, h * 0.012)}
-              className={detail}
+              {...detail}
             />
           ))}
         </g>
@@ -344,33 +358,26 @@ function ReferenceShape({
     case "door":
       return (
         <g>
-          <rect
-            x={x}
-            y={y}
-            width={w}
-            height={h}
-            className={body}
-            strokeWidth={1}
-          />
+          <rect x={x} y={y} width={w} height={h} {...body} strokeWidth={1} />
           <rect
             x={x + w * 0.14}
             y={y + h * 0.06}
             width={w * 0.72}
             height={h * 0.38}
-            className={detail}
+            {...detail}
           />
           <rect
             x={x + w * 0.14}
             y={y + h * 0.5}
             width={w * 0.72}
             height={h * 0.44}
-            className={detail}
+            {...detail}
           />
           <circle
             cx={x + w * 0.88}
             cy={y + h * 0.5}
             r={Math.max(2, w * 0.035)}
-            className="fill-on-surface-mid"
+            fill={INK.mid}
           />
         </g>
       );
@@ -437,7 +444,7 @@ function ScaleDrawing({
         x2={WIDTH - x0 + 10}
         y1={baseline}
         y2={baseline}
-        className="stroke-on-surface-dim"
+        stroke={INK.dim}
         strokeWidth={1}
       />
       <line
@@ -445,7 +452,7 @@ function ScaleDrawing({
         x2={px + span * unitLen * k}
         y1={rulerY}
         y2={rulerY}
-        className="stroke-foreground"
+        stroke={INK.foreground}
         strokeWidth={1}
       />
       {ticks.map((t) => (
@@ -455,14 +462,14 @@ function ScaleDrawing({
             x2={px + t * unitLen * k}
             y1={rulerY}
             y2={rulerY + 6}
-            className="stroke-foreground"
+            stroke={INK.foreground}
             strokeWidth={1}
           />
           <text
             x={px + t * unitLen * k}
             y={rulerY + 17}
             textAnchor="middle"
-            className="fill-on-surface-mid"
+            fill={INK.mid}
             style={{ ...MONO, fontSize: 9 }}
           >
             {t}
@@ -472,7 +479,7 @@ function ScaleDrawing({
       <text
         x={px + span * unitLen * k + 6}
         y={rulerY + 4}
-        className="fill-on-surface-mid"
+        fill={INK.mid}
         style={{ ...MONO, fontSize: 9 }}
       >
         {metric ? "cm" : "in"}
@@ -481,7 +488,7 @@ function ScaleDrawing({
         x={px + (p.width * k) / 2}
         y={rulerY + 44}
         textAnchor="middle"
-        className="fill-foreground"
+        fill={INK.foreground}
         style={{ ...MONO, fontSize: 11 }}
       >
         {fmtSize(p.width)} x {fmtSize(p.height)} {p.unit}
@@ -490,7 +497,7 @@ function ScaleDrawing({
         x={rx + (r.width * k) / 2}
         y={rulerY + 44}
         textAnchor="middle"
-        className="fill-on-surface-mid"
+        fill={INK.mid}
         style={{ ...SANS, fontSize: 11 }}
       >
         {r.name}
@@ -499,7 +506,7 @@ function ScaleDrawing({
         x={rx + (r.width * k) / 2}
         y={rulerY + 58}
         textAnchor="middle"
-        className="fill-on-surface-dim"
+        fill={INK.dim}
         style={{ ...MONO, fontSize: 9 }}
       >
         {fmtSize(r.width)} x {fmtSize(r.height)} {p.unit}
@@ -541,14 +548,14 @@ function SizeSpec({
         x2={x + w}
         y1={y + h + 18}
         y2={y + h + 18}
-        className="stroke-on-surface-mid"
+        stroke={INK.mid}
         strokeWidth={1}
       />
       <text
         x={WIDTH / 2}
         y={y + h + 36}
         textAnchor="middle"
-        className="fill-foreground"
+        fill={INK.foreground}
         style={{ ...MONO, fontSize: 12 }}
       >
         {fmt(view.width)} {view.unit}
@@ -558,13 +565,13 @@ function SizeSpec({
         x2={x + w + 18}
         y1={y}
         y2={y + h}
-        className="stroke-on-surface-mid"
+        stroke={INK.mid}
         strokeWidth={1}
       />
       <text
         x={x + w + 26}
         y={y + h / 2 + 4}
-        className="fill-foreground"
+        fill={INK.foreground}
         style={{ ...MONO, fontSize: 12 }}
       >
         {fmt(view.height)} {view.unit}
@@ -574,7 +581,7 @@ function SizeSpec({
           <text
             x={70}
             y={y + h + 62 + i * 22}
-            className="fill-on-surface-dim"
+            fill={INK.dim}
             style={{ ...SANS, fontSize: 10, fontWeight: 700, letterSpacing: 1 }}
           >
             {f.label.toUpperCase()}
@@ -582,7 +589,7 @@ function SizeSpec({
           <text
             x={170}
             y={y + h + 62 + i * 22}
-            className="fill-foreground"
+            fill={INK.foreground}
             style={{ ...SANS, fontSize: 13 }}
           >
             {f.value}
@@ -594,7 +601,7 @@ function SizeSpec({
           x={WIDTH / 2}
           y={height - 24}
           textAnchor="middle"
-          className="fill-on-surface-mid"
+          fill={INK.mid}
           style={{ ...MONO, fontSize: 11 }}
         >
           {fmt(view.depth)} {view.unit} thick
@@ -626,7 +633,7 @@ function Personalize({
             <text
               x={56}
               y={y}
-              className="fill-on-surface-dim"
+              fill={INK.dim}
               style={{
                 ...SANS,
                 fontSize: 10,
@@ -642,13 +649,14 @@ function Personalize({
               width={WIDTH - 112}
               height={40}
               rx={13}
-              className="fill-surface-soft stroke-border"
+              fill={INK.soft}
+              stroke={INK.border}
               strokeWidth={1}
             />
             <text
               x={72}
               y={y + 36}
-              className="fill-foreground"
+              fill={INK.foreground}
               style={{ ...SERIF, fontSize: 18 }}
             >
               {line.example ?? ""}
@@ -658,7 +666,7 @@ function Personalize({
                 x={WIDTH - 72}
                 y={y + 36}
                 textAnchor="end"
-                className="fill-on-surface-mid"
+                fill={INK.mid}
                 style={{ ...MONO, fontSize: 11 }}
               >
                 max {line.maxChars}
