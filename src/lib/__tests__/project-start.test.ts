@@ -74,12 +74,24 @@ describe("slotCards", () => {
       "etsy.lifestyle",
       "etsy.detail",
       "etsy.gift",
+      "etsy.video",
       "instagram.hook",
       "instagram.in-place",
       "instagram.detail",
     ]);
     expect(new Set(cards.map((c) => c.id)).size).toBe(cards.length);
     expect(cards.every((c) => c.status === "draft")).toBe(true);
+  });
+
+  it("the video slot gets a video card, drafted for Sora at 9:16", () => {
+    const video = cards.find((c) => c.id === "etsy.video");
+    expect(video).toMatchObject({
+      type: "video",
+      direction: "Listing video",
+      status: "draft",
+      model: { provider: "openai", model: "sora-2", aspect: "9:16" },
+      video: { durationSec: 8, startFrameAssetId: null },
+    });
   });
 
   it("each card resolves its recipe and keeps its slot's aspect and label", () => {
@@ -191,7 +203,7 @@ describe("startEditorState", () => {
     });
     expect(state.phase).toBe("generation");
     expect(state.understanding?.subject).toContain('"The Riveras"');
-    expect(state.cards).toHaveLength(8);
+    expect(state.cards).toHaveLength(9);
     expect(state.name).toBe("Engraved family cutting board — Launch");
   });
 

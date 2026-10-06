@@ -74,11 +74,18 @@ export function boardRows(
 }
 
 // The scene slots a batch would generate: a card exists, nothing is queued or
-// running for it, and it has no output yet (a failed one counts).
+// running for it, and it has no output yet (a failed one counts). A video is
+// generated from its own slot, never in the scene batch.
 export function waitingCardIds(rows: ReturnType<typeof boardRows>): string[] {
   return rows
     .flatMap((r) => r.slots)
-    .filter((s) => s.card && s.view.state === "queued" && !s.view.inBatch)
+    .filter(
+      (s) =>
+        s.slot.fill === "scene" &&
+        s.card &&
+        s.view.state === "queued" &&
+        !s.view.inBatch,
+    )
     .map((s) => s.cardId);
 }
 

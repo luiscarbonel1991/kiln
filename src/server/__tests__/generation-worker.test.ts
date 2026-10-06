@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { EditBytesResult, ImageProvider } from "@/providers/interfaces";
+import type {
+  EditBytesResult,
+  ImageProvider,
+  VideoBytesResult,
+  VideoProvider,
+} from "@/providers/interfaces";
 import type { ClaimedJob } from "@/server/generation-repository";
 import {
   createWorker,
@@ -79,6 +84,7 @@ function deps(overrides: Partial<WorkerDeps> = {}) {
     requeueExpired: vi.fn(async () => 0),
     overCap: vi.fn(async () => false),
     provider: () => provider,
+    videoProvider: () => undefined,
     storeAsset: vi.fn(async () => {
       calls.push("store");
       return "https://storage/out.png";
@@ -322,5 +328,98 @@ describe("createWorker", () => {
       "t-late",
       "https://storage/out.png",
     );
+  });
+});
+
+describe("video jobs", () => {
+  const videoRequest = {
+    kind: "video",
+    startFrameUrl: "https://storage/cards/in-use.png",
+    prompt: "animate the start frame",
+    motion: "a subtle, slow push-in toward the product",
+    durationSec: 8,
+    model: {
+      provider: "openai",
+      model: "sora-2",
+      aspect: "9:16",
+      guidance: 7.5,
+      strength: 0.65,
+    },
+  };
+  const videoJob = (attempt = 1): ClaimedJob => ({
+    ...claimed("v", attempt),
+    request: videoRequest,
+    estimateMicros: 800_000,
+  });
+  const clip: VideoBytesResult = {
+    bytes: new Uint8Array([9, 9]),
+    mime: "video/mp4",
+    model: "sora-2",
+    seconds: 8,
+  };
+
+  function videoDeps(
+    animate: (options: {
+      beforeCall?: () => Promise<void>;
+    }) => Promise<VideoBytesResult>,
+    overrides: Partial<WorkerDeps> = {},
+  ) {
+    const animateBytes = vi.fn(
+      async (
+        _input: unknown,
+        options: { beforeCall?: () => Promise<void> } = {},
+      ) => animate(options),
+    );
+    const video = { id: "openai", animateBytes } as unknown as VideoProvider;
+    const made = deps({ videoProvider: () => video, ...overrides });
+    return { ...made, animateBytes };
+  }
+
+  it("marks the call, records the seconds it rendered, stores the clip, completes", async () => {
+    const { d, calls, animateBytes } = videoDeps(async (options) => {
+      await options.beforeCall?.();
+      return clip;
+    });
+    await runJob(d, videoJob());
+    expect(animateBytes.mock.calls[0][0]).toMatchObject({
+      startFrameAssetId: videoRequest.startFrameUrl,
+      durationSec: 8,
+    });
+    expect(calls).toEqual(["mark", "cost", "store", "complete"]);
+    expect(d.recordCost).toHaveBeenCalledWith("v", { seconds: 8 }, 800_000);
+    expect(d.storeAsset).toHaveBeenCalledWith(clip.bytes, "video/mp4", "cards");
+  });
+
+  it("a render that fails after its call is final: never a second paid render", async () => {
+    const { d, animateBytes } = videoDeps(async (options) => {
+      await options.beforeCall?.();
+      throw new Error("Sora did not finish within 12 minutes");
+    });
+    await runJob(d, videoJob());
+    expect(animateBytes).toHaveBeenCalledTimes(1);
+    expect(d.failJob).toHaveBeenCalledWith(
+      "v",
+      "t-v",
+      expect.stringContaining("may have been charged"),
+      { retry: false, mayBeCharged: true },
+    );
+  });
+
+  it("a canceled job never starts its render", async () => {
+    const render = vi.fn();
+    const { d } = videoDeps(
+      async (options) => {
+        await options.beforeCall?.();
+        render();
+        return clip;
+      },
+      { markCallStarted: vi.fn(async () => false) },
+    );
+    await runJob(d, videoJob());
+    expect(render).not.toHaveBeenCalled();
+    expect(d.failJob).toHaveBeenCalledWith("v", "t-v", expect.any(String), {
+      retry: false,
+      mayBeCharged: false,
+    });
   });
 });

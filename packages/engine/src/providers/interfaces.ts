@@ -72,19 +72,35 @@ export interface EditBytesResult {
 }
 
 // (d) Video executor (image-to-video). `beforeCall` runs right before the paid
-// request (the spend row marks it), like the image edit's.
+// request (the spend row marks it), like the image edit's. `animate` stores
+// the clip (the studio); `animateBytes` returns it unstored (the queue records
+// its cost first, then stores it with retries — never the paid call).
+export interface AnimateRequest {
+  startFrameAssetId: string;
+  prompt: string;
+  motion: string;
+  durationSec: number;
+  model: ModelConfigLike;
+}
+
+export interface VideoBytesResult {
+  bytes: Uint8Array;
+  mime: string;
+  model: string;
+  // The seconds rendered (what the clip is billed by).
+  seconds: number;
+}
+
 export interface VideoProvider {
   readonly id: ProviderId;
   animate(
-    input: {
-      startFrameAssetId: string;
-      prompt: string;
-      motion: string;
-      durationSec: number;
-      model: ModelConfigLike;
-    },
+    input: AnimateRequest,
     options?: { beforeCall?: () => Promise<void> },
   ): Promise<GenerationResult>;
+  animateBytes?(
+    input: AnimateRequest,
+    options?: { beforeCall?: () => Promise<void> },
+  ): Promise<VideoBytesResult>;
 }
 
 // Structural mirror of ModelConfig's fields the video adapters read — keeps this

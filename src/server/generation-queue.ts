@@ -1,21 +1,25 @@
 import type { Card } from "@/domain/card";
 import {
   estimateGeneration,
+  estimateVideo,
   type ImagePrice,
   imagePrice,
   toMicros,
 } from "@/domain/generation-cost";
 import {
   buildGenerationRequest,
+  buildVideoRequest,
   type GenerationRequest,
+  VideoNeedsScene,
 } from "@/domain/generation-request";
+import { parseSlotCardId, slotCardId, videoSettings } from "@/domain/plan";
 import { SEED_BRAND } from "@/domain/seed";
 import { db, hasDatabase } from "@/lib/db";
 import { env } from "@/lib/env";
-import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
+import { CATALOG, findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { storeAsset } from "@/providers/asset-bytes";
 import { providerMode } from "@/providers/mode";
-import { getImageProvider } from "@/providers/registry";
+import { getImageProvider, getVideoProvider } from "@/providers/registry";
 import {
   budget,
   claimJobs,
@@ -23,13 +27,14 @@ import {
   enqueueBatch,
   failJob,
   markCallStarted,
+  QueueRefusal,
   recordCost,
   renewLease,
   requeueExpired,
 } from "@/server/generation-repository";
 import { createWorker, type Worker } from "@/server/generation-worker";
 import { getCurrentMaker } from "@/server/maker-repository";
-import { loadProject } from "@/server/project-repository";
+import { loadProject, loadProjectBoard } from "@/server/project-repository";
 
 // The queue's entry points for the app: estimate and enqueue a planned
 // project's cards, and the per-process worker.
@@ -66,8 +71,60 @@ export async function estimateProjectCards(
   }
   const { master, understanding } = project;
   const byId = new Map(project.cards.map((c) => [c.id, c]));
-  const cards = cardIds.map((id) => {
+  // A video is built from the board (its plan slot, the approved scene it
+  // starts from) and the product's spec.
+  let board: Awaited<ReturnType<typeof loadProjectBoard>> | undefined;
+  const videoEstimate = async (card: Card): Promise<CardEstimate> => {
+    board ??= await loadProjectBoard(projectId);
+    const ref = parseSlotCardId(card.id);
+    const destination = board?.board.plan?.destinations.find(
+      (d) => d.destinationId === ref?.destinationId,
+    );
+    const slot = destination?.slots.find((s) => s.key === ref?.slotKey);
+    if (!board?.product || !destination || slot?.fill !== "video") {
+      throw new Error(`"${card.id}" is not a video slot of this project.`);
+    }
+    const settings = videoSettings(
+      destination,
+      slot,
+      CATALOG.destinations.find((d) => d.id === destination.destinationId)
+        ?.video,
+    );
+    const source = settings.from
+      ? byId.get(slotCardId(destination.destinationId, settings.from))
+      : undefined;
+    let request: GenerationRequest;
+    try {
+      request = buildVideoRequest({
+        product: board.product,
+        settings,
+        scene: source?.fields.scene.value,
+        model: card.model,
+      });
+    } catch (error) {
+      if (error instanceof VideoNeedsScene) {
+        throw new QueueRefusal("needs-scene", error.message);
+      }
+      throw error;
+    }
+    const usd = estimateVideo(request.model, request.durationSec);
+    if (usd === null) {
+      throw new Error(`No pinned price for ${request.model.model}.`);
+    }
+    return {
+      cardId: card.id,
+      request,
+      typicalMicros: toMicros(usd),
+      maxMicros: toMicros(usd),
+    };
+  };
+  const cards: CardEstimate[] = [];
+  for (const id of cardIds) {
     const card: Card | undefined = byId.get(id);
+    if (card?.type === "video") {
+      cards.push(await videoEstimate(card));
+      continue;
+    }
     if (!card || card.type !== "image") {
       throw new Error(`"${id}" is not an image card of this project.`);
     }
@@ -82,13 +139,13 @@ export async function estimateProjectCards(
     if (!estimate) {
       throw new Error(`No pinned price for ${request.model.model}.`);
     }
-    return {
+    cards.push({
       cardId: id,
       request,
       typicalMicros: toMicros(estimate.typical),
       maxMicros: toMicros(estimate.max),
-    };
-  });
+    });
+  }
   const models = new Map<string, BatchModel>();
   for (const { request } of cards) {
     const seen = models.get(request.model.model);
@@ -96,7 +153,10 @@ export async function estimateProjectCards(
     else {
       models.set(request.model.model, {
         model: request.model.model,
-        quality: imagePrice(request.model)?.quality ?? null,
+        quality:
+          request.kind === "image"
+            ? (imagePrice(request.model)?.quality ?? null)
+            : null,
         count: 1,
       });
     }
@@ -167,6 +227,7 @@ export function ensureGenerationWorker(): Worker | null {
         return b.spentMicros >= b.capMicros;
       },
       provider: (id) => getImageProvider(id),
+      videoProvider: (id) => getVideoProvider(id),
       storeAsset,
       log: (message, error) =>
         console.warn(`[kiln queue] ${message}`, error ?? ""),

@@ -1,9 +1,15 @@
-import type { Card } from "@/domain/card";
+import { Card } from "@/domain/card";
 import { buildCards } from "@/domain/cards";
 import { buildPlanningContext } from "@/domain/cascade";
 import type { MasterAsset } from "@/domain/master-asset";
+import { defaultVideoModel } from "@/domain/model-defaults";
 import type { PersistedProject } from "@/domain/persisted-project";
-import { type ProjectPlan, slotCardId, slotRecipeId } from "@/domain/plan";
+import {
+  type PlanSlot,
+  type ProjectPlan,
+  slotCardId,
+  slotRecipeId,
+} from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import type { ProjectType } from "@/domain/project";
@@ -79,13 +85,54 @@ export function slotCards(
         ...(s.aspect ? { aspect: s.aspect } : {}),
       })),
     };
-    return buildCards({ master, recipe: slotRecipe, planning, variants }).map(
-      (card, i) => ({
-        ...card,
-        id: slotCardId(d.destinationId, scenes[i].key),
-        status: "draft" as const,
-      }),
-    );
+    const sceneCards = buildCards({
+      master,
+      recipe: slotRecipe,
+      planning,
+      variants,
+    }).map((card, i) => ({
+      ...card,
+      id: slotCardId(d.destinationId, scenes[i].key),
+      status: "draft" as const,
+    }));
+    const videoCards = d.slots
+      .filter((s) => s.fill === "video")
+      .map((s) =>
+        videoSlotCard(d.destinationId, d.shotListId, s, master, understanding),
+      );
+    return [...sceneCards, ...videoCards];
+  });
+}
+
+// A video slot's card: it holds the clip the queue renders (outputs, status);
+// what it animates and how live on the plan slot. Its fields mirror a scene
+// card's, so the editor can show it.
+export function videoSlotCard(
+  destinationId: string,
+  shotListId: string,
+  slot: PlanSlot,
+  master: MasterAsset,
+  understanding: BaseUnderstanding,
+): Card {
+  const recipe = findRecipe(slotRecipeId(shotListId, destinationId));
+  if (!recipe)
+    throw new Error(`no recipe for ${shotListId} on ${destinationId}`);
+  const planning = buildPlanningContext(understanding, recipe, SEED_BRAND);
+  const [base] = buildCards({
+    master,
+    recipe: {
+      ...recipe,
+      directions: [{ label: slot.label, purpose: slot.purpose }],
+    },
+    planning,
+  });
+  return Card.parse({
+    ...base,
+    id: slotCardId(destinationId, slot.key),
+    type: "video",
+    model: { ...base.model, ...defaultVideoModel(), aspect: "9:16" },
+    video: { durationSec: 8, motion: "push-in", startFrameAssetId: null },
+    status: "draft",
   });
 }
 

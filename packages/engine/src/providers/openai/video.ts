@@ -7,7 +7,12 @@ import { promisify } from "node:util";
 import { toFile } from "openai";
 import { soraSeconds } from "@/domain/generation-cost";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
-import type { VideoProvider } from "@/providers/interfaces";
+import type {
+  AnimateRequest,
+  VideoBytesResult,
+  VideoProvider,
+} from "@/providers/interfaces";
+import { mockDelay } from "@/providers/mode";
 import { MODELS, resolveVideoModel } from "@/providers/models";
 import { getOpenAI, hasOpenAIKey } from "@/providers/openai/client";
 import { GenerationResult } from "@/providers/types";
@@ -83,57 +88,96 @@ async function frameSizedTo(
   }
 }
 
+// A stand-in clip for mock runs and key-free tests: the start frame itself
+// (an image, not a video) when it can be read, else a 1x1 PNG, so the board's
+// flow can be exercised without a paid call.
+const PIXEL = Uint8Array.from(
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+    "base64",
+  ),
+);
+
+async function mockBytes(input: AnimateRequest): Promise<VideoBytesResult> {
+  await mockDelay();
+  const seconds = soraSeconds(input.durationSec);
+  const model = resolveVideoModel("openai", input.model.model);
+  if (isFetchable(input.startFrameAssetId)) {
+    try {
+      const frame = await fetchAsset(input.startFrameAssetId);
+      return { bytes: frame.bytes, mime: frame.mime, model, seconds };
+    } catch {
+      // fall through to the pixel
+    }
+  }
+  return { bytes: PIXEL, mime: "image/png", model, seconds };
+}
+
 // Real Sora (image->video). Like Veo it is a long-running operation: create,
-// poll until it leaves the queue, then download the mp4 bytes and store them.
-// A render that fails or outlives the deadline throws without an HTTP status:
-// the spend row counts it at its estimate (it may still be charged).
+// poll until it leaves the queue, then download the mp4 bytes. A render that
+// fails or outlives the deadline throws without an HTTP status: the job or
+// spend row counts it at its estimate (it may still be charged).
+async function animateBytes(
+  input: AnimateRequest,
+  options?: { beforeCall?: () => Promise<void> },
+): Promise<VideoBytesResult> {
+  if (!hasOpenAIKey()) return mockBytes(input);
+  const client = getOpenAI();
+  const model = resolveVideoModel("openai", input.model.model);
+  const { size, w, h } = sizeFor(input.model.aspect);
+  const seconds = soraSeconds(input.durationSec);
+
+  let inputReference: Awaited<ReturnType<typeof toFile>> | undefined;
+  if (isFetchable(input.startFrameAssetId)) {
+    const frame = await fetchAsset(input.startFrameAssetId);
+    const sized = await frameSizedTo(frame.bytes, w, h);
+    inputReference = await toFile(sized, "frame.png", { type: "image/png" });
+  }
+
+  await options?.beforeCall?.();
+  let video = await client.videos.create(
+    {
+      model,
+      prompt: `${input.prompt}. Motion: ${input.motion}.`,
+      seconds: String(seconds) as "4" | "8" | "12",
+      size,
+      ...(inputReference ? { input_reference: inputReference } : {}),
+    },
+    { maxRetries: 0, timeout: CREATE_TIMEOUT_MS },
+  );
+  const deadline = Date.now() + VIDEO_POLL_DEADLINE_MS;
+  while (video.status === "queued" || video.status === "in_progress") {
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Sora did not finish within ${VIDEO_POLL_DEADLINE_MS / 60_000} minutes; the render may still be charged.`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    video = await client.videos.retrieve(video.id);
+  }
+  if (video.status !== "completed") {
+    throw new Error(video.error?.message ?? "Sora returned no video");
+  }
+  const res = await client.videos.downloadContent(video.id);
+  return {
+    bytes: new Uint8Array(await res.arrayBuffer()),
+    mime: "video/mp4",
+    model,
+    seconds,
+  };
+}
+
 export const openaiVideoProvider: VideoProvider = {
   id: "openai",
+  animateBytes,
   async animate(input, options) {
     if (!hasOpenAIKey()) return mockResult();
-    const client = getOpenAI();
-    const model = resolveVideoModel("openai", input.model.model);
-    const { size, w, h } = sizeFor(input.model.aspect);
-
-    let inputReference: Awaited<ReturnType<typeof toFile>> | undefined;
-    if (isFetchable(input.startFrameAssetId)) {
-      const frame = await fetchAsset(input.startFrameAssetId);
-      const sized = await frameSizedTo(frame.bytes, w, h);
-      inputReference = await toFile(sized, "frame.png", { type: "image/png" });
-    }
-
-    await options?.beforeCall?.();
-    let video = await client.videos.create(
-      {
-        model,
-        prompt: `${input.prompt}. Motion: ${input.motion}.`,
-        seconds: String(soraSeconds(input.durationSec)) as "4" | "8" | "12",
-        size,
-        ...(inputReference ? { input_reference: inputReference } : {}),
-      },
-      { maxRetries: 0, timeout: CREATE_TIMEOUT_MS },
-    );
-    const deadline = Date.now() + VIDEO_POLL_DEADLINE_MS;
-    while (video.status === "queued" || video.status === "in_progress") {
-      if (Date.now() >= deadline) {
-        throw new Error(
-          `Sora did not finish within ${VIDEO_POLL_DEADLINE_MS / 60_000} minutes; the render may still be charged.`,
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-      video = await client.videos.retrieve(video.id);
-    }
-    if (video.status !== "completed") {
-      throw new Error(video.error?.message ?? "Sora returned no video");
-    }
-
-    const res = await client.videos.downloadContent(video.id);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const url = await storeAsset(bytes, "video/mp4", "videos");
+    const clip = await animateBytes(input, options);
+    const url = await storeAsset(clip.bytes, clip.mime, "videos");
     return GenerationResult.parse({
-      assets: [{ id: randomUUID(), url, mime: "video/mp4" }],
+      assets: [{ id: randomUUID(), url, mime: clip.mime }],
       provider: "openai",
-      model,
+      model: clip.model,
     });
   },
 };

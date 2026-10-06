@@ -62,6 +62,19 @@ describe("openai animate (Sora)", () => {
     expect(downloadContent).not.toHaveBeenCalled();
   });
 
+  it("the queue's call returns the clip unstored, with the seconds it rendered", async () => {
+    create.mockResolvedValue({ id: "v4", status: "completed" });
+    downloadContent.mockResolvedValue(new Response("mp4"));
+    const clip = await openaiVideoProvider.animateBytes?.(input);
+    expect(clip).toMatchObject({
+      mime: "video/mp4",
+      model: "sora-2",
+      seconds: 8,
+    });
+    expect(Buffer.from(clip?.bytes ?? []).toString()).toBe("mp4");
+    expect(storeAsset).not.toHaveBeenCalled();
+  });
+
   it("a failed render throws without an HTTP status", async () => {
     create.mockResolvedValue({
       id: "v3",

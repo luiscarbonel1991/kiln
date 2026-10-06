@@ -1,7 +1,11 @@
-import { costFromUsage, toMicros } from "@/domain/generation-cost";
-import { ImageGenerationRequest } from "@/domain/generation-request";
+import { costFromUsage, toMicros, videoCost } from "@/domain/generation-cost";
+import {
+  GenerationRequest,
+  type ImageGenerationRequest,
+  type VideoGenerationRequest,
+} from "@/domain/generation-request";
 import { errorMessage, hadResponse, retryDecision } from "@/domain/queue";
-import type { EditBytesResult, ImageProvider } from "@/providers/interfaces";
+import type { ImageProvider, VideoProvider } from "@/providers/interfaces";
 import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 
 // The background generation worker: one per server process (a globalThis
@@ -11,7 +15,8 @@ import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 // one exactly once. A job pays for at most one call:
 // - the call is marked under the lease right before it goes out; no mark, no
 //   call;
-// - the paid call runs with a bounded timeout and no SDK retries;
+// - the paid call runs with a bounded timeout and no SDK retries (a video's
+//   create too; its render is polled to a deadline under a renewed lease);
 // - its cost is recorded as soon as the call returns, before anything else
 //   (a failure to record it never loses the image);
 // - storing the image is retried in-process — never the paid call;
@@ -48,6 +53,7 @@ export interface WorkerDeps {
   requeueExpired(mode: ProviderMode): Promise<number>;
   overCap(makerId: string): Promise<boolean>;
   provider(id: "google" | "openai"): ImageProvider;
+  videoProvider(id: "google" | "openai"): VideoProvider | undefined;
   storeAsset(bytes: Uint8Array, mime: string, prefix: string): Promise<string>;
   log(message: string, error?: unknown): void;
 }
@@ -92,19 +98,86 @@ class CallNotStarted extends Error {
 async function recordPaidCost(
   deps: WorkerDeps,
   job: ClaimedJob,
-  result: EditBytesResult,
+  usage: unknown,
+  usd: number | null,
 ): Promise<void> {
-  const usd = result.usage ? costFromUsage(result.model, result.usage) : null;
   try {
-    await deps.recordCost(
-      job.id,
-      result.usage,
-      usd === null ? null : toMicros(usd),
-    );
+    await deps.recordCost(job.id, usage, usd === null ? null : toMicros(usd));
   } catch (error) {
     // The job keeps its call mark, so it still counts at its estimate.
     deps.log(`could not record the cost of ${job.id}`, error);
   }
+}
+
+// One paid call, marked right before it goes out; its output's bytes.
+type Paid = { bytes: Uint8Array | null; mime: string };
+
+async function callImage(
+  deps: WorkerDeps,
+  job: ClaimedJob,
+  request: ImageGenerationRequest,
+  beforeCall: () => Promise<void>,
+  onPaid: () => void,
+): Promise<Paid> {
+  const provider = deps.provider(request.model.provider);
+  if (!provider.editBytes) {
+    throw Object.assign(new Error(`${provider.id} cannot run queued edits`), {
+      name: "CapabilityError",
+    });
+  }
+  const result = await provider.editBytes(
+    {
+      masterAssetUrl: request.masterAssetUrl,
+      prompt: request.prompt,
+      imageInputs: request.imageInputs,
+      negative: request.negative,
+      model: request.model,
+    },
+    { timeoutMs: deps.callTimeoutMs, beforeCall },
+  );
+  onPaid();
+  await recordPaidCost(
+    deps,
+    job,
+    result.usage,
+    result.usage ? costFromUsage(result.model, result.usage) : null,
+  );
+  return result;
+}
+
+// A video: the approved start frame animated; billed by the seconds rendered.
+async function callVideo(
+  deps: WorkerDeps,
+  job: ClaimedJob,
+  request: VideoGenerationRequest,
+  beforeCall: () => Promise<void>,
+  onPaid: () => void,
+): Promise<Paid> {
+  const provider = deps.videoProvider(request.model.provider);
+  if (!provider?.animateBytes) {
+    throw Object.assign(
+      new Error(`${request.model.provider} cannot run queued videos`),
+      { name: "CapabilityError" },
+    );
+  }
+  const clip = await provider.animateBytes(
+    {
+      startFrameAssetId: request.startFrameUrl,
+      prompt: request.prompt,
+      motion: request.motion,
+      durationSec: request.durationSec,
+      model: request.model,
+    },
+    { beforeCall },
+  );
+  onPaid();
+  await recordPaidCost(
+    deps,
+    job,
+    { seconds: clip.seconds },
+    videoCost(clip.model, clip.seconds),
+  );
+  return clip;
 }
 
 export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
@@ -123,33 +196,20 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
       );
       return;
     }
-    const request = ImageGenerationRequest.parse(job.request);
-    const provider = deps.provider(request.model.provider);
-    if (!provider.editBytes) {
-      throw Object.assign(new Error(`${provider.id} cannot run queued edits`), {
-        name: "CapabilityError",
-      });
-    }
-    const result = await provider.editBytes(
-      {
-        masterAssetUrl: request.masterAssetUrl,
-        prompt: request.prompt,
-        imageInputs: request.imageInputs,
-        negative: request.negative,
-        model: request.model,
-      },
-      {
-        timeoutMs: deps.callTimeoutMs,
-        beforeCall: async () => {
-          if (!(await deps.markCallStarted(job.id, job.leaseToken))) {
-            throw new CallNotStarted();
-          }
-          callStarted = true;
-        },
-      },
-    );
-    paid = true;
-    await recordPaidCost(deps, job, result);
+    const request = GenerationRequest.parse(job.request);
+    const beforeCall = async () => {
+      if (!(await deps.markCallStarted(job.id, job.leaseToken))) {
+        throw new CallNotStarted();
+      }
+      callStarted = true;
+    };
+    const onPaid = () => {
+      paid = true;
+    };
+    const result =
+      request.kind === "video"
+        ? await callVideo(deps, job, request, beforeCall, onPaid)
+        : await callImage(deps, job, request, beforeCall, onPaid);
     if (!result.bytes) throw new Error("The provider returned no image.");
     const url = await storeWithRetries(deps, result.bytes, result.mime);
     await deps.completeJob(job.id, job.leaseToken, url);

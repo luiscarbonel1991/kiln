@@ -306,6 +306,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       failJob: queueRepo.failJob,
       requeueExpired: queueRepo.requeueExpired,
       overCap: async () => false,
+      videoProvider: () => undefined,
       provider: () =>
         ({
           id: "openai",
@@ -476,6 +477,106 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       "in the queue",
     );
     await db.generationBatch.delete({ where: { id: batchId } });
+  });
+
+  it("a video is queued from an approved scene, at its pinned price; never without one", async () => {
+    const { estimateProjectCards } = await import("@/server/generation-queue");
+    const queueRepo = await import("@/server/generation-repository");
+    const { getCurrentMaker } = await import("@/server/maker-repository");
+    const [saved] = await upsertProducts([product]);
+    const videoPlan = {
+      destinations: [
+        {
+          ...plan.destinations[0],
+          slots: [
+            ...plan.destinations[0].slots,
+            {
+              key: "video",
+              label: "Listing video",
+              purpose: "In motion.",
+              aspect: "9:16",
+              fill: "video" as const,
+            },
+          ],
+        },
+      ],
+    };
+    const id = await repo.createProject({
+      type: "launch",
+      productId: saved.id,
+      plan: videoPlan,
+      editor: {
+        ...editor,
+        cards: [
+          ...editor.cards,
+          {
+            ...card("etsy.video", []),
+            type: "video" as const,
+            status: "draft" as const,
+            model: { ...card("x", []).model, model: "sora-2", aspect: "9:16" },
+            video: {
+              durationSec: 8,
+              motion: "push-in",
+              startFrameAssetId: null,
+            },
+          },
+        ],
+      },
+    });
+    created.push(id);
+    await expect(
+      estimateProjectCards(id, ["etsy.video"]),
+    ).rejects.toMatchObject({ reason: "needs-scene" });
+    await repo.setSlotApproval(
+      id,
+      { destinationId: "etsy", slotKey: "in-use" },
+      true,
+    );
+    const { cards, model } = await estimateProjectCards(id, ["etsy.video"]);
+    expect(cards[0]).toMatchObject({
+      typicalMicros: 800_000,
+      maxMicros: 800_000,
+      request: {
+        kind: "video",
+        startFrameUrl: "https://stub.local/in-use.png",
+        durationSec: 8,
+        model: { model: "sora-2", aspect: "9:16" },
+      },
+    });
+    const maker = await getCurrentMaker();
+    const mode = "video-test" as never;
+    const { queued, batchId } = await queueRepo.enqueueBatch({
+      makerId: maker.id,
+      projectId: id,
+      mode,
+      model,
+      jobs: cards.map((c) => ({
+        cardId: c.cardId,
+        request: c.request,
+        estimateMicros: c.maxMicros,
+      })),
+    });
+    expect(queued).toBe(1);
+    // A video switched off is never queued.
+    await queueRepo.cancelBatch(maker.id, batchId);
+    await repo.setSlotOff(
+      id,
+      { destinationId: "etsy", slotKey: "video" },
+      true,
+    );
+    await expect(
+      queueRepo.enqueueBatch({
+        makerId: maker.id,
+        projectId: id,
+        mode,
+        model,
+        jobs: cards.map((c) => ({
+          cardId: c.cardId,
+          request: c.request,
+          estimateMicros: c.maxMicros,
+        })),
+      }),
+    ).rejects.toMatchObject({ reason: "not-in-plan" });
   });
 
   it("the batch estimate names every model its cards run", async () => {

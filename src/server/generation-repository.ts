@@ -29,7 +29,8 @@ export class QueueRefusal extends Error {
       | "cap"
       | "estimate-changed"
       | "already-queued"
-      | "not-in-plan",
+      | "not-in-plan"
+      | "needs-scene",
     message: string,
   ) {
     super(message);
