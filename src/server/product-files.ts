@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { colourName, svgColours } from "@/lib/product-form";
 import { sanitizeSvg } from "@/lib/svg-sanitize";
-import { storeAsset } from "@/providers/asset-bytes";
+import {
+  fetchAsset,
+  isAllowedAssetUrl,
+  storeAsset,
+} from "@/providers/asset-bytes";
 import { measureDrawing } from "@/providers/plates/svg";
 
 const execFileP = promisify(execFile);
@@ -107,4 +111,34 @@ export async function storeProductSvg(
     drawnWidthPx: drawn.width,
     ratio: drawn.width / drawn.height,
   };
+}
+
+// A design already in Kiln's storage (a vectorized line-art card, handed over
+// by "Make it a product"), described like an upload; null when the address is
+// not a stored SVG or it cannot be read.
+export async function describeStoredSvg(
+  url: string,
+): Promise<StoredProductFile | null> {
+  if (
+    url.startsWith("data:") ||
+    !/\.svg(\?|$)/i.test(url) ||
+    !isAllowedAssetUrl(url)
+  ) {
+    return null;
+  }
+  try {
+    const { bytes } = await fetchAsset(url);
+    const svg = sanitizeSvg(bytes.toString("utf8"));
+    const drawn = svg ? measureDrawing(svg) : null;
+    if (!svg || !drawn) return null;
+    return {
+      kind: "vector",
+      url,
+      colours: named(svgColours(svg, 4)),
+      drawnWidthPx: drawn.width,
+      ratio: drawn.width / drawn.height,
+    };
+  } catch {
+    return null;
+  }
 }

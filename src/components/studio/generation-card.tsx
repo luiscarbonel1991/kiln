@@ -1,6 +1,13 @@
 "use client";
 
-import { Download, RefreshCw, Scissors, Spline } from "lucide-react";
+import {
+  Download,
+  PackagePlus,
+  RefreshCw,
+  Scissors,
+  Spline,
+} from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { enqueueGenerationAction } from "@/app/actions/generation";
 import { saveProjectAction } from "@/app/actions/project";
@@ -288,6 +295,16 @@ export function GenerationCard({
             >
               <Download className="size-3" /> Download .svg
             </button>
+          ) : null}
+          {card.vectorUrl && !vectorizing ? (
+            // A design becomes a product: size, material, finish, colours
+            // (ROADMAP: a Design SVG "becomes a product").
+            <Link
+              href={`/projects/new?design=${encodeURIComponent(card.vectorUrl)}`}
+              className="flex w-full items-center justify-center gap-1.5 border-border-soft border-t py-3 font-sans text-[0.78rem] font-semibold text-primary transition-colors hover:bg-secondary"
+            >
+              <PackagePlus className="size-3" /> Make it a product
+            </Link>
           ) : null}
           {costModule && card.vectorUrl && !vectorizing ? (
             <CostPanel vectorUrl={card.vectorUrl} />

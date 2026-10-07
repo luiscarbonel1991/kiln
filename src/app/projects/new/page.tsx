@@ -3,12 +3,22 @@ import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
 import { getMakerBrand, getMakerModels } from "@/server/maker-repository";
+import { describeStoredSvg } from "@/server/product-files";
 import { listProducts } from "@/server/product-repository";
 
 // New project (ROADMAP screen 2): product -> type -> destinations -> plan ->
 // Start. Rendered per request (it reads the maker's products and defaults).
-export default async function NewProjectPage() {
+// `?design=` hands over a stored design from the studio ("Make it a
+// product"): the new-product form opens with it.
+export default async function NewProjectPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   await connection();
+  const { design } = await searchParams;
+  const initialDesign =
+    typeof design === "string" ? await describeStoredSvg(design) : null;
   const products = await listProducts();
   const brand = await getMakerBrand();
   const models = await getMakerModels();
@@ -21,7 +31,7 @@ export default async function NewProjectPage() {
         initialBrand={brand}
         makerModels={models}
         draftPrice={draft === null ? null : `≈ $${draft.toFixed(2)}`}
-        initialDesign={null}
+        initialDesign={initialDesign}
       />
     </div>
   );

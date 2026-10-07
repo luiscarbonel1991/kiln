@@ -215,3 +215,14 @@ describe("draftProductAction", () => {
     ).toEqual({ error: "Upload the photo first." });
   });
 });
+
+describe("describeStoredSvg (Make it a product)", () => {
+  it("only takes a stored SVG, never an inline or outside address", async () => {
+    const { describeStoredSvg } = await import("@/server/product-files");
+    expect(await describeStoredSvg(dataSvg(DESIGN))).toBeNull();
+    expect(await describeStoredSvg("http://169.254.169.254/d.svg")).toBeNull();
+    expect(
+      await describeStoredSvg("http://localhost:9000/kiln-assets/x.png"),
+    ).toBeNull();
+  });
+});
