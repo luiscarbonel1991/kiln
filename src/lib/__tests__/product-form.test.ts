@@ -83,6 +83,9 @@ describe("product form", () => {
       "senal-bienvenidos-2026-x1",
     );
     expect(colourName("#111111")).toBe("Black");
+    // A near-black grey is black, never "dark brown".
+    expect(colourName("#262627")).toBe("Black");
+    expect(colourName("#787674")).toBe("Grey");
     expect(colourName("#D9C5A0")).toBe("Beige");
   });
 });

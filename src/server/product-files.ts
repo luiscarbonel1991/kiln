@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { productColours } from "@/lib/photo-colours";
 import { colourName, svgColours } from "@/lib/product-form";
 import { sanitizeSvg } from "@/lib/svg-sanitize";
 import {
@@ -41,8 +42,12 @@ export class ProductFileRefused extends Error {
 const named = (hexes: string[]) =>
   hexes.map((hex) => ({ name: colourName(hex), hex }));
 
-// The dominant colours of a photo (ImageMagick, already a system dependency):
-// reduced to a few, most covered first.
+// The size the photo is read at: enough to tell a piece from its background.
+const COLOUR_SIZE = 48;
+
+// A photo's product colours: its pixels at a small size (ImageMagick, already
+// a system dependency), read from the centre without the background
+// (productColours).
 export async function photoColours(
   bytes: Uint8Array,
   max = 4,
@@ -51,27 +56,21 @@ export async function photoColours(
   try {
     const src = join(dir, "in");
     await writeFile(src, bytes);
-    const { stdout } = await execFileP("magick", [
-      src,
-      "-resize",
-      "96x96",
-      "-colors",
-      String(max),
-      "-format",
-      "%c",
-      "histogram:info:-",
-    ]);
-    return stdout
-      .split("\n")
-      .map((line) => {
-        const count = Number(/^\s*(\d+):/.exec(line)?.[1] ?? 0);
-        const hex = /#([0-9A-Fa-f]{6})/.exec(line)?.[0]?.toUpperCase();
-        return { count, hex };
-      })
-      .filter((c): c is { count: number; hex: string } => Boolean(c.hex))
-      .sort((a, b) => b.count - a.count)
-      .map((c) => c.hex)
-      .slice(0, max);
+    const { stdout } = await execFileP(
+      "magick",
+      [
+        src,
+        "-auto-orient",
+        "-resize",
+        `${COLOUR_SIZE}x${COLOUR_SIZE}!`,
+        "-depth",
+        "8",
+        "rgb:-",
+      ],
+      { encoding: "buffer", maxBuffer: 1 << 20 },
+    );
+    if (stdout.length < COLOUR_SIZE * COLOUR_SIZE * 3) return [];
+    return productColours(new Uint8Array(stdout), COLOUR_SIZE, max);
   } catch {
     return [];
   } finally {

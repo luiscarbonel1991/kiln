@@ -103,8 +103,23 @@ function colourKeys(names: string[]): string[] {
   });
 }
 
+// A grey is named by how light it is (a near-black never reads as brown).
+const GREYS: [number, string][] = [
+  [48, "Black"],
+  [96, "Charcoal"],
+  [160, "Grey"],
+  [215, "Silver"],
+  [256, "White"],
+];
+
 // "#d9b98c" -> "Tan": a starting name the maker can change.
 export function colourName(hex: string): string {
+  const n = Number.parseInt(hex.slice(1, 7), 16);
+  const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  if (Math.max(...rgb) - Math.min(...rgb) < 18) {
+    const light = (rgb[0] + rgb[1] + rgb[2]) / 3;
+    return GREYS.find(([below]) => light < below)?.[1] ?? "White";
+  }
   const word = colourWord(hex);
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
