@@ -71,6 +71,22 @@ KILN_DB_TESTS=1 DATABASE_URL=postgresql://kiln:kiln@localhost:5444/kiln_test pnp
   pnpm db:deploy
   ```
 
+## Products
+
+A project starts from a product. New project's step 1 picks one, adds a new one, or
+imports a catalog:
+
+- **New product** is a short form: name, what it is, size, material, finish, colours, the
+  text a buyer personalizes, and where it is used. An optional photo becomes the reference
+  every scene starts from. An optional design file (SVG) is drawn to scale, and its height
+  follows its proportions. "Fill from the photo" drafts the form with the text model
+  (priced, on a click).
+- **A design that does not exist yet:** draw it in the studio (Design: line art, then
+  vectorize), then "Make it a product".
+- **Import a catalog (.json)** takes a product package exported from your own system.
+  Start from `public/templates/product-package.json` (the page has "Download the
+  template"). The schema is in `docs/app-idea/PRODUCT-MODEL.md`.
+
 ## Models and providers
 
 Kiln generates with several models from two providers, OpenAI and Google:
