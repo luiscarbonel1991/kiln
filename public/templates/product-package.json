@@ -1,0 +1,27 @@
+{
+  "products": [
+    {
+      "id": "CB-01",
+      "sku": "CB-01",
+      "name": "Engraved family cutting board",
+      "family": "Kitchen",
+      "description": "End-grain board engraved with the family name.",
+      "dimensions": { "w": 16, "h": 10, "unit": "in" },
+      "shape": "cutting board",
+      "material": "solid hardwood",
+      "treatment": "engraved",
+      "colours": [
+        { "key": "walnut", "name": "Walnut", "face": "#5B3A29" },
+        { "key": "maple", "name": "Maple", "face": "#E3C9A0" }
+      ],
+      "defaultColour": "walnut",
+      "typography": { "family": "Fraunces" },
+      "wording": [
+        { "label": "Family name", "maxChars": 20, "example": "The Johnsons" },
+        { "label": "Year", "maxChars": 4, "required": false, "example": "2026" }
+      ],
+      "useContexts": ["a kitchen counter during dinner prep"],
+      "source": { "kind": "form" }
+    }
+  ]
+}

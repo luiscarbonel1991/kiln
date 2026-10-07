@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { BrandKit } from "@/domain/brand";
 import { Product } from "@/domain/product";
+import { unknownDefaultColours } from "@/lib/product-form";
 
 // The product package contract (ROADMAP Phase 8, PRODUCT-MODEL.md): what a
 // maker's catalog exports and Kiln imports. A package is one Product, an array
@@ -64,6 +65,10 @@ export function parseProductPackage(input: unknown): PackageResult {
       ok: false,
       errors: [...new Set(repeated)].map((sku) => `sku "${sku}" appears twice`),
     };
+  }
+  const defaults = unknownDefaultColours(parsed.data);
+  if (defaults.length > 0) {
+    return { ok: false, errors: defaults.slice(0, MAX_ERRORS) };
   }
   return { ok: true, products: parsed.data, ...(brand ? { brand } : {}) };
 }
