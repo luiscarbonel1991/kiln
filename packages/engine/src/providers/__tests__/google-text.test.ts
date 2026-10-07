@@ -1,0 +1,84 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const generateContent = vi.fn();
+
+vi.mock("@/providers/google/client", () => ({
+  hasGoogleKey: () => true,
+  getGenAI: () => ({ models: { generateContent } }),
+}));
+vi.mock("@/providers/asset-bytes", () => ({
+  fetchAsset: async () => ({
+    bytes: Buffer.from("png"),
+    base64: "cG5n",
+    mime: "image/png",
+  }),
+}));
+
+const { googleVisionProvider } = await import("@/providers/google/vision");
+
+const usageMetadata = {
+  promptTokenCount: 1400,
+  promptTokensDetails: [{ modality: "IMAGE", tokenCount: 1100 }],
+  candidatesTokenCount: 250,
+  thoughtsTokenCount: 120,
+};
+
+afterEach(() => vi.clearAllMocks());
+
+describe("Gemini text calls", () => {
+  it("drafts a product: one request, its schema, bounded output, thinking low, usage", async () => {
+    const draft = {
+      name: "Slate coaster",
+      whatItIs: "square coaster",
+      material: "natural slate",
+      treatment: "engraved",
+      colours: [{ name: "Charcoal", hex: "#3A3A3A" }],
+      wording: [],
+      useContext: "a coffee table",
+    };
+    const order: string[] = [];
+    generateContent.mockImplementation(async () => {
+      order.push("call");
+      return { text: JSON.stringify(draft), usageMetadata };
+    });
+    const result = await googleVisionProvider.draftProduct(
+      { assetUrl: "https://store/slate.png" },
+      {
+        model: "gemini-3.8-flash",
+        beforeCall: async () => {
+          order.push("mark");
+        },
+      },
+    );
+    expect(order).toEqual(["mark", "call"]);
+    expect(result).toEqual({
+      value: draft,
+      model: "gemini-3.8-flash",
+      usage: {
+        inputTextTokens: 300,
+        inputImageTokens: 1100,
+        outputTokens: 370,
+      },
+    });
+    const call = generateContent.mock.calls[0][0];
+    expect(call.config).toMatchObject({
+      maxOutputTokens: 2000,
+      thinkingConfig: { thinkingLevel: "LOW" },
+      httpOptions: { timeout: 60_000 },
+    });
+    expect(call.config.responseSchema.required).toContain("treatment");
+  });
+
+  it("an answer outside the shape throws after the call (never invented)", async () => {
+    generateContent.mockResolvedValue({
+      text: JSON.stringify({ name: "x", treatment: "laser" }),
+      usageMetadata,
+    });
+    await expect(
+      googleVisionProvider.draftProduct(
+        { assetUrl: "https://store/x.png" },
+        { model: "gemini-3.5-flash" },
+      ),
+    ).rejects.toThrow();
+  });
+});

@@ -20,6 +20,7 @@ import {
 import type { VariantDirection } from "@/domain/variant-direction";
 import { fallbackVariants } from "@/providers/mock/art-director";
 import { getArtDirector, getVisionProvider } from "@/providers/registry";
+import type { ProductDraft } from "@/providers/text-prompts";
 import { textCall, withDirectSpend } from "@/server/direct-spend";
 
 // Vision and the art director on the maker's text model, under the monthly cap
@@ -119,5 +120,38 @@ export async function directScenes(
       variants: fallbackVariants(input.recipe, input.understanding, input.n),
       degraded: degraded(model, "artDirection", error),
     };
+  }
+}
+
+// The product form's "Fill from the photo": a draft the maker reviews, never
+// saved on its own. Hex colours the model got wrong are dropped. On failure the
+// form stays as it was and the answer says why.
+export async function draftProduct(
+  assetUrl: string,
+  model: TextModel,
+): Promise<{ draft?: ProductDraft; degraded?: Degraded }> {
+  try {
+    assertModel(model, "text");
+    const result = await withDirectSpend(
+      textCall<ProductDraft>(model, "productDraft"),
+      (beforeCall) =>
+        getVisionProvider(model.provider).draftProduct(
+          { assetUrl },
+          { model: model.model, beforeCall },
+        ),
+    );
+    const draft = result.value;
+    return {
+      draft: {
+        ...draft,
+        colours: draft.colours
+          .filter((c) => /^#[0-9a-fA-F]{6}$/.test(c.hex))
+          .slice(0, 4),
+        wording: draft.wording.slice(0, 3),
+      },
+    };
+  } catch (error) {
+    console.warn("[kiln] product draft degraded:", errorMessage(error));
+    return { degraded: degraded(model, "productDraft", error) };
   }
 }

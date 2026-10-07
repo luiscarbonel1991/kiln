@@ -288,6 +288,8 @@ export const TEXT_CALL_BUDGETS = {
   vision: { inputTokens: 4_000, outputTokens: 3_000 },
   // The prompt, the understanding and the slots; one direction per slot.
   artDirection: { inputTokens: 3_000, outputTokens: 6_000 },
+  // The prompt and one product photo; a short product draft.
+  productDraft: { inputTokens: 4_000, outputTokens: 2_000 },
 } as const;
 export type TextCallKind = keyof typeof TEXT_CALL_BUDGETS;
 

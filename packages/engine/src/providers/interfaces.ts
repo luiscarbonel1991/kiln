@@ -4,6 +4,7 @@ import type { PlateRequest, PlateResult, Product } from "@/domain/product";
 import type { Recipe } from "@/domain/recipe";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
+import type { ProductDraft } from "@/providers/text-prompts";
 import type {
   Capabilities,
   GenerationResult,
@@ -37,6 +38,11 @@ export interface VisionProvider {
     input: { assetUrl: string },
     options: TextCallOptions,
   ): Promise<TextResult<BaseUnderstanding>>;
+  // A product form drafted from one photo of the piece (the maker reviews it).
+  draftProduct(
+    input: { assetUrl: string },
+    options: TextCallOptions,
+  ): Promise<TextResult<ProductDraft>>;
 }
 
 // (b) Art director: text model -> diverse per-direction creative specs (scene,

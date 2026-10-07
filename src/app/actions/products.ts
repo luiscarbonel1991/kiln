@@ -1,10 +1,12 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
+import { z } from "zod";
 import {
   ACCEPTED_IMAGE_MIME,
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
+import { defaultTextModel, ProviderId } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
 import { ProductForm, productFromForm } from "@/lib/product-form";
 import { type PackageResult, parseProductPackage } from "@/lib/product-package";
@@ -14,7 +16,8 @@ import {
   storeAsset,
 } from "@/providers/asset-bytes";
 import { measureOutline } from "@/providers/plates/svg";
-import { saveMakerBrand } from "@/server/maker-repository";
+import type { ProductDraft } from "@/providers/text-prompts";
+import { getMakerModels, saveMakerBrand } from "@/server/maker-repository";
 import {
   ProductFileRefused,
   type StoredProductFile,
@@ -22,6 +25,7 @@ import {
   storeProductSvg,
 } from "@/server/product-files";
 import { listProducts, upsertProducts } from "@/server/product-repository";
+import { type Degraded, draftProduct } from "@/server/text-calls";
 
 // Server Functions are POST-reachable: the package parse is the trust boundary.
 
@@ -175,4 +179,30 @@ export async function createProductAction(
       ? { warning: measured.warning.replace(/^sku "[^"]+": /, "") }
       : {}),
   };
+}
+
+const Draft = z.object({
+  assetUrl: z.string().min(1),
+  model: z
+    .object({ provider: ProviderId, model: z.string().min(1) })
+    .optional(),
+});
+
+// "Fill from the photo": the product form drafted from the uploaded photo by
+// the maker's text model (or the one the degraded notice offers), under the
+// monthly cap. The photo must be in Kiln's storage.
+export async function draftProductAction(
+  input: unknown,
+): Promise<{ draft?: ProductDraft; degraded?: Degraded; error?: string }> {
+  const parsed = Draft.safeParse(input);
+  if (!parsed.success) return { error: "Upload the photo first." };
+  try {
+    assertAllowedAssetUrl(parsed.data.assetUrl);
+  } catch {
+    return { error: "Upload the photo first." };
+  }
+  return draftProduct(
+    parsed.data.assetUrl,
+    parsed.data.model ?? defaultTextModel(await getMakerModels()),
+  );
 }

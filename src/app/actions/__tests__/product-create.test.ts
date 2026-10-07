@@ -37,8 +37,8 @@ const dataSvg = (svg: string) =>
   `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 
 const form = {
-  name: "Walnut wall plaque",
-  whatItIs: "wall plaque",
+  name: "Walnut wall art",
+  whatItIs: "wall art",
   width: 8,
   height: 4,
   unit: "in",
@@ -109,8 +109,8 @@ describe("createProductAction", () => {
   it("saves a product typed in, with nothing else to fill", async () => {
     const result = await createProductAction(form);
     expect("product" in result && result.product).toMatchObject({
-      name: "Walnut wall plaque",
-      sku: expect.stringMatching(/^walnut-wall-plaque-[a-z0-9]+$/),
+      name: "Walnut wall art",
+      sku: expect.stringMatching(/^walnut-wall-art-[a-z0-9]+$/),
       defaultColour: "walnut",
       source: { kind: "form" },
     });
@@ -185,5 +185,33 @@ describe("importProductsAction", () => {
     expect(upsertProducts.mock.calls[0][0][0]).toMatchObject({
       source: { kind: "photo", assetUrl: "http://storage.test/products/p.png" },
     });
+  });
+});
+
+describe("draftProductAction", () => {
+  const photo =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+  it("says why it could not fill the form, and offers the other provider with its price", async () => {
+    const { draftProductAction } = await import("@/app/actions/products");
+    expect(await draftProductAction({ assetUrl: photo })).toMatchObject({
+      degraded: {
+        provider: "openai",
+        model: "gpt-6.1-sol",
+        message: "OpenAI has no API key (OPENAI_API_KEY is not set).",
+        alternative: {
+          provider: "google",
+          model: "gemini-3.5-flash",
+          usd: 0.024,
+        },
+      },
+    });
+  });
+
+  it("needs a photo in Kiln's storage", async () => {
+    const { draftProductAction } = await import("@/app/actions/products");
+    expect(
+      await draftProductAction({ assetUrl: "http://169.254.169.254/x.png" }),
+    ).toEqual({ error: "Upload the photo first." });
   });
 });

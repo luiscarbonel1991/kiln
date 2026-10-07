@@ -123,3 +123,30 @@ describe("OpenAI art director", () => {
     });
   });
 });
+
+describe("OpenAI product draft", () => {
+  it("drafts the product form from the photo, bounded by its own budget", async () => {
+    const draft = {
+      name: "Engraved walnut cutting board",
+      whatItIs: "cutting board",
+      material: "solid walnut",
+      treatment: "engraved",
+      colours: [{ name: "Walnut", hex: "#5B3A29" }],
+      wording: [{ label: "Family name", example: "The Johnsons" }],
+      useContext: "a kitchen counter",
+    };
+    parse.mockResolvedValue({
+      output_parsed: draft,
+      usage: { input_tokens: 1400, output_tokens: 300 },
+    });
+    const result = await openaiVisionProvider.draftProduct(
+      { assetUrl: "https://store/board.png" },
+      { model: "gpt-6.1-sol" },
+    );
+    expect(result.value).toEqual(draft);
+    const [body, options] = parse.mock.calls[0];
+    expect(options).toEqual({ maxRetries: 0, timeout: 60_000 });
+    expect(body).toMatchObject({ max_output_tokens: 2000 });
+    expect(body.text.format.name).toBe("product_draft");
+  });
+});

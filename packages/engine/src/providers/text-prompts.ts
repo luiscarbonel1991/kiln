@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { BrandProfile } from "@/domain/brand";
+import { Treatment } from "@/domain/product";
 import type { ListingSlot } from "@/domain/recipe";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { VariantDirection } from "@/domain/variant-direction";
@@ -89,3 +90,28 @@ export function pinToSlots(
     variants[i] ? { ...variants[i], direction: slot.label } : fill[i],
   );
 }
+
+// A product drafted from one photo (the product form's "Fill from the photo"):
+// what a maker would type, read from the picture. Never its size — a photo has
+// no scale — and never saved without the maker's review.
+export const PRODUCT_DRAFT_PROMPT = [
+  "This photo shows one physical product a small maker sells. Describe it for the maker's product form. Return JSON:",
+  "- name: a short product name a shop would list it under, e.g. 'Engraved walnut cutting board'.",
+  "- whatItIs: a short noun phrase for the object itself, e.g. 'cutting board', 'round coaster', 'wall print'.",
+  "- material: what it is made of, as a buyer would say it, e.g. 'solid walnut', 'glazed stoneware'.",
+  "- treatment: how its marks or design are made — engraved (cut into the surface), raised (standing out from the face), inlaid (filled with a second material or colour), printed (flat print or paint), or cut (the shape itself is cut through).",
+  "- colours: the finish colours of the product itself (not the background), 1-4, each with a plain name and a hex like #5B3A29.",
+  "- wording: any text on the product a buyer would personalize (a name, a date), at most 3 lines, each with a short label and the example shown; an empty list if there is none.",
+  "- useContext: where it is used in real life, one short phrase, e.g. 'a kitchen counter'.",
+].join("\n");
+
+export const ProductDraft = z.object({
+  name: z.string(),
+  whatItIs: z.string(),
+  material: z.string(),
+  treatment: Treatment,
+  colours: z.array(z.object({ name: z.string(), hex: z.string() })),
+  wording: z.array(z.object({ label: z.string(), example: z.string() })),
+  useContext: z.string(),
+});
+export type ProductDraft = z.infer<typeof ProductDraft>;
