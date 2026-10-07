@@ -17,6 +17,7 @@ export { mockArtDirector } from "@/providers/mock/art-director";
 export { mockVisionProvider } from "@/providers/mock/vision";
 export {
   composePlateSvg,
+  measureDrawing,
   rasterize,
   svgBox,
   svgPlateRenderer,

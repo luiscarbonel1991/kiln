@@ -41,6 +41,18 @@ export function svgBox(svg: string): SvgBox {
   throw new Error("SVG has neither a viewBox nor px width/height");
 }
 
+// The size of everything an SVG draws (strokes included), in its own pixels;
+// null when it draws nothing. A product made from a design takes its height
+// from these proportions and its scale from the width the maker gives.
+export function measureDrawing(
+  svg: string,
+): { width: number; height: number } | null {
+  const resvg = new Resvg(svg);
+  const drawn = resvg.getBBox() ?? resvg.innerBBox();
+  if (!drawn || drawn.width <= 0 || drawn.height <= 0) return null;
+  return { width: drawn.width, height: drawn.height };
+}
+
 // How far a drawing's proportions (or its calibrated width) may stray from the
 // product's declared dimensions and still be drawn to scale.
 const OUTLINE_TOLERANCE = 0.03;

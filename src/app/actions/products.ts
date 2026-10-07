@@ -1,10 +1,26 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
+import {
+  ACCEPTED_IMAGE_MIME,
+  MAX_UPLOAD_BYTES,
+} from "@/components/studio/constants";
 import type { Product } from "@/domain/product";
+import { ProductForm, productFromForm } from "@/lib/product-form";
 import { type PackageResult, parseProductPackage } from "@/lib/product-package";
-import { assertAllowedAssetUrl, fetchAsset } from "@/providers/asset-bytes";
+import {
+  assertAllowedAssetUrl,
+  fetchAsset,
+  storeAsset,
+} from "@/providers/asset-bytes";
 import { measureOutline } from "@/providers/plates/svg";
 import { saveMakerBrand } from "@/server/maker-repository";
+import {
+  ProductFileRefused,
+  type StoredProductFile,
+  storeProductPhoto,
+  storeProductSvg,
+} from "@/server/product-files";
 import { listProducts, upsertProducts } from "@/server/product-repository";
 
 // Server Functions are POST-reachable: the package parse is the trust boundary.
@@ -72,6 +88,20 @@ async function withOutline(
   }
 }
 
+// A photo given inline (a data: URL) is moved to Kiln's storage: a scene's
+// reference must be a stored image, as the New project page promises.
+async function withStoredPhoto(product: Product): Promise<Product> {
+  if (
+    product.source.kind !== "photo" ||
+    !product.source.assetUrl.startsWith("data:")
+  ) {
+    return product;
+  }
+  const photo = await fetchAsset(product.source.assetUrl);
+  const assetUrl = await storeAsset(photo.bytes, photo.mime, "products");
+  return { ...product, source: { kind: "photo", assetUrl } };
+}
+
 // Import a product package for the current maker. Re-importing a sku updates
 // that product in place (its id, and every project using it, stay); a `maker`
 // block replaces the maker's brand kit.
@@ -82,9 +112,67 @@ export async function importProductsAction(
   if (!parsed.ok) return parsed;
   const blocked = blockedAssets(parsed.products);
   if (blocked.length > 0) return { ok: false, errors: blocked };
-  const measured = await Promise.all(parsed.products.map(withOutline));
+  const stored = await Promise.all(parsed.products.map(withStoredPhoto));
+  const measured = await Promise.all(stored.map(withOutline));
   const warnings = measured.flatMap((m) => (m.warning ? [m.warning] : []));
   const products = await upsertProducts(measured.map((m) => m.product));
   if (parsed.brand) await saveMakerBrand(parsed.brand);
   return { ...parsed, products, ...(warnings.length > 0 ? { warnings } : {}) };
+}
+
+const PHOTO_MIME = new Set<string>(ACCEPTED_IMAGE_MIME);
+
+// The product form's file: a photo (PNG, JPEG, WebP) or the SVG of a design,
+// stored with what the form can prefill (its colours; a design's proportions).
+// FormData, because it carries a file; refusals come back as words.
+export async function uploadProductFileAction(
+  formData: FormData,
+): Promise<StoredProductFile | { error: string }> {
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { error: "No file was sent." };
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return { error: "That file is larger than 15 MB." };
+  }
+  const isSvg =
+    file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg");
+  try {
+    if (isSvg) return await storeProductSvg(await file.text());
+    if (PHOTO_MIME.has(file.type)) {
+      return await storeProductPhoto(
+        new Uint8Array(await file.arrayBuffer()),
+        file.type,
+      );
+    }
+  } catch (error) {
+    if (error instanceof ProductFileRefused) return { error: error.message };
+    throw error;
+  }
+  return { error: "Use a photo (PNG, JPEG, WebP) or an SVG design." };
+}
+
+// Save the product the form describes, through the same checks as an import
+// (its file where Kiln fetches, a design's outline measured against its size).
+export async function createProductAction(
+  input: unknown,
+): Promise<{ product: Product; warning?: string } | { error: string }> {
+  const parsed = ProductForm.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+  }
+  const product = productFromForm(
+    parsed.data,
+    randomBytes(3).readUIntBE(0, 3).toString(36).slice(0, 4),
+  );
+  const blocked = blockedAssets([product]);
+  if (blocked.length > 0) {
+    return { error: "That file is not in Kiln's storage; upload it again." };
+  }
+  const measured = await withOutline(product);
+  const [saved] = await upsertProducts([measured.product]);
+  return {
+    product: saved,
+    ...(measured.warning
+      ? { warning: measured.warning.replace(/^sku "[^"]+": /, "") }
+      : {}),
+  };
 }
