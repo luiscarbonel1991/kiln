@@ -24,7 +24,8 @@ export const PROJECT_TYPES: {
   {
     type: "design",
     label: "Design",
-    description: "Image to SVG: line art for a new design (opens the studio).",
+    description:
+      "A new design: draw it as line art, then make it a product (opens the studio).",
   },
 ];
 

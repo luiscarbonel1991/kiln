@@ -1,11 +1,20 @@
 "use client";
 
-import { ArrowRight, Eye, EyeOff, FileUp, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  Download,
+  Eye,
+  EyeOff,
+  FileUp,
+  Loader2,
+  Plus,
+} from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { createProjectAction } from "@/app/actions/new-project";
 import { importProductsAction } from "@/app/actions/products";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
+import { NewProductForm } from "@/components/projects/new-product-form";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
   onIndexes,
@@ -21,7 +30,7 @@ import {
   textLayerColours,
 } from "@/domain/exact";
 import { estimateScenes } from "@/domain/generation-cost";
-import { defaultImageModel } from "@/domain/model-defaults";
+import { defaultImageModel, type MakerModels } from "@/domain/model-defaults";
 import {
   offeredDestinations,
   type ProjectPlan,
@@ -34,6 +43,7 @@ import { plateHref } from "@/lib/plate-href";
 import { PROJECT_TYPES } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
+import type { StoredProductFile } from "@/server/product-files";
 
 type BoardType = Exclude<ProjectType, "design">;
 
@@ -50,17 +60,31 @@ function money(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-// The New project flow (ROADMAP "Experience design"): three decisions, no text
-// field. Every frame of the plan is previewed here; exact ones are already
-// final. Start creates the project and opens its board; it calls no model.
+// The New project flow (ROADMAP "Experience design"): pick a product (or add
+// one: a short form, a photo or a design file — no file format to learn; a
+// catalog export still imports), then three decisions. Every frame of the
+// plan is previewed here; exact ones are already final. Start creates the
+// project and opens its board; it calls no model.
 export function NewProjectFlow({
   initialProducts,
   initialBrand,
+  makerModels,
+  draftPrice,
+  initialDesign,
 }: {
   initialProducts: Product[];
   initialBrand: BrandKit | null;
+  makerModels: MakerModels;
+  draftPrice: string | null;
+  // A design handed over from the studio ("Make it a product").
+  initialDesign: StoredProductFile | null;
 }) {
   const [products, setProducts] = useState(initialProducts);
+  // The new-product form: open from the start for a maker with no products
+  // yet, or a design handed over from the studio.
+  const [creating, setCreating] = useState(
+    initialProducts.length === 0 || initialDesign !== null,
+  );
   const [brand, setBrand] = useState(initialBrand);
   const [productId, setProductId] = useState<string | null>(
     initialProducts.length === 1 ? initialProducts[0].id : null,
@@ -98,7 +122,7 @@ export function NewProjectFlow({
   const off = planned.filter((p) => offSlots.includes(p.id)).map((p) => p.id);
   const slots = planned.filter((p) => !off.includes(p.id)).map((p) => p.slot);
   const scenes = slots.filter((s) => s.fill === "scene");
-  const model = defaultImageModel();
+  const model = defaultImageModel(makerModels);
   const estimate = estimateScenes(scenes, model);
 
   function toggleSlot(id: string) {
@@ -181,7 +205,29 @@ export function NewProjectFlow({
 
       {/* 1 · Product */}
       <Step n={1} title="Product">
+        <p className="-mt-2 font-sans text-[0.8125rem] text-on-surface-mid">
+          Pick a product, add a new one, or import your catalog.
+        </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {creating ? (
+            <NewProductForm
+              materials={[...new Set(products.map((p) => p.material))].sort()}
+              draftPrice={draftPrice}
+              initialFile={initialDesign}
+              onCreated={(created, warning) => {
+                setProducts((current) =>
+                  [...current.filter((p) => p.id !== created.id), created].sort(
+                    (a, b) => a.name.localeCompare(b.name),
+                  ),
+                );
+                setProductId(created.id);
+                setImportErrors([]);
+                setImportWarnings(warning ? [warning] : []);
+                setCreating(false);
+              }}
+              onCancel={() => setCreating(false)}
+            />
+          ) : null}
           {products.map((p) => (
             <button
               key={p.id}
@@ -215,6 +261,24 @@ export function NewProjectFlow({
               </span>
             </button>
           ))}
+          {creating ? null : (
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="flex flex-col justify-center gap-2 rounded-card bg-card p-5 text-left shadow-card transition-shadow hover:ring-1 hover:ring-primary"
+            >
+              <span className="flex size-8 items-center justify-center rounded-pill bg-primary/10 text-primary">
+                <Plus className="size-4" />
+              </span>
+              <span className="font-serif text-lg italic leading-tight text-foreground">
+                New product
+              </span>
+              <span className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
+                Type it in, from a photo or a design file. No file format to
+                learn.
+              </span>
+            </button>
+          )}
           <div className="flex flex-col justify-center gap-2 rounded-card border border-dashed border-border bg-card/60 p-5">
             <input
               ref={fileInput}
@@ -234,12 +298,20 @@ export function NewProjectFlow({
               className="self-start"
             >
               {importing ? <Loader2 className="animate-spin" /> : <FileUp />}
-              Import products (.json)
+              Import a catalog (.json)
             </Button>
             <p className="font-sans text-[0.75rem] leading-snug text-on-surface-mid">
-              A product package: one product, a list, or {"{ products: [...] }"}
-              , in the Product schema. Re-importing a SKU updates it.
+              For products exported from your own system. Each one needs a name,
+              its size, material, finish and colours; re-importing a SKU updates
+              it.
             </p>
+            <a
+              href="/templates/product-package.json"
+              download="kiln-product-template.json"
+              className="inline-flex items-center gap-1 self-start font-sans text-[0.75rem] font-semibold text-primary hover:underline"
+            >
+              <Download className="size-3" /> Download the template
+            </a>
           </div>
         </div>
         {importErrors.length > 0 ? (
