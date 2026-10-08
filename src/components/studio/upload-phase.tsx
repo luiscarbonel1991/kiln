@@ -101,8 +101,12 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const reduced = useRef(false);
 
-  // First-mount-only reveal flag (see heroAnimatedThisSession above).
+  // First-mount-only reveal flag (see heroAnimatedThisSession above). The
+  // server always renders the entrance: it serves many sessions, and a flag
+  // it kept from an earlier request made its HTML differ from the browser's
+  // first render (a hydration mismatch). Only the browser remembers.
   const [animate] = useState(() => {
+    if (typeof window === "undefined") return true;
     const first = !heroAnimatedThisSession;
     heroAnimatedThisSession = true;
     return first;

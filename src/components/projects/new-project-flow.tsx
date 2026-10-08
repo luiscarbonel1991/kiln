@@ -264,9 +264,12 @@ export function NewProjectFlow({
                 {p.colours.map((c) => (
                   <span
                     key={c.key}
-                    title={c.name}
+                    title={c.inStock ? c.name : `${c.name} (out of stock)`}
                     className="size-4 rounded-swatch border border-border"
-                    style={{ backgroundColor: c.face }}
+                    style={{
+                      backgroundColor: c.face,
+                      opacity: c.inStock ? 1 : 0.35,
+                    }}
                   />
                 ))}
               </span>

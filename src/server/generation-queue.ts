@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Card } from "@/domain/card";
 import {
   estimateGeneration,
@@ -255,12 +256,29 @@ export async function enqueueProjectCards(input: {
 
 const globalForWorker = globalThis as unknown as {
   kilnGenerationWorker?: Worker;
+  kilnGenerationWorkerCode?: string;
 };
 
+// One token per evaluation of this module. The worker outlives a code reload
+// (a globalThis singleton; dev HMR re-evaluates modules, never the running
+// worker), so it would keep running the old code. The next enqueue under new
+// code stops it — it takes no new job and finishes the ones it holds — and
+// starts one with the current code. (Instrumentation evaluates its own copy,
+// so the first enqueue after a start restarts it once; harmless.)
+const WORKER_CODE = randomUUID();
+
 // The process's worker (started from instrumentation, or lazily on the first
-// enqueue). null without a database.
+// enqueue), always running this code. null without a database.
 export function ensureGenerationWorker(): Worker | null {
   if (!hasDatabase()) return null;
+  const running = globalForWorker.kilnGenerationWorker;
+  if (running && globalForWorker.kilnGenerationWorkerCode !== WORKER_CODE) {
+    running.stop();
+    globalForWorker.kilnGenerationWorker = undefined;
+    console.info(
+      "[kiln queue] the generation worker restarted with the current code",
+    );
+  }
   if (!globalForWorker.kilnGenerationWorker) {
     const worker = createWorker({
       mode: providerMode(),
@@ -287,6 +305,7 @@ export function ensureGenerationWorker(): Worker | null {
         console.warn(`[kiln queue] ${message}`, error ?? ""),
     });
     globalForWorker.kilnGenerationWorker = worker;
+    globalForWorker.kilnGenerationWorkerCode = WORKER_CODE;
     process.once("SIGTERM", () => worker.stop());
     worker.wake();
   }
