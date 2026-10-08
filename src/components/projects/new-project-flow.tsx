@@ -37,6 +37,7 @@ import {
 import { dimensionsLabel, type Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
 import { plateHref } from "@/lib/plate-href";
+import { plural } from "@/lib/plural";
 import { PROJECT_TYPES } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
@@ -387,13 +388,13 @@ export function NewProjectFlow({
                 <section key={d.destinationId} className="flex flex-col gap-3">
                   <h3 className="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
                     {destination.name} ·{" "}
-                    {
+                    {plural(
                       d.slots.filter(
                         (s) =>
                           !off.includes(slotCardId(d.destinationId, s.key)),
-                      ).length
-                    }{" "}
-                    frames
+                      ).length,
+                      "frame",
+                    )}
                   </h3>
                   <SlotGrid>
                     {d.slots.map((slot, i) => {
@@ -477,8 +478,10 @@ export function NewProjectFlow({
                   <strong>
                     {slots.length - scenes.length} of {slots.length}
                   </strong>{" "}
-                  frames are exact — drawn from the spec, free and final.{" "}
-                  {scenes.length} scenes need the image model.
+                  {slots.length === 1 ? "frame is" : "frames are"} exact — drawn
+                  from the spec, free and final.{" "}
+                  {plural(scenes.length, "scene")}{" "}
+                  {scenes.length === 1 ? "needs" : "need"} the image model.
                   {off.length > 0
                     ? ` ${off.length} switched off, not part of the deliverable.`
                     : ""}

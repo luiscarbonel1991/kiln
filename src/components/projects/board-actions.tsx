@@ -22,6 +22,8 @@ import {
 import { deliverAction } from "@/app/actions/deliver";
 import { Button } from "@/components/ui/button";
 import { downloadAsset } from "@/lib/download";
+import { plural } from "@/lib/plural";
+import { cn } from "@/lib/utils";
 
 export function ApproveButton({
   projectId,
@@ -103,7 +105,16 @@ export function SlotSwitch({
         ) : (
           <EyeOff />
         )}
-        {off ? "Switch on" : "Switch off"}
+        {/* Both labels take the room, one hidden: the button keeps its width,
+            so switching never re-wraps the caption under the cursor. */}
+        <span className="grid">
+          <span className={cn("col-start-1 row-start-1", off && "invisible")}>
+            Switch off
+          </span>
+          <span className={cn("col-start-1 row-start-1", !off && "invisible")}>
+            Switch on
+          </span>
+        </span>
       </Button>
       {error ? (
         <span className="font-mono text-[0.6rem] text-prov-local">{error}</span>
@@ -194,7 +205,9 @@ export function DeliverButton({
             try {
               await downloadAsset(result.url, result.filename);
               setFailed(false);
-              setMessage(`${result.count} files in ${result.filename}`);
+              setMessage(
+                `${plural(result.count, "file")} in ${result.filename}`,
+              );
             } catch {
               setFailed(true);
               setMessage("The zip is ready but the download failed.");

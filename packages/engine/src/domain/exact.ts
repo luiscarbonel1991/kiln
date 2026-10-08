@@ -42,6 +42,7 @@ export function renderTextTemplate(template: string, product: Product): string {
     "product.material": product.material,
     "product.shape": product.shape,
     "colours.count": String(product.colours.length),
+    "colours.counted": `${product.colours.length} colour${product.colours.length === 1 ? "" : "s"}`,
   };
   return template.replace(/\{([a-z.]+)\}/g, (token, key: string) =>
     key in values ? values[key] : token,
@@ -157,7 +158,7 @@ export function shopLine(brand: BrandKit | null | undefined): string | null {
 }
 
 const DEFAULT_TITLE: Record<ExactKind, string> = {
-  "colour-grid": "Available in {colours.count} colours",
+  "colour-grid": "Available in {colours.counted}",
   "size-spec": "{product.dimensions}",
   scale: "Shown to scale",
   personalize: "Make it yours",

@@ -105,9 +105,11 @@ export function offeredDestinations(
 }
 
 // An exact slot that has nothing to show for this product is left out of the
-// plan (e.g. "how to personalize" for a product with no wording lines).
+// plan: "how to personalize" for a product with no wording lines, the colour
+// sheet for a product sold in one colour.
 function exactApplies(slot: ShotList["slots"][number], product: Product) {
   if (slot.exact === "personalize") return product.wording.length > 0;
+  if (slot.exact === "colour-grid") return product.colours.length > 1;
   return true;
 }
 

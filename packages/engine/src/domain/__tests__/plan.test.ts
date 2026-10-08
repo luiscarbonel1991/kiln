@@ -138,6 +138,14 @@ describe("planProject", () => {
       "hero",
       "colours",
     ]);
+    // A product sold in one colour has no colour sheet to show.
+    const single = planProject({
+      product: { ...plain, colours: [CUTTING_BOARD.colours[0]] },
+      type: "listing-kit",
+      destinationIds: ["shop"],
+      catalog,
+    });
+    expect(single.destinations[0].slots.map((s) => s.key)).toEqual(["hero"]);
   });
 });
 

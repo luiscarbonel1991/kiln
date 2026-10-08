@@ -45,6 +45,10 @@ describe("exactView", () => {
   it("colour grid lists every colour, out-of-stock included", () => {
     const view = exactView("colour-grid", CUTTING_BOARD);
     expect(view).toMatchObject({ title: "Available in 3 colours" });
+    const one = { ...CUTTING_BOARD, colours: [CUTTING_BOARD.colours[0]] };
+    expect(exactView("colour-grid", one)).toMatchObject({
+      title: "Available in 1 colour",
+    });
     if (view.kind !== "colour-grid") throw new Error();
     expect(view.swatches.map((s) => s.key)).toEqual([
       "maple",

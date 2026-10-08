@@ -55,6 +55,7 @@ import type { JobView } from "@/domain/queue";
 import { VIDEO_MOTIONS } from "@/domain/video";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { plateHref } from "@/lib/plate-href";
+import { plural } from "@/lib/plural";
 import { projectTypeLabel } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
 import type { BatchProgress, Budget } from "@/server/generation-repository";
@@ -66,6 +67,8 @@ interface BoardSlot {
   cardId: string;
   card?: Card;
   view: SlotView;
+  // Its state as if switched on: a slot switched off keeps that caption.
+  onView: SlotView;
 }
 
 // Each destination's slots with their card, latest job and board state.
@@ -85,6 +88,7 @@ export function boardRows(
         cardId,
         card,
         view: slotState(slot, card, jobs[cardId]),
+        onView: slotState({ ...slot, off: false }, card, jobs[cardId]),
       };
     }),
   }));
@@ -235,8 +239,8 @@ export function ProjectBoard({
                   {destination.name}
                 </span>
                 <span className="font-mono text-[0.625rem] text-on-surface-dim">
-                  {destination.kind} · {slots.filter((s) => !s.slot.off).length}{" "}
-                  frames
+                  {destination.kind} ·{" "}
+                  {plural(slots.filter((s) => !s.slot.off).length, "frame")}
                   {slots.some((s) => s.slot.off)
                     ? ` (${slots.filter((s) => s.slot.off).length} off)`
                     : ""}{" "}
@@ -250,7 +254,7 @@ export function ProjectBoard({
                 ) : null}
               </h2>
               <SlotGrid>
-                {slots.map(({ slot, cardId, card, view }, i) => {
+                {slots.map(({ slot, cardId, card, view, onView }, i) => {
                   const video =
                     slot.fill === "video"
                       ? videoSettings(
@@ -290,6 +294,7 @@ export function ProjectBoard({
                           slot={slot}
                           cardId={cardId}
                           view={view}
+                          onView={onView}
                           hasReference={board.master !== null}
                           model={card ? (card.model as ModelValue) : null}
                           notes={notes}
@@ -304,11 +309,13 @@ export function ProjectBoard({
                               : null
                           }
                           order={
-                            places[i] === null
+                            // A video never moves; a slot switched off keeps
+                            // the order buttons' room (hidden).
+                            video
                               ? null
                               : {
-                                  place: places[i] ?? 0,
-                                  last,
+                                  place: places[i] ?? 1,
+                                  last: places[i] === null ? 2 : last,
                                   firstLabel:
                                     destination.kind === "sale"
                                       ? "Make photo 1"
@@ -445,7 +452,7 @@ export function ProjectBoard({
                 ) : null}
                 <li>{count("exact")} exact, from the spec</li>
                 <li>
-                  {count("approved")} of {scenes} scenes approved
+                  {count("approved")} of {plural(scenes, "scene")} approved
                 </li>
                 <li>{count("to-review")} to review</li>
                 <li>
@@ -488,7 +495,8 @@ function SlotActions({
   destinationId,
   slot,
   cardId,
-  view,
+  view: actual,
+  onView,
   hasReference,
   order,
   video,
@@ -500,6 +508,7 @@ function SlotActions({
   slot: PlanSlot;
   cardId: string;
   view: SlotView;
+  onView: SlotView;
   hasReference: boolean;
   order: { place: number; last: number; firstLabel: string } | null;
   video: {
@@ -511,54 +520,74 @@ function SlotActions({
   model: ModelValue | null;
   notes: ProviderNote[];
 }) {
+  // A slot switched off keeps the caption it has when on, its other actions
+  // hidden in place: the switch stays under the cursor and the frames below
+  // never move (switching three off in a row must not hit a fourth).
+  const off = actual.state === "off";
+  const view = off ? onView : actual;
+  const keep = (node: React.ReactNode) =>
+    off && node ? (
+      // contents: the hidden actions lay out exactly as when shown
+      // (visibility is inherited, the wrapper draws no box).
+      <span className="invisible contents" aria-hidden="true">
+        {node}
+      </span>
+    ) : (
+      node
+    );
   const toggle = (
     <SlotSwitch
       projectId={projectId}
       destinationId={destinationId}
       slotKey={slot.key}
-      off={view.state === "off"}
+      off={off}
     />
   );
-  const ordering = order ? (
-    <SlotOrder
-      projectId={projectId}
-      destinationId={destinationId}
-      slotKey={slot.key}
-      {...order}
-    />
-  ) : null;
-  if (view.state === "off") return toggle;
+  const ordering = keep(
+    order ? (
+      <SlotOrder
+        projectId={projectId}
+        destinationId={destinationId}
+        slotKey={slot.key}
+        {...order}
+      />
+    ) : null,
+  );
   if (slot.fill === "video") {
     return (
       <div className="flex flex-col gap-2">
-        {view.state === "to-review" || view.state === "approved" ? (
-          <ApproveButton
-            projectId={projectId}
-            destinationId={destinationId}
-            slotKey={slot.key}
-            approved={view.state === "approved"}
-          />
-        ) : null}
-        {video && model ? (
-          <VideoControls
-            projectId={projectId}
-            destinationId={destinationId}
-            slotKey={slot.key}
-            cardId={cardId}
-            model={model}
-            notes={notes}
-            settings={video.settings}
-            scenes={video.scenes}
-            busy={view.inBatch === true || view.state === "generating"}
-            rendered={video.rendered}
-            budgetLine={video.budgetLine}
-          />
-        ) : (
-          <span className="font-mono text-[0.6rem] text-on-surface-dim">
-            needs a reference image
-          </span>
+        {keep(
+          view.state === "to-review" || view.state === "approved" ? (
+            <ApproveButton
+              projectId={projectId}
+              destinationId={destinationId}
+              slotKey={slot.key}
+              approved={view.state === "approved"}
+            />
+          ) : null,
         )}
-        {view.inBatch ? null : toggle}
+        {keep(
+          video && model ? (
+            <VideoControls
+              projectId={projectId}
+              destinationId={destinationId}
+              slotKey={slot.key}
+              cardId={cardId}
+              model={model}
+              notes={notes}
+              settings={video.settings}
+              scenes={video.scenes}
+              busy={view.inBatch === true || view.state === "generating"}
+              rendered={video.rendered}
+              budgetLine={video.budgetLine}
+            />
+          ) : (
+            <span className="font-mono text-[0.6rem] text-on-surface-dim">
+              needs a reference image
+            </span>
+          ),
+        )}
+        {view.inBatch && !off ? null : toggle}
       </div>
     );
   }
@@ -573,48 +602,56 @@ function SlotActions({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {ordering}
-      {view.state === "to-review" || view.state === "approved" ? (
-        <ApproveButton
-          projectId={projectId}
-          destinationId={destinationId}
-          slotKey={slot.key}
-          approved={view.state === "approved"}
-        />
-      ) : null}
-      {hasReference ? (
-        <Link
-          href={`/projects/${projectId}/editor?card=${encodeURIComponent(cardId)}`}
-          className="inline-flex items-center gap-1 font-sans text-[0.72rem] font-semibold text-primary hover:underline"
-        >
-          <PenLine className="size-3" /> Open in editor
-        </Link>
-      ) : (
-        <span className="font-mono text-[0.6rem] text-on-surface-dim">
-          needs a reference image
-        </span>
+      {keep(
+        view.state === "to-review" || view.state === "approved" ? (
+          <ApproveButton
+            projectId={projectId}
+            destinationId={destinationId}
+            slotKey={slot.key}
+            approved={view.state === "approved"}
+          />
+        ) : null,
       )}
-      {view.inBatch ? null : toggle}
-      {hasReference && model ? (
-        <SlotModel
-          projectId={projectId}
-          cardId={cardId}
-          kind="image"
-          value={model}
-          notes={notes}
-          disabled={
-            view.inBatch === true ||
-            view.state === "generating" ||
-            view.state === "retrying"
-          }
-        />
-      ) : null}
-      {slot.key === "scale" ? (
-        // Plans from before M4 kept an AI scale scene; its size cue can lie
-        // (new plans draw the scale exactly).
-        <span className="font-mono text-[0.6rem] text-prov-brand">
-          AI scale · unverified
-        </span>
-      ) : null}
+      {keep(
+        hasReference ? (
+          <Link
+            href={`/projects/${projectId}/editor?card=${encodeURIComponent(cardId)}`}
+            className="inline-flex items-center gap-1 font-sans text-[0.72rem] font-semibold text-primary hover:underline"
+          >
+            <PenLine className="size-3" /> Open in editor
+          </Link>
+        ) : (
+          <span className="font-mono text-[0.6rem] text-on-surface-dim">
+            needs a reference image
+          </span>
+        ),
+      )}
+      {view.inBatch && !off ? null : toggle}
+      {keep(
+        hasReference && model ? (
+          <SlotModel
+            projectId={projectId}
+            cardId={cardId}
+            kind="image"
+            value={model}
+            notes={notes}
+            disabled={
+              view.inBatch === true ||
+              view.state === "generating" ||
+              view.state === "retrying"
+            }
+          />
+        ) : null,
+      )}
+      {keep(
+        slot.key === "scale" ? (
+          // Plans from before M4 kept an AI scale scene; its size cue can lie
+          // (new plans draw the scale exactly).
+          <span className="font-mono text-[0.6rem] text-prov-brand">
+            AI scale · unverified
+          </span>
+        ) : null,
+      )}
     </div>
   );
 }
