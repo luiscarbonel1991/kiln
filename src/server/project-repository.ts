@@ -31,6 +31,7 @@ import type { VideoChoice } from "@/domain/video";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
+import { productHash } from "@/server/product-version";
 import {
   type CardRow,
   cardsToRows,
@@ -181,10 +182,11 @@ export async function saveProject(
 
 // A project started from the New project flow: its type, product and plan are
 // fixed here, with the editor state (understanding, cards, master) the start
-// produced. One transaction.
+// produced, and the product as it was (its version: a later change shows on
+// the board). One transaction.
 export async function createProject(input: {
   type: ProjectType;
-  productId: string;
+  product: Product;
   plan: ProjectPlan;
   editor: PersistedProject;
 }): Promise<string> {
@@ -199,7 +201,14 @@ export async function createProject(input: {
         type: input.type,
         plan: input.plan as unknown as Prisma.InputJsonValue,
         makerId: maker.id,
-        products: { create: { productId: input.productId, position: 0 } },
+        products: {
+          create: {
+            productId: input.product.id,
+            position: 0,
+            productSnapshot: input.product as unknown as Prisma.InputJsonValue,
+            productHash: productHash(input.product),
+          },
+        },
       },
     });
     if (rows.master) {
@@ -372,10 +381,22 @@ const CARD_COLUMNS = {
   sortOrder: true,
 } as const;
 
+// Which version of its product a project was built from: the product as it
+// was then and its hash (null on projects started before versions were
+// kept, read from the dates instead).
+export interface ProjectProductVersion {
+  snapshot: unknown;
+  hash: string | null;
+  productUpdatedAt: Date;
+  projectCreatedAt: Date;
+}
+
 // The board's read: project + plan + product + anchor + cards, or null.
-export async function loadProjectBoard(
-  id: string,
-): Promise<{ board: ProjectBoard; product: Product | null } | null> {
+export async function loadProjectBoard(id: string): Promise<{
+  board: ProjectBoard;
+  product: Product | null;
+  version: ProjectProductVersion | null;
+} | null> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
   const record = await db.project.findFirst({
@@ -395,10 +416,13 @@ export async function loadProjectBoard(
         },
       },
       cards: { select: CARD_COLUMNS, orderBy: { sortOrder: "asc" } },
+      createdAt: true,
       products: {
         orderBy: { position: "asc" },
         take: 1,
         select: {
+          productSnapshot: true,
+          productHash: true,
           product: {
             select: {
               id: true,
@@ -406,6 +430,7 @@ export async function loadProjectBoard(
               name: true,
               spec: true,
               source: true,
+              updatedAt: true,
             },
           },
         },
@@ -413,10 +438,18 @@ export async function loadProjectBoard(
     },
   });
   if (!record) return null;
-  const productRow = record.products[0]?.product;
+  const link = record.products[0];
   return {
     board: rowsToBoard(record),
-    product: productRow ? rowToProduct(productRow) : null,
+    product: link ? rowToProduct(link.product) : null,
+    version: link
+      ? {
+          snapshot: link.productSnapshot,
+          hash: link.productHash,
+          productUpdatedAt: link.product.updatedAt,
+          projectCreatedAt: record.createdAt,
+        }
+      : null,
   };
 }
 

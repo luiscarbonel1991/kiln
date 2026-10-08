@@ -96,12 +96,18 @@ model Product {
 }
 
 // The products a project uses, in order. A product in use cannot be deleted.
+// productSnapshot is the product as the project was built from it (Start) or
+// last updated to, productHash that version (src/server/product-version.ts):
+// a product changed since shows on the board. Null on projects started
+// before versions were kept.
 model ProjectProduct {
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  position  Int     @default(0)
+  projectId       String
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product @relation(fields: [productId], references: [id])
+  position        Int     @default(0)
+  productSnapshot Json?
+  productHash     String?
 
   @@id([projectId, productId])
   @@index([productId])
@@ -201,6 +207,9 @@ model GenerationJob {
   // estimate.
   callStartedAt  DateTime?        @db.Timestamptz(3)
   finishedAt     DateTime?        @db.Timestamptz(3)
+  // The product version its request was built from (its project's at
+  // enqueue): which version each scene shows.
+  productHash    String?
 
   // One queued or running job per card. The predicate is written as Postgres
   // stores it (it normalizes IN to = ANY), so migrate sees no drift.

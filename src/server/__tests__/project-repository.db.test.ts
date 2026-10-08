@@ -133,7 +133,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan,
       editor,
     });
@@ -146,6 +146,12 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       "etsy.in-use",
     ]);
     expect(loaded?.product?.sku).toBe(product.sku);
+    // The product as the project was built from it, and that version.
+    const { productHash } = await import("@/server/product-version");
+    expect(loaded?.version).toMatchObject({
+      hash: productHash(saved),
+      snapshot: { sku: product.sku, material: "hardwood" },
+    });
     const [again] = await upsertProducts([product]);
     expect(again.id).toBe(saved.id);
   });
@@ -201,7 +207,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan,
       editor,
     });
@@ -354,7 +360,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan,
       editor,
     });
@@ -381,6 +387,12 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     await repo.deleteProject(id);
 
     const jobs = await db.generationJob.findMany({ where: { batchId } });
+    // Each job remembers the product version its request was built from.
+    const { productHash } = await import("@/server/product-version");
+    expect(jobs.map((j) => j.productHash)).toEqual([
+      productHash(saved),
+      productHash(saved),
+    ]);
     expect(jobs.map((j) => j.status).sort()).toEqual(["canceled", "running"]);
     expect(jobs.every((j) => j.projectId === null)).toBe(true);
     const batch = await db.generationBatch.findUniqueOrThrow({
@@ -416,7 +428,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan,
       editor,
     });
@@ -451,7 +463,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan,
       editor,
     });
@@ -509,7 +521,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     };
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan: videoPlan,
       editor: {
         ...editor,
@@ -616,7 +628,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan,
       editor,
     });
@@ -654,7 +666,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan,
       editor,
     });
@@ -707,7 +719,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan,
       editor,
     });
@@ -741,7 +753,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [saved] = await upsertProducts([product]);
     const id = await repo.createProject({
       type: "launch",
-      productId: saved.id,
+      product: saved,
       plan,
       editor,
     });

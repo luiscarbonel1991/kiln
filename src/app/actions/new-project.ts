@@ -52,7 +52,7 @@ export async function createProjectAction(
       master,
       models: await getMakerModels(),
     });
-    id = await createProject({ type, productId: product.id, plan, editor });
+    id = await createProject({ type, product, plan, editor });
   } catch (error) {
     return {
       error:

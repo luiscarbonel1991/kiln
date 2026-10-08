@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import pkg from "@/lib/__fixtures__/product-package.json";
 import { parseProductPackage } from "@/lib/product-package";
-import { productHash } from "@/server/product-version";
+import { productDrift, productHash } from "@/server/product-version";
 
 const parsed = parseProductPackage(pkg);
 if (!parsed.ok) throw new Error("fixture package does not parse");
@@ -19,5 +19,47 @@ describe("productHash", () => {
     expect(productHash({ ...board, material: "oak" })).not.toBe(
       productHash(board),
     );
+  });
+});
+
+describe("productDrift", () => {
+  const dates = {
+    productUpdatedAt: new Date("2026-10-07T10:00:00Z"),
+    projectCreatedAt: new Date("2026-10-06T10:00:00Z"),
+  };
+
+  it("a project built from this version is current", () => {
+    expect(
+      productDrift(board, {
+        snapshot: board,
+        hash: productHash(board),
+        ...dates,
+      }),
+    ).toEqual({ stale: false, changed: [] });
+  });
+
+  it("a project built from an earlier version says what changed since", () => {
+    const now = { ...board, material: "solid oak" };
+    expect(
+      productDrift(now, {
+        snapshot: board,
+        hash: productHash(board),
+        ...dates,
+      }),
+    ).toEqual({ stale: true, changed: ["material"] });
+  });
+
+  it("a project from before versions is judged by the dates", () => {
+    expect(
+      productDrift(board, { snapshot: null, hash: null, ...dates }),
+    ).toEqual({ stale: true, changed: [] });
+    expect(
+      productDrift(board, {
+        snapshot: null,
+        hash: null,
+        productUpdatedAt: dates.projectCreatedAt,
+        projectCreatedAt: dates.productUpdatedAt,
+      }).stale,
+    ).toBe(false);
   });
 });

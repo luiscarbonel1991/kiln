@@ -199,6 +199,12 @@ export async function enqueueBatch(input: {
         );
       }
     }
+    // Each job remembers the product version its request was built from.
+    const link = await tx.projectProduct.findFirst({
+      where: { projectId },
+      orderBy: { position: "asc" },
+      select: { productHash: true },
+    });
     const batch = await tx.generationBatch.create({
       data: {
         makerId,
@@ -221,6 +227,7 @@ export async function enqueueBatch(input: {
         maxAttempts: MAX_ATTEMPTS,
         request: j.request as unknown as Prisma.InputJsonValue,
         estimateMicros: j.estimateMicros,
+        productHash: link?.productHash ?? null,
       })),
     });
     return { batchId: batch.id, queued: fresh.length, skipped: [...busy] };
