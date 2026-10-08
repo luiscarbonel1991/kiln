@@ -6,10 +6,15 @@ import {
   ACCEPTED_IMAGE_MIME,
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
+import type { BrandKit } from "@/domain/brand";
 import { defaultTextModel, ProviderId } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
 import { ProductForm, productFromForm } from "@/lib/product-form";
-import { type PackageResult, parseProductPackage } from "@/lib/product-package";
+import {
+  parseProductPackage,
+  productLabel,
+  type RejectedProduct,
+} from "@/lib/product-package";
 import {
   assertAllowedAssetUrl,
   fetchAsset,
@@ -17,14 +22,19 @@ import {
 } from "@/providers/asset-bytes";
 import { measureOutline } from "@/providers/plates/svg";
 import type { ProductDraft } from "@/providers/text-prompts";
-import { getMakerModels, saveMakerBrand } from "@/server/maker-repository";
+import { getMakerModels } from "@/server/maker-repository";
 import {
   ProductFileRefused,
   type StoredProductFile,
   storeProductPhoto,
   storeProductSvg,
 } from "@/server/product-files";
-import { listProducts, upsertProducts } from "@/server/product-repository";
+import {
+  type ImportedProduct,
+  importCatalog,
+  listProducts,
+  upsertProducts,
+} from "@/server/product-repository";
 import { type Degraded, draftProduct } from "@/server/text-calls";
 
 // Server Functions are POST-reachable: the package parse is the trust boundary.
@@ -40,19 +50,17 @@ function sourceUrl(product: Product): string | null {
   return null;
 }
 
-// A package whose assets live where Kiln will not fetch is refused at import,
-// not later when a plate or a scene needs them.
-function blockedAssets(products: Product[]): string[] {
-  return products.flatMap((product) => {
-    const url = sourceUrl(product);
-    if (!url) return [];
-    try {
-      assertAllowedAssetUrl(url);
-      return [];
-    } catch (error) {
-      return [`sku "${product.sku}": ${(error as Error).message}`];
-    }
-  });
+// A product whose asset lives where Kiln will not fetch is refused at import,
+// not later when a plate or a scene needs it: the reason, or null.
+function blockedAsset(product: Product): string | null {
+  const url = sourceUrl(product);
+  if (!url) return null;
+  try {
+    assertAllowedAssetUrl(url);
+    return null;
+  } catch (error) {
+    return (error as Error).message;
+  }
 }
 
 // A vector product's outline, measured from its SVG (never taken from the
@@ -82,18 +90,19 @@ async function withOutline(
     }
     return {
       product: bare,
-      warning: `sku "${product.sku}": ${measured.mismatch}; its scale frames draw the outline from the spec.`,
+      warning: `${measured.mismatch}; its scale frames draw the outline from the spec.`,
     };
   } catch (error) {
     return {
       product: bare,
-      warning: `sku "${product.sku}": its SVG could not be measured (${(error as Error).message}); its scale frames draw the outline from the spec.`,
+      warning: `its SVG could not be measured (${(error as Error).message}); its scale frames draw the outline from the spec.`,
     };
   }
 }
 
 // A photo given inline (a data: URL) is moved to Kiln's storage: a scene's
-// reference must be a stored image, as the New project page promises.
+// reference must be a stored image, as the New project page promises. Named
+// by its bytes, so re-importing the same photo keeps the product unchanged.
 async function withStoredPhoto(product: Product): Promise<Product> {
   if (
     product.source.kind !== "photo" ||
@@ -102,26 +111,86 @@ async function withStoredPhoto(product: Product): Promise<Product> {
     return product;
   }
   const photo = await fetchAsset(product.source.assetUrl);
-  const assetUrl = await storeAsset(photo.bytes, photo.mime, "products");
+  const assetUrl = await storeAsset(photo.bytes, photo.mime, "products", {
+    byContent: true,
+  });
   return { ...product, source: { kind: "photo", assetUrl } };
 }
 
-// Import a product package for the current maker. Re-importing a sku updates
-// that product in place (its id, and every project using it, stay); a `maker`
-// block replaces the maker's brand kit.
+// Scenes show a product in its default colour: one out of stock would sell a
+// look the maker cannot ship.
+function outOfStockDefault(product: Product): string | null {
+  const colour = product.colours.find((c) => c.key === product.defaultColour);
+  return colour && !colour.inStock
+    ? `${productLabel(product)}: its default colour, ${colour.name}, is out of stock, and scenes show the default colour. Pick one in stock as defaultColour.`
+    : null;
+}
+
+export interface ImportResult {
+  imported: ImportedProduct[];
+  // Products set aside, each with why; the others imported.
+  rejected: RejectedProduct[];
+  brand?: BrandKit;
+  // Why the maker block was not saved.
+  brandErrors: string[];
+  warnings: string[];
+}
+
+// Import a product package for the current maker, product by product: the
+// valid ones are saved (re-importing a sku updates that product in place —
+// its id, and every project using it, stay — and says what changed), the
+// others come back with their reasons; a `maker` block replaces the maker's
+// brand kit.
 export async function importProductsAction(
   input: unknown,
-): Promise<PackageResult> {
+): Promise<ImportResult | { error: string }> {
   const parsed = parseProductPackage(input);
-  if (!parsed.ok) return parsed;
-  const blocked = blockedAssets(parsed.products);
-  if (blocked.length > 0) return { ok: false, errors: blocked };
-  const stored = await Promise.all(parsed.products.map(withStoredPhoto));
-  const measured = await Promise.all(stored.map(withOutline));
-  const warnings = measured.flatMap((m) => (m.warning ? [m.warning] : []));
-  const products = await upsertProducts(measured.map((m) => m.product));
-  if (parsed.brand) await saveMakerBrand(parsed.brand);
-  return { ...parsed, products, ...(warnings.length > 0 ? { warnings } : {}) };
+  if (!parsed.ok) return { error: parsed.errors.join(" ") };
+  const rejected = [...parsed.rejected];
+  const ready: Product[] = [];
+  for (const product of parsed.products) {
+    const blocked = blockedAsset(product);
+    if (blocked) {
+      rejected.push({ label: productLabel(product), errors: [blocked] });
+      continue;
+    }
+    try {
+      ready.push(await withStoredPhoto(product));
+    } catch (error) {
+      rejected.push({
+        label: productLabel(product),
+        errors: [`its photo could not be read (${(error as Error).message})`],
+      });
+    }
+  }
+  const measured = await Promise.all(ready.map(withOutline));
+  const warnings = [
+    ...measured.flatMap((m) =>
+      m.warning ? [`${productLabel(m.product)}: ${m.warning}`] : [],
+    ),
+    ...ready.flatMap((p) => {
+      const warning = outOfStockDefault(p);
+      return warning ? [warning] : [];
+    }),
+  ];
+  let imported: ImportedProduct[] = [];
+  if (measured.length > 0 || parsed.brand) {
+    try {
+      imported = await importCatalog(
+        measured.map((m) => m.product),
+        parsed.brand,
+      );
+    } catch (error) {
+      return { error: `Nothing was saved: ${(error as Error).message}` };
+    }
+  }
+  return {
+    imported,
+    rejected,
+    ...(parsed.brand ? { brand: parsed.brand } : {}),
+    brandErrors: parsed.brandErrors,
+    warnings,
+  };
 }
 
 const PHOTO_MIME = new Set<string>(ACCEPTED_IMAGE_MIME);
@@ -167,17 +236,14 @@ export async function createProductAction(
     parsed.data,
     randomBytes(3).readUIntBE(0, 3).toString(36).slice(0, 4),
   );
-  const blocked = blockedAssets([product]);
-  if (blocked.length > 0) {
+  if (blockedAsset(product)) {
     return { error: "That file is not in Kiln's storage; upload it again." };
   }
   const measured = await withOutline(product);
   const [saved] = await upsertProducts([measured.product]);
   return {
     product: saved,
-    ...(measured.warning
-      ? { warning: measured.warning.replace(/^sku "[^"]+": /, "") }
-      : {}),
+    ...(measured.warning ? { warning: measured.warning } : {}),
   };
 }
 

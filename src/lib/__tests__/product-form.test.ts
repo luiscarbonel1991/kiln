@@ -102,12 +102,10 @@ describe("product packages", () => {
   it("refuses a default colour that is not one of the product's colours", () => {
     const product = productFromForm(form, "a");
     const result = parseProductPackage({ ...product, defaultColour: "oak" });
-    expect(result).toEqual({
-      ok: false,
-      errors: [
-        `sku "${product.sku}": defaultColour "oak" is not one of its colours (natural, natural-2)`,
-      ],
-    });
+    expect(result.ok && result.products).toEqual([]);
+    expect(result.ok && result.rejected[0].errors).toEqual([
+      'defaultColour "oak" is not one of its colours (natural, natural-2)',
+    ]);
   });
 
   it("the downloadable template is a valid package", () => {
@@ -118,6 +116,6 @@ describe("product packages", () => {
       ),
     );
     const result = parseProductPackage(template);
-    expect(result.ok).toBe(true);
+    expect(result.ok && result.rejected).toEqual([]);
   });
 });

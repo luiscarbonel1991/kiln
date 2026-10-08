@@ -1,74 +1,190 @@
-import { z } from "zod";
+import type { z } from "zod";
 import { BrandKit } from "@/domain/brand";
 import { Product } from "@/domain/product";
-import { unknownDefaultColours } from "@/lib/product-form";
 
 // The product package contract (ROADMAP Phase 8, PRODUCT-MODEL.md): what a
 // maker's catalog exports and Kiln imports. A package is one Product, an array
 // of them, or { maker?, products: [...] }: each product validated by the
 // engine's Product schema, the optional `maker` block by BrandKit (the brand
 // kit for text layers). Example: src/lib/__fixtures__/product-package.json.
+//
+// Products are read one by one: a product that does not parse is set aside
+// with its reasons and the others still import, so one long field never
+// drops a whole catalog. A maker block that does not parse is left unsaved,
+// with its reasons, and the products still import.
+
+export interface RejectedProduct {
+  // How the maker knows it: `"DP-W" Desk name plate`, or its place.
+  label: string;
+  errors: string[];
+}
 
 export type PackageResult =
-  | { ok: true; products: Product[]; brand?: BrandKit; warnings?: string[] }
+  | {
+      ok: true;
+      products: Product[];
+      rejected: RejectedProduct[];
+      brand?: BrandKit;
+      brandErrors: string[];
+    }
+  // Nothing in it reads as a package (no products at all).
   | { ok: false; errors: string[] };
 
-const MAX_ERRORS = 12;
+type Key = PropertyKey;
 
-function format(issues: z.core.$ZodIssue[], prefix: string): string[] {
+function at(value: unknown, path: readonly Key[]): unknown {
+  return path.reduce<unknown>(
+    (node, key) =>
+      node !== null && typeof node === "object"
+        ? (node as Record<Key, unknown>)[key]
+        : undefined,
+    value,
+  );
+}
+
+// "colours › oak › inlayName": an array item is named by its key, label or
+// name when it has one, else by its place (1-based).
+function pathWords(value: unknown, path: readonly Key[]): string {
+  return path
+    .map((key, i) => {
+      if (typeof key !== "number") return String(key);
+      const item = at(value, path.slice(0, i + 1));
+      const named =
+        item !== null && typeof item === "object"
+          ? ["key", "label", "name"]
+              .map((k) => (item as Record<string, unknown>)[k])
+              .find((v) => typeof v === "string" && v.trim() !== "")
+          : undefined;
+      return typeof named === "string" ? named : `#${key + 1}`;
+    })
+    .join(" › ");
+}
+
+const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// One issue in plain words, with what the value was where that helps.
+function issueWords(issue: z.core.$ZodIssue, value: unknown): string {
+  const got = at(value, issue.path);
+  switch (issue.code) {
+    case "too_big": {
+      const max = Number(issue.maximum);
+      if (issue.origin === "string" && typeof got === "string") {
+        return `at most ${count(max, "character")} (this one has ${got.length})`;
+      }
+      if (issue.origin === "array" && Array.isArray(got)) {
+        return `at most ${count(max, "item")} (this one has ${got.length})`;
+      }
+      return `at most ${max}`;
+    }
+    case "too_small": {
+      const min = Number(issue.minimum);
+      if (issue.origin === "string") {
+        return min <= 1 ? "is empty" : `at least ${count(min, "character")}`;
+      }
+      if (issue.origin === "array") {
+        return min <= 1
+          ? "needs at least one"
+          : `at least ${count(min, "item")}`;
+      }
+      return `at least ${min}`;
+    }
+    case "invalid_type":
+      return got === undefined
+        ? "is missing"
+        : `should be a ${issue.expected} (it is ${Array.isArray(got) ? "a list" : `a ${typeof got}`})`;
+    case "invalid_value":
+      return `should be one of ${issue.values.map(String).join(", ")}`;
+    default:
+      return issue.message;
+  }
+}
+
+function issuesWords(issues: z.core.$ZodIssue[], value: unknown): string[] {
   return issues.map((issue) => {
-    const path = issue.path.reduce<string>(
-      (acc, key) =>
-        typeof key === "number"
-          ? `${acc}[${key}]`
-          : acc
-            ? `${acc}.${String(key)}`
-            : String(key),
-      prefix,
-    );
-    return `${path || "package"}: ${issue.message}`;
+    const where = pathWords(value, issue.path);
+    return where
+      ? `${where}: ${issueWords(issue, value)}`
+      : issueWords(issue, value);
   });
 }
 
+// How the maker knows a product in a list: `"DP-W" Desk name plate`.
+export function productLabel(product: { sku: string; name: string }): string {
+  return `"${product.sku}" ${product.name}`;
+}
+
+function label(raw: unknown, index: number): string {
+  const sku = at(raw, ["sku"]);
+  const name = at(raw, ["name"]);
+  const quoted = typeof sku === "string" && sku.trim() ? `"${sku}"` : null;
+  const named = typeof name === "string" && name.trim() ? name : null;
+  return [quoted, named].filter(Boolean).join(" ") || `product #${index + 1}`;
+}
+
 export function parseProductPackage(input: unknown): PackageResult {
-  const block =
-    input !== null && typeof input === "object" && !Array.isArray(input)
-      ? (input as { maker?: unknown }).maker
-      : undefined;
+  const isObject =
+    input !== null && typeof input === "object" && !Array.isArray(input);
+  const list: unknown = Array.isArray(input)
+    ? input
+    : isObject && "products" in input
+      ? (input as { products: unknown }).products
+      : isObject
+        ? [input]
+        : null;
+  if (!Array.isArray(list) || list.length === 0) {
+    return {
+      ok: false,
+      errors: [
+        "No products found: a package is one product, a list of them, or { maker, products: [...] }.",
+      ],
+    };
+  }
+
   let brand: BrandKit | undefined;
+  let brandErrors: string[] = [];
+  const block = isObject ? (input as { maker?: unknown }).maker : undefined;
   if (block !== undefined) {
     const kit = BrandKit.safeParse(block);
-    if (!kit.success) {
-      return {
-        ok: false,
-        errors: format(kit.error.issues, "maker").slice(0, MAX_ERRORS),
-      };
+    if (kit.success) brand = kit.data;
+    else brandErrors = issuesWords(kit.error.issues, block);
+  }
+
+  const products: Product[] = [];
+  const rejected: RejectedProduct[] = [];
+  const seen = new Set<string>();
+  list.forEach((raw, index) => {
+    const parsed = Product.safeParse(raw);
+    if (!parsed.success) {
+      rejected.push({
+        label: label(raw, index),
+        errors: issuesWords(parsed.error.issues, raw),
+      });
+      return;
     }
-    brand = kit.data;
-  }
-  const [list, prefix] = Array.isArray(input)
-    ? [input, ""]
-    : input !== null && typeof input === "object" && "products" in input
-      ? [(input as { products: unknown }).products, "products"]
-      : [[input], ""];
-  const parsed = z.array(Product).min(1).safeParse(list);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      errors: format(parsed.error.issues, prefix).slice(0, MAX_ERRORS),
-    };
-  }
-  const skus = parsed.data.map((p) => p.sku);
-  const repeated = skus.filter((sku, i) => skus.indexOf(sku) !== i);
-  if (repeated.length > 0) {
-    return {
-      ok: false,
-      errors: [...new Set(repeated)].map((sku) => `sku "${sku}" appears twice`),
-    };
-  }
-  const defaults = unknownDefaultColours(parsed.data);
-  if (defaults.length > 0) {
-    return { ok: false, errors: defaults.slice(0, MAX_ERRORS) };
-  }
-  return { ok: true, products: parsed.data, ...(brand ? { brand } : {}) };
+    const product = parsed.data;
+    const keys = product.colours.map((c) => c.key);
+    // A typo in the default colour would import and only fail later, when a
+    // frame or a scene needs it.
+    const errors = seen.has(product.sku)
+      ? [`sku "${product.sku}" appears earlier in the package`]
+      : keys.includes(product.defaultColour)
+        ? []
+        : [
+            `defaultColour "${product.defaultColour}" is not one of its colours (${keys.join(", ")})`,
+          ];
+    if (errors.length > 0) {
+      rejected.push({ label: label(raw, index), errors });
+      return;
+    }
+    seen.add(product.sku);
+    products.push(product);
+  });
+
+  return {
+    ok: true,
+    products,
+    rejected,
+    ...(brand ? { brand } : {}),
+    brandErrors,
+  };
 }

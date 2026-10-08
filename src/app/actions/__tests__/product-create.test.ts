@@ -4,14 +4,29 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const upsertProducts = vi.fn(async (products: { sku: string }[]) =>
   products.map((p) => ({ ...p, id: `db-${p.sku}` })),
 );
-const storeAsset = vi.fn(async (_bytes: Uint8Array, mime: string) =>
-  mime === "image/svg+xml"
-    ? "http://storage.test/products/d.svg"
-    : "http://storage.test/products/p.png",
+const storeAsset = vi.fn(
+  async (
+    _bytes: Uint8Array,
+    mime: string,
+    _prefix?: string,
+    _options?: { byContent?: boolean },
+  ) =>
+    mime === "image/svg+xml"
+      ? "http://storage.test/products/d.svg"
+      : "http://storage.test/products/p.png",
+);
+
+const importCatalog = vi.fn(async (products: { sku: string }[]) =>
+  products.map((p) => ({
+    product: { ...p, id: `db-${p.sku}` },
+    status: "new",
+    changed: [],
+  })),
 );
 
 vi.mock("@/server/product-repository", () => ({
   upsertProducts,
+  importCatalog,
   listProducts: async () => [],
 }));
 vi.mock("@/providers/asset-bytes", async (importOriginal) => ({
@@ -181,10 +196,15 @@ describe("importProductsAction", () => {
       },
     };
     const result = await importProductsAction(product);
-    expect(result.ok).toBe(true);
-    expect(upsertProducts.mock.calls[0][0][0]).toMatchObject({
+    expect(result).toMatchObject({
+      rejected: [],
+      imported: [{ status: "new" }],
+    });
+    expect(importCatalog.mock.calls[0][0][0]).toMatchObject({
       source: { kind: "photo", assetUrl: "http://storage.test/products/p.png" },
     });
+    // Named by its bytes: the same photo re-imported keeps one URL.
+    expect(storeAsset.mock.calls.at(-1)?.[3]).toEqual({ byContent: true });
   });
 });
 

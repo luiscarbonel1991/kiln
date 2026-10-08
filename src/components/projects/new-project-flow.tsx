@@ -155,18 +155,25 @@ export function NewProjectFlow({
         return;
       }
       const result = await importProductsAction(json);
-      if (!result.ok) {
-        setImportErrors(result.errors);
+      if ("error" in result) {
+        setImportErrors([result.error]);
         return;
       }
+      setImportErrors([
+        ...result.brandErrors.map((e) => `maker: ${e}`),
+        ...result.rejected.flatMap((r) =>
+          r.errors.map((e) => `${r.label} — ${e}`),
+        ),
+      ]);
+      const imported = result.imported.map((i) => i.product);
       setProducts((current) => {
         const byId = new Map(current.map((p) => [p.id, p]));
-        for (const p of result.products) byId.set(p.id, p);
+        for (const p of imported) byId.set(p.id, p);
         return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
       });
-      setProductId(result.products[0]?.id ?? null);
+      if (imported[0]) setProductId(imported[0].id);
       if (result.brand) setBrand(result.brand);
-      setImportWarnings(result.warnings ?? []);
+      setImportWarnings(result.warnings);
     } catch {
       setImportErrors(["The import failed. Is the database running?"]);
     } finally {

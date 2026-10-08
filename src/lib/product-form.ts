@@ -187,15 +187,3 @@ export function svgColours(svg: string, max = 6): string[] {
     .slice(0, max)
     .map(([hex]) => hex);
 }
-
-// A product package's default colour must be one of its colours: a typo would
-// import and only fail later, when a frame or a scene needs it.
-export function unknownDefaultColours(products: Product[]): string[] {
-  return products.flatMap((p) =>
-    p.colours.some((c) => c.key === p.defaultColour)
-      ? []
-      : [
-          `sku "${p.sku}": defaultColour "${p.defaultColour}" is not one of its colours (${p.colours.map((c) => c.key).join(", ")})`,
-        ],
-  );
-}

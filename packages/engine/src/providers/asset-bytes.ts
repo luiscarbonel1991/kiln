@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getStorageProvider } from "@/providers/storage";
 import { env } from "../env";
 
@@ -130,14 +130,20 @@ const EXTENSION: Record<string, string> = {
 };
 
 // Store generated output bytes in object storage; returns a durable public URL.
+// `byContent` names the file after its bytes, so the same bytes stored twice
+// keep one URL (a product's photo re-imported is not a new photo).
 export async function storeAsset(
   bytes: Uint8Array,
   mime: string,
   prefix: string,
+  options: { byContent?: boolean } = {},
 ): Promise<string> {
   const ext = EXTENSION[mime] ?? "bin";
+  const name = options.byContent
+    ? createHash("sha256").update(bytes).digest("hex").slice(0, 32)
+    : randomUUID();
   const { url } = await getStorageProvider().put({
-    key: `${prefix}/${randomUUID()}.${ext}`,
+    key: `${prefix}/${name}.${ext}`,
     body: bytes,
     contentType: mime,
   });

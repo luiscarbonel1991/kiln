@@ -31,7 +31,7 @@ describe.skipIf(!enabled)("maker brand kit (database)", async () => {
         },
       ],
     });
-    expect(result.ok).toBe(true);
+    expect(result).toMatchObject({ rejected: [], brandErrors: [] });
     expect(await repo.getMakerBrand()).toEqual({
       palette: ["#2F4A3A"],
       handle: "brandtest",
@@ -63,15 +63,16 @@ describe.skipIf(!enabled)("maker brand kit (database)", async () => {
       vector("OT-01", 4, 4),
       vector("OT-02", 5, 3),
     ]);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const [fits, off] = result.products;
+    if ("error" in result) throw new Error(result.error);
+    const [fits, off] = result.imported.map((i) => i.product);
     expect(fits.source).toMatchObject({
       outlineBox: { x: 0.025, y: 0.025, w: 0.95, h: 0.95 },
     });
     expect(off.source).not.toHaveProperty("outlineBox");
     expect(result.warnings).toEqual([
-      expect.stringContaining('sku "OT-02": its SVG\'s drawing is 1.00:1'),
+      expect.stringContaining(
+        '"OT-02" Outline test coaster: its SVG\'s drawing is 1.00:1',
+      ),
     ]);
     const maker = await repo.getCurrentMaker();
     await db.product.deleteMany({

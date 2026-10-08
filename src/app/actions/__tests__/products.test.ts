@@ -17,7 +17,7 @@ const product = (source: unknown) => ({
 });
 
 describe("importProductsAction", () => {
-  it("refuses a package whose asset lives where Kiln does not fetch, before saving anything", async () => {
+  it("sets aside a product whose asset lives where Kiln does not fetch, before saving anything", async () => {
     const result = await importProductsAction({
       products: [
         product({
@@ -26,8 +26,9 @@ describe("importProductsAction", () => {
         }),
       ],
     });
-    expect(result.ok).toBe(false);
-    expect(!result.ok && result.errors[0]).toContain('sku "AS-01"');
-    expect(!result.ok && result.errors[0]).toContain("KILN_ASSET_ORIGINS");
+    if ("error" in result) throw new Error(result.error);
+    expect(result.imported).toEqual([]);
+    expect(result.rejected[0].label).toBe('"AS-01" Asset test coaster');
+    expect(result.rejected[0].errors[0]).toContain("KILN_ASSET_ORIGINS");
   });
 });
