@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import pkg from "@/lib/__fixtures__/product-package.json";
-import { parseProductPackage } from "@/lib/product-package";
+import { packageJsonSchema, parseProductPackage } from "@/lib/product-package";
 
 const [board] = pkg.products;
 
@@ -104,5 +104,25 @@ describe("parseProductPackage", () => {
     expect(JSON.stringify(pkg).toLowerCase()).not.toMatch(
       /maker1|\bsigns?\b|acrylic/,
     );
+  });
+
+  it("publishes its limits as a JSON Schema, generated from the same schema", () => {
+    const schema = packageJsonSchema() as {
+      properties: {
+        products: {
+          items: {
+            required: string[];
+            properties: Record<string, Record<string, unknown>>;
+          };
+        };
+      };
+    };
+    const item = schema.properties.products.items;
+    expect(item.required).toContain("defaultColour");
+    expect(item.properties.hook).toMatchObject({ maxLength: 80 });
+    const colours = item.properties.colours as {
+      items: { properties: Record<string, unknown> };
+    };
+    expect(colours.items.properties.inlayName).toMatchObject({ maxLength: 40 });
   });
 });

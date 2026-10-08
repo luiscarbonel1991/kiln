@@ -11,8 +11,21 @@
       "material": "solid hardwood",
       "treatment": "engraved",
       "colours": [
-        { "key": "walnut", "name": "Walnut", "face": "#5B3A29" },
-        { "key": "maple", "name": "Maple", "face": "#E3C9A0" }
+        {
+          "key": "walnut",
+          "name": "Walnut",
+          "face": "#5B3A29",
+          "inlay": "#E9D9BE",
+          "inlayName": "pale engraved wood"
+        },
+        {
+          "key": "maple",
+          "name": "Maple",
+          "face": "#E3C9A0",
+          "inlay": "#6B4A2E",
+          "inlayName": "warm brown engraved wood",
+          "inStock": false
+        }
       ],
       "defaultColour": "walnut",
       "typography": { "family": "Fraunces" },

@@ -1,19 +1,16 @@
 "use client";
 
-import {
-  ArrowRight,
-  Download,
-  Eye,
-  EyeOff,
-  FileUp,
-  Loader2,
-  Plus,
-} from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { createProjectAction } from "@/app/actions/new-project";
 import { importProductsAction } from "@/app/actions/products";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
+import {
+  ImportCatalogCard,
+  type ImportOutcome,
+  ImportResultPanel,
+} from "@/components/projects/import-catalog";
 import { NewProductForm } from "@/components/projects/new-product-form";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
@@ -93,12 +90,14 @@ export function NewProjectFlow({
   const [destinationIds, setDestinationIds] = useState<string[]>([]);
   // Slot card ids ("etsy.gift") the maker switched off for this product.
   const [offSlots, setOffSlots] = useState<string[]>([]);
-  const [importErrors, setImportErrors] = useState<string[]>([]);
-  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [importOutcome, setImportOutcome] = useState<ImportOutcome | null>(
+    null,
+  );
+  // A note from saving the new-product form (its drawing off its size).
+  const [createdNote, setCreatedNote] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [starting, startTransition] = useTransition();
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const product = products.find((p) => p.id === productId) ?? null;
   const offered = type ? offeredDestinations(type, CATALOG) : [];
@@ -142,29 +141,23 @@ export function NewProjectFlow({
     );
   }
 
-  async function importFile(file: File) {
+  async function importText(text: string, from: string) {
     setImporting(true);
-    setImportErrors([]);
-    setImportWarnings([]);
+    setImportOutcome(null);
+    setCreatedNote(null);
     try {
       let json: unknown;
       try {
-        json = JSON.parse(await file.text());
-      } catch {
-        setImportErrors([`${file.name} is not valid JSON.`]);
+        json = JSON.parse(text);
+      } catch (error) {
+        setImportOutcome({
+          error: `${from} is not valid JSON (${(error as Error).message}).`,
+        });
         return;
       }
       const result = await importProductsAction(json);
-      if ("error" in result) {
-        setImportErrors([result.error]);
-        return;
-      }
-      setImportErrors([
-        ...result.brandErrors.map((e) => `maker: ${e}`),
-        ...result.rejected.flatMap((r) =>
-          r.errors.map((e) => `${r.label} — ${e}`),
-        ),
-      ]);
+      setImportOutcome(result);
+      if ("error" in result) return;
       const imported = result.imported.map((i) => i.product);
       setProducts((current) => {
         const byId = new Map(current.map((p) => [p.id, p]));
@@ -173,12 +166,12 @@ export function NewProjectFlow({
       });
       if (imported[0]) setProductId(imported[0].id);
       if (result.brand) setBrand(result.brand);
-      setImportWarnings(result.warnings);
-    } catch {
-      setImportErrors(["The import failed. Is the database running?"]);
+    } catch (error) {
+      setImportOutcome({
+        error: `The import failed: ${(error as Error).message}`,
+      });
     } finally {
       setImporting(false);
-      if (fileInput.current) fileInput.current.value = "";
     }
   }
 
@@ -215,6 +208,12 @@ export function NewProjectFlow({
         <p className="-mt-2 font-sans text-[0.8125rem] text-on-surface-mid">
           Pick a product, add a new one, or import your catalog.
         </p>
+        {importOutcome ? (
+          <ImportResultPanel
+            outcome={importOutcome}
+            onDismiss={() => setImportOutcome(null)}
+          />
+        ) : null}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {creating ? (
             <NewProductForm
@@ -228,8 +227,8 @@ export function NewProjectFlow({
                   ),
                 );
                 setProductId(created.id);
-                setImportErrors([]);
-                setImportWarnings(warning ? [warning] : []);
+                setImportOutcome(null);
+                setCreatedNote(warning ?? null);
                 setCreating(false);
               }}
               onCancel={() => setCreating(false)}
@@ -286,54 +285,12 @@ export function NewProjectFlow({
               </span>
             </button>
           )}
-          <div className="flex flex-col justify-center gap-2 rounded-card border border-dashed border-border bg-card/60 p-5">
-            <input
-              ref={fileInput}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void importFile(file);
-              }}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={importing}
-              onClick={() => fileInput.current?.click()}
-              className="self-start"
-            >
-              {importing ? <Loader2 className="animate-spin" /> : <FileUp />}
-              Import a catalog (.json)
-            </Button>
-            <p className="font-sans text-[0.75rem] leading-snug text-on-surface-mid">
-              For products exported from your own system. Each one needs a name,
-              its size, material, finish and colours; re-importing a SKU updates
-              it.
-            </p>
-            <a
-              href="/templates/product-package.json"
-              download="kiln-product-template.json"
-              className="inline-flex items-center gap-1 self-start font-sans text-[0.75rem] font-semibold text-primary hover:underline"
-            >
-              <Download className="size-3" /> Download the template
-            </a>
-          </div>
+          <ImportCatalogCard importing={importing} onImport={importText} />
         </div>
-        {importErrors.length > 0 ? (
-          <ul className="mt-3 flex flex-col gap-1 rounded-field bg-prov-local/10 px-4 py-3 font-mono text-[0.7rem] text-prov-local">
-            {importErrors.map((e) => (
-              <li key={e}>{e}</li>
-            ))}
-          </ul>
-        ) : null}
-        {importWarnings.length > 0 ? (
-          <ul className="mt-3 flex flex-col gap-1 rounded-field bg-surface-soft px-4 py-3 font-mono text-[0.7rem] text-on-surface-mid">
-            {importWarnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
+        {createdNote ? (
+          <p className="mt-3 rounded-field bg-surface-soft px-4 py-3 font-mono text-[0.7rem] text-on-surface-mid">
+            {createdNote}
+          </p>
         ) : null}
       </Step>
 

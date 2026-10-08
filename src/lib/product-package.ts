@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import { BrandKit } from "@/domain/brand";
 import { Product } from "@/domain/product";
 
@@ -29,6 +29,22 @@ export type PackageResult =
     }
   // Nothing in it reads as a package (no products at all).
   | { ok: false; errors: string[] };
+
+// The package as documented ({ maker?, products }), for its JSON Schema: the
+// limits (maxLength, maxItems) are the ones the import checks, never a copy.
+const PackageShape = z.object({
+  maker: BrandKit.optional(),
+  products: z.array(Product).min(1),
+});
+
+export function packageJsonSchema(): Record<string, unknown> {
+  return {
+    ...z.toJSONSchema(PackageShape, { io: "input", unrepresentable: "any" }),
+    title: "Kiln product package",
+    description:
+      "One product, a list of them, or { maker, products }. Example: /templates/product-package.json.",
+  };
+}
 
 type Key = PropertyKey;
 
