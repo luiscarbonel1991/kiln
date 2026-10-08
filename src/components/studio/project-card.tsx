@@ -28,12 +28,15 @@ export function ProjectCard({
   onDelete,
   onRename,
   disabled,
+  detail,
 }: {
   summary: ProjectSummary;
   onOpen: () => void;
   onDelete: () => void;
   onRename: (name: string) => void;
   disabled: boolean;
+  // A line under the meta (Home: what the project kept and spent).
+  detail?: string;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -102,6 +105,11 @@ export function ProjectCard({
             {formatRelativeTime(summary.updatedAt)} · {summary.cardCount} card
             {summary.cardCount === 1 ? "" : "s"}
           </p>
+          {detail ? (
+            <p className="pt-1 font-mono text-[0.625rem] text-on-surface-mid">
+              {detail}
+            </p>
+          ) : null}
         </div>
       </button>
 

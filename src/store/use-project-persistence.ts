@@ -20,10 +20,13 @@ const AUTOSAVE_DEBOUNCE_MS = 1000;
 export function useProjectPersistence({
   fresh = false,
   projectId,
+  openId,
 }: {
   fresh?: boolean;
   // Bound to one project (the editor of a planned project's slot).
   projectId?: string;
+  // A studio project to open instead of the latest (from Home).
+  openId?: string;
 } = {}): { status: PersistenceStatus; missing: boolean } {
   const [status, setStatus] = useState<PersistenceStatus>("idle");
   const [missing, setMissing] = useState(false);
@@ -56,7 +59,8 @@ export function useProjectPersistence({
     };
   }, [projectId]);
 
-  // Restore the latest saved project once, only when the store is fresh.
+  // Restore the latest saved project once, only when the store is fresh; or
+  // open the one Home asked for.
   useEffect(() => {
     if (projectId || restored.current) return;
     restored.current = true;
@@ -67,16 +71,23 @@ export function useProjectPersistence({
       return;
     }
     const state = useProject.getState();
-    if (state.phase !== "upload" || state.master || state.projectId) return;
+    if (openId) {
+      if (state.projectId === openId) return;
+      useProject.getState().reset();
+    } else if (state.phase !== "upload" || state.master || state.projectId) {
+      return;
+    }
 
     let active = true;
     setStatus("restoring");
     listProjectsAction()
       .then(async (rows) => {
         // Planned projects open on their board, not in the studio.
-        const latest = rows.find((row) => !row.planned);
-        if (active && latest) {
-          const record = await loadProjectAction(latest.id);
+        const target = openId
+          ? rows.find((row) => row.id === openId && !row.planned)
+          : rows.find((row) => !row.planned);
+        if (active && target) {
+          const record = await loadProjectAction(target.id);
           if (active && record) useProject.getState().hydrate(record);
         }
         if (active) setStatus("idle");
@@ -87,7 +98,7 @@ export function useProjectPersistence({
     return () => {
       active = false;
     };
-  }, [fresh, projectId]);
+  }, [fresh, projectId, openId]);
 
   // Debounced autosave on any store change, once there is a master to persist.
   // On unmount a pending save is flushed, not dropped, so leaving the editor

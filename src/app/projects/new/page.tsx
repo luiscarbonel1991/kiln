@@ -9,14 +9,15 @@ import { listProducts } from "@/server/product-repository";
 // New project (ROADMAP screen 2): product -> type -> destinations -> plan ->
 // Start. Rendered per request (it reads the maker's products and defaults).
 // `?design=` hands over a stored design from the studio ("Make it a
-// product"): the new-product form opens with it.
+// product"): the new-product form opens with it. `?product=` (Home) picks a
+// product.
 export default async function NewProjectPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   await connection();
-  const { design } = await searchParams;
+  const { design, product } = await searchParams;
   const initialDesign =
     typeof design === "string" ? await describeStoredSvg(design) : null;
   const products = await listProducts();
@@ -32,6 +33,11 @@ export default async function NewProjectPage({
         makerModels={models}
         draftPrice={draft === null ? null : `≈ $${draft.toFixed(2)}`}
         initialDesign={initialDesign}
+        initialProductId={
+          typeof product === "string" && products.some((p) => p.id === product)
+            ? product
+            : null
+        }
       />
     </div>
   );

@@ -527,7 +527,7 @@ export function NewProductForm({
         </Button>
         <span className="font-sans text-[0.75rem] text-on-surface-mid">
           Only an idea so far?{" "}
-          <Link href="/?new=1" className="font-semibold text-primary">
+          <Link href="/studio?new=1" className="font-semibold text-primary">
             Draw it first
           </Link>
           , then make the design a product.

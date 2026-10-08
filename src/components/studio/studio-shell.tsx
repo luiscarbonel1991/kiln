@@ -18,11 +18,14 @@ import { useProjectPersistence } from "@/store/use-project-persistence";
 export function StudioShell({
   fresh = false,
   projectId,
+  openId,
   focusCardId,
   makerModels,
 }: {
   fresh?: boolean;
   projectId?: string;
+  // A studio project opened from Home (else the latest is restored).
+  openId?: string;
   focusCardId?: string;
   makerModels: MakerModels;
 }) {
@@ -32,7 +35,11 @@ export function StudioShell({
   const master = useProject((s) => s.master);
   const loadedId = useProject((s) => s.projectId);
   const reset = useProject((s) => s.reset);
-  const { status, missing } = useProjectPersistence({ fresh, projectId });
+  const { status, missing } = useProjectPersistence({
+    fresh,
+    projectId,
+    openId,
+  });
   useGenerationSync(projectId, loadedId === projectId);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const boardHref = projectId ? `/projects/${projectId}` : undefined;
@@ -86,7 +93,7 @@ function ProjectEditor({
 }) {
   if (missing) {
     return (
-      <Notice text="This project could not be found." href="/" link="Studio" />
+      <Notice text="This project could not be found." href="/" link="Home" />
     );
   }
   if (!ready) {

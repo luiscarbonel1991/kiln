@@ -68,6 +68,7 @@ export function NewProjectFlow({
   makerModels,
   draftPrice,
   initialDesign,
+  initialProductId = null,
 }: {
   initialProducts: Product[];
   initialBrand: BrandKit | null;
@@ -75,6 +76,8 @@ export function NewProjectFlow({
   draftPrice: string | null;
   // A design handed over from the studio ("Make it a product").
   initialDesign: StoredProductFile | null;
+  // A product picked on Home.
+  initialProductId?: string | null;
 }) {
   const [products, setProducts] = useState(initialProducts);
   // The new-product form: open from the start for a maker with no products
@@ -84,7 +87,8 @@ export function NewProjectFlow({
   );
   const [brand, setBrand] = useState(initialBrand);
   const [productId, setProductId] = useState<string | null>(
-    initialProducts.length === 1 ? initialProducts[0].id : null,
+    initialProductId ??
+      (initialProducts.length === 1 ? initialProducts[0].id : null),
   );
   const [type, setType] = useState<BoardType | null>(null);
   const [destinationIds, setDestinationIds] = useState<string[]>([]);
@@ -301,7 +305,7 @@ export function NewProjectFlow({
             t.type === "design" ? (
               <Link
                 key={t.type}
-                href="/?new=1"
+                href="/studio?new=1"
                 className="flex flex-col gap-1.5 rounded-card bg-card/60 p-5 shadow-card hover:ring-1 hover:ring-border"
               >
                 <span className="font-serif text-lg italic text-foreground">
