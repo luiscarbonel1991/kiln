@@ -57,10 +57,7 @@ export function ProductChangedBanner({
   ownPrompts: string[];
 }) {
   return (
-    <div
-      role="status"
-      className="flex flex-col gap-3 rounded-card bg-prov-brand/10 p-5"
-    >
+    <div className="flex flex-col gap-3 rounded-card bg-prov-brand/10 p-5">
       <div className="flex flex-col gap-1">
         <p className="font-sans text-sm font-semibold text-foreground">
           This product changed since this project started
