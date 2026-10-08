@@ -6,6 +6,7 @@ import {
   cancelBatchAction,
   enqueueGenerationAction,
 } from "@/app/actions/generation";
+import { UpdateProjectButton } from "@/components/projects/product-changed";
 import { Button } from "@/components/ui/button";
 import { canAfford, fromMicros } from "@/domain/generation-cost";
 import type { BatchProgress, Budget } from "@/server/generation-repository";
@@ -36,6 +37,9 @@ export interface BatchEstimate {
   warnings: string[];
 }
 
+const STALE_LINE =
+  "The product changed since this project started: these scenes would show its earlier version. Update the project first (free)?";
+
 const range = (typical: number, max: number) =>
   money(typical) === money(max)
     ? money(max)
@@ -54,6 +58,7 @@ export function GenerationPanel({
   batch,
   budget,
   mode,
+  staleProduct = false,
 }: {
   projectId: string;
   cardIds: string[];
@@ -61,6 +66,9 @@ export function GenerationPanel({
   batch: BatchProgress | null;
   budget: Budget;
   mode: "live" | "mock";
+  // The product changed since the project was built: these scenes would show
+  // the earlier version. Said, never blocked (Luis, 2026-10-08).
+  staleProduct?: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +163,11 @@ export function GenerationPanel({
           No scene is waiting.
         </p>
       )}
+      {staleProduct && estimate && estimate.count > 0 ? (
+        <p className="font-mono text-[0.65rem] leading-snug text-prov-brand">
+          {STALE_LINE}
+        </p>
+      ) : null}
       {estimate && estimate.warnings.length > 0
         ? estimate.warnings.map((w) => (
             <p
@@ -238,6 +251,18 @@ export function GenerationPanel({
               you can leave this page. The cost is measured from what each
               provider reports.
             </p>
+            {staleProduct ? (
+              <div className="flex flex-col gap-2 rounded-field bg-prov-brand/10 px-3 py-2.5">
+                <p className="font-sans text-[0.78rem] leading-snug text-foreground">
+                  {STALE_LINE}
+                </p>
+                <UpdateProjectButton
+                  projectId={projectId}
+                  size="xs"
+                  onUpdated={() => setConfirming(false)}
+                />
+              </div>
+            ) : null}
             {estimate.warnings.map((w) => (
               <p key={w} className="font-mono text-[0.7rem] text-prov-local">
                 {w}

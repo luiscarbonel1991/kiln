@@ -17,6 +17,7 @@ import {
   GenerationPanel,
 } from "@/components/projects/generation-panel";
 import { GenerationPoller } from "@/components/projects/generation-poller";
+import { ProductChangedBanner } from "@/components/projects/product-changed";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
   onIndexes,
@@ -57,6 +58,7 @@ import { plateHref } from "@/lib/plate-href";
 import { projectTypeLabel } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
 import type { BatchProgress, Budget } from "@/server/generation-repository";
+import type { ProductDrift } from "@/server/product-version";
 import type { ProjectBoard as Board } from "@/server/project-mapper";
 
 interface BoardSlot {
@@ -141,6 +143,9 @@ export function ProjectBoard({
   mode,
   brand,
   notes,
+  drift,
+  earlier,
+  ownPrompts,
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -153,9 +158,18 @@ export function ProjectBoard({
   // Each provider's health (free to read): the pickers mark a provider with
   // no key or a failed last call.
   notes: ProviderNote[];
+  // Whether the product changed since the project was built from it.
+  drift: ProductDrift | null;
+  // Cards whose current output shows an earlier version of the product.
+  earlier: string[];
+  // Cards that run their own prompt (they do not follow the product).
+  ownPrompts: string[];
 }) {
   const rows = boardRows(board, jobs);
   const waiting = waitingCardIds(rows);
+  const labelOf = new Map(
+    rows.flatMap((r) => r.slots.map((s) => [s.cardId, s.slot.label] as const)),
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-[1320px] flex-col gap-8 px-6 py-8 sm:px-8 lg:flex-row">
@@ -175,6 +189,14 @@ export function ProjectBoard({
             {product.material}
           </p>
         </div>
+
+        {drift?.stale ? (
+          <ProductChangedBanner
+            projectId={projectId}
+            changed={drift.changed}
+            ownPrompts={ownPrompts.map((id) => labelOf.get(id) ?? id)}
+          />
+        ) : null}
 
         {rows.map(({ plan, destination, slots }) => {
           if (!destination) {
@@ -256,6 +278,11 @@ export function ProjectBoard({
                           : slot.aspect
                       }
                       view={view}
+                      mark={
+                        earlier.includes(cardId)
+                          ? "earlier version of the product"
+                          : undefined
+                      }
                       actions={
                         <SlotActions
                           projectId={projectId}
@@ -376,6 +403,7 @@ export function ProjectBoard({
             batch={generation.batch}
             budget={generation.budget}
             mode={mode}
+            staleProduct={drift?.stale === true}
           />
         ) : null}
 
@@ -386,6 +414,9 @@ export function ProjectBoard({
           const on = slots.filter((s) => !s.slot.off);
           const scenes = on.filter((s) => s.slot.fill === "scene").length;
           const done = count("exact") + count("approved") + count("delivered");
+          const approvedEarlier = on.filter(
+            (s) => s.slot.approvedOutput && earlier.includes(s.cardId),
+          ).length;
           return (
             <div
               key={plan.destinationId}
@@ -421,6 +452,14 @@ export function ProjectBoard({
                   {count("queued") + count("generating") + count("retrying")}{" "}
                   waiting or in progress
                 </li>
+                {approvedEarlier > 0 ? (
+                  <li className="text-prov-brand">
+                    {approvedEarlier === 1
+                      ? "1 approved scene shows"
+                      : `${approvedEarlier} approved scenes show`}{" "}
+                    an earlier version of the product
+                  </li>
+                ) : null}
               </ul>
               <DeliverButton
                 projectId={projectId}

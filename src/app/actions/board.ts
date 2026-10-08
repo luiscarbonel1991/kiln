@@ -15,13 +15,16 @@ import {
 import { SlotMove } from "@/domain/plan";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { VideoChoice } from "@/domain/video";
+import { refreshCards } from "@/lib/project-refresh";
 import { slotCards, videoSlotCard } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { getStorageProvider } from "@/providers/registry";
 import { getMakerModels } from "@/server/maker-repository";
+import { productReference } from "@/server/product-reference";
 import {
   addVideoToPlan,
   loadProjectBoard,
+  refreshProjectProduct,
   setCardModel,
   setProjectReference,
   setSlotApproval,
@@ -111,6 +114,52 @@ export async function addReferenceAction(formData: FormData): Promise<void> {
         )
       : [];
   await setProjectReference(projectId, master, cards);
+  refresh();
+}
+
+// "Product changed — update the project": the project follows its product's
+// current version. Free (no model call: a vector product's plate renders
+// locally). The maker's own card edits are kept; outputs and approvals stay,
+// and the board marks scenes made from the earlier version.
+export async function updateProjectProductAction(
+  input: unknown,
+): Promise<{ error: string } | undefined> {
+  const { projectId } = z.object({ projectId: z.string().min(1) }).parse(input);
+  const loaded = await loadProjectBoard(projectId);
+  if (!loaded?.board.plan || !loaded.product) {
+    return { error: "Only a planned project with a product can be updated." };
+  }
+  const { board, product } = loaded;
+  const plan = board.plan;
+  if (!plan) return { error: "This project has no plan to update." };
+  try {
+    const understanding = productUnderstanding(product);
+    const fresh = await productReference(product);
+    const master = fresh ?? board.master;
+    const cards = master
+      ? refreshCards(
+          board.cards,
+          slotCards(
+            plan,
+            master,
+            understanding,
+            product,
+            await getMakerModels(),
+          ),
+          master.id,
+        )
+      : board.cards;
+    await refreshProjectProduct(projectId, {
+      product,
+      understanding,
+      master: fresh,
+      cards,
+    });
+  } catch (error) {
+    return {
+      error: `The project could not be updated: ${(error as Error).message}`,
+    };
+  }
   refresh();
 }
 

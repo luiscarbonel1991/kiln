@@ -661,6 +661,26 @@ export interface OutputSource {
   resolution?: string;
 }
 
+// The product version each of these outputs was made from (the job that
+// finished with it): null for a job from before versions were kept; an output
+// no job made (a studio edit) is absent.
+export async function outputVersions(
+  projectId: string,
+  outputs: string[],
+): Promise<Map<string, string | null>> {
+  assertDatabaseUrl();
+  if (outputs.length === 0) return new Map();
+  const jobs = await db.generationJob.findMany({
+    where: { projectId, status: "done", outputUrl: { in: outputs } },
+    select: { outputUrl: true, productHash: true },
+  });
+  return new Map(
+    jobs.flatMap((job) =>
+      job.outputUrl ? [[job.outputUrl, job.productHash] as const] : [],
+    ),
+  );
+}
+
 // What produced each of these outputs: the queue job that finished with it
 // (its prompt, model and measured cost), for a delivery's manifest.
 export async function outputSources(

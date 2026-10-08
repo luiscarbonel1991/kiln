@@ -29,6 +29,7 @@ export function SlotFrame({
   view,
   children,
   actions,
+  mark,
 }: {
   position: string;
   label: string;
@@ -37,6 +38,8 @@ export function SlotFrame({
   view: SlotView;
   children: ReactNode;
   actions?: ReactNode;
+  // A note on what the render shows ("earlier version"), under its state.
+  mark?: string;
 }) {
   return (
     <figure className="row-span-2 grid min-w-0 grid-rows-subgrid gap-y-2">
@@ -56,6 +59,11 @@ export function SlotFrame({
           </span>
           <SlotStateBadge view={view} />
         </div>
+        {mark ? (
+          <span className="font-mono text-[0.59rem] text-prov-brand">
+            {mark}
+          </span>
+        ) : null}
         <span
           className="font-serif text-[0.95rem] italic leading-tight text-foreground"
           style={{ fontVariationSettings: "'opsz' 40" }}

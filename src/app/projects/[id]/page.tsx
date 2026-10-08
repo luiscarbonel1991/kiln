@@ -9,13 +9,16 @@ import {
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { modelLabel } from "@/domain/model-defaults";
 import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
+import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerMode } from "@/providers/mode";
 import { estimateProjectCards } from "@/server/generation-queue";
 import {
+  outputVersions,
   projectGenerationState,
   QueueRefusal,
 } from "@/server/generation-repository";
 import { getCurrentMaker, getMakerBrand } from "@/server/maker-repository";
+import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
 import { type ProviderHealth, providerHealth } from "@/server/provider-health";
 
@@ -91,7 +94,22 @@ export default async function ProjectBoardPage({
   const { id } = await params;
   const loaded = await loadProjectBoard(id);
   if (!loaded) notFound();
-  const { board, product } = loaded;
+  const { board, product, version } = loaded;
+  // Whether the product changed since the project was built from it, and the
+  // cards whose current output shows an earlier version.
+  const drift = product && version ? productDrift(product, version) : null;
+  const shown = board.cards.flatMap((c) => c.outputs.slice(0, 1));
+  const versions = version?.hash
+    ? await outputVersions(board.id, shown)
+    : new Map<string, string | null>();
+  const earlier = board.cards
+    .filter((c) => {
+      const output = c.outputs[0];
+      return (
+        output && versions.has(output) && versions.get(output) !== version?.hash
+      );
+    })
+    .map((c) => c.id);
   const maker = await getCurrentMaker();
   const generation = await projectGenerationState(maker.id, board.id);
   const brand = await getMakerBrand();
@@ -124,6 +142,9 @@ export default async function ProjectBoardPage({
           mode={providerMode()}
           brand={brand}
           notes={health}
+          drift={drift}
+          earlier={earlier}
+          ownPrompts={cardsWithOwnPrompt(board.cards)}
         />
       ) : (
         <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">

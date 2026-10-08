@@ -752,6 +752,60 @@ export async function setDelivered(
   });
 }
 
+// Bring a planned project up to its product's current version: the
+// understanding written from the product, the reference when Kiln makes one
+// (null keeps the maker's), each card's fields (refreshCards), and the version
+// the project now follows. Locked like approvals; one transaction.
+export async function refreshProjectProduct(
+  projectId: string,
+  input: {
+    product: Product;
+    understanding: BaseUnderstanding;
+    master: MasterAsset | null;
+    cards: Card[];
+  },
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    if (input.master) {
+      await tx.masterAsset.deleteMany({ where: { projectId } });
+      await tx.masterAsset.create({
+        data: masterData(projectId, masterToRow(input.master)),
+      });
+    }
+    for (const card of input.cards) {
+      await tx.card.update({
+        where: { projectId_cardId: { projectId, cardId: card.id } },
+        data: {
+          fields: card.fields as Prisma.InputJsonValue,
+          masterAssetId: card.masterAssetId,
+        },
+      });
+    }
+    await tx.project.update({
+      where: { id: projectId },
+      data: {
+        understanding: input.understanding as unknown as Prisma.InputJsonValue,
+      },
+    });
+    await tx.projectProduct.update({
+      where: {
+        projectId_productId: { projectId, productId: input.product.id },
+      },
+      data: {
+        productSnapshot: input.product as unknown as Prisma.InputJsonValue,
+        productHash: productHash(input.product),
+      },
+    });
+  });
+}
+
 // Set a planned project's reference image (the anchor every scene edits). The
 // first reference also creates the scene slots' draft cards; a later one only
 // re-points the existing cards at it. Locked like approvals.
