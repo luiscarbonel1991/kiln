@@ -16,6 +16,10 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+`/` is Home: the projects in progress (what each kept and spent), the products, and
+this month's spend with its cost per approved output. The image-first studio is at
+`/studio` (`?open=<id>` opens a studio project, `?new=1` starts empty).
+
 ## Database (Prisma Migrate)
 
 Local Postgres runs in Docker (`pnpm db:up`). The schema changes only through
@@ -83,9 +87,25 @@ imports a catalog:
   (priced, on a click).
 - **A design that does not exist yet:** draw it in the studio (Design: line art, then
   vectorize), then "Make it a product".
-- **Import a catalog (.json)** takes a product package exported from your own system.
-  Start from `public/templates/product-package.json` (the page has "Download the
-  template"). The schema is in `docs/app-idea/PRODUCT-MODEL.md`.
+- **Import a catalog (.json)** takes a product package exported from your own system,
+  as a file or pasted in ("Paste JSON": an assistant or a browser automation can type,
+  not attach). Start from `public/templates/product-package.json` ("Download the
+  template"). Every field and limit is in the JSON Schema served at
+  `/templates/product-package.schema.json`, generated from the engine's schema; the
+  model is in `docs/app-idea/PRODUCT-MODEL.md`.
+
+  Products are imported one by one. A product that does not pass is set aside with its
+  fields in words ("colours › oak › inlayName: at most 40 characters (this one has
+  52)"), and the others are saved. The result shows at the top of the page: new,
+  updated (with what changed), unchanged, set aside. Re-importing a SKU updates that
+  product in place. One whose content is the same is not written.
+
+A project remembers the version of its product it was built from. When the product
+changes, the board says what changed and offers "Update the project · free". The
+update rewrites the product's text and reference into the project and keeps the
+maker's own card edits. Scenes made from the earlier version are marked, and so are
+the generate confirmation and the Deliver checklist. Kiln never blocks Generate over
+this.
 
 ## Models and providers
 
@@ -140,11 +160,11 @@ prompt comes from the product's spec. The same rules hold on both providers:
 - A timeout or a failed render counts at its estimate.
 - A render is never paid twice.
 
-**Restart the dev server after changes to the worker or the queue.** The
-worker is a `globalThis` singleton started once from `src/instrumentation.ts`,
-so HMR never reloads it: it keeps running the code it started with. The same
-goes after a migration plus `prisma generate`, because a running server keeps
-the Prisma client it loaded (a new column reads as "Unknown field").
+The worker is a `globalThis` singleton started from `src/instrumentation.ts`.
+It restarts with the current code on the next enqueue after a code reload: it
+finishes the jobs it holds and takes no new one. **Restart the dev server
+after a migration plus `prisma generate`.** A running server keeps the Prisma
+client it loaded, so a new column reads as "Unknown field".
 
 ```bash
 pnpm db:mock:setup   # once (and after new migrations): the mock database
