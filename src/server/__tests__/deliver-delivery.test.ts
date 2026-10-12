@@ -133,7 +133,8 @@ const input = (overrides = {}) => ({
   ...overrides,
 });
 
-describe.skipIf(!hasMagick)("buildDelivery", () => {
+// Renders 2000 px frames and upscales with ImageMagick: slow on a busy machine.
+describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
   it("zips every slot switched on, in order, at the destination's pixel target", async () => {
     const result = await buildDelivery(input());
     expect(result.filename).toBe("botanical-coaster-launch-etsy.zip");

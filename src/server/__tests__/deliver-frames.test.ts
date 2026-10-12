@@ -80,7 +80,8 @@ const hasMagick = (() => {
   }
 })();
 
-describe.skipIf(!hasMagick)("scenes to files", () => {
+// Upscales with ImageMagick: slow on a busy machine.
+describe.skipIf(!hasMagick)("scenes to files", { timeout: 30_000 }, () => {
   it("cover-crops a 2:3 output to its 4:5 slot at 2000 x 2500", async () => {
     const source = execFileSync("magick", [
       "-size",
