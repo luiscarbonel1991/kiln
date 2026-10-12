@@ -50,7 +50,12 @@ import {
   type VideoSettings,
   videoSettings,
 } from "@/domain/plan";
-import { dimensionsLabel, type Product } from "@/domain/product";
+import {
+  colourOf,
+  defaultSwatch,
+  dimensionsLabel,
+  type Product,
+} from "@/domain/product";
 import type { JobView } from "@/domain/queue";
 import { VIDEO_MOTIONS } from "@/domain/video";
 import { isRenderableUrl } from "@/lib/asset-url";
@@ -171,6 +176,15 @@ export function ProjectBoard({
 }) {
   const rows = boardRows(board, jobs);
   const waiting = waitingCardIds(rows);
+  // The material sample scenes are made with (the default colour's).
+  const swatchUrl = defaultSwatch(product);
+  const sample =
+    swatchUrl && isRenderableUrl(swatchUrl)
+      ? {
+          url: swatchUrl,
+          name: colourOf(product, product.defaultColour).name,
+        }
+      : null;
   const labelOf = new Map(
     rows.flatMap((r) => r.slots.map((s) => [s.cardId, s.slot.label] as const)),
   );
@@ -400,6 +414,26 @@ export function ProjectBoard({
               <ReferenceUpload projectId={projectId} />
             </>
           )}
+          {sample ? (
+            <div className="flex items-center gap-3 border-t border-border-soft pt-3">
+              <div className="size-14 flex-shrink-0 overflow-hidden rounded-thumb bg-surface-soft shadow-render">
+                {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
+                <img
+                  src={sample.url}
+                  alt={`${sample.name} material sample`}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <p className="font-sans text-[0.75rem] leading-snug text-on-surface-mid">
+                <span className="font-semibold text-foreground">
+                  Material sample · {sample.name}
+                </span>
+                <br />
+                Every scene reads it after the reference: compare each scene's
+                surfaces with it.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {board.master ? (

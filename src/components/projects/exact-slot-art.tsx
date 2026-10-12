@@ -5,6 +5,7 @@ import {
   type ProductOutline,
   type ScaleReference,
 } from "@/domain/exact";
+import { isRenderableUrl } from "@/lib/asset-url";
 import type { PlateImage } from "@/lib/plate-href";
 
 // Draws an exact slot from its view model: plain SVG, no image model, the same
@@ -114,15 +115,37 @@ function ColourGrid({
       <Title text={view.title} />
       {view.swatches.map((s, i) => {
         const cell = layout.cells[i];
+        // A colour with a material sample shows the material itself (its
+        // photo, cropped to the square), not a flat fill.
+        const sample = isRenderableUrl(s.swatchUrl) ? s.swatchUrl : null;
+        const pattern = `swatch-${i}-${s.key}`;
         return (
           <g key={s.key} opacity={s.inStock ? 1 : 0.45}>
+            {sample ? (
+              <defs>
+                <pattern
+                  id={pattern}
+                  patternUnits="objectBoundingBox"
+                  patternContentUnits="objectBoundingBox"
+                  width={1}
+                  height={1}
+                >
+                  <image
+                    href={sample}
+                    width={1}
+                    height={1}
+                    preserveAspectRatio="xMidYMid slice"
+                  />
+                </pattern>
+              </defs>
+            ) : null}
             <rect
               x={cell.cx - swatch / 2}
               y={cell.swatchY}
               width={swatch}
               height={swatch}
               rx={Math.min(14, swatch / 5)}
-              fill={s.face}
+              fill={sample ? `url(#${pattern})` : s.face}
               stroke={INK.border}
               strokeWidth={1}
             />

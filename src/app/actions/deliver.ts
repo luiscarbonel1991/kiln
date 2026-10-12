@@ -49,9 +49,18 @@ export async function deliverAction(input: unknown): Promise<DeliverResult> {
     const plate = plateHref(loaded.product);
     const sources = await outputSources(projectId, outputs);
     const now = new Date();
+    // resvg fetches nothing: the colour sheet's material samples go inline.
+    const product = {
+      ...loaded.product,
+      colours: await Promise.all(
+        loaded.product.colours.map(async (c) =>
+          c.swatchUrl ? { ...c, swatchUrl: await dataUrl(c.swatchUrl) } : c,
+        ),
+      ),
+    };
     const result = await buildDelivery({
       projectName: loaded.board.name,
-      product: loaded.product,
+      product,
       brand: await getMakerBrand(),
       destination,
       plan,

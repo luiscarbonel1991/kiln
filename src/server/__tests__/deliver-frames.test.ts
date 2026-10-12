@@ -50,6 +50,38 @@ describe("exact frames to files", () => {
     });
   });
 
+  it("a colour with a material sample shows its photo, not a flat fill", () => {
+    const red = new Resvg(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="#ff0000"/></svg>`,
+    )
+      .render()
+      .asPng();
+    const sampled = {
+      ...board,
+      colours: board.colours.map((c, i) =>
+        i === 0
+          ? {
+              ...c,
+              swatchUrl: `data:image/png;base64,${Buffer.from(red).toString("base64")}`,
+            }
+          : c,
+      ),
+    };
+    const redPixels = (product: typeof board) => {
+      const svg = exactFrameSvg(exactView("colour-grid", product), "1:1", null);
+      const { pixels } = new Resvg(svg).render();
+      let n = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] > 200 && pixels[i + 1] < 60 && pixels[i + 2] < 60) n++;
+      }
+      return { svg, n };
+    };
+    const shown = redPixels(sampled);
+    expect(shown.svg).toContain("<pattern");
+    expect(shown.n).toBeGreaterThan(500);
+    expect(redPixels(board).n).toBe(0);
+  });
+
   it("names real fonts the vendored files provide", () => {
     const svg = exactFrameSvg(exactView("size-spec", coaster), "1:1", null);
     expect(svg).toContain("font-family:Fraunces");
