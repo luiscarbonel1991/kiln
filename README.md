@@ -100,6 +100,14 @@ imports a catalog:
   updated (with what changed), unchanged, set aside. Re-importing a SKU updates that
   product in place. One whose content is the same is not written.
 
+Each colour can carry a **material sample** (`swatchUrl`, or "Material photo" on the
+form). It is a close photo of the material in that colour, with even light and no text;
+a real photo carries the grain better than a drawn texture. Every scene sends the
+default colour's sample as the image after the product's reference, and the prompt
+says the surfaces take its material, colour and grain. On gpt-image-2 that adds about
+$0.009 per scene. The colour sheet shows each sample, and the board shows it beside
+the reference, so each scene can be checked by eye.
+
 A project remembers the version of its product it was built from. When the product
 changes, the board says what changed and offers "Update the project · free". The
 update rewrites the product's text and reference into the project and keeps the
@@ -151,7 +159,8 @@ video" all queue jobs that a worker in the server process runs (started from
 cap (`Maker.monthlyCapCents`, $25 by default), one cap for both providers;
 vision and art direction count too. A video animates a scene the maker
 approved (Veo, priced by the second: 8 s on Veo 3.1 Fast 720p = $0.80); its
-prompt comes from the product's spec. The same rules hold on both providers:
+prompt comes from the product's spec. It defaults to a static camera with a light
+change, which keeps the product exact; the push-in is a choice. The same rules hold on both providers:
 
 - The paid call is marked right before it goes out and is never retried by
   the SDK.
