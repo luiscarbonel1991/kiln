@@ -50,17 +50,28 @@ function sourceUrl(product: Product): string | null {
   return null;
 }
 
-// A product whose asset lives where Kiln will not fetch is refused at import,
-// not later when a plate or a scene needs it: the reason, or null.
+// A product whose assets live where Kiln will not fetch is refused at import,
+// not later when a plate or a scene needs them: the reason, or null. Its
+// source and each colour's material sample.
 function blockedAsset(product: Product): string | null {
-  const url = sourceUrl(product);
-  if (!url) return null;
-  try {
-    assertAllowedAssetUrl(url);
-    return null;
-  } catch (error) {
-    return (error as Error).message;
+  const source = sourceUrl(product);
+  const urls = [
+    ...(source ? [{ where: null, url: source }] : []),
+    ...product.colours.flatMap((c) =>
+      c.swatchUrl
+        ? [{ where: `colours › ${c.key} › swatchUrl`, url: c.swatchUrl }]
+        : [],
+    ),
+  ];
+  for (const { where, url } of urls) {
+    try {
+      assertAllowedAssetUrl(url);
+    } catch (error) {
+      const reason = (error as Error).message;
+      return where ? `${where}: ${reason}` : reason;
+    }
   }
+  return null;
 }
 
 // A vector product's outline, measured from its SVG (never taken from the
@@ -100,21 +111,44 @@ async function withOutline(
   }
 }
 
-// A photo given inline (a data: URL) is moved to Kiln's storage: a scene's
-// reference must be a stored image, as the New project page promises. Named
-// by its bytes, so re-importing the same photo keeps the product unchanged.
-async function withStoredPhoto(product: Product): Promise<Product> {
-  if (
-    product.source.kind !== "photo" ||
-    !product.source.assetUrl.startsWith("data:")
-  ) {
-    return product;
+const RASTER = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+// An image given inline (a data: URL) — the product's photo, a colour's
+// material sample — is moved to Kiln's storage: a scene's reference must be a
+// stored image, as the New project page promises. Named by its bytes, so
+// re-importing the same image keeps the product unchanged. A sample goes to
+// the image model, so it must be a photo, never an SVG.
+async function storedInline(url: string, what: string): Promise<string> {
+  if (!url.startsWith("data:")) return url;
+  const image = await fetchAsset(url);
+  if (!RASTER.has(image.mime)) {
+    throw new Error(`${what} must be a PNG, JPEG or WebP image`);
   }
-  const photo = await fetchAsset(product.source.assetUrl);
-  const assetUrl = await storeAsset(photo.bytes, photo.mime, "products", {
-    byContent: true,
-  });
-  return { ...product, source: { kind: "photo", assetUrl } };
+  return storeAsset(image.bytes, image.mime, "products", { byContent: true });
+}
+
+async function withStoredImages(product: Product): Promise<Product> {
+  const source =
+    product.source.kind === "photo"
+      ? {
+          kind: "photo" as const,
+          assetUrl: await storedInline(product.source.assetUrl, "its photo"),
+        }
+      : product.source;
+  const colours = await Promise.all(
+    product.colours.map(async (c) =>
+      c.swatchUrl
+        ? {
+            ...c,
+            swatchUrl: await storedInline(
+              c.swatchUrl,
+              `the ${c.name} material sample`,
+            ),
+          }
+        : c,
+    ),
+  );
+  return { ...product, source, colours };
 }
 
 // Scenes show a product in its default colour: one out of stock would sell a
@@ -155,11 +189,11 @@ export async function importProductsAction(
       continue;
     }
     try {
-      ready.push(await withStoredPhoto(product));
+      ready.push(await withStoredImages(product));
     } catch (error) {
       rejected.push({
         label: productLabel(product),
-        errors: [`its photo could not be read (${(error as Error).message})`],
+        errors: [`an image could not be stored: ${(error as Error).message}`],
       });
     }
   }

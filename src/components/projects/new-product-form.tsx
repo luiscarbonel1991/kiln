@@ -26,6 +26,9 @@ const round = (n: number) => Math.round(n * 100) / 100;
 interface Colour {
   name: string;
   hex: string;
+  // A photo of the material in this colour: it travels with the reference
+  // to the image model.
+  swatchUrl?: string;
 }
 
 // New product (New project, step 1): what a maker knows about a piece, on one
@@ -74,6 +77,9 @@ export function NewProductForm({
   const [drafting, startDraft] = useTransition();
   const [saving, startSave] = useTransition();
   const input = useRef<HTMLInputElement>(null);
+  const sampleInput = useRef<HTMLInputElement>(null);
+  // The colour row a material photo is being chosen for.
+  const sampleRow = useRef<number | null>(null);
 
   const ratio = file?.kind === "vector" ? file.ratio : null;
   const busy = uploading || drafting || saving;
@@ -100,6 +106,36 @@ export function NewProductForm({
       if (result.kind === "vector" && w > 0) {
         setHeight(String(round(w / result.ratio)));
       }
+    });
+  }
+
+  // A colour's material photo: stored like the product photo; its dominant
+  // colour becomes the swatch's hex (the maker can change it).
+  function uploadSample(row: number, chosen: File) {
+    setError(null);
+    startUpload(async () => {
+      const data = new FormData();
+      data.set("file", chosen);
+      const result = await uploadProductFileAction(data);
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      if (result.kind !== "photo") {
+        setError("A material sample is a photo (PNG, JPEG or WebP).");
+        return;
+      }
+      setColours((all) =>
+        all.map((x, j) =>
+          j === row
+            ? {
+                ...x,
+                swatchUrl: result.url,
+                hex: result.colours[0]?.hex ?? x.hex,
+              }
+            : x,
+        ),
+      );
     });
   }
 
@@ -405,6 +441,43 @@ export function NewProductForm({
                   )
                 }
               />
+              {c.swatchUrl ? (
+                <span className="relative flex-shrink-0">
+                  {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
+                  <img
+                    src={c.swatchUrl}
+                    alt={`${c.name || `Colour ${i + 1}`} material`}
+                    className="size-9 rounded-swatch border border-border object-cover"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Remove the material photo"
+                    onClick={() =>
+                      setColours((all) =>
+                        all.map((x, j) =>
+                          j === i ? { ...x, swatchUrl: undefined } : x,
+                        ),
+                      )
+                    }
+                    className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-pill bg-card text-on-surface-mid shadow-render hover:text-foreground"
+                  >
+                    <X className="size-2.5" />
+                  </button>
+                </span>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={busy}
+                  title="A close photo of the material in this colour, even light, no text: scenes copy its look"
+                  onClick={() => {
+                    sampleRow.current = i;
+                    sampleInput.current?.click();
+                  }}
+                >
+                  <ImagePlus /> Material photo
+                </Button>
+              )}
               {i === 0 ? (
                 <span className="font-mono text-[0.625rem] text-on-surface-dim">
                   default
@@ -423,6 +496,18 @@ export function NewProductForm({
               )}
             </div>
           ))}
+          <input
+            ref={sampleInput}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const chosen = e.target.files?.[0];
+              const row = sampleRow.current;
+              if (chosen && row !== null) uploadSample(row, chosen);
+              e.target.value = "";
+            }}
+          />
           {colours.length < 8 ? (
             <Button
               variant="ghost"

@@ -47,6 +47,26 @@ describe("product form", () => {
     });
   });
 
+  it("keeps a colour's material photo", () => {
+    const product = productFromForm(
+      {
+        ...form,
+        colours: [
+          {
+            ...form.colours[0],
+            swatchUrl: "http://storage.test/products/oak.jpg",
+          },
+          form.colours[1],
+        ],
+      },
+      "7k2",
+    );
+    expect(product.colours[0].swatchUrl).toBe(
+      "http://storage.test/products/oak.jpg",
+    );
+    expect(product.colours[1]).not.toHaveProperty("swatchUrl");
+  });
+
   it("a photo becomes the reference; an SVG the plate, its scale from the width", () => {
     expect(
       productFromForm(

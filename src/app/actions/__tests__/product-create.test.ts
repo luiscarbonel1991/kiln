@@ -208,6 +208,57 @@ describe("importProductsAction", () => {
   });
 });
 
+describe("importProductsAction: material samples", () => {
+  const png =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  const withSample = (swatchUrl: string) => ({
+    id: "x",
+    sku: "SW-01",
+    name: "Sample test",
+    family: "Home",
+    dimensions: { w: 4, h: 4 },
+    shape: "coaster",
+    material: "oak",
+    treatment: "engraved",
+    colours: [{ key: "oak", name: "Oak", face: "#CBA983", swatchUrl }],
+    defaultColour: "oak",
+    typography: { family: "Hanken Grotesk" },
+    source: { kind: "form" },
+  });
+
+  it("moves an inline sample to storage, named by its bytes", async () => {
+    importCatalog.mockClear();
+    const result = await importProductsAction(
+      withSample(`data:image/png;base64,${png}`),
+    );
+    expect(result).toMatchObject({ rejected: [] });
+    expect(importCatalog.mock.calls[0][0][0]).toMatchObject({
+      colours: [{ swatchUrl: "http://storage.test/products/p.png" }],
+    });
+    expect(storeAsset.mock.calls.at(-1)?.[3]).toEqual({ byContent: true });
+  });
+
+  it("refuses a sample that is not a photo", async () => {
+    importCatalog.mockClear();
+    const svg = Buffer.from(
+      "<svg xmlns='http://www.w3.org/2000/svg'/>",
+    ).toString("base64");
+    const result = await importProductsAction(
+      withSample(`data:image/svg+xml;base64,${svg}`),
+    );
+    expect(result).toMatchObject({
+      imported: [],
+      rejected: [
+        {
+          errors: [
+            "an image could not be stored: the Oak material sample must be a PNG, JPEG or WebP image",
+          ],
+        },
+      ],
+    });
+  });
+});
+
 describe("draftProductAction", () => {
   const photo =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";

@@ -31,4 +31,27 @@ describe("importProductsAction", () => {
     expect(result.rejected[0].label).toBe('"AS-01" Asset test coaster');
     expect(result.rejected[0].errors[0]).toContain("KILN_ASSET_ORIGINS");
   });
+
+  it("sets aside a product whose material sample lives where Kiln does not fetch", async () => {
+    const result = await importProductsAction({
+      products: [
+        {
+          ...product({ kind: "form" }),
+          colours: [
+            {
+              key: "natural",
+              name: "Natural",
+              face: "#D9B98C",
+              swatchUrl: "http://169.254.169.254/oak.jpg",
+            },
+          ],
+        },
+      ],
+    });
+    if ("error" in result) throw new Error(result.error);
+    expect(result.imported).toEqual([]);
+    expect(result.rejected[0].errors[0]).toMatch(
+      /^colours › natural › swatchUrl: .*KILN_ASSET_ORIGINS/,
+    );
+  });
 });

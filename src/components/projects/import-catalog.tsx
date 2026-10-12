@@ -12,7 +12,7 @@ export type ImportOutcome = ImportResult | { error: string };
 // The limits a catalog export most often runs into, in words; the full set is
 // the JSON Schema next to the template.
 const LIMITS =
-  "Limits: a colour's inlayName up to 40 characters, hook 80, cta 40, up to 6 places of use of 80 each.";
+  "Limits: a colour's inlayName up to 40 characters, hook 80, cta 40, up to 6 places of use of 80 each. A colour's swatchUrl is a photo of its material.";
 
 // The catalog import card: a .json file, or the JSON pasted in (an assistant
 // or a browser automation can type, not attach a file). The page shows what

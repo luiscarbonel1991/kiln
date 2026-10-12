@@ -28,7 +28,10 @@ export type Dimensions = z.infer<typeof Dimensions>;
 // One sellable finish. `face` is what the camera sees; `inlay` is the contrast
 // colour of the lettering or marks on that face (white on dark, black on
 // light); `inlayName` names it for prompts ("white"), else the nearest plain
-// colour word is used.
+// colour word is used. `swatchUrl` is a sample of the material in this colour
+// — a close photo or a tileable texture, even light, no text — that travels
+// with the reference to the image model: a flat colour fill reads as paper or
+// plastic, and a real photo carries the grain better than a drawn texture.
 export const ColourOption = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
@@ -36,6 +39,13 @@ export const ColourOption = z.object({
   edge: Hex.optional(),
   inlay: Hex.optional(),
   inlayName: z.string().trim().min(1).max(40).optional(),
+  swatchUrl: z
+    .string()
+    .min(1)
+    .describe(
+      "A close photo of the material in this colour (PNG, JPEG or WebP; even light, no text): a data: image, Kiln's storage or an origin in KILN_ASSET_ORIGINS. It travels with the reference to the image model.",
+    )
+    .optional(),
   supplierUrl: z.string().optional(),
   inStock: z.boolean().default(true),
 });

@@ -124,5 +124,8 @@ describe("parseProductPackage", () => {
       items: { properties: Record<string, unknown> };
     };
     expect(colours.items.properties.inlayName).toMatchObject({ maxLength: 40 });
+    expect(colours.items.properties.swatchUrl).toMatchObject({
+      description: expect.stringContaining("photo of the material"),
+    });
   });
 });

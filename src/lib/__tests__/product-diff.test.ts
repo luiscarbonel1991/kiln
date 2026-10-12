@@ -50,6 +50,14 @@ describe("productChanges", () => {
     expect(productChanges(before, after)).toEqual([
       "colours (+Walnut, −Ash, Oak changed)",
     ]);
+    const sampled = {
+      ...before,
+      colours: [
+        { ...before.colours[0], swatchUrl: "http://storage.test/oak.jpg" },
+        before.colours[1],
+      ],
+    };
+    expect(productChanges(before, sampled)).toEqual(["colours (Oak changed)"]);
     const reordered = { ...before, colours: [...before.colours].reverse() };
     expect(productChanges(before, reordered)).toEqual(["colour order"]);
   });

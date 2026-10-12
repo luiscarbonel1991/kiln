@@ -58,7 +58,14 @@ export const ProductForm = z.object({
   material: z.string().trim().min(1, "Name its material.").max(60),
   treatment: Treatment,
   colours: z
-    .array(z.object({ name: z.string().trim().min(1).max(40), hex: Hex }))
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(40),
+        hex: Hex,
+        // A photo of the material in this colour, uploaded to Kiln's storage.
+        swatchUrl: z.string().min(1).optional(),
+      }),
+    )
     .min(1, "Add at least one colour.")
     .max(8),
   wording: z
@@ -153,6 +160,7 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
       key: keys[i],
       name: c.name,
       face: c.hex.toUpperCase(),
+      ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
     })),
     defaultColour: keys[0],
     typography: { family: "Hanken Grotesk" },
