@@ -7,7 +7,8 @@ import legacy from "./fixtures/legacy-recipes.json";
 // shot-list split (2026-10-02, parity); since then it is regenerated only by an
 // intended change: M4 (2026-10-05) added each Etsy scene's own art direction;
 // M5 (2026-10-05) made the macro show the treatment ({surface}) and keep words
-// whole.
+// whole; 2026-10-11 the macro shows the finish, not the edges, and keeps words
+// whole with a margin.
 describe("legacy recipes (golden)", () => {
   it("SEED_RECIPES equals the frozen pre-split recipes, in order", () => {
     expect(SEED_RECIPES).toEqual(legacy);

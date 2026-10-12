@@ -157,6 +157,8 @@ export function sceneCues(product: Product, place = ""): string[] {
     dark
       ? "its dark face set against a lighter background, so it stands out"
       : "its light face set against a darker background, so it stands out",
+    // The objects named for scale invite their brands and labels.
+    "everything around it plain and unbranded",
   ];
 }
 

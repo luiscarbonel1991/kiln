@@ -196,7 +196,10 @@ export function assemblePrompt(
       `Composition: ${value("composition")}.`,
       `Lighting: ${value("lighting")}.`,
       `Mood: ${value("mood")}. Color palette: ${value("palette")}.`,
-      "Photorealistic, sharp, high detail. No text, captions, watermarks or graphic overlays.",
+      // Props and background carry nothing to read (garbled key labels, a
+      // third-party logo on a doorbell); scoped, so it never touches the
+      // product's own wording.
+      "Photorealistic, sharp, high detail. No text, captions, watermarks or graphic overlays. Props and background carry no logos, brand marks or readable lettering; the product's own wording stays exactly as in the reference.",
     ]
       .filter(Boolean)
       .join(" ");

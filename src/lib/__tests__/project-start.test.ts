@@ -164,8 +164,12 @@ describe("slotCards", () => {
     const composition = detail?.fields.composition.value ?? "";
     // The board is engraved: seen nearly straight on, flush.
     expect(composition).toContain("the engraving flush with the face");
-    expect(composition).toContain("never cut at the frame's edge");
+    expect(composition).toContain(
+      "whole inside the frame with a margin around them, never cut at the frame's edge",
+    );
+    expect(composition).not.toContain("on purpose");
     expect(composition).not.toContain("{surface}");
+    expect(detail?.fields.scene.value).not.toContain("edges");
   });
 
   it("a photographic scene reads the default colour's material sample after the reference", () => {

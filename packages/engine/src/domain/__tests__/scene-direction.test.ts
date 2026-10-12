@@ -104,7 +104,8 @@ describe("sceneCues", () => {
       colours: [{ key: "k", name: "Black", face: "#1A1A1A", inStock: true }],
       defaultColour: "k",
     };
-    const [size, legible, contrast] = sceneCues(small);
+    const [size, legible, contrast, plain] = sceneCues(small);
+    expect(plain).toBe("everything around it plain and unbranded");
     expect(size).toBe(
       "the product true to its real size (5 x 3 in, about the size of a phone) against every object around it",
     );

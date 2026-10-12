@@ -276,6 +276,21 @@ describe("assemblePrompt", () => {
     expect(imageInputs).toEqual([master.assetUrl]);
   });
 
+  it("keeps props and background unbranded and unlettered, never the product's own wording", () => {
+    const { prompt, negative } = assemblePrompt(
+      undefined,
+      master,
+      understanding,
+      SEED_RECIPE,
+      SEED_BRAND,
+    );
+    expect(prompt).toContain(
+      "Props and background carry no logos, brand marks or readable lettering; the product's own wording stays exactly as in the reference.",
+    );
+    // Scoped in the prompt: a bare "logos" or "text" never joins the negative.
+    expect(negative).not.toMatch(/\blogos?\b|\btext\b(?! overlay)/);
+  });
+
   it("derives the negative from the recipe constraints", () => {
     const { negative } = assemblePrompt(
       undefined,
