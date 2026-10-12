@@ -566,7 +566,7 @@ describe("video slots", () => {
     expect(planCounts(withVideo())).toMatchObject({ scene: 2, video: 1 });
   });
 
-  it("starts from the first approved scene, a push-in, 8 s, vertical", () => {
+  it("starts from the first approved scene, a still camera with a light change, 8 s, vertical", () => {
     const plan = withVideo();
     const none = videoSettings(shopOf(plan), slotOf(plan, "video"), {
       minSec: 5,
@@ -582,7 +582,7 @@ describe("video slots", () => {
     ).toEqual({
       from: "hero",
       startFrame: "https://x/hero.png",
-      motion: "push-in",
+      motion: "light",
       seconds: 8,
       orientation: "portrait",
       allowed: [6, 8],

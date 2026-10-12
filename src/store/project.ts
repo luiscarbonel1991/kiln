@@ -24,6 +24,7 @@ import type { JobView } from "@/domain/queue";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
+import { VIDEO_MOTIONS } from "@/domain/video";
 import { UNTITLED } from "@/lib/project-summary";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
 
@@ -325,7 +326,8 @@ export const useProject = create<ProjectState>((set, get) => ({
       },
       video: {
         durationSec: 8, // Etsy accepts 5-15 s; Veo renders 4, 6 or 8
-        motion: "subtle push-in",
+        // A still camera keeps the product exact; the light moves.
+        motion: VIDEO_MOTIONS.light.text,
         startFrameAssetId:
           source.outputs[0] ?? get().master?.assetUrl ?? source.masterAssetId,
       },

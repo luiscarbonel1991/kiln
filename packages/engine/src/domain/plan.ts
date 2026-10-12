@@ -188,7 +188,9 @@ export interface VideoSettings {
 
 // A video slot's choices with their defaults: the start frame is the chosen
 // slot's approved scene, else the first approved scene in photo order (photo 1
-// when it is a scene); a push-in; 8 s, or the nearest length the card's model
+// when it is a scene); a static camera with a light change (a push-in pushed
+// a product out of a 9:16 frame and morphed what stood beside it; the still
+// camera kept every letter); 8 s, or the nearest length the card's model
 // renders and the destination accepts (a saved 12 s from Sora reads as 8);
 // vertical.
 export function videoSettings(
@@ -207,7 +209,7 @@ export function videoSettings(
   return {
     from: chosen?.key ?? null,
     startFrame: chosen?.approvedOutput ?? null,
-    motion: choice.motion ?? "push-in",
+    motion: choice.motion ?? "light",
     seconds,
     orientation: choice.orientation ?? "portrait",
     allowed,

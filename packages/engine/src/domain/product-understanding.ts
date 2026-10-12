@@ -54,7 +54,11 @@ function inkOf(colour: ColourOption): string | null {
 // would have extracted from a photo, written from the spec instead (no paid
 // call). Generic for any maker; the default colour and the wording examples
 // stand in for a buyer's choice until the project asks for one.
-export function productUnderstanding(product: Product): BaseUnderstanding {
+export function productUnderstanding(
+  product: Product,
+  // A video animates a start frame and reads no material sample.
+  options: { sample?: boolean } = {},
+): BaseUnderstanding {
   const colour = colourOf(product, product.defaultColour);
   const material = colourMaterial(colour.name, product.material);
   const examples = product.wording
@@ -72,9 +76,10 @@ export function productUnderstanding(product: Product): BaseUnderstanding {
       : "";
   // A material sample travels as the image after the reference (see
   // defaultSwatch): it says what the surfaces look like, never what to draw.
-  const sample = colour.swatchUrl
-    ? "; its surfaces have exactly the material, colour and grain of the material sample (the second image), and nothing else is taken from that sample (not its shape, framing or edges)"
-    : "";
+  const sample =
+    colour.swatchUrl && options.sample !== false
+      ? "; its surfaces have exactly the material, colour and grain of the material sample (the second image), and nothing else is taken from that sample (not its shape, framing or edges)"
+      : "";
   return {
     subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${material}${wording}; keep every letter, mark and proportion exactly as in the master image${forbidden}`,
     productType: `${product.family.toLowerCase()}, ${product.shape}`,

@@ -65,11 +65,26 @@ describe("buildVideoRequest", () => {
     );
     expect(request.prompt).toContain("only the camera and the light move");
     expect(request.prompt).toContain(
+      "Everything around the product keeps its place, shape and markings; nothing new appears.",
+    );
+    expect(request.prompt).toContain(
       "Add no text, captions, logos, people or new objects. Never: flat printed lettering",
     );
     expect(request.prompt).toContain("exactly as in the start frame");
     expect(request.prompt).not.toContain("master image");
     expect(GenerationRequest.parse(request)).toEqual(request);
+  });
+
+  it("reads no material sample: a video animates its start frame", () => {
+    const sampled = {
+      ...plate,
+      colours: [
+        { ...plate.colours[0], swatchUrl: "https://stub.local/black.jpg" },
+      ],
+    };
+    const request = buildVideoRequest({ product: sampled, settings });
+    expect(request.prompt).not.toContain("material sample");
+    expect(request.prompt).not.toContain("second image");
   });
 
   it("goes landscape and follows the motion and length chosen", () => {

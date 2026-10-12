@@ -247,7 +247,9 @@ describe("useProject promoteToVideo", () => {
     expect(video?.model).toMatchObject(DEFAULT_MAKER_MODELS.video);
     expect(video?.video?.startFrameAssetId).toBe("https://stub.local/o.png");
     expect(video?.video?.durationSec).toBe(8);
-    expect(video?.video?.motion).toBe("subtle push-in");
+    expect(video?.video?.motion).toBe(
+      "a static camera; soft natural light slowly shifting across the scene",
+    );
   });
 
   it("falls back to the master asset URL when the source has no output yet", () => {

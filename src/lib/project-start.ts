@@ -149,7 +149,7 @@ export function videoSlotCard(
     id: slotCardId(destinationId, slot.key),
     type: "video",
     model: { ...base.model, ...defaultVideoModel(models), aspect: "9:16" },
-    video: { durationSec: 8, motion: "push-in", startFrameAssetId: null },
+    video: { durationSec: 8, motion: "light", startFrameAssetId: null },
     status: "draft",
   });
 }

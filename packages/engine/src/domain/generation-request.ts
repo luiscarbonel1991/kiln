@@ -91,7 +91,7 @@ export function buildVideoRequest(input: {
       "Approve a scene first: the video starts from an approved scene, never a new image.",
     );
   }
-  const u = productUnderstanding(product);
+  const u = productUnderstanding(product, { sample: false });
   const subject = u.subject.replaceAll("the master image", "the start frame");
   const scene = input.scene?.trim().replace(/[.\s]+$/, "");
   const prompt = [
@@ -99,6 +99,7 @@ export function buildVideoRequest(input: {
     `The product: ${subject}; ${u.materials}.`,
     scene ? `The scene stays the start frame's: ${scene}.` : "",
     "Keep the product exactly as in the start frame: its shape, proportions, every letter of its wording, its colours and finish. It does not move, bend, flicker or morph; only the camera and the light move.",
+    "Everything around the product keeps its place, shape and markings; nothing new appears.",
     `Add no text, captions, logos, people or new objects.${u.avoid ? ` Never: ${u.avoid}.` : ""}`,
     "Photorealistic, steady, natural motion",
   ]
