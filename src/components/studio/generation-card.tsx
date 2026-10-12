@@ -144,7 +144,11 @@ export function GenerationCard({
       ? videoUsd === null
         ? null
         : { typical: videoUsd, max: videoUsd }
-      : estimateGeneration(card.model, card.model.aspect);
+      : estimateGeneration(
+          card.model,
+          card.model.aspect,
+          card.references.length,
+        );
   const busyLabel =
     job?.status === "queued"
       ? job.attempt >= 1

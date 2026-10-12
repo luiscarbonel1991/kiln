@@ -109,6 +109,27 @@ async function storeB64(
   });
 }
 
+// The images an edit reads, in order: the reference (the product) first, then
+// each further reference (a material sample), as the prompt names them. The
+// Images API takes several for GPT image models; one sent alone would drop
+// the rest without a word.
+async function editImages(
+  input: ImageEditInput,
+  master?: Awaited<ReturnType<typeof fetchAsset>>,
+) {
+  const assets = await Promise.all([
+    master ?? fetchAsset(input.masterAssetUrl),
+    ...input.imageInputs.map((url) => fetchAsset(url)),
+  ]);
+  return Promise.all(
+    assets.map((asset, i) =>
+      toFile(asset.bytes, i === 0 ? "master.png" : `reference-${i}.png`, {
+        type: asset.mime,
+      }),
+    ),
+  );
+}
+
 export const openaiImageProvider: ImageProvider = {
   id: "openai",
   capabilities: OPENAI_CAPS,
@@ -139,10 +160,7 @@ export const openaiImageProvider: ImageProvider = {
       await mockDelay();
       return mockResult("edit", model);
     }
-    const master = await fetchAsset(input.masterAssetUrl);
-    const image = await toFile(master.bytes, "master.png", {
-      type: master.mime,
-    });
+    const image = await editImages(input);
     await options?.beforeCall?.();
     const r = await getOpenAI().images.edit(
       { ...editParams(input, model), image },
@@ -171,9 +189,7 @@ export const openaiImageProvider: ImageProvider = {
         usage: providerMode() === "mock" ? MOCK_USAGE : undefined,
       };
     }
-    const image = await toFile(master.bytes, "master.png", {
-      type: master.mime,
-    });
+    const image = await editImages(input, master);
     await options.beforeCall?.();
     const r = await getOpenAI().images.edit(
       { ...editParams(input, model), image },

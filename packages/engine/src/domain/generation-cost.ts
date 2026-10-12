@@ -178,19 +178,44 @@ export interface SceneEstimate {
   confidence: ImagePrice["confidence"];
 }
 
+// Each further reference an edit reads (a material sample beside the
+// product's reference) is about one more 1024 px image of input: ~1,024
+// image tokens on gpt-image-2 (~$0.008, measured on the reference), ~1,100
+// tokens on Gemini. Gemini's input max already allows three more.
+const OPENAI_PER_REFERENCE = { typical: 0.009, max: 0.012 };
+const GOOGLE_TOKENS_PER_REFERENCE = 1_100;
+
 // What one generation at this model and aspect costs: output plus the edit's
-// input allowance. null when the model has no pinned price.
+// input allowance, with `references` further images read beside the
+// reference. null when the model has no pinned price.
 export function estimateGeneration(
   model: { provider: string; model: string; quality?: ImageQuality },
   aspect?: string,
+  references = 0,
 ): { typical: number; max: number } | null {
   const price = imagePrice(model);
   if (!price) return null;
   const output =
     !aspect || aspect === "1:1" ? price.output.square : price.output.nonSquare;
+  const extra =
+    references === 0
+      ? { typical: 0, max: 0 }
+      : price.provider === "openai"
+        ? {
+            typical: OPENAI_PER_REFERENCE.typical * references,
+            max: OPENAI_PER_REFERENCE.max * references,
+          }
+        : {
+            typical:
+              (GOOGLE_TOKENS_PER_REFERENCE *
+                references *
+                (TOKEN_PRICES[key(model)]?.imageIn ?? 0)) /
+              1e6,
+            max: 0,
+          };
   return {
-    typical: round(output + price.input.typical),
-    max: round(output + price.input.max),
+    typical: round(output + price.input.typical + extra.typical),
+    max: round(output + price.input.max + extra.max),
   };
 }
 
@@ -199,10 +224,13 @@ export function estimateGeneration(
 export function estimateScenes(
   slots: { aspect?: string }[],
   model: { provider: string; model: string; quality?: ImageQuality },
+  references = 0,
 ): SceneEstimate | null {
   const price = imagePrice(model);
   if (!price) return null;
-  const each = slots.map((s) => estimateGeneration(model, s.aspect));
+  const each = slots.map((s) =>
+    estimateGeneration(model, s.aspect, references),
+  );
   const sum = (pick: (e: { typical: number; max: number }) => number) =>
     round(each.reduce((t, e) => t + (e ? pick(e) : 0), 0));
   return {

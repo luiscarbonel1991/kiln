@@ -179,7 +179,11 @@ export async function estimateProjectCards(
       recipe: findRecipe(card.recipeId) ?? SEED_RECIPES[0],
       brand: SEED_BRAND,
     });
-    const estimate = estimateGeneration(request.model, request.model.aspect);
+    const estimate = estimateGeneration(
+      request.model,
+      request.model.aspect,
+      request.imageInputs.length,
+    );
     if (!estimate) {
       throw new QueueRefusal(
         "model",

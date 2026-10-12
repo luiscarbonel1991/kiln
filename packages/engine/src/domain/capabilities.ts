@@ -26,7 +26,9 @@ export const PROVIDER_CAPABILITIES: Record<"google" | "openai", Capabilities> =
       generate: true,
       edit: true,
       compose: false,
-      maxRefs: 1,
+      // The Images API takes up to 16 images for GPT image models; Kiln
+      // sends the reference plus these, like Google.
+      maxRefs: 3,
       aspectRatios: ["1:1", "2:3", "3:2"],
     }),
   };

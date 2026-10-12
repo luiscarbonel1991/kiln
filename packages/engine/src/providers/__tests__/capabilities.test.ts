@@ -26,9 +26,9 @@ describe("capability flags", () => {
     expect(openai.capabilities.compose).toBe(false);
   });
 
-  it("maxRefs differs: google 3, openai 1", () => {
+  it("both take three references beside the reference image", () => {
     expect(google.capabilities.maxRefs).toBe(3);
-    expect(openai.capabilities.maxRefs).toBe(1);
+    expect(openai.capabilities.maxRefs).toBe(3);
   });
 });
 
@@ -59,11 +59,11 @@ describe("compose gating", () => {
 });
 
 describe("maxRefs gating", () => {
-  it("openai.edit rejects 2 refs (max 1)", async () => {
+  it("openai.edit rejects 4 refs (max 3)", async () => {
     const input: ImageEditInput = {
       masterAssetUrl: "u",
       prompt: "p",
-      imageInputs: ["r1", "r2"],
+      imageInputs: ["r1", "r2", "r3", "r4"],
       negative: "",
       model: {
         provider: "openai",

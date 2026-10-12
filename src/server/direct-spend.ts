@@ -39,11 +39,12 @@ export interface PricedCall<T extends { usage?: unknown }> {
 export function imageCall(
   model: { provider: string; model: string; quality?: ImageQuality },
   aspect: string,
+  references = 0,
 ): PricedCall<GenerationResult> {
   return {
     provider: model.provider,
     model: model.model,
-    estimateMax: estimateGeneration(model, aspect)?.max ?? null,
+    estimateMax: estimateGeneration(model, aspect, references)?.max ?? null,
     costOf: (result) =>
       result.usage
         ? costFromUsage(

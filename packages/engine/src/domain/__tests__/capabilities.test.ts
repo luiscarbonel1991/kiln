@@ -7,9 +7,9 @@ describe("PROVIDER_CAPABILITIES", () => {
     expect(PROVIDER_CAPABILITIES.openai.compose).toBe(false);
   });
 
-  it("maxRefs differs: google 3, openai 1", () => {
+  it("both take three references beside the reference image", () => {
     expect(PROVIDER_CAPABILITIES.google.maxRefs).toBe(3);
-    expect(PROVIDER_CAPABILITIES.openai.maxRefs).toBe(1);
+    expect(PROVIDER_CAPABILITIES.openai.maxRefs).toBe(3);
   });
 });
 
@@ -18,7 +18,7 @@ describe("canUse", () => {
     expect(canUse(PROVIDER_CAPABILITIES.google, "edit", 3)).toBe(true);
     expect(canUse(PROVIDER_CAPABILITIES.google, "edit", 4)).toBe(false);
     expect(canUse(PROVIDER_CAPABILITIES.openai, "compose")).toBe(false);
-    expect(canUse(PROVIDER_CAPABILITIES.openai, "edit", 1)).toBe(true);
-    expect(canUse(PROVIDER_CAPABILITIES.openai, "edit", 2)).toBe(false);
+    expect(canUse(PROVIDER_CAPABILITIES.openai, "edit", 3)).toBe(true);
+    expect(canUse(PROVIDER_CAPABILITIES.openai, "edit", 4)).toBe(false);
   });
 });

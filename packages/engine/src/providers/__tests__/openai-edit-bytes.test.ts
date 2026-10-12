@@ -7,11 +7,12 @@ vi.mock("@/providers/openai/client", () => ({
   hasOpenAIKey: () => true,
   getOpenAI: () => ({ images: { edit } }),
 }));
+// Each asset's bytes are its URL, so a test can tell the images apart.
 vi.mock("@/providers/asset-bytes", () => ({
-  fetchAsset: async () => ({
-    bytes: Buffer.from("png"),
+  fetchAsset: async (url: string) => ({
+    bytes: Buffer.from(url),
     base64: "",
-    mime: "image/png",
+    mime: url.endsWith(".jpg") ? "image/jpeg" : "image/png",
   }),
   storeAsset,
 }));
@@ -61,6 +62,23 @@ describe("openai editBytes (the queue's edit)", () => {
     });
     expect(edit.mock.calls[0][1]).toEqual({ timeout: 180_000, maxRetries: 0 });
     expect(storeAsset).not.toHaveBeenCalled();
+  });
+
+  it("sends the reference first, then each further reference (a material sample)", async () => {
+    edit.mockResolvedValue({
+      data: [{ b64_json: Buffer.from("image").toString("base64") }],
+    });
+    await openaiImageProvider.editBytes?.(
+      { ...input, imageInputs: ["https://stub.local/oak.jpg"] },
+      { timeoutMs: 180_000 },
+    );
+    const files = edit.mock.calls[0][0].image as File[];
+    expect(files.map((f) => [f.name, f.type])).toEqual([
+      ["master.png", "image/png"],
+      ["reference-1.png", "image/jpeg"],
+    ]);
+    expect(await files[0].text()).toBe("https://stub.local/plate.png");
+    expect(await files[1].text()).toBe("https://stub.local/oak.jpg");
   });
 
   it("an answer without an image still returns its usage (it was paid)", async () => {

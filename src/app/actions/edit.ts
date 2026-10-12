@@ -16,7 +16,7 @@ export async function editImage(
   const parsed = ImageEditInput.parse(input);
   assertModel(parsed.model, "image");
   return withDirectSpend(
-    imageCall(parsed.model, parsed.model.aspect),
+    imageCall(parsed.model, parsed.model.aspect, parsed.imageInputs.length),
     async (beforeCall) =>
       GenerationResult.parse(
         await getImageProvider(parsed.model.provider).edit(parsed, {

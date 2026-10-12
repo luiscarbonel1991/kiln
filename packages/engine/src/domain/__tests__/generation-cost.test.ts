@@ -232,6 +232,22 @@ describe("actual cost and the monthly cap", () => {
     ).toEqual({ typical: 0.063, max: 0.073 });
   });
 
+  it("a further reference (a material sample) adds its input", () => {
+    expect(
+      estimateGeneration(
+        { provider: "openai", model: "gpt-image-2" },
+        "1:1",
+        1,
+      ),
+    ).toEqual({ typical: 0.072, max: 0.085 });
+    // Gemini's input max already allows three more; the typical grows.
+    const gemini = { provider: "google", model: "gemini-3.1-flash-image" };
+    expect(estimateGeneration(gemini, "4:5", 1)).toEqual({
+      typical: 0.0685,
+      max: 0.0695,
+    });
+  });
+
   it("canAfford counts spent + reserved + the request, exactly up to the cap", () => {
     const cap = toMicros(25);
     expect(
