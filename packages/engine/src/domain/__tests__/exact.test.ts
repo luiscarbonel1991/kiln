@@ -9,6 +9,7 @@ import {
   shopLine,
   textLayerColours,
 } from "@/domain/exact";
+import { defaultSwatch } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
 
@@ -105,6 +106,21 @@ describe("productUnderstanding", () => {
   it("uses the default colour for materials and palette", () => {
     expect(u.materials).toContain("maple solid hardwood");
     expect(u.palette).toEqual(["#E8D2A6", "#3B2A1E"]);
+  });
+
+  it("names the material sample, only when the default colour has one", () => {
+    expect(u.materials).not.toContain("material sample");
+    const sampled = {
+      ...CUTTING_BOARD,
+      colours: CUTTING_BOARD.colours.map((c, i) =>
+        i === 0 ? { ...c, swatchUrl: "https://stub.local/maple.jpg" } : c,
+      ),
+    };
+    expect(productUnderstanding(sampled).materials).toContain(
+      "exactly the material, colour and grain of the material sample (the second image)",
+    );
+    expect(defaultSwatch(sampled)).toBe("https://stub.local/maple.jpg");
+    expect(defaultSwatch(CUTTING_BOARD)).toBeNull();
   });
 
   it("keeps the forbidden list on the product, so a scene may hold props", () => {

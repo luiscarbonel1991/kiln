@@ -70,12 +70,17 @@ export function productUnderstanding(product: Product): BaseUnderstanding {
     product.forbidden.length > 0
       ? `; add nothing to the product itself (no ${product.forbidden.join(", no ")})`
       : "";
+  // A material sample travels as the image after the reference (see
+  // defaultSwatch): it says what the surfaces look like, never what to draw.
+  const sample = colour.swatchUrl
+    ? "; its surfaces have exactly the material, colour and grain of the material sample (the second image), and nothing else is taken from that sample (not its shape, framing or edges)"
+    : "";
   return {
     subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${material}${wording}; keep every letter, mark and proportion exactly as in the master image${forbidden}`,
     productType: `${product.family.toLowerCase()}, ${product.shape}`,
     useContext: product.useContexts[0] ?? "",
     sceneProps: "",
-    materials: `${material}, ${TREATMENT_DETAIL[product.treatment](inkOf(colour), reliefOf(product.dimensions))}`,
+    materials: `${material}, ${TREATMENT_DETAIL[product.treatment](inkOf(colour), reliefOf(product.dimensions))}${sample}`,
     avoid: TREATMENT_AVOID[product.treatment],
     lighting: "soft natural light",
     composition: "the product centered, filling most of the frame",

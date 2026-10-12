@@ -241,6 +241,12 @@ export function colourOf(product: Product, key: string): ColourOption {
   return c;
 }
 
+// The material sample scenes are made with: the default colour's, since
+// scenes show the product in its default colour. null without one.
+export function defaultSwatch(product: Product): string | null {
+  return colourOf(product, product.defaultColour).swatchUrl ?? null;
+}
+
 // Checks a request against the product's wording rules before anything is
 // rendered or billed. Returns human-readable problems; empty = ok.
 export function validateWording(

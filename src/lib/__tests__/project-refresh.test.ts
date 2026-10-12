@@ -45,7 +45,17 @@ describe("refreshCards", () => {
       promptOverride: "my prompt",
     });
     mine.fields.mood = field("moody blue", "local");
-    const [refreshed] = refreshCards([mine], [card("etsy.hero", "new")], "m-2");
+    const [refreshed] = refreshCards(
+      [mine],
+      [
+        card("etsy.hero", "new", {
+          references: ["https://stub.local/oak.jpg"],
+        }),
+      ],
+      "m-2",
+    );
+    // The material sample comes with the product.
+    expect(refreshed.references).toEqual(["https://stub.local/oak.jpg"]);
     expect(refreshed.fields.subject.value).toBe("new subject");
     expect(refreshed.fields.scene.value).toBe("new scene");
     expect(refreshed.fields.mood).toEqual(field("moody blue", "local"));

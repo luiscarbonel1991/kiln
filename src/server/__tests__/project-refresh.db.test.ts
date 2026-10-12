@@ -1,6 +1,8 @@
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ refresh: () => {} }));
+// The queue refuses a live job whose provider has no key; tests run key-free.
+vi.mock("@/providers/keys", () => ({ hasProviderKey: () => true }));
 
 // Integration test against the throwaway Postgres (see
 // project-repository.db.test.ts for the setup).
@@ -78,15 +80,27 @@ describe.skipIf(!enabled)(
         },
       });
 
+      const sample = "https://stub.local/birch-sample.jpg";
       const [changed] = await upsertProducts([
-        { ...saved, material: "solid oak" },
+        {
+          ...saved,
+          material: "solid oak",
+          colours: [{ ...saved.colours[0], swatchUrl: sample }],
+        },
       ]);
       const before = await repo.loadProjectBoard(id);
       if (!before?.version || !before.product) throw new Error("no version");
       expect(productDrift(before.product, before.version)).toEqual({
         stale: true,
-        changed: ["material"],
+        changed: ["material", "colours (Birch changed)"],
       });
+      const { estimateProjectCards } = await import(
+        "@/server/generation-queue"
+      );
+      const [old] = (await estimateProjectCards(id, [first.id])).cards;
+      expect(old.request.kind === "image" && old.request.imageInputs).toEqual(
+        [],
+      );
 
       expect(
         await updateProjectProductAction({ projectId: id }),
@@ -102,6 +116,13 @@ describe.skipIf(!enabled)(
         locked: false,
       });
       expect(card?.fields.subject.value).toContain("solid oak");
+      // The material sample now travels with the reference, and is priced.
+      expect(card?.references).toEqual([sample]);
+      const [now] = (await estimateProjectCards(id, [first.id])).cards;
+      expect(now.request.kind === "image" && now.request.imageInputs).toEqual([
+        sample,
+      ]);
+      expect(now.maxMicros).toBeGreaterThan(old.maxMicros);
       const row = await db.project.findUniqueOrThrow({ where: { id } });
       expect(JSON.stringify(row.understanding)).toContain("solid oak");
     });

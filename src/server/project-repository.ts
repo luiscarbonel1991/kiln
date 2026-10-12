@@ -754,8 +754,8 @@ export async function setDelivered(
 
 // Bring a planned project up to its product's current version: the
 // understanding written from the product, the reference when Kiln makes one
-// (null keeps the maker's), each card's fields (refreshCards), and the version
-// the project now follows. Locked like approvals; one transaction.
+// (null keeps the maker's), each card's fields and references (refreshCards:
+// the material sample), and the version the project now follows. Locked like approvals; one transaction.
 export async function refreshProjectProduct(
   projectId: string,
   input: {
@@ -784,6 +784,7 @@ export async function refreshProjectProduct(
         where: { projectId_cardId: { projectId, cardId: card.id } },
         data: {
           fields: card.fields as Prisma.InputJsonValue,
+          references: card.references as Prisma.InputJsonValue,
           masterAssetId: card.masterAssetId,
         },
       });

@@ -3,11 +3,11 @@ import type { Card } from "@/domain/card";
 type Fields = Card["fields"];
 
 // A project brought up to its product's current version keeps what the maker
-// made of it. Each card takes its fields from the card the product now
-// derives, except a field the maker wrote (source "local"); its outputs,
-// status, model, prompt override, references and video stay, and it points
-// at the project's reference. A card the product no longer derives is left
-// as it was, re-pointed.
+// made of it. Each card takes its fields and its references (the material
+// sample) from the card the product now derives, except a field the maker
+// wrote (source "local"); its outputs, status, model, prompt override and
+// video stay, and it points at the project's reference. A card the product
+// no longer derives is left as it was, re-pointed.
 export function refreshCards(
   existing: Card[],
   derived: Card[],
@@ -23,7 +23,7 @@ export function refreshCards(
         field.source === "local" ? field : next.fields[key as keyof Fields],
       ]),
     ) as Fields;
-    return { ...card, fields, masterAssetId };
+    return { ...card, fields, references: next.references, masterAssetId };
   });
 }
 

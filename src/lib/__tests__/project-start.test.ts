@@ -168,6 +168,32 @@ describe("slotCards", () => {
     expect(composition).not.toContain("{surface}");
   });
 
+  it("a photographic scene reads the default colour's material sample after the reference", () => {
+    expect(cards.every((c) => c.references.length === 0)).toBe(true);
+    const sampled = {
+      ...board,
+      colours: board.colours.map((c) =>
+        c.key === board.defaultColour
+          ? { ...c, swatchUrl: "https://stub.local/sample.jpg" }
+          : c,
+      ),
+    };
+    const withSample = slotCards(
+      plan,
+      master,
+      productUnderstanding(sampled),
+      sampled,
+    );
+    const scenes = withSample.filter((c) => c.type === "image");
+    expect(scenes.length).toBeGreaterThan(0);
+    expect(
+      scenes.every((c) => c.references[0] === "https://stub.local/sample.jpg"),
+    ).toBe(true);
+    expect(
+      withSample.filter((c) => c.type === "video").map((c) => c.references),
+    ).toEqual(withSample.filter((c) => c.type === "video").map(() => []));
+  });
+
   it("follows the plan's own slots, even when the shot list has changed since", () => {
     const etsy = plan.destinations[0];
     const edited = {
