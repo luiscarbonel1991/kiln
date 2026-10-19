@@ -9,6 +9,7 @@ import {
 } from "@/domain/listing";
 import { SEED_DESTINATIONS } from "@/domain/seed";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
+import { PLATE_ON_BASE } from "./fixtures/plate-on-base";
 
 const etsy = SEED_DESTINATIONS.find((d) => d.id === "etsy");
 if (!etsy?.text) throw new Error("Etsy has no text rules");
@@ -124,6 +125,22 @@ describe("listingDraft", () => {
     expect(JSON.stringify(draft).toLowerCase()).not.toMatch(
       /sign|acrylic|laser/,
     );
+  });
+});
+
+describe("a product of several pieces", () => {
+  it("lists each part with its size in what you get; the attributes stay the whole box", () => {
+    const d = listingDraft(PLATE_ON_BASE, rules).description.value;
+    expect(d).toContain("· The plate: 8 x 2.5 in, 0.14 in thick.");
+    expect(d).toContain(
+      "· The base: 9 x 2.25 in footprint, 1/4 in thick, black matte.",
+    );
+    expect(d).not.toContain("9 x 2.78 in");
+    expect(listingAttributes(PLATE_ON_BASE)).toEqual([
+      { label: "Width", value: "9 in" },
+      { label: "Height", value: "2.78 in" },
+      { label: "Depth", value: "2.25 in" },
+    ]);
   });
 });
 

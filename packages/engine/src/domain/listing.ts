@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { DestinationText } from "@/domain/destination";
 import { TREATMENT_LABEL } from "@/domain/exact";
-import { dimensionsLabel, type Product } from "@/domain/product";
+import { dimensionsLabel, type Product, partLabel } from "@/domain/product";
 
 // A listing's text on a sale destination (ROADMAP Phases 16-17): what the
 // maker pastes into the channel's editor beside the photos. Kiln drafts every
@@ -118,9 +118,19 @@ function draftDescription(product: Product): string {
     product.shape.length <= SHORT && product.material.length <= SHORT
       ? [`${product.shape} in ${product.material}`]
       : [];
+  // A product of several pieces lists each with its size; one piece, its
+  // size (and thickness).
+  const sizes = product.parts
+    ? product.parts.map(
+        (p) =>
+          `The ${p.name}: ${partLabel(p, product.dimensions.unit)}${p.colour ? `, ${p.colour.name}` : ""}`,
+      )
+    : [
+        `${dimensionsLabel(product.dimensions)}${product.dimensions.d ? `, ${product.dimensions.d} ${product.dimensions.unit} thick` : ""}`,
+      ];
   const gets = [
     ...brief,
-    `${dimensionsLabel(product.dimensions)}${product.dimensions.d ? `, ${product.dimensions.d} ${product.dimensions.unit} thick` : ""}`,
+    ...sizes,
     `${TREATMENT_LABEL[product.treatment]} finish`,
     ...(product.colours.length > 1 ? [`In ${colours}`] : []),
     ...product.variants.map(

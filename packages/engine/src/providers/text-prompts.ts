@@ -3,7 +3,13 @@ import type { BrandProfile } from "@/domain/brand";
 import type { DestinationText } from "@/domain/destination";
 import { TREATMENT_LABEL } from "@/domain/exact";
 import { type ListingText, listingVariations } from "@/domain/listing";
-import { dimensionsLabel, type Product, Treatment } from "@/domain/product";
+import {
+  buyerSizeLabel,
+  dimensionsLabel,
+  type Product,
+  partLabel,
+  Treatment,
+} from "@/domain/product";
 import type { ListingSlot } from "@/domain/recipe";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { VariantDirection } from "@/domain/variant-direction";
@@ -136,7 +142,18 @@ export function listingCopyPrompt(input: {
     family: product.family,
     material: product.material,
     finish: TREATMENT_LABEL[product.treatment],
-    size: dimensionsLabel(product.dimensions),
+    size: buyerSizeLabel(product),
+    ...(product.parts
+      ? {
+          overallSize: dimensionsLabel(product.dimensions),
+          parts: product.parts.map((p) => ({
+            name: p.name,
+            size: partLabel(p, product.dimensions.unit),
+            ...(p.colour ? { colour: p.colour.name } : {}),
+            ...(p.material ? { material: p.material } : {}),
+          })),
+        }
+      : {}),
     colours: product.colours.map((c) =>
       c.inStock ? c.name : `${c.name} (out of stock)`,
     ),

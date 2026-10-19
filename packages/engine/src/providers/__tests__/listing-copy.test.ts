@@ -67,6 +67,25 @@ describe("writing a listing's prose (no image)", () => {
     expect(prompt).toContain('"Cherry (out of stock)"');
   });
 
+  it("sends a product's parts as facts, and the size the buyer buys", async () => {
+    const { PLATE_ON_BASE } = await import(
+      "../../domain/__tests__/fixtures/plate-on-base"
+    );
+    parse.mockResolvedValue({ output_parsed: copy, usage: {} });
+    await openaiArtDirector.writeListing(
+      {
+        ...input,
+        product: PLATE_ON_BASE,
+        draft: listingDraft(PLATE_ON_BASE, rules),
+      },
+      { model: "gpt-6.1-sol" },
+    );
+    const prompt: string = parse.mock.calls[0][0].input[0].content[0].text;
+    expect(prompt).toContain('"size": "8 x 2.5 in"');
+    expect(prompt).toContain('"overallSize": "9 x 2.78 in"');
+    expect(prompt).toContain('"size": "9 x 2.25 in footprint, 1/4 in thick"');
+  });
+
   it("Gemini: one text request with its schema, bounded, thinking low", async () => {
     generateContent.mockResolvedValue({
       text: JSON.stringify(copy),
