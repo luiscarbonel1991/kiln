@@ -46,6 +46,24 @@ export const ProductPart = z.object({
 });
 export type ProductPart = z.infer<typeof ProductPart>;
 
+// Another view of the product, beside the front one the reference shows: the
+// side (how far marks stand out, how deep it is), the top (a base's
+// footprint), the back, or three-quarter. A PNG, JPEG or WebP; an SVG
+// drawing is rendered to PNG at import. It travels with the reference.
+export const ViewLabel = z.enum(["side", "top", "back", "three-quarter"]);
+export type ViewLabel = z.infer<typeof ViewLabel>;
+
+export const ProductView = z.object({
+  label: ViewLabel,
+  url: z
+    .string()
+    .min(1)
+    .describe(
+      "An image of the product from this side (PNG, JPEG or WebP, or an SVG drawing rendered at import): a data: image, Kiln's storage or an origin in KILN_ASSET_ORIGINS.",
+    ),
+});
+export type ProductView = z.infer<typeof ProductView>;
+
 // One sellable finish. `face` is what the camera sees; `inlay` is the contrast
 // colour of the lettering or marks on that face (white on dark, black on
 // light); `inlayName` names it for prompts ("white"), else the nearest plain
@@ -162,6 +180,8 @@ export const Product = z.object({
   dimensions: Dimensions,
   // The pieces it is made of, when more than one; absent for a single piece.
   parts: z.array(ProductPart).min(2).max(4).optional(),
+  // Up to two more views of it (the front one is the reference).
+  views: z.array(ProductView).min(1).max(2).optional(),
   shape: z.string().min(1),
   material: z.string().min(1),
   treatment: Treatment,

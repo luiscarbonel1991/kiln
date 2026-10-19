@@ -138,10 +138,12 @@ export {
   ProductIcon,
   ProductPart,
   ProductSource,
+  ProductView,
   partLabel,
   Treatment,
   Typography,
   VariantAxis,
+  ViewLabel,
   validateWording,
   WordingLine,
 } from "@/domain/product";

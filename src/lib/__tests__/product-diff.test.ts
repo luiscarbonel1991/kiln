@@ -38,6 +38,12 @@ describe("productChanges", () => {
       "reference drawing",
     ]);
     expect(productChanges(before, { ...before, price: 30 })).toEqual(["price"]);
+    expect(
+      productChanges(before, {
+        ...before,
+        views: [{ label: "side", url: "http://storage.test/side.png" }],
+      }),
+    ).toEqual(["reference views"]);
   });
 
   it("says which colours were added, removed or changed", () => {

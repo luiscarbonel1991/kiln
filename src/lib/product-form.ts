@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { colourWord } from "@/domain/colour-words";
-import { Hex, Product, Treatment, Unit } from "@/domain/product";
+import { Hex, Product, Treatment, Unit, ViewLabel } from "@/domain/product";
 
 // The product form (New project, step 1): the few things a maker knows about
 // a piece, in plain words, turned into a Product. Kiln fills the rest — the
@@ -80,6 +80,11 @@ export const ProductForm = z.object({
   useContext: z.string().trim().max(80).optional(),
   // The maker's price, in the shop's currency (optional; a listing needs it).
   price: z.number().positive("A price is more than 0.").optional(),
+  // Up to two more views of the piece, uploaded to Kiln's storage.
+  views: z
+    .array(z.object({ label: ViewLabel, url: z.string().min(1) }))
+    .max(2)
+    .default([]),
   file: ProductFile.optional(),
 });
 export type ProductForm = z.infer<typeof ProductForm>;
@@ -173,6 +178,7 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
     })),
     useContexts: form.useContext ? [form.useContext] : [],
     ...(form.price ? { price: form.price } : {}),
+    ...(form.views.length > 0 ? { views: form.views } : {}),
     source,
   });
 }

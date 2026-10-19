@@ -152,8 +152,16 @@ export function composePlateSvg(
   return { doc, boxes, scale };
 }
 
-export function rasterize(doc: string, sizePx: number): Uint8Array {
-  const r = new Resvg(doc, { fitTo: { mode: "width", value: sizePx } });
+// An SVG to a PNG `sizePx` wide; transparent unless given a background.
+export function rasterize(
+  doc: string,
+  sizePx: number,
+  background?: string,
+): Uint8Array {
+  const r = new Resvg(doc, {
+    fitTo: { mode: "width", value: sizePx },
+    ...(background ? { background } : {}),
+  });
   return r.render().asPng();
 }
 

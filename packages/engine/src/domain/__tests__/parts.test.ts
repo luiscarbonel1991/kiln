@@ -21,3 +21,27 @@ describe("parts", () => {
     expect(Product.safeParse(one).success).toBe(false);
   });
 });
+
+describe("views", () => {
+  it("up to two more views, each named by its side", () => {
+    const view = (label: string) => ({
+      label,
+      url: "https://stub.local/v.png",
+    });
+    expect(
+      Product.safeParse({
+        ...CUTTING_BOARD,
+        views: [view("side"), view("top")],
+      }).success,
+    ).toBe(true);
+    expect(
+      Product.safeParse({
+        ...CUTTING_BOARD,
+        views: [view("side"), view("top"), view("back")],
+      }).success,
+    ).toBe(false);
+    expect(
+      Product.safeParse({ ...CUTTING_BOARD, views: [view("inside")] }).success,
+    ).toBe(false);
+  });
+});

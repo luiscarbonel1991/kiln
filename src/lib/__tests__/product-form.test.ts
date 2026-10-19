@@ -24,6 +24,7 @@ const form: ProductForm = {
   ],
   wording: [{ label: "Initials", example: "A & J" }],
   useContext: "a coffee table",
+  views: [],
 };
 
 describe("product form", () => {

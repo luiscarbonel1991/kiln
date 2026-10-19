@@ -15,12 +15,13 @@ import {
   productLabel,
   type RejectedProduct,
 } from "@/lib/product-package";
+import { sanitizeSvg } from "@/lib/svg-sanitize";
 import {
   assertAllowedAssetUrl,
   fetchAsset,
   storeAsset,
 } from "@/providers/asset-bytes";
-import { measureOutline } from "@/providers/plates/svg";
+import { measureOutline, rasterize } from "@/providers/plates/svg";
 import type { ProductDraft } from "@/providers/text-prompts";
 import { getMakerModels } from "@/server/maker-repository";
 import {
@@ -52,7 +53,7 @@ function sourceUrl(product: Product): string | null {
 
 // A product whose assets live where Kiln will not fetch is refused at import,
 // not later when a plate or a scene needs them: the reason, or null. Its
-// source and each colour's material sample.
+// source, each colour's material sample and each view.
 function blockedAsset(product: Product): string | null {
   const source = sourceUrl(product);
   const urls = [
@@ -62,6 +63,10 @@ function blockedAsset(product: Product): string | null {
         ? [{ where: `colours › ${c.key} › swatchUrl`, url: c.swatchUrl }]
         : [],
     ),
+    ...(product.views ?? []).map((v) => ({
+      where: `views › ${v.label} › url`,
+      url: v.url,
+    })),
   ];
   for (const { where, url } of urls) {
     try {
@@ -127,6 +132,30 @@ async function storedInline(url: string, what: string): Promise<string> {
   return storeAsset(image.bytes, image.mime, "products", { byContent: true });
 }
 
+// The ground a view drawing is rendered on: the reference plate's.
+const VIEW_GROUND = "#F0EEE9";
+
+// A view goes to the image model beside the reference, so it must be a
+// raster in Kiln's storage: an inline image is stored by its bytes, an SVG
+// drawing (inline or fetched) is cleaned and rendered to PNG on the plate's
+// ground. A raster already at an allowed address stays where it is.
+async function storedView(url: string, label: string): Promise<string> {
+  const image = await fetchAsset(url);
+  if (image.mime === "image/svg+xml") {
+    const clean = sanitizeSvg(image.bytes.toString("utf8"));
+    if (!clean)
+      throw new Error(`the ${label} view is not a drawing Kiln can read`);
+    const png = rasterize(clean, 1024, VIEW_GROUND);
+    return storeAsset(png, "image/png", "products", { byContent: true });
+  }
+  if (!RASTER.has(image.mime)) {
+    throw new Error(`the ${label} view must be a PNG, JPEG, WebP or SVG image`);
+  }
+  return url.startsWith("data:")
+    ? storeAsset(image.bytes, image.mime, "products", { byContent: true })
+    : url;
+}
+
 async function withStoredImages(product: Product): Promise<Product> {
   const source =
     product.source.kind === "photo"
@@ -148,7 +177,15 @@ async function withStoredImages(product: Product): Promise<Product> {
         : c,
     ),
   );
-  return { ...product, source, colours };
+  const views = product.views
+    ? await Promise.all(
+        product.views.map(async (v) => ({
+          ...v,
+          url: await storedView(v.url, v.label),
+        })),
+      )
+    : undefined;
+  return { ...product, source, colours, ...(views ? { views } : {}) };
 }
 
 // Scenes show a product in its default colour: one out of stock would sell a
@@ -273,7 +310,16 @@ export async function createProductAction(
   if (blockedAsset(product)) {
     return { error: "That file is not in Kiln's storage; upload it again." };
   }
-  const measured = await withOutline(product);
+  let stored: Product;
+  try {
+    // A view uploaded as an SVG design is rendered to PNG here.
+    stored = await withStoredImages(product);
+  } catch (error) {
+    return {
+      error: `An image could not be stored: ${(error as Error).message}`,
+    };
+  }
+  const measured = await withOutline(stored);
   const [saved] = await upsertProducts([measured.product]);
   return {
     product: saved,

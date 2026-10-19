@@ -10,7 +10,7 @@ import {
 } from "@/app/actions/products";
 import { DegradedNotice } from "@/components/studio/degraded-notice";
 import { Button } from "@/components/ui/button";
-import type { Product, Treatment, Unit } from "@/domain/product";
+import type { Product, Treatment, Unit, ViewLabel } from "@/domain/product";
 import { FINISHES } from "@/lib/product-form";
 import { cn } from "@/lib/utils";
 import type { StoredProductFile } from "@/server/product-files";
@@ -72,6 +72,10 @@ export function NewProductForm({
   );
   const [useContext, setUseContext] = useState("");
   const [price, setPrice] = useState("");
+  // Up to two more views of the piece (the front one is the reference).
+  const [views, setViews] = useState<{ label: ViewLabel; url: string }[]>([]);
+  const [viewLabel, setViewLabel] = useState<ViewLabel>("side");
+  const viewInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [degraded, setDegraded] = useState<Degraded | null>(null);
   const [uploading, startUpload] = useTransition();
@@ -140,6 +144,21 @@ export function NewProductForm({
     });
   }
 
+  // Another view: a photo, or an SVG drawing (rendered to PNG on save).
+  function uploadView(chosen: File) {
+    setError(null);
+    startUpload(async () => {
+      const data = new FormData();
+      data.set("file", chosen);
+      const result = await uploadProductFileAction(data);
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      setViews((all) => [...all, { label: viewLabel, url: result.url }]);
+    });
+  }
+
   function fill(model?: { provider: "google" | "openai"; model: string }) {
     if (file?.kind !== "photo") return;
     setError(null);
@@ -179,6 +198,7 @@ export function NewProductForm({
           })),
         ...(useContext.trim() ? { useContext } : {}),
         ...(Number(price) > 0 ? { price: Number(price) } : {}),
+        views,
         ...(file
           ? {
               file:
@@ -615,6 +635,76 @@ export function NewProductForm({
             never sets one.
           </span>
         </label>
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <span className={LABEL}>Another view (optional)</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {views.map((v, i) => (
+              <span
+                key={v.url}
+                className="relative flex items-center gap-2 rounded-field bg-surface-soft py-1 pr-6 pl-1"
+              >
+                {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
+                <img
+                  src={v.url}
+                  alt={`${v.label} view`}
+                  className="size-9 rounded-swatch object-cover"
+                />
+                <span className="font-sans text-[0.8rem] text-foreground">
+                  {v.label}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Remove the ${v.label} view`}
+                  onClick={() =>
+                    setViews((all) => all.filter((_, j) => j !== i))
+                  }
+                  className="absolute top-1/2 right-1.5 -translate-y-1/2 text-on-surface-mid hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+            {views.length < 2 ? (
+              <>
+                <select
+                  aria-label="Which view"
+                  className={cn(FIELD, "w-auto")}
+                  value={viewLabel}
+                  onChange={(e) => setViewLabel(e.target.value as ViewLabel)}
+                >
+                  <option value="side">Side</option>
+                  <option value="top">Top</option>
+                  <option value="back">Back</option>
+                  <option value="three-quarter">Three-quarter</option>
+                </select>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={busy}
+                  onClick={() => viewInput.current?.click()}
+                >
+                  <ImagePlus /> Add a view
+                </Button>
+              </>
+            ) : null}
+          </div>
+          <input
+            ref={viewInput}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg"
+            className="hidden"
+            onChange={(e) => {
+              const chosen = e.target.files?.[0];
+              if (chosen) uploadView(chosen);
+              e.target.value = "";
+            }}
+          />
+          <span className="font-sans text-[0.75rem] text-on-surface-mid">
+            {treatment === "raised" && !views.some((v) => v.label === "side")
+              ? "A side view shows how far the marks stand out; scenes read it beside the front."
+              : "What the front cannot show — the side, the top of a base. A photo or an SVG drawing."}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border-soft pt-4">

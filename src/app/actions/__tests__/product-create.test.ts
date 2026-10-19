@@ -259,6 +259,68 @@ describe("importProductsAction: material samples", () => {
   });
 });
 
+describe("importProductsAction: views", () => {
+  const withView = (url: string) => ({
+    id: "x",
+    sku: "VW-01",
+    name: "View test",
+    family: "Home",
+    dimensions: { w: 4, h: 4 },
+    shape: "coaster",
+    material: "oak",
+    treatment: "raised",
+    colours: [{ key: "oak", name: "Oak", face: "#CBA983" }],
+    defaultColour: "oak",
+    typography: { family: "Hanken Grotesk" },
+    views: [{ label: "side", url }],
+    source: { kind: "form" },
+  });
+
+  it("renders an SVG view to PNG on the plate's ground and stores it by its bytes", async () => {
+    importCatalog.mockClear();
+    storeAsset.mockClear();
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><rect width="100" height="20" fill="#CBA983"/></svg>`;
+    const result = await importProductsAction(
+      withView(
+        `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+      ),
+    );
+    expect(result).toMatchObject({ rejected: [] });
+    const [bytes, mime, prefix, options] = storeAsset.mock.calls[0];
+    expect([mime, prefix, options]).toEqual([
+      "image/png",
+      "products",
+      { byContent: true },
+    ]);
+    expect(Buffer.from(bytes).subarray(1, 4).toString()).toBe("PNG");
+    expect(importCatalog.mock.calls[0][0][0]).toMatchObject({
+      views: [{ label: "side", url: "http://storage.test/products/p.png" }],
+    });
+  });
+
+  it("refuses a view that is not an image Kiln can send, and one it may not fetch", async () => {
+    importCatalog.mockClear();
+    const gif = await importProductsAction(
+      withView("data:image/gif;base64,R0lGODlhAQABAAAAACw="),
+    );
+    expect(gif).toMatchObject({
+      rejected: [
+        {
+          errors: [
+            "an image could not be stored: the side view must be a PNG, JPEG, WebP or SVG image",
+          ],
+        },
+      ],
+    });
+    const far = await importProductsAction(
+      withView("http://169.254.169.254/side.png"),
+    );
+    expect(far).toMatchObject({
+      rejected: [{ errors: [expect.stringMatching(/^views › side › url: /)] }],
+    });
+  });
+});
+
 describe("draftProductAction", () => {
   const photo =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
