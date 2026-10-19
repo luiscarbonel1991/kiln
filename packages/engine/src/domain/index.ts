@@ -23,6 +23,7 @@ export {
   DestinationKind,
   DestinationProfile,
   DestinationRules,
+  DestinationText,
 } from "@/domain/destination";
 export {
   type ExactView,
@@ -51,6 +52,19 @@ export {
   buildGenerationRequest,
   GenerationRequest,
 } from "@/domain/generation-request";
+export {
+  checkListing,
+  type ListingField,
+  type ListingIssue,
+  ListingText,
+  type ListingVariation,
+  listingAttributes,
+  listingDraft,
+  listingVariations,
+  PersonalizationField,
+  refreshListing,
+  TextSource,
+} from "@/domain/listing";
 export { lockByDefault } from "@/domain/locks";
 export { MasterAsset } from "@/domain/master-asset";
 export { ModelConfig } from "@/domain/model-config";

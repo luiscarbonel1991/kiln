@@ -38,6 +38,33 @@ export const DestinationVideo = z.object({
   maxSec: z.number().positive(),
 });
 
+// What a listing's text must meet on a sale destination (data, not code):
+// each limit is one the channel refuses (checkListing reports an error) or,
+// where marked, advises (a warning). Where each comes from is noted with the
+// destination's data.
+export const DestinationText = z.object({
+  title: z.object({
+    maxChars: z.number().int().positive(),
+    // Advice, not a refusal: a short title that names the item once.
+    adviseMaxWords: z.number().int().positive().optional(),
+  }),
+  tags: z.object({
+    count: z.number().int().positive(),
+    maxChars: z.number().int().positive(),
+    // The characters a tag may hold, as a Unicode regex.
+    pattern: z.string().min(1),
+  }),
+  personalization: z.object({
+    maxFields: z.number().int().positive(),
+    titleMaxChars: z.number().int().positive(),
+    instructionsMaxChars: z.number().int().positive(),
+    // Words in capitals an instruction may hold ("UNIT, SUITE" is two).
+    maxCapsWords: z.number().int().nonnegative(),
+  }),
+  variations: z.object({ maxTypes: z.number().int().positive() }),
+});
+export type DestinationText = z.infer<typeof DestinationText>;
+
 export const DestinationProfile = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -46,5 +73,6 @@ export const DestinationProfile = z.object({
   rules: DestinationRules,
   delivery: Delivery,
   video: DestinationVideo.optional(),
+  text: DestinationText.optional(),
 });
 export type DestinationProfile = z.infer<typeof DestinationProfile>;

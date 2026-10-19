@@ -13,7 +13,7 @@ import type { ExactKind } from "@/domain/shot-list";
 // product spec alone — no image model, no cost, the same output every time. The
 // app draws them (SVG); a delivery step can rasterize the same models later.
 
-const TREATMENT_LABEL: Record<Treatment, string> = {
+export const TREATMENT_LABEL: Record<Treatment, string> = {
   raised: "Raised",
   inlaid: "Inlaid",
   engraved: "Engraved",

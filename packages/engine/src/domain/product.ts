@@ -158,6 +158,15 @@ export const Product = z.object({
   // the call to action. Templates fall back when absent (see exact.ts).
   hook: z.string().trim().min(1).max(80).optional(),
   cta: z.string().trim().min(1).max(40).optional(),
+  // The maker's price (costing and margins are the maker's policy; Kiln never
+  // computes a price). A variant value's priceExtra is added to it.
+  price: z
+    .number()
+    .positive()
+    .describe(
+      "The maker's base price, in the shop's currency; each variant value's priceExtra is added to it.",
+    )
+    .optional(),
   source: ProductSource,
 });
 export type Product = z.infer<typeof Product>;

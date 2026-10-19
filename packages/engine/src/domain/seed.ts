@@ -47,6 +47,27 @@ export const SEED_DESTINATIONS: DestinationProfile[] = [
     },
     delivery: { mode: "draft-api" },
     video: { minSec: 5, maxSec: 15 },
+    // Listing text, as of 2026-10:
+    // - title 140 characters and tags 13 x 20 (letters, numbers, spaces, -,
+    //   ' and ™©®): Etsy's listing editor;
+    // - a short title of about 15 words: Etsy's title guidance of 2026-04-27
+    //   (advice);
+    // - up to 5 personalization questions, each instruction up to 120
+    //   characters: Etsy's personalization migration (open API, 2026);
+    // - a question's title up to 45 characters and at most one all-caps word
+    //   in its instructions: observed in the listing editor by a maker;
+    // - two variation types.
+    text: {
+      title: { maxChars: 140, adviseMaxWords: 15 },
+      tags: { count: 13, maxChars: 20, pattern: "^[\\p{L}\\p{N} '\\-™©®]+$" },
+      personalization: {
+        maxFields: 5,
+        titleMaxChars: 45,
+        instructionsMaxChars: 120,
+        maxCapsWords: 1,
+      },
+      variations: { maxTypes: 2 },
+    },
   },
   {
     id: "amazon",
