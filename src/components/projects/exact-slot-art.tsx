@@ -555,7 +555,7 @@ function SizeSpec({
   const h = view.height * scale;
   const x = (WIDTH - w) / 2;
   const y = 92;
-  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+  const fmt = (n: number) => String(Number(n.toFixed(2)));
   return (
     <g>
       <Title text={view.title} />
@@ -583,6 +583,7 @@ function SizeSpec({
         style={{ ...MONO, fontSize: 12 }}
       >
         {fmt(view.width)} {view.unit}
+        {view.overall ? " overall" : ""}
       </text>
       <line
         x1={x + w + 18}

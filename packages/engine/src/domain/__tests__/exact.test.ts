@@ -12,6 +12,7 @@ import {
 import { defaultSwatch } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
+import { PLATE_ON_BASE } from "./fixtures/plate-on-base";
 
 describe("renderTextTemplate", () => {
   it("fills known tokens and leaves unknown ones visible", () => {
@@ -90,6 +91,36 @@ describe("exactView", () => {
       ["Family name", 14, true],
       ["Year", 4, false],
     ]);
+  });
+});
+
+describe("size & spec of a product with parts", () => {
+  it("titles what the buyer buys, a row per part, the drawing measured overall", () => {
+    const view = exactView("size-spec", PLATE_ON_BASE);
+    if (view.kind !== "size-spec") throw new Error();
+    expect(view.title).toBe("8 x 2.5 in");
+    expect(view).toMatchObject({ width: 9, height: 2.78, overall: true });
+    expect(view).not.toHaveProperty("depth");
+    expect(view.facts).toEqual([
+      { label: "Shape", value: "name plate" },
+      { label: "Material", value: "hardwood" },
+      { label: "plate", value: "8 x 2.5 in, 0.14 in thick" },
+      {
+        label: "base",
+        value: "9 x 2.25 in footprint, 1/4 in thick, black matte",
+      },
+      { label: "Finish", value: "Engraved" },
+    ]);
+  });
+
+  it("leaves out a shape or material too long for one line", () => {
+    const view = exactView("size-spec", {
+      ...PLATE_ON_BASE,
+      shape:
+        "a rectangular name plate with rounded corners standing upright in a base",
+    });
+    if (view.kind !== "size-spec") throw new Error();
+    expect(view.facts.map((f) => f.label)).not.toContain("Shape");
   });
 });
 
