@@ -12,6 +12,7 @@ const FIELDS: [Field, string][] = [
   ["family", "family"],
   ["description", "description"],
   ["dimensions", "size"],
+  ["parts", "parts"],
   ["shape", "shape"],
   ["material", "material"],
   ["treatment", "finish"],

@@ -42,7 +42,7 @@ describe("reliefLabel", () => {
     expect(reliefLabel(0.125, "in")).toBe("1/8 in");
     expect(reliefLabel(0.25, "in")).toBe("1/4 in");
     expect(reliefLabel(1.5, "in")).toBe("1 1/2 in");
-    expect(reliefLabel(0.3, "in")).toBe("0.30 in");
+    expect(reliefLabel(0.3, "in")).toBe("0.3 in");
     expect(reliefLabel(3, "mm")).toBe("3 mm");
   });
 });

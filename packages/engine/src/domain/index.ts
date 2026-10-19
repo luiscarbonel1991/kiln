@@ -126,6 +126,7 @@ export {
   withVideoChoice,
 } from "@/domain/plan";
 export {
+  buyerSizeLabel,
   ColourOption,
   colourOf,
   Dimensions,
@@ -135,7 +136,9 @@ export {
   PlateResult,
   Product,
   ProductIcon,
+  ProductPart,
   ProductSource,
+  partLabel,
   Treatment,
   Typography,
   VariantAxis,

@@ -25,6 +25,27 @@ export const Dimensions = z.object({
 });
 export type Dimensions = z.infer<typeof Dimensions>;
 
+// One piece of a product made of several (a plate and the base it stands in):
+// its size in the product's unit — w across, h up, d front to back — whether
+// it stands upright (its face toward the camera) or lies flat, and its own
+// material and a fixed colour when they differ from the product's (a base
+// always black, whatever colour the plate). The first part is the main one:
+// what the buyer chooses and personalizes.
+export const ProductPart = z.object({
+  name: z.string().trim().min(1).max(40),
+  dimensions: z.object({
+    w: z.number().positive(),
+    h: z.number().positive(),
+    d: z.number().positive(),
+  }),
+  lies: z.enum(["upright", "flat"]).default("upright"),
+  material: z.string().trim().min(1).max(120).optional(),
+  colour: z
+    .object({ name: z.string().trim().min(1).max(40), hex: Hex })
+    .optional(),
+});
+export type ProductPart = z.infer<typeof ProductPart>;
+
 // One sellable finish. `face` is what the camera sees; `inlay` is the contrast
 // colour of the lettering or marks on that face (white on dark, black on
 // light); `inlayName` names it for prompts ("white"), else the nearest plain
@@ -137,7 +158,10 @@ export const Product = z.object({
   name: z.string().min(1),
   family: z.string().min(1),
   description: z.string().optional(),
+  // The whole product's box, as its drawing frames it (parts and all).
   dimensions: Dimensions,
+  // The pieces it is made of, when more than one; absent for a single piece.
+  parts: z.array(ProductPart).min(2).max(4).optional(),
   shape: z.string().min(1),
   material: z.string().min(1),
   treatment: Treatment,
@@ -220,7 +244,8 @@ export const PlateResult = z.object({
 });
 export type PlateResult = z.infer<typeof PlateResult>;
 
-const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+// A measurement as a maker writes it: two decimals at most, no trailing zero.
+const fmt = (n: number) => String(Number(n.toFixed(2)));
 
 export function dimensionsLabel(d: Dimensions): string {
   return `${fmt(d.w)} x ${fmt(d.h)} ${d.unit}`;
@@ -242,6 +267,28 @@ export function reliefLabel(relief: number, unit: Unit): string {
     }
   }
   return `${fmt(relief)} ${unit}`;
+}
+
+// A part's size in words, by how it stands: an upright part is its face and
+// how thick it is ("8 x 2.5 in, 0.14 in thick"); a part lying flat is its
+// footprint and how thick it is ("9 x 2.25 in footprint, 1/4 in thick").
+export function partLabel(part: ProductPart, unit: Unit): string {
+  const { w, h, d } = part.dimensions;
+  return part.lies === "flat"
+    ? `${fmt(w)} x ${fmt(d)} ${unit} footprint, ${reliefLabel(h, unit)} thick`
+    : `${fmt(w)} x ${fmt(h)} ${unit}, ${reliefLabel(d, unit)} thick`;
+}
+
+// The size the buyer buys: the main part's face when the product has parts,
+// else the whole product's.
+export function buyerSizeLabel(product: Product): string {
+  const main = product.parts?.[0];
+  if (!main) return dimensionsLabel(product.dimensions);
+  const { w, h, d } = main.dimensions;
+  const unit = product.dimensions.unit;
+  return main.lies === "flat"
+    ? `${fmt(w)} x ${fmt(d)} ${unit}`
+    : `${fmt(w)} x ${fmt(h)} ${unit}`;
 }
 
 export function colourOf(product: Product, key: string): ColourOption {
