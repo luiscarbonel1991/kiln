@@ -78,6 +78,8 @@ export const ProductForm = z.object({
     .max(3)
     .default([]),
   useContext: z.string().trim().max(80).optional(),
+  // The maker's price, in the shop's currency (optional; a listing needs it).
+  price: z.number().positive("A price is more than 0.").optional(),
   file: ProductFile.optional(),
 });
 export type ProductForm = z.infer<typeof ProductForm>;
@@ -170,6 +172,7 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
       ...(w.example ? { example: w.example } : {}),
     })),
     useContexts: form.useContext ? [form.useContext] : [],
+    ...(form.price ? { price: form.price } : {}),
     source,
   });
 }

@@ -47,6 +47,11 @@ describe("product form", () => {
     });
   });
 
+  it("keeps the maker's price when given", () => {
+    expect(productFromForm({ ...form, price: 24 }, "7k2").price).toBe(24);
+    expect(productFromForm(form, "7k2")).not.toHaveProperty("price");
+  });
+
   it("keeps a colour's material photo", () => {
     const product = productFromForm(
       {

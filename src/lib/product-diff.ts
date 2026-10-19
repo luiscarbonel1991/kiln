@@ -24,6 +24,7 @@ const FIELDS: [Field, string][] = [
   ["useContexts", "places of use"],
   ["hook", "hook"],
   ["cta", "call to action"],
+  ["price", "price"],
 ];
 
 // JSON with sorted keys: two objects with the same content compare equal

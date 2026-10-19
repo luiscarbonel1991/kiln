@@ -34,6 +34,7 @@
         { "label": "Year", "maxChars": 4, "required": false, "example": "2026" }
       ],
       "useContexts": ["a kitchen counter during dinner prep"],
+      "price": 48,
       "source": { "kind": "form" }
     }
   ]

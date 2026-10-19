@@ -37,6 +37,7 @@ describe("productChanges", () => {
       "material",
       "reference drawing",
     ]);
+    expect(productChanges(before, { ...before, price: 30 })).toEqual(["price"]);
   });
 
   it("says which colours were added, removed or changed", () => {

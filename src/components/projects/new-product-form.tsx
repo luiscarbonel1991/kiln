@@ -71,6 +71,7 @@ export function NewProductForm({
     [],
   );
   const [useContext, setUseContext] = useState("");
+  const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [degraded, setDegraded] = useState<Degraded | null>(null);
   const [uploading, startUpload] = useTransition();
@@ -177,6 +178,7 @@ export function NewProductForm({
             ...(w.example.trim() ? { example: w.example } : {}),
           })),
         ...(useContext.trim() ? { useContext } : {}),
+        ...(Number(price) > 0 ? { price: Number(price) } : {}),
         ...(file
           ? {
               file:
@@ -594,6 +596,23 @@ export function NewProductForm({
           />
           <span className="font-sans text-[0.75rem] text-on-surface-mid">
             The in-use and lifestyle scenes take place there.
+          </span>
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className={LABEL}>Price (optional)</span>
+          <input
+            className={cn(FIELD, "max-w-[160px]")}
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            value={price}
+            placeholder="24.00"
+            onChange={(e) => setPrice(e.target.value)}
+          />
+          <span className="font-sans text-[0.75rem] text-on-surface-mid">
+            Yours, in your shop's currency. The listing text needs it; Kiln
+            never sets one.
           </span>
         </label>
       </div>
