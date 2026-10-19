@@ -108,6 +108,17 @@ says the surfaces take its material, colour and grain. On gpt-image-2 that adds 
 $0.009 per scene. The colour sheet shows each sample, and the board shows it beside
 the reference, so each scene can be checked by eye.
 
+**Parts and views.**
+- A product made of several pieces lists them in `parts`: a plate standing in a base,
+  each with its size (w across, h up, d front to back), whether it stands upright or
+  lies flat, and its own material and fixed colour.
+- The first part is what the buyer buys. Size & spec titles its size and gives a row
+  per part, and the prompt and the listing name every part.
+- `dimensions` stays the whole box the drawing frames.
+- Up to two `views` (side, top, back, three-quarter) show what the front cannot. An SVG
+  view is rendered to PNG at import. Every scene sends them after the reference and the
+  material sample, each named by its place ("the top view (the second image)").
+
 **Listing text.** On a destination with text rules (Etsy), the board shows the
 listing text under the photos: title, description, variations with the maker's
 prices, personalization fields, 13 tags, materials and attributes, in the order of
