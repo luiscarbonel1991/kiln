@@ -4,7 +4,6 @@ import {
   type ColourOption,
   colourOf,
   type Dimensions,
-  dimensionsLabel,
   type Product,
   partLabel,
   type Treatment,
