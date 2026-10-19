@@ -158,6 +158,7 @@ export async function updateProjectProductAction(
       understanding,
       master: fresh,
       cards,
+      textRules: (id) => CATALOG.destinations.find((d) => d.id === id)?.text,
     });
   } catch (error) {
     return {

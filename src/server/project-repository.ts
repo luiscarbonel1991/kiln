@@ -1,7 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { Card } from "@/domain/card";
+import type { DestinationText } from "@/domain/destination";
 import { modelPriced } from "@/domain/generation-cost";
-import type { ListingText } from "@/domain/listing";
+import { type ListingText, refreshListing } from "@/domain/listing";
 import type { MasterAsset } from "@/domain/master-asset";
 import { assertModel, ModelRefused } from "@/domain/model-defaults";
 import type {
@@ -790,7 +791,8 @@ export async function setDelivered(
 // Bring a planned project up to its product's current version: the
 // understanding written from the product, the reference when Kiln makes one
 // (null keeps the maker's), each card's fields and references (refreshCards:
-// the material sample), and the version the project now follows. Locked like approvals; one transaction.
+// the material sample), each saved listing's spec fields, and the version the
+// project now follows. Locked like approvals; one transaction.
 export async function refreshProjectProduct(
   projectId: string,
   input: {
@@ -798,6 +800,9 @@ export async function refreshProjectProduct(
     understanding: BaseUnderstanding;
     master: MasterAsset | null;
     cards: Card[];
+    // A destination's text rules: its saved listing's spec fields are
+    // drafted again from the product (refreshListing).
+    textRules?: (destinationId: string) => DestinationText | undefined;
   },
 ): Promise<void> {
   assertDatabaseUrl();
@@ -824,10 +829,29 @@ export async function refreshProjectProduct(
         },
       });
     }
+    const row = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true },
+    });
+    const plan = ProjectPlan.safeParse(row.plan);
+    const listed = plan.success
+      ? {
+          destinations: plan.data.destinations.map((d) => {
+            const rules = input.textRules?.(d.destinationId);
+            return d.listing && rules
+              ? {
+                  ...d,
+                  listing: refreshListing(d.listing, input.product, rules),
+                }
+              : d;
+          }),
+        }
+      : null;
     await tx.project.update({
       where: { id: projectId },
       data: {
         understanding: input.understanding as unknown as Prisma.InputJsonValue,
+        ...(listed ? { plan: listed as unknown as Prisma.InputJsonValue } : {}),
       },
     });
     await tx.projectProduct.update({

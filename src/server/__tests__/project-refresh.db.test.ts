@@ -70,6 +70,14 @@ describe.skipIf(!enabled)(
       });
       created.push(id);
       const [first] = editor.cards;
+      // A saved listing: the title the maker wrote, the rest from the spec.
+      const { listingDraft } = await import("@/domain/listing");
+      const { SEED_DESTINATIONS } = await import("@/domain/seed");
+      const etsyText = SEED_DESTINATIONS.find((d) => d.id === "etsy")?.text;
+      await repo.setListing(id, "etsy", {
+        ...listingDraft(saved, etsyText),
+        title: { value: "My coaster title", source: "maker" },
+      });
       await db.card.update({
         where: { projectId_cardId: { projectId: id, cardId: first.id } },
         data: {
@@ -123,6 +131,16 @@ describe.skipIf(!enabled)(
         sample,
       ]);
       expect(now.maxMicros).toBeGreaterThan(old.maxMicros);
+      // The listing follows the product where it is still the spec's.
+      const listing = after.board.plan?.destinations[0].listing;
+      expect(listing?.title).toEqual({
+        value: "My coaster title",
+        source: "maker",
+      });
+      expect(listing?.materials).toEqual({
+        value: ["solid oak"],
+        source: "spec",
+      });
       const row = await db.project.findUniqueOrThrow({ where: { id } });
       expect(JSON.stringify(row.understanding)).toContain("solid oak");
     });
