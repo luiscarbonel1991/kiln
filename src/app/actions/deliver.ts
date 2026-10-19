@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
+import { listingDraft } from "@/domain/listing";
 import { slotCardId } from "@/domain/plan";
 import { plateHref } from "@/lib/plate-href";
 import { CATALOG } from "@/lib/recipes";
@@ -68,6 +69,12 @@ export async function deliverAction(input: unknown): Promise<DeliverResult> {
       plate: plate ? { ...plate, href: await dataUrl(plate.href) } : null,
       fetchOutput: async (url) => (await fetchAsset(url)).bytes,
       sourceOf: (output) => sources.get(output),
+      ...(destination.text
+        ? {
+            listing:
+              plan.listing ?? listingDraft(loaded.product, destination.text),
+          }
+        : {}),
       now,
     });
     const url = await storeAsset(result.zip, "application/zip", "deliveries");

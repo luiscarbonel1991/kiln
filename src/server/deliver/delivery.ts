@@ -2,6 +2,7 @@ import { strToU8, zipSync } from "fflate";
 import type { BrandKit } from "@/domain/brand";
 import type { DestinationProfile } from "@/domain/destination";
 import { exactView } from "@/domain/exact";
+import type { ListingText } from "@/domain/listing";
 import {
   type CardLike,
   deliveryBlockers,
@@ -16,6 +17,7 @@ import {
   targetSize,
   upscaleScene,
 } from "@/server/deliver/frames";
+import { listingSheet } from "@/server/deliver/listing-sheet";
 
 // A destination's delivery (ROADMAP principle 10, "Finished means delivered";
 // Phase 11 export): every slot switched on, in the plan's order, as a file at
@@ -50,6 +52,9 @@ export interface DeliveryInput {
   fetchOutput(url: string): Promise<Uint8Array>;
   // What produced an approved output, when the queue knows.
   sourceOf(output: string): SceneSource | undefined;
+  // The listing text (saved, else the free draft), on a destination with
+  // text rules: it goes along as the paste sheet.
+  listing?: ListingText;
   now: Date;
 }
 
@@ -116,6 +121,13 @@ function readme(
     "",
     "manifest.json lists each file with its source (the prompt and model of each",
     "scene, its measured cost when known).",
+    ...(input.listing && input.destination.text
+      ? [
+          "",
+          `listing.txt is the listing text, in the order of ${input.destination.name}'s listing editor;`,
+          "listing.json holds the same as data.",
+        ]
+      : []),
   ];
   return `${lines.join("\n")}\n`;
 }
@@ -227,6 +239,19 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
     files,
   };
   entries[`${folder}/README.txt`] = strToU8(readme(input, files, folder));
+  if (input.listing && input.destination.text) {
+    entries[`${folder}/listing.txt`] = strToU8(
+      listingSheet({
+        channel: input.destination.name,
+        product: input.product,
+        listing: input.listing,
+        rules: input.destination.text,
+      }),
+    );
+    entries[`${folder}/listing.json`] = strToU8(
+      `${JSON.stringify(input.listing, null, 2)}\n`,
+    );
+  }
   entries[`${folder}/manifest.json`] = strToU8(
     `${JSON.stringify(manifest, null, 2)}\n`,
   );

@@ -223,6 +223,29 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
     );
   });
 
+  it("a destination with text rules carries the listing as the paste sheet and as data", async () => {
+    const { SEED_DESTINATIONS } = await import("@/domain/seed");
+    const { listingDraft } = await import("@/domain/listing");
+    const rules = SEED_DESTINATIONS.find((d) => d.id === "etsy")?.text;
+    if (!rules) throw new Error("Etsy has no text rules");
+    const listing = listingDraft(coaster, rules);
+    const result = await buildDelivery(
+      input({ destination: { ...etsy, text: rules }, listing }),
+    );
+    const files = unzipSync(result.zip);
+    const folder = "botanical-coaster-launch-etsy";
+    const sheet = strFromU8(files[`${folder}/listing.txt`]);
+    expect(sheet).toContain("[1] TITLE");
+    expect(sheet.indexOf("[1] TITLE")).toBeLessThan(sheet.indexOf("[5] TAGS"));
+    expect(JSON.parse(strFromU8(files[`${folder}/listing.json`]))).toEqual(
+      listing,
+    );
+    expect(strFromU8(files[`${folder}/README.txt`])).toContain("listing.txt");
+    // Without text rules, no sheet.
+    const plain = unzipSync((await buildDelivery(input({ listing }))).zip);
+    expect(plain[`${folder}/listing.txt`]).toBeUndefined();
+  });
+
   it("refuses until every scene switched on is approved", async () => {
     await expect(
       buildDelivery(
