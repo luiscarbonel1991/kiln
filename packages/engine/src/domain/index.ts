@@ -120,6 +120,7 @@ export {
   unapproveSlot,
   type VideoSettings,
   videoSettings,
+  withListing,
   withSlotOff,
   withVideoChoice,
 } from "@/domain/plan";

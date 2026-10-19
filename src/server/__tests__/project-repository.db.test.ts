@@ -156,6 +156,28 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     expect(again.id).toBe(saved.id);
   });
 
+  it("saving the listing text keeps the slots and their approvals", async () => {
+    const id = created[0];
+    const { listingDraft } = await import("@/domain/listing");
+    const row = await db.project.findUniqueOrThrow({ where: { id } });
+    const plan = row.plan as {
+      destinations: { slots: { approvedOutput?: string }[] }[];
+    };
+    plan.destinations[0].slots[0].approvedOutput =
+      "https://stub.local/kept.png";
+    await db.project.update({ where: { id }, data: { plan } });
+    const listing = {
+      ...listingDraft(product),
+      title: { value: "A title of my own", source: "maker" as const },
+    };
+    await repo.setListing(id, "etsy", listing);
+    const loaded = await repo.loadProjectBoard(id);
+    expect(loaded?.board.plan?.destinations[0].listing).toEqual(listing);
+    expect(loaded?.board.plan?.destinations[0].slots[0].approvedOutput).toBe(
+      "https://stub.local/kept.png",
+    );
+  });
+
   it("an editor autosave keeps a planned project's type and plan", async () => {
     const id = created[0];
     await repo.saveProject({ ...editor, recipeId: "recipe-line-art" }, id);

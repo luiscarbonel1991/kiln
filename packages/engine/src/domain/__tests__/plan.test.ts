@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DestinationProfile } from "@/domain/destination";
+import { listingDraft } from "@/domain/listing";
 import {
   addVideoSlot,
   approveSlot,
@@ -7,6 +8,7 @@ import {
   destinationsFor,
   generableCardIds,
   moveSlot,
+  ProjectPlan,
   parseSlotCardId,
   parseSlotRecipeId,
   planCounts,
@@ -18,6 +20,7 @@ import {
   unapproveSlot,
   videoSettings,
   withDelivered,
+  withListing,
   withSlotOff,
   withVideoChoice,
 } from "@/domain/plan";
@@ -674,5 +677,26 @@ describe("video slots", () => {
     ).toBeNull();
     // A destination whose shot list has no video.
     expect(addVideoSlot(old, "social", videoCatalog.shotLists)).toBeNull();
+  });
+});
+
+describe("withListing", () => {
+  it("saves a destination's listing text in the plan, the slots untouched", () => {
+    const plan = planProject({
+      product: CUTTING_BOARD,
+      type: "launch",
+      destinationIds: ["shop", "social"],
+      catalog,
+    });
+    const listing = listingDraft(CUTTING_BOARD);
+    const next = withListing(plan, "shop", listing);
+    expect(next.destinations[0].listing).toEqual(listing);
+    expect(next.destinations[0].slots).toEqual(plan.destinations[0].slots);
+    expect(next.destinations[1].listing).toBeUndefined();
+    // Stored as JSON, it reads back; a plan without one still reads.
+    expect(ProjectPlan.parse(JSON.parse(JSON.stringify(next)))).toEqual(next);
+    expect(() => withListing(plan, "nowhere", listing)).toThrow(
+      /not a destination/,
+    );
   });
 });

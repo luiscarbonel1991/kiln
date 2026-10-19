@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { DestinationKind, DestinationProfile } from "@/domain/destination";
+import { ListingText } from "@/domain/listing";
 import type { VideoResolution } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
@@ -40,6 +41,9 @@ export const PlanDestination = z.object({
   destinationId: z.string().min(1),
   shotListId: z.string().min(1),
   slots: z.array(PlanSlot).min(1),
+  // The listing text once saved (edited, or written by the text model); until
+  // then the board shows the free draft from the spec.
+  listing: ListingText.optional(),
 });
 export type PlanDestination = z.infer<typeof PlanDestination>;
 
@@ -461,6 +465,22 @@ export function withDelivered(
               return { ...s, deliveredAt: at };
             }),
           },
+    ),
+  };
+}
+
+// Save a destination's listing text.
+export function withListing(
+  plan: ProjectPlan,
+  destinationId: string,
+  listing: ListingText,
+): ProjectPlan {
+  if (!plan.destinations.some((d) => d.destinationId === destinationId)) {
+    throw new Error(`"${destinationId}" is not a destination of this plan`);
+  }
+  return {
+    destinations: plan.destinations.map((d) =>
+      d.destinationId === destinationId ? { ...d, listing } : d,
     ),
   };
 }

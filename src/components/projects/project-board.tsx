@@ -17,6 +17,7 @@ import {
   GenerationPanel,
 } from "@/components/projects/generation-panel";
 import { GenerationPoller } from "@/components/projects/generation-poller";
+import { ListingPanel } from "@/components/projects/listing-panel";
 import { ProductChangedBanner } from "@/components/projects/product-changed";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
@@ -39,6 +40,7 @@ import {
   textLayerColours,
 } from "@/domain/exact";
 import { fromMicros } from "@/domain/generation-cost";
+import { checkListing, listingDraft } from "@/domain/listing";
 import {
   addVideoSlot,
   deliveryBlockers,
@@ -377,6 +379,20 @@ export function ProjectBoard({
                   );
                 })}
               </SlotGrid>
+              {destination.text ? (
+                <ListingPanel
+                  key={JSON.stringify(plan.listing ?? null)}
+                  projectId={projectId}
+                  destinationId={plan.destinationId}
+                  destinationName={destination.name}
+                  initial={
+                    plan.listing ?? listingDraft(product, destination.text)
+                  }
+                  saved={plan.listing !== undefined}
+                  product={product}
+                  rules={destination.text}
+                />
+              ) : null}
             </section>
           );
         })}
@@ -455,6 +471,15 @@ export function ProjectBoard({
           const on = slots.filter((s) => !s.slot.off);
           const scenes = on.filter((s) => s.slot.fill === "scene").length;
           const done = count("exact") + count("approved") + count("delivered");
+          // What the listing text still needs, when the destination has text
+          // rules (errors only: what the channel would refuse).
+          const listingErrors = destination.text
+            ? checkListing(
+                plan.listing ?? listingDraft(product, destination.text),
+                product,
+                destination.text,
+              ).filter((i) => i.severity === "error").length
+            : null;
           const approvedEarlier = on.filter(
             (s) => s.slot.approvedOutput && earlier.includes(s.cardId),
           ).length;
@@ -493,6 +518,17 @@ export function ProjectBoard({
                   {count("queued") + count("generating") + count("retrying")}{" "}
                   waiting or in progress
                 </li>
+                {listingErrors !== null ? (
+                  <li
+                    className={
+                      listingErrors > 0 ? "text-prov-local" : "text-prov-recipe"
+                    }
+                  >
+                    Listing text:{" "}
+                    {listingErrors > 0 ? `${listingErrors} to fix` : "ready"}
+                    {plan.listing ? "" : " (draft, not saved)"}
+                  </li>
+                ) : null}
                 {approvedEarlier > 0 ? (
                   <li className="text-prov-brand">
                     {approvedEarlier === 1

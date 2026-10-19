@@ -7,6 +7,7 @@ import {
   ACCEPTED_IMAGE_MIME,
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
+import { ListingText } from "@/domain/listing";
 import {
   ImageQuality,
   ProviderId,
@@ -26,6 +27,7 @@ import {
   loadProjectBoard,
   refreshProjectProduct,
   setCardModel,
+  setListing,
   setProjectReference,
   setSlotApproval,
   setSlotOff,
@@ -159,6 +161,28 @@ export async function updateProjectProductAction(
     return {
       error: `The project could not be updated: ${(error as Error).message}`,
     };
+  }
+  refresh();
+}
+
+const ListingSave = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  listing: ListingText,
+});
+
+// Save a destination's listing text as the maker left it (the fields they
+// edited say so). Free; checked again on every read.
+export async function saveListingAction(
+  input: unknown,
+): Promise<{ error: string } | undefined> {
+  const parsed = ListingSave.safeParse(input);
+  if (!parsed.success) return { error: "The listing text could not be read." };
+  const { projectId, destinationId, listing } = parsed.data;
+  try {
+    await setListing(projectId, destinationId, listing);
+  } catch (error) {
+    return { error: (error as Error).message };
   }
   refresh();
 }

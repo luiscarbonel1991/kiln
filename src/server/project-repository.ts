@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { Card } from "@/domain/card";
 import { modelPriced } from "@/domain/generation-cost";
+import type { ListingText } from "@/domain/listing";
 import type { MasterAsset } from "@/domain/master-asset";
 import { assertModel, ModelRefused } from "@/domain/model-defaults";
 import type {
@@ -19,6 +20,7 @@ import {
   slotCardId,
   unapproveSlot,
   withDelivered,
+  withListing,
   withSlotOff,
   withVideoChoice,
 } from "@/domain/plan";
@@ -501,6 +503,39 @@ export async function setSlotApproval(
 // back on. Locked like approvals; enqueueBatch takes the same lock, so a scene
 // is never queued as it is switched off. A scene with a job queued or running
 // cannot be switched off (cancel the batch first).
+// Save a destination's listing text in the plan. Locked like approvals, so a
+// save never drops an approval landing at the same time.
+export async function setListing(
+  projectId: string,
+  destinationId: string,
+  listing: ListingText,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true },
+    });
+    const plan = ProjectPlan.parse(project.plan);
+    await tx.project.update({
+      where: { id: projectId },
+      data: {
+        plan: withListing(
+          plan,
+          destinationId,
+          listing,
+        ) as unknown as Prisma.InputJsonValue,
+      },
+    });
+  });
+}
+
 export async function setSlotOff(
   projectId: string,
   ref: SlotRef,
