@@ -108,6 +108,19 @@ says the surfaces take its material, colour and grain. On gpt-image-2 that adds 
 $0.009 per scene. The colour sheet shows each sample, and the board shows it beside
 the reference, so each scene can be checked by eye.
 
+**Listing text.** On a destination with text rules (Etsy), the board shows the
+listing text under the photos: title, description, variations with the maker's
+prices, personalization fields, 13 tags, materials and attributes, in the order of
+Etsy's listing editor.
+- Every field is drafted free from the spec, with a count against its limit, what
+  Etsy would refuse in red and its advice in amber, and Copy.
+- "Write it with the text model" (≈ $0.03) rewrites the prose the maker has not
+  edited; the rules are checked again.
+- The rules are data (`DestinationProfile.text`). Prices come from the product
+  package (`price`, plus each variant value's `priceExtra`); Kiln never sets one.
+- Deliver adds `listing.txt`, a paste sheet with anything left to fix at the top, and
+  `listing.json`.
+
 A project remembers the version of its product it was built from. When the product
 changes, the board says what changed and offers "Update the project · free". The
 update rewrites the product's text and reference into the project and keeps the
