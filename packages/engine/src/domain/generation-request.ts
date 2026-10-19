@@ -91,7 +91,7 @@ export function buildVideoRequest(input: {
       "Approve a scene first: the video starts from an approved scene, never a new image.",
     );
   }
-  const u = productUnderstanding(product, { sample: false });
+  const u = productUnderstanding(product, { images: false });
   const subject = u.subject.replaceAll("the master image", "the start frame");
   const scene = input.scene?.trim().replace(/[.\s]+$/, "");
   const prompt = [

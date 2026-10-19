@@ -15,7 +15,7 @@ import {
   slotCardId,
   slotRecipeId,
 } from "@/domain/plan";
-import { defaultSwatch, type Product } from "@/domain/product";
+import { type Product, productImages } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import type { ProjectType } from "@/domain/project";
 import { productSceneCues, sceneVariants } from "@/domain/scene-direction";
@@ -91,8 +91,12 @@ export function slotCards(
         ...(s.aspect ? { aspect: s.aspect } : {}),
       })),
     };
-    // A photographic scene reads the material sample after the reference.
-    const swatch = recipe.style === "line-art" ? null : defaultSwatch(product);
+    // A photographic scene reads the sample and the views after the
+    // reference, in the order the product's text names them.
+    const images =
+      recipe.style === "line-art"
+        ? []
+        : productImages(product).map((i) => i.url);
     const sceneCards = buildCards({
       master,
       recipe: slotRecipe,
@@ -103,7 +107,7 @@ export function slotCards(
       ...card,
       id: slotCardId(d.destinationId, scenes[i].key),
       status: "draft" as const,
-      references: swatch ? [swatch] : [],
+      references: images,
     }));
     const videoCards = d.slots
       .filter((s) => s.fill === "video")

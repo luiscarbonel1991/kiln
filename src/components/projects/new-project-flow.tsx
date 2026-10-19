@@ -34,7 +34,7 @@ import {
   planProject,
   slotCardId,
 } from "@/domain/plan";
-import { defaultSwatch, dimensionsLabel, type Product } from "@/domain/product";
+import { dimensionsLabel, type Product, productImages } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
 import { plateHref } from "@/lib/plate-href";
 import { plural } from "@/lib/plural";
@@ -127,11 +127,11 @@ export function NewProjectFlow({
   const slots = planned.filter((p) => !off.includes(p.id)).map((p) => p.slot);
   const scenes = slots.filter((s) => s.fill === "scene");
   const model = defaultImageModel(makerModels);
-  // Each scene reads the material sample beside the reference, when there is one.
+  // Each scene reads the sample and the views beside the reference.
   const estimate = estimateScenes(
     scenes,
     model,
-    product && defaultSwatch(product) ? 1 : 0,
+    product ? productImages(product).length : 0,
   );
 
   function toggleSlot(id: string) {

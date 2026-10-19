@@ -89,18 +89,20 @@ describe.skipIf(!enabled)(
       });
 
       const sample = "https://stub.local/birch-sample.jpg";
+      const view = "https://stub.local/birch-top.png";
       const [changed] = await upsertProducts([
         {
           ...saved,
           material: "solid oak",
           colours: [{ ...saved.colours[0], swatchUrl: sample }],
+          views: [{ label: "top", url: view }],
         },
       ]);
       const before = await repo.loadProjectBoard(id);
       if (!before?.version || !before.product) throw new Error("no version");
       expect(productDrift(before.product, before.version)).toEqual({
         stale: true,
-        changed: ["material", "colours (Birch changed)"],
+        changed: ["reference views", "material", "colours (Birch changed)"],
       });
       const { estimateProjectCards } = await import(
         "@/server/generation-queue"
@@ -125,10 +127,11 @@ describe.skipIf(!enabled)(
       });
       expect(card?.fields.subject.value).toContain("solid oak");
       // The material sample now travels with the reference, and is priced.
-      expect(card?.references).toEqual([sample]);
+      expect(card?.references).toEqual([sample, view]);
       const [now] = (await estimateProjectCards(id, [first.id])).cards;
       expect(now.request.kind === "image" && now.request.imageInputs).toEqual([
         sample,
+        view,
       ]);
       expect(now.maxMicros).toBeGreaterThan(old.maxMicros);
       // The listing follows the product where it is still the spec's.

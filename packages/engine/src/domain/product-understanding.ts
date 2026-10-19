@@ -6,8 +6,10 @@ import {
   dimensionsLabel,
   type Product,
   partLabel,
+  productImages,
   reliefLabel,
   type Treatment,
+  type ViewLabel,
 } from "@/domain/product";
 import type { BaseUnderstanding } from "@/domain/understanding";
 
@@ -55,10 +57,19 @@ function inkOf(colour: ColourOption): string | null {
 // would have extracted from a photo, written from the spec instead (no paid
 // call). Generic for any maker; the default colour and the wording examples
 // stand in for a buyer's choice until the project asks for one.
+// How a view's side reads in a sentence.
+const FROM: Record<ViewLabel, string> = {
+  side: "from the side",
+  top: "from above",
+  back: "from behind",
+  "three-quarter": "at three-quarter",
+};
+
 export function productUnderstanding(
   product: Product,
-  // A video animates a start frame and reads no material sample.
-  options: { sample?: boolean } = {},
+  // A video animates a start frame and reads no other image, so no image is
+  // named to it.
+  options: { images?: boolean } = {},
 ): BaseUnderstanding {
   const colour = colourOf(product, product.defaultColour);
   const material = colourMaterial(colour.name, product.material);
@@ -75,12 +86,20 @@ export function productUnderstanding(
     product.forbidden.length > 0
       ? `; add nothing to the product itself (no ${product.forbidden.join(", no ")})`
       : "";
-  // A material sample travels as the image after the reference (see
-  // defaultSwatch): it says what the surfaces look like, never what to draw.
-  const sample =
-    colour.swatchUrl && options.sample !== false
-      ? "; its surfaces have exactly the material, colour and grain of the material sample (the second image), and nothing else is taken from that sample (not its shape, framing or edges)"
-      : "";
+  // The images read after the reference (productImages), each named by its
+  // place: what it shows, and that nothing else is taken from it.
+  const images = options.images === false ? [] : productImages(product);
+  const sampleImage = images.find((i) => i.role === "sample");
+  const sample = sampleImage
+    ? `; its surfaces have exactly the material, colour and grain of the material sample (the ${sampleImage.place} image), and nothing else is taken from that sample (not its shape, framing or edges)`
+    : "";
+  const views = images
+    .filter((i) => i.role !== "sample")
+    .map(
+      (i) =>
+        `; the ${i.role} view (the ${i.place} image) shows this same product ${FROM[i.role as ViewLabel]}: its shape, its depth and how far its marks stand from the face; nothing else is taken from it`,
+    )
+    .join("");
   // A product of several pieces names each with its size, colour and
   // material, so a scene draws the base as a base, not a thin strip.
   const parts = product.parts ?? [];
@@ -93,7 +112,7 @@ export function productUnderstanding(
       ? `, made of ${named.length} parts: ${named.slice(0, -1).join(", ")} and ${named.at(-1)}; every part true to its size`
       : "";
   return {
-    subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${material}${pieces}${wording}; keep every letter, mark and proportion exactly as in the master image${forbidden}`,
+    subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${material}${pieces}${wording}; keep every letter, mark and proportion exactly as in the master image${views}${forbidden}`,
     productType: `${product.family.toLowerCase()}, ${product.shape}`,
     useContext: product.useContexts[0] ?? "",
     sceneProps: "",

@@ -154,6 +154,29 @@ describe("productUnderstanding", () => {
     expect(defaultSwatch(CUTTING_BOARD)).toBeNull();
   });
 
+  it("names every image by its place: the sample, then each view", () => {
+    const side = { label: "side" as const, url: "https://stub.local/side.png" };
+    const sampled = {
+      ...CUTTING_BOARD,
+      colours: CUTTING_BOARD.colours.map((c, i) =>
+        i === 0 ? { ...c, swatchUrl: "https://stub.local/maple.jpg" } : c,
+      ),
+      views: [side],
+    };
+    const u = productUnderstanding(sampled);
+    expect(u.materials).toContain("material sample (the second image)");
+    expect(u.subject).toContain(
+      "the side view (the third image) shows this same product from the side: its shape, its depth and how far its marks stand from the face; nothing else is taken from it",
+    );
+    // Without a sample, the view is the second image.
+    expect(
+      productUnderstanding({ ...CUTTING_BOARD, views: [side] }).subject,
+    ).toContain("the side view (the second image)");
+    // A video names no image.
+    const video = productUnderstanding(sampled, { images: false });
+    expect(`${video.subject} ${video.materials}`).not.toContain("image)");
+  });
+
   it("keeps the forbidden list on the product, so a scene may hold props", () => {
     expect(productUnderstanding(CUTTING_BOARD).subject).toContain(
       "; add nothing to the product itself (no other text, no logos, no people, no extra objects on the product)",

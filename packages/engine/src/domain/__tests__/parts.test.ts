@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buyerSizeLabel, Product, partLabel } from "@/domain/product";
+import {
+  buyerSizeLabel,
+  Product,
+  partLabel,
+  productImages,
+} from "@/domain/product";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
 import { PLATE_ON_BASE } from "./fixtures/plate-on-base";
 
@@ -43,5 +48,26 @@ describe("views", () => {
     expect(
       Product.safeParse({ ...CUTTING_BOARD, views: [view("inside")] }).success,
     ).toBe(false);
+  });
+});
+
+describe("productImages", () => {
+  const sampled = {
+    ...CUTTING_BOARD,
+    colours: CUTTING_BOARD.colours.map((c, i) =>
+      i === 0 ? { ...c, swatchUrl: "https://stub.local/maple.jpg" } : c,
+    ),
+  };
+  const side = { label: "side" as const, url: "https://stub.local/side.png" };
+
+  it("lists the sample, then each view, each with its place after the reference", () => {
+    expect(productImages({ ...sampled, views: [side] })).toEqual([
+      { url: "https://stub.local/maple.jpg", role: "sample", place: "second" },
+      { url: "https://stub.local/side.png", role: "side", place: "third" },
+    ]);
+    expect(productImages({ ...CUTTING_BOARD, views: [side] })).toEqual([
+      { url: "https://stub.local/side.png", role: "side", place: "second" },
+    ]);
+    expect(productImages(CUTTING_BOARD)).toEqual([]);
   });
 });

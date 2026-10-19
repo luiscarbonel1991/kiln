@@ -323,6 +323,29 @@ export function defaultSwatch(product: Product): string | null {
   return colourOf(product, product.defaultColour).swatchUrl ?? null;
 }
 
+export interface ProductImage {
+  url: string;
+  // What it shows: the material sample, or a view from one side.
+  role: "sample" | ViewLabel;
+  // Its place among the images an edit reads, the reference being the first
+  // ("second", "third"): prompts name each image by it.
+  place: string;
+}
+
+const PLACES = ["second", "third", "fourth"];
+
+// The images a scene reads after the product's reference, in order: the
+// default colour's material sample, then each view. One list, so the
+// references a card sends and the words that name them never disagree.
+export function productImages(product: Product): ProductImage[] {
+  const sample = defaultSwatch(product);
+  const urls: { url: string; role: ProductImage["role"] }[] = [
+    ...(sample ? [{ url: sample, role: "sample" as const }] : []),
+    ...(product.views ?? []).map((v) => ({ url: v.url, role: v.label })),
+  ];
+  return urls.map((image, i) => ({ ...image, place: PLACES[i] }));
+}
+
 // Checks a request against the product's wording rules before anything is
 // rendered or billed. Returns human-readable problems; empty = ok.
 export function validateWording(
