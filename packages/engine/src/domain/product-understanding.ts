@@ -5,6 +5,7 @@ import {
   type Dimensions,
   dimensionsLabel,
   type Product,
+  partLabel,
   reliefLabel,
   type Treatment,
 } from "@/domain/product";
@@ -80,8 +81,19 @@ export function productUnderstanding(
     colour.swatchUrl && options.sample !== false
       ? "; its surfaces have exactly the material, colour and grain of the material sample (the second image), and nothing else is taken from that sample (not its shape, framing or edges)"
       : "";
+  // A product of several pieces names each with its size, colour and
+  // material, so a scene draws the base as a base, not a thin strip.
+  const parts = product.parts ?? [];
+  const named = parts.map(
+    (p) =>
+      `the ${p.name} (${[partLabel(p, product.dimensions.unit), p.colour?.name, p.material].filter(Boolean).join(", ")})`,
+  );
+  const pieces =
+    named.length > 0
+      ? `, made of ${named.length} parts: ${named.slice(0, -1).join(", ")} and ${named.at(-1)}; every part true to its size`
+      : "";
   return {
-    subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${material}${wording}; keep every letter, mark and proportion exactly as in the master image${forbidden}`,
+    subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${material}${pieces}${wording}; keep every letter, mark and proportion exactly as in the master image${forbidden}`,
     productType: `${product.family.toLowerCase()}, ${product.shape}`,
     useContext: product.useContexts[0] ?? "",
     sceneProps: "",

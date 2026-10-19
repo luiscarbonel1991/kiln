@@ -160,6 +160,13 @@ describe("productUnderstanding", () => {
     );
   });
 
+  it("names each part with its size, colour and material", () => {
+    expect(productUnderstanding(PLATE_ON_BASE).subject).toContain(
+      "a 9 x 2.78 in name plate in maple hardwood, made of 2 parts: the plate (8 x 2.5 in, 0.14 in thick) and the base (9 x 2.25 in footprint, 1/4 in thick, black matte, two layers of the same sheet); every part true to its size",
+    );
+    expect(productUnderstanding(CUTTING_BOARD).subject).not.toContain("parts");
+  });
+
   it("takes the first place of use as the use context", () => {
     expect(productUnderstanding(CUTTING_BOARD).useContext).toBe("");
     expect(

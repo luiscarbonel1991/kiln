@@ -75,6 +75,31 @@ describe("buildVideoRequest", () => {
     expect(GenerationRequest.parse(request)).toEqual(request);
   });
 
+  it("keeps a product's parts, so the video holds the base true too", () => {
+    const request = buildVideoRequest({
+      product: {
+        ...plate,
+        dimensions: { w: 9, h: 2.78, d: 2.25, unit: "in" as const },
+        parts: [
+          {
+            name: "plate",
+            lies: "upright" as const,
+            dimensions: { w: 8, h: 2.5, d: 0.14 },
+          },
+          {
+            name: "base",
+            lies: "flat" as const,
+            dimensions: { w: 9, h: 0.25, d: 2.25 },
+          },
+        ],
+      },
+      settings,
+    });
+    expect(request.prompt).toContain(
+      "made of 2 parts: the plate (8 x 2.5 in, 0.14 in thick) and the base (9 x 2.25 in footprint, 1/4 in thick)",
+    );
+  });
+
   it("reads no material sample: a video animates its start frame", () => {
     const sampled = {
       ...plate,
