@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { HomeProjects } from "@/components/home/home-projects";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { fromMicros } from "@/domain/generation-cost";
-import { dimensionsLabel } from "@/domain/product";
+import { buyerSizeLabel } from "@/domain/product";
 import { providerMode } from "@/providers/mode";
 import { budget } from "@/server/generation-repository";
 import { homeStats, type ProjectStats } from "@/server/home-repository";
@@ -147,7 +147,7 @@ export default async function HomePage() {
                     {p.name}
                   </span>
                   <span className="font-sans text-[0.8rem] text-on-surface-mid">
-                    {dimensionsLabel(p.dimensions)} · {p.material}
+                    {buyerSizeLabel(p)} · {p.material}
                   </span>
                   <span className="flex gap-1.5 pt-1">
                     {p.colours.map((c) => (

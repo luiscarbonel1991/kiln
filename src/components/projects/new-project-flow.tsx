@@ -34,7 +34,7 @@ import {
   planProject,
   slotCardId,
 } from "@/domain/plan";
-import { dimensionsLabel, type Product, productImages } from "@/domain/product";
+import { buyerSizeLabel, type Product, productImages } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
 import { plateHref } from "@/lib/plate-href";
 import { plural } from "@/lib/plural";
@@ -263,7 +263,7 @@ export function NewProjectFlow({
                 {p.name}
               </span>
               <span className="font-sans text-[0.8rem] text-on-surface-mid">
-                {dimensionsLabel(p.dimensions)} · {p.material}
+                {buyerSizeLabel(p)} · {p.material}
               </span>
               <span className="flex gap-1.5 pt-1">
                 {p.colours.map((c) => (

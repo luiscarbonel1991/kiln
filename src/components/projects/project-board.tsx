@@ -53,9 +53,9 @@ import {
   videoSettings,
 } from "@/domain/plan";
 import {
+  buyerSizeLabel,
   colourOf,
   defaultSwatch,
-  dimensionsLabel,
   type Product,
 } from "@/domain/product";
 import type { JobView } from "@/domain/queue";
@@ -208,8 +208,7 @@ export function ProjectBoard({
             {board.name}
           </h1>
           <p className="mt-1 font-sans text-sm text-on-surface-mid">
-            {product.name} · {dimensionsLabel(product.dimensions)} ·{" "}
-            {product.material}
+            {product.name} · {buyerSizeLabel(product)} · {product.material}
           </p>
         </div>
 
