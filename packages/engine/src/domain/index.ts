@@ -64,6 +64,7 @@ export {
   PersonalizationField,
   refreshListing,
   TextSource,
+  withCopy,
 } from "@/domain/listing";
 export { lockByDefault } from "@/domain/locks";
 export { MasterAsset } from "@/domain/master-asset";

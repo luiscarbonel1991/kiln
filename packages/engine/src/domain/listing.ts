@@ -209,6 +209,32 @@ export function refreshListing(
   ) as ListingText;
 }
 
+// The text model's prose laid over a listing: each field the maker has not
+// written takes the model's words (marked so); one the maker wrote stays.
+export function withCopy(
+  listing: ListingText,
+  copy: {
+    title: string;
+    description: string;
+    tags: string[];
+    materials: string[];
+  },
+): ListingText {
+  const take = <K extends "title" | "description" | "tags" | "materials">(
+    key: K,
+  ) =>
+    listing[key].source === "maker"
+      ? listing[key]
+      : { value: copy[key], source: "model" as const };
+  return {
+    ...listing,
+    title: take("title"),
+    description: take("description"),
+    tags: take("tags"),
+    materials: take("materials"),
+  };
+}
+
 const STOP = new Set(["and", "with", "for", "the", "your", "you", "from"]);
 
 const capsWords = (text: string) =>

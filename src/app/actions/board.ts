@@ -7,8 +7,9 @@ import {
   ACCEPTED_IMAGE_MIME,
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
-import { ListingText } from "@/domain/listing";
+import { ListingText, listingDraft, withCopy } from "@/domain/listing";
 import {
+  defaultTextModel,
   ImageQuality,
   ProviderId,
   VideoResolution,
@@ -34,6 +35,7 @@ import {
   setSlotOrder,
   setVideoChoice,
 } from "@/server/project-repository";
+import { type Degraded, writeListing } from "@/server/text-calls";
 
 // Board mutations. Server Functions are POST-reachable: Zod is the trust
 // boundary, and every write is scoped to the current maker by the repository.
@@ -163,6 +165,53 @@ export async function updateProjectProductAction(
     };
   }
   refresh();
+}
+
+const ListingWrite = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  model: z
+    .object({ provider: ProviderId, model: z.string().min(1) })
+    .optional(),
+});
+
+// "Write it with the text model": the maker's text model (or the one the
+// degraded notice offers) rewrites the listing's prose, under the cap. Only
+// the fields the maker has not written are replaced; the result is saved and
+// checked like the draft.
+export async function writeListingAction(
+  input: unknown,
+): Promise<{ degraded?: Degraded; error?: string }> {
+  const parsed = ListingWrite.safeParse(input);
+  if (!parsed.success) return { error: "Nothing to write for." };
+  const { projectId, destinationId } = parsed.data;
+  const loaded = await loadProjectBoard(projectId);
+  const plan = loaded?.board.plan?.destinations.find(
+    (d) => d.destinationId === destinationId,
+  );
+  const destination = CATALOG.destinations.find((d) => d.id === destinationId);
+  if (!loaded?.product || !plan || !destination?.text) {
+    return { error: "This destination has no listing text." };
+  }
+  const current =
+    plan.listing ?? listingDraft(loaded.product, destination.text);
+  const result = await writeListing(
+    {
+      channel: destination.name,
+      product: loaded.product,
+      rules: destination.text,
+      draft: current,
+    },
+    parsed.data.model ?? defaultTextModel(await getMakerModels()),
+  );
+  if (!result.copy) return { degraded: result.degraded };
+  try {
+    await setListing(projectId, destinationId, withCopy(current, result.copy));
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+  refresh();
+  return {};
 }
 
 const ListingSave = z.object({

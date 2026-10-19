@@ -157,6 +157,7 @@ export function ProjectBoard({
   drift,
   earlier,
   ownPrompts,
+  listingPrice,
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -175,6 +176,8 @@ export function ProjectBoard({
   earlier: string[];
   // Cards that run their own prompt (they do not follow the product).
   ownPrompts: string[];
+  // "≈ $0.03": the maker's text model writing a listing; null unpriced.
+  listingPrice: string | null;
 }) {
   const rows = boardRows(board, jobs);
   const waiting = waitingCardIds(rows);
@@ -391,6 +394,7 @@ export function ProjectBoard({
                   saved={plan.listing !== undefined}
                   product={product}
                   rules={destination.text}
+                  writePrice={listingPrice}
                 />
               ) : null}
             </section>

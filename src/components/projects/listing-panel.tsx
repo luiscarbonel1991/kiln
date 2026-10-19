@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Copy, Loader2, Save } from "lucide-react";
+import { Check, Copy, Loader2, Save, Sparkles } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
-import { saveListingAction } from "@/app/actions/board";
+import { saveListingAction, writeListingAction } from "@/app/actions/board";
+import { DegradedNotice } from "@/components/studio/degraded-notice";
 import { Button } from "@/components/ui/button";
 import type { DestinationText } from "@/domain/destination";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/domain/listing";
 import type { Product } from "@/domain/product";
 import { cn } from "@/lib/utils";
+import type { Degraded } from "@/server/text-calls";
 
 const LABEL =
   "font-sans text-[0.59375rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim";
@@ -136,7 +138,7 @@ export function ListingPanel({
   saved,
   product,
   rules,
-  writer,
+  writePrice,
 }: {
   projectId: string;
   destinationId: string;
@@ -146,8 +148,8 @@ export function ListingPanel({
   saved: boolean;
   product: Product;
   rules: DestinationText;
-  // The text model's button, when offered (rendered by the board).
-  writer?: React.ReactNode;
+  // "≈ $0.03" on the maker's text model; null when it has no price.
+  writePrice: string | null;
 }) {
   const [listing, setListing] = useState(initial);
   // The materials as typed (commas and spaces kept while typing).
@@ -157,6 +159,8 @@ export function ListingPanel({
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [writing, startWriting] = useTransition();
+  const [degraded, setDegraded] = useState<Degraded | null>(null);
   const issues = useMemo(
     () => checkListing(listing, product, rules),
     [listing, product, rules],
@@ -201,6 +205,32 @@ export function ListingPanel({
     });
   }
 
+  // The text model rewrites the prose the maker has not written. Unsaved
+  // edits are saved first, so they are never written over.
+  function write(model?: { provider: "google" | "openai"; model: string }) {
+    setError(null);
+    startWriting(async () => {
+      if (dirty) {
+        const saved = await saveListingAction({
+          projectId,
+          destinationId,
+          listing,
+        });
+        if (saved?.error) {
+          setError(saved.error);
+          return;
+        }
+      }
+      const result = await writeListingAction({
+        projectId,
+        destinationId,
+        model,
+      });
+      if (result.error) setError(result.error);
+      setDegraded(result.degraded ?? null);
+    });
+  }
+
   const errors = issues.filter((i) => i.severity === "error").length;
   const tags = [
     ...listing.tags.value,
@@ -233,7 +263,17 @@ export function ListingPanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {writer}
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={writing || pending}
+            onClick={() => write()}
+            title="Rewrites the title, description, tags and materials you have not written yourself"
+          >
+            {writing ? <Loader2 className="animate-spin" /> : <Sparkles />}
+            Write it with the text model
+            {writePrice ? ` · ${writePrice}` : ""}
+          </Button>
           <Button
             size="sm"
             disabled={pending || (!dirty && saved)}
@@ -247,6 +287,15 @@ export function ListingPanel({
       </div>
       {error ? (
         <p className="font-mono text-[0.7rem] text-prov-local">{error}</p>
+      ) : null}
+      {degraded ? (
+        <DegradedNotice
+          degraded={degraded}
+          fellBackTo="the listing as it was"
+          verb="Write it"
+          pending={writing}
+          onAlternative={(model) => write(model)}
+        />
       ) : null}
 
       <div className="flex flex-col gap-1.5">

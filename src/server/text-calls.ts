@@ -1,15 +1,18 @@
 import type { BrandProfile } from "@/domain/brand";
+import type { DestinationText } from "@/domain/destination";
 import {
   TEXT_CALL_BUDGETS,
   type TextCallKind,
   textEstimate,
 } from "@/domain/generation-cost";
+import type { ListingText } from "@/domain/listing";
 import {
   assertModel,
   catalogFor,
   modelLabel,
   type ProviderId,
 } from "@/domain/model-defaults";
+import type { Product } from "@/domain/product";
 import { describeProviderError, errorMessage } from "@/domain/queue";
 import type { Recipe } from "@/domain/recipe";
 import { SEED_BRAND } from "@/domain/seed";
@@ -20,7 +23,7 @@ import {
 import type { VariantDirection } from "@/domain/variant-direction";
 import { fallbackVariants } from "@/providers/mock/art-director";
 import { getArtDirector, getVisionProvider } from "@/providers/registry";
-import type { ProductDraft } from "@/providers/text-prompts";
+import type { ListingCopy, ProductDraft } from "@/providers/text-prompts";
 import { textCall, withDirectSpend } from "@/server/direct-spend";
 
 // Vision and the art director on the maker's text model, under the monthly cap
@@ -153,5 +156,44 @@ export async function draftProduct(
   } catch (error) {
     console.warn("[kiln] product draft degraded:", errorMessage(error));
     return { degraded: degraded(model, "productDraft", error) };
+  }
+}
+
+// A listing's prose written by the maker's text model (the board's "Write it
+// with the text model"), under the cap. Tags come back trimmed, blanks
+// dropped; nothing is cut to fit — the board checks the answer against the
+// channel's rules and shows what to fix. On failure the listing stays as it
+// was and the answer says why.
+export async function writeListing(
+  input: {
+    channel: string;
+    product: Product;
+    rules: DestinationText;
+    draft: ListingText;
+  },
+  model: TextModel,
+): Promise<{ copy?: ListingCopy; degraded?: Degraded }> {
+  try {
+    assertModel(model, "text");
+    const result = await withDirectSpend(
+      textCall<ListingCopy>(model, "listingCopy"),
+      (beforeCall) =>
+        getArtDirector(model.provider).writeListing(input, {
+          model: model.model,
+          beforeCall,
+        }),
+    );
+    const clean = (list: string[]) => list.map((x) => x.trim()).filter(Boolean);
+    return {
+      copy: {
+        title: result.value.title.trim(),
+        description: result.value.description.trim(),
+        tags: clean(result.value.tags),
+        materials: clean(result.value.materials),
+      },
+    };
+  } catch (error) {
+    console.warn("[kiln] listing copy degraded:", errorMessage(error));
+    return { degraded: degraded(model, "listingCopy", error) };
   }
 }

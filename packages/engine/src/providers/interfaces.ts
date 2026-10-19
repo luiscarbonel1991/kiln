@@ -1,10 +1,12 @@
 import type { BrandProfile } from "@/domain/brand";
+import type { DestinationText } from "@/domain/destination";
+import type { ListingText } from "@/domain/listing";
 import type { ProviderId, VideoResolution } from "@/domain/model-defaults";
 import type { PlateRequest, PlateResult, Product } from "@/domain/product";
 import type { Recipe } from "@/domain/recipe";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
-import type { ProductDraft } from "@/providers/text-prompts";
+import type { ListingCopy, ProductDraft } from "@/providers/text-prompts";
 import type {
   Capabilities,
   GenerationResult,
@@ -47,8 +49,18 @@ export interface VisionProvider {
 
 // (b) Art director: text model -> diverse per-direction creative specs (scene,
 // composition, lighting), orthogonal not variations. buildCards combines these
-// with the shared planning (subject + palette) into the cards.
+// with the shared planning (subject + palette) into the cards. The same text
+// model, with no image, writes a listing's prose (writeListing).
 export interface ArtDirector {
+  writeListing(
+    input: {
+      channel: string;
+      product: Product;
+      rules: DestinationText;
+      draft: ListingText;
+    },
+    options: TextCallOptions,
+  ): Promise<TextResult<ListingCopy>>;
   proposeDirections(
     input: {
       understanding: BaseUnderstanding;

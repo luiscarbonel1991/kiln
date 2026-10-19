@@ -5,6 +5,7 @@ import {
   listingDraft,
   listingVariations,
   refreshListing,
+  withCopy,
 } from "@/domain/listing";
 import { SEED_DESTINATIONS } from "@/domain/seed";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
@@ -219,5 +220,24 @@ describe("refreshListing", () => {
     const refreshed = refreshListing(stored, changed, rules);
     expect(refreshed.title.value).toBe("My own title");
     expect(refreshed.materials.value).toEqual(["end-grain maple"]);
+  });
+});
+
+describe("withCopy", () => {
+  it("takes the model's words where the maker wrote none, marked as the model's", () => {
+    const stored = {
+      ...listingDraft(board, rules),
+      tags: { value: ["my own tag"], source: "maker" as const },
+    };
+    const next = withCopy(stored, {
+      title: "A better title",
+      description: "A better description.",
+      tags: ["model tag"],
+      materials: ["maple"],
+    });
+    expect(next.title).toEqual({ value: "A better title", source: "model" });
+    expect(next.materials).toEqual({ value: ["maple"], source: "model" });
+    expect(next.tags).toEqual({ value: ["my own tag"], source: "maker" });
+    expect(next.personalization).toEqual(stored.personalization);
   });
 });

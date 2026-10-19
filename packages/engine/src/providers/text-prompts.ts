@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { BrandProfile } from "@/domain/brand";
-import { Treatment } from "@/domain/product";
+import type { DestinationText } from "@/domain/destination";
+import { TREATMENT_LABEL } from "@/domain/exact";
+import { type ListingText, listingVariations } from "@/domain/listing";
+import { dimensionsLabel, type Product, Treatment } from "@/domain/product";
 import type { ListingSlot } from "@/domain/recipe";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { VariantDirection } from "@/domain/variant-direction";
@@ -115,3 +118,69 @@ export const ProductDraft = z.object({
   useContext: z.string(),
 });
 export type ProductDraft = z.infer<typeof ProductDraft>;
+
+// A listing's prose (the board's "Write it with the text model"): the title,
+// description, tags and materials, from the maker's spec alone, within the
+// channel's rules. The free draft from the spec goes along, to improve on;
+// Kiln checks the answer against the rules (nothing is cut on its own).
+export function listingCopyPrompt(input: {
+  channel: string;
+  product: Product;
+  rules: DestinationText;
+  draft: ListingText;
+}): string {
+  const { channel, product, rules, draft } = input;
+  const facts = {
+    name: product.name,
+    whatItIs: product.shape,
+    family: product.family,
+    material: product.material,
+    finish: TREATMENT_LABEL[product.treatment],
+    size: dimensionsLabel(product.dimensions),
+    colours: product.colours.map((c) =>
+      c.inStock ? c.name : `${c.name} (out of stock)`,
+    ),
+    textTheBuyerTypes: product.wording.map((w) => ({
+      label: w.label,
+      required: w.required,
+      ...(w.maxChars ? { maxCharacters: w.maxChars } : {}),
+    })),
+    variations: listingVariations(product).map((v) => ({
+      name: v.name,
+      values: v.values.map((x) => x.label),
+    })),
+    placesOfUse: product.useContexts,
+    ...(product.hook ? { hook: product.hook } : {}),
+    ...(product.description ? { description: product.description } : {}),
+  };
+  return [
+    `Write the text of one product listing for ${channel}. A small maker pastes it into ${channel}'s listing editor; a human publishes it. Return JSON.`,
+    "The product, from the maker's spec. These are the only facts you may use: invent no feature, material, size, claim, price, shipping, or production detail the spec does not give.",
+    JSON.stringify(facts, null, 2),
+    "Rules:",
+    `- title: at most ${rules.title.maxChars} characters${rules.title.adviseMaxWords ? ` and about ${rules.title.adviseMaxWords} words or fewer` : ""}. Name the item once, leading with its colour, material and size where they matter; no word twice; no lists of keywords.`,
+    "- description: plain text, no markdown, no emoji. Open with one line on what it is and who it is for. Then short sections headed in capitals (e.g. WHAT YOU GET, PERSONALIZATION): the size, material, finish and colours; each line the buyer types and its limit. Nothing about price, shipping, returns or how it is made beyond the spec.",
+    `- tags: exactly ${rules.tags.count} tags, each at most ${rules.tags.maxChars} characters, only letters, numbers, spaces, hyphens and apostrophes. Whole phrases a buyer would search; no two alike; not a lone word already in the title. Mix broad terms, longer specific phrases, and the buyer's own words (who it is for, the occasion, the room).`,
+    "- materials: 1-5 materials, each a few words, as a buyer would say them.",
+    "A free draft written from the spec, to improve on:",
+    JSON.stringify(
+      {
+        title: draft.title.value,
+        description: draft.description.value,
+        tags: draft.tags.value,
+        materials: draft.materials.value,
+      },
+      null,
+      2,
+    ),
+    "Write in English.",
+  ].join("\n");
+}
+
+export const ListingCopy = z.object({
+  title: z.string(),
+  description: z.string(),
+  tags: z.array(z.string()),
+  materials: z.array(z.string()),
+});
+export type ListingCopy = z.infer<typeof ListingCopy>;

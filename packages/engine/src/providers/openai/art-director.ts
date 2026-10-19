@@ -1,9 +1,14 @@
 import type { ArtDirector } from "@/providers/interfaces";
-import { fallbackVariants } from "@/providers/mock/art-director";
+import {
+  fallbackVariants,
+  mockListingCopy,
+} from "@/providers/mock/art-director";
 import { askOpenAI, openaiTextModel } from "@/providers/openai/text";
 import {
   artDirectionPrompt,
   DirectionsAnswer,
+  ListingCopy,
+  listingCopyPrompt,
   pinToSlots,
 } from "@/providers/text-prompts";
 
@@ -11,6 +16,21 @@ import {
 // failure throws (the caller offers the recipe's directions or the other
 // provider, never a silent stand-in).
 export const openaiArtDirector: ArtDirector = {
+  async writeListing(input, options) {
+    const model = openaiTextModel(options.model);
+    if (model.mock) {
+      return { value: mockListingCopy(input.draft), model: model.id };
+    }
+    const answer = await askOpenAI({
+      model: model.id,
+      kind: "listingCopy",
+      name: "listing",
+      schema: ListingCopy,
+      content: [{ type: "input_text", text: listingCopyPrompt(input) }],
+      beforeCall: options.beforeCall,
+    });
+    return { value: answer.value, model: model.id, usage: answer.usage };
+  },
   async proposeDirections({ understanding, recipe, brand, n }, options) {
     const model = openaiTextModel(options.model);
     const fill = fallbackVariants(recipe, understanding, n);

@@ -318,6 +318,8 @@ export const TEXT_CALL_BUDGETS = {
   artDirection: { inputTokens: 3_000, outputTokens: 6_000 },
   // The prompt and one product photo; a short product draft.
   productDraft: { inputTokens: 4_000, outputTokens: 2_000 },
+  // The spec, the rules and the free draft; a title, a description, 13 tags.
+  listingCopy: { inputTokens: 3_000, outputTokens: 3_000 },
 } as const;
 export type TextCallKind = keyof typeof TEXT_CALL_BUDGETS;
 

@@ -7,7 +7,8 @@ import {
   waitingCardIds,
 } from "@/components/projects/project-board";
 import { ProjectsHeader } from "@/components/projects/projects-header";
-import { modelLabel } from "@/domain/model-defaults";
+import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
+import { defaultTextModel, modelLabel } from "@/domain/model-defaults";
 import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerMode } from "@/providers/mode";
@@ -17,7 +18,11 @@ import {
   projectGenerationState,
   QueueRefusal,
 } from "@/server/generation-repository";
-import { getCurrentMaker, getMakerBrand } from "@/server/maker-repository";
+import {
+  getCurrentMaker,
+  getMakerBrand,
+  getMakerModels,
+} from "@/server/maker-repository";
 import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
 import { type ProviderHealth, providerHealth } from "@/server/provider-health";
@@ -111,6 +116,11 @@ export default async function ProjectBoardPage({
     })
     .map((c) => c.id);
   const maker = await getCurrentMaker();
+  const writeUsd = textEstimate(
+    defaultTextModel(await getMakerModels()),
+    TEXT_CALL_BUDGETS.listingCopy,
+  );
+  const listingPrice = writeUsd === null ? null : `≈ $${writeUsd.toFixed(2)}`;
   const generation = await projectGenerationState(maker.id, board.id);
   const brand = await getMakerBrand();
   const health = await providerHealth(maker.id);
@@ -145,6 +155,7 @@ export default async function ProjectBoardPage({
           drift={drift}
           earlier={earlier}
           ownPrompts={cardsWithOwnPrompt(board.cards)}
+          listingPrice={listingPrice}
         />
       ) : (
         <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
