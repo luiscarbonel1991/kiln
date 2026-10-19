@@ -101,6 +101,25 @@ describe("listingDraft", () => {
     ).toEqual([]);
   });
 
+  it("a long visual brief stays out of the description; short phrases make the tags", () => {
+    const briefed = {
+      ...board,
+      name: "Desk name plate, engraved wood",
+      shape:
+        "rectangular desk name plate with rounded corners, standing upright in a base that shows in front of and behind the plate",
+      material:
+        "thin pale wood plate with an oak finish and visible straight grain over a fibre core",
+      description: "One wood plate in a matching base.",
+    };
+    const d = listingDraft(briefed, rules);
+    expect(d.description.value).toContain("One wood plate in a matching base.");
+    expect(d.description.value).not.toContain("visible straight grain");
+    expect(d.tags.value).toContain("desk name plate");
+    expect(d.tags.value).toContain("name plate");
+    expect(d.tags.value).not.toContain("the plate");
+    expect(d.materials.value).toEqual([]);
+  });
+
   it("is generic: nothing of a maker's catalog", () => {
     expect(JSON.stringify(draft).toLowerCase()).not.toMatch(
       /sign|acrylic|laser/,

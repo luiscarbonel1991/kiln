@@ -73,7 +73,7 @@ function Count({ n, max }: { n: number; max: number }) {
   return (
     <span
       className={cn(
-        "font-mono text-[0.625rem]",
+        "flex-shrink-0 whitespace-nowrap font-mono text-[0.625rem]",
         n > max ? "text-prov-local" : "text-on-surface-dim",
       )}
     >
@@ -248,7 +248,8 @@ export function ListingPanel({
           </h3>
           <p className="max-w-[560px] font-sans text-[0.8rem] leading-snug text-on-surface-mid">
             Paste each field into {destinationName}'s listing editor, in this
-            order. Drafted from the spec for free; whatever you edit is yours.
+            order. Drafted from the spec for free; whatever you edit is yours,
+            and the text model only rewrites what you have not.
             {saved ? "" : " Not saved yet."}
           </p>
           <p
@@ -268,7 +269,6 @@ export function ListingPanel({
             size="sm"
             disabled={writing || pending}
             onClick={() => write()}
-            title="Rewrites the title, description, tags and materials you have not written yourself"
           >
             {writing ? <Loader2 className="animate-spin" /> : <Sparkles />}
             Write it with the text model

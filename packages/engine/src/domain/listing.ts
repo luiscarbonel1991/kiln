@@ -106,12 +106,21 @@ function draftTitle(product: Product): string {
   return `${product.name}${product.wording.length > 0 ? ", personalized" : ""}`;
 }
 
+// Words written for a buyer, not for an image model: a spec's shape or
+// material can be a long visual brief, which the description leaves out.
+const SHORT = 60;
+
 function draftDescription(product: Product): string {
   const colours = product.colours
     .map((c) => (c.inStock ? c.name : `${c.name} (out of stock)`))
     .join(", ");
+  const brief =
+    product.shape.length <= SHORT && product.material.length <= SHORT
+      ? [`${product.shape} in ${product.material}`]
+      : [];
   const gets = [
-    `${product.shape} in ${product.material}, ${dimensionsLabel(product.dimensions)}${product.dimensions.d ? `, ${product.dimensions.d} ${product.dimensions.unit} thick` : ""}`,
+    ...brief,
+    `${dimensionsLabel(product.dimensions)}${product.dimensions.d ? `, ${product.dimensions.d} ${product.dimensions.unit} thick` : ""}`,
     `${TREATMENT_LABEL[product.treatment]} finish`,
     ...(product.colours.length > 1 ? [`In ${colours}`] : []),
     ...product.variants.map(
@@ -122,8 +131,12 @@ function draftDescription(product: Product): string {
     (w) =>
       `${w.label}${w.maxChars ? `: up to ${w.maxChars} characters` : ""}${w.required ? "" : " (optional)"}`,
   );
+  const opening = [
+    sentence(product.hook ?? product.name),
+    ...(product.description ? [sentence(product.description)] : []),
+  ];
   return [
-    sentence(product.hook ?? product.description ?? product.name),
+    opening.join("\n\n"),
     "",
     "WHAT YOU GET",
     ...gets.map((g) => `· ${sentence(g)}`),
@@ -140,18 +153,52 @@ function draftDescription(product: Product): string {
 
 const lower = (s: string) => s.trim().toLowerCase();
 
+const LEADING = new Set([
+  "a",
+  "an",
+  "the",
+  "of",
+  "in",
+  "on",
+  "with",
+  "and",
+  "for",
+  "to",
+  "that",
+  "its",
+]);
+
+// Short phrases for what the product is: each comma part of its name and
+// shape, and their last two words ("desk name plate" -> "name plate").
+function heads(product: Product): string[] {
+  const parts = [product.name, product.shape]
+    .flatMap((text) => text.split(","))
+    .map(lower)
+    .filter(Boolean);
+  const short = parts.flatMap((part) => {
+    const words = part.split(/\s+/);
+    return words.length > 2 ? [part, words.slice(-2).join(" ")] : [part];
+  });
+  // Never a phrase that starts mid-sentence ("the plate", "of wood").
+  return [...new Set(short)].filter(
+    (phrase) => !LEADING.has(phrase.split(" ")[0]),
+  );
+}
+
 // Phrases from the spec that fit a tag; the text model writes better ones.
 function draftTags(product: Product, rules?: DestinationText): string[] {
-  const shape = lower(product.shape);
+  const items = heads(product);
   const candidates = [
-    shape,
+    ...items,
     lower(product.family),
-    ...(product.wording.length > 0
-      ? [`personalized ${shape}`, `custom ${shape}`]
-      : []),
-    `${product.treatment} ${shape}`,
-    ...product.colours.map((c) => `${lower(c.name)} ${shape}`),
-    ...product.useContexts.map(lower),
+    ...items.flatMap((item) => [
+      `${product.treatment} ${item}`,
+      ...(product.wording.length > 0
+        ? [`custom ${item}`, `personalized ${item}`]
+        : []),
+      ...product.colours.map((c) => `${lower(c.name).split(" ")[0]} ${item}`),
+    ]),
+    ...product.useContexts.map((u) => lower(u.split(",")[0])),
   ];
   const fits = (tag: string) =>
     tag.length > 0 &&
