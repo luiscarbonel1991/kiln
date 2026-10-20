@@ -112,14 +112,16 @@ export const SEED_SHOT_LISTS: ShotList[] = [
       {
         key: "hero",
         label: "Marketplace hero",
-        purpose:
-          "Win the click: clean seamless background, soft contact shadow, no props.",
+        purpose: "Win the click: clean seamless background, no props.",
         aspect: "1:1",
-        scene:
-          "a clean seamless sweep in a soft neutral tone, a soft contact shadow, no props",
-        composition:
-          "the product centered at a slight three-quarter angle, filling most of the frame",
-        lighting: "soft, even studio light",
+        scene: "a clean seamless sweep in a soft neutral tone, no props",
+        composition: "the product centered at a slight three-quarter angle",
+        knobs: {
+          camera: "any",
+          distance: "close",
+          light: "studio",
+          shadow: "soft",
+        },
       },
       {
         key: "in-use",
@@ -127,11 +129,15 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         purpose:
           "Show it where the customer actually uses it, product still the hero.",
         aspect: "4:5",
-        scene:
-          "in use at {use}, doing its job, with the everyday objects that belong there",
-        composition:
-          "eye level or slightly above, the product sharp and unmistakably the hero, its surroundings readable",
-        lighting: "natural window light",
+        scene: "in use at {use}, doing its job",
+        composition: "the product sharp and unmistakably the hero",
+        knobs: {
+          camera: "eye",
+          distance: "medium",
+          light: "window",
+          shadow: "any",
+          props: "few",
+        },
       },
       {
         key: "colours",
@@ -176,10 +182,15 @@ export const SEED_SHOT_LISTS: ShotList[] = [
           "Place it in an aspirational styled setting that sells the feeling.",
         aspect: "4:5",
         scene:
-          "an aspirational, lived-in setting at {use}, styled to sell the feeling",
-        composition:
-          "a wider styled shot, the product the clear focal point and the props secondary",
-        lighting: "warm natural light",
+          "an aspirational, lived-in setting at {use} that sells the feeling",
+        composition: "the product the clear focal point",
+        knobs: {
+          camera: "any",
+          distance: "wide",
+          light: "warm",
+          shadow: "any",
+          props: "styled",
+        },
       },
       {
         key: "detail",
@@ -202,7 +213,7 @@ export const SEED_SHOT_LISTS: ShotList[] = [
           "gift-ready: the product with gift packaging (a box, tissue paper, a ribbon or a gift tag) on a simple surface",
         composition:
           "the product and its packaging arranged together, the product in front and unmistakable",
-        lighting: "soft daylight",
+        knobs: { camera: "any", distance: "any", light: "window" },
       },
       {
         key: "video",

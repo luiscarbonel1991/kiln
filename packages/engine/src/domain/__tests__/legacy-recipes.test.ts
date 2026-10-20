@@ -8,7 +8,8 @@ import legacy from "./fixtures/legacy-recipes.json";
 // intended change: M4 (2026-10-05) added each Etsy scene's own art direction;
 // M5 (2026-10-05) made the macro show the treatment ({surface}) and keep words
 // whole; 2026-10-11 the macro shows the finish, not the edges, and keeps words
-// whole with a margin.
+// whole with a margin; 2026-10-20 the Etsy scenes name their knobs (camera,
+// distance, light, shadow, props) and their prose leaves those to them.
 describe("legacy recipes (golden)", () => {
   it("SEED_RECIPES equals the frozen pre-split recipes, in order", () => {
     expect(SEED_RECIPES).toEqual(legacy);
