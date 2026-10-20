@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { Product } from "@/domain/product";
 
 // Scene knobs (ROADMAP "Knobs, not prose"): a maker who is not a designer
 // tunes a scene by picking a stop, never by writing prose. Each stop carries a
@@ -69,7 +68,7 @@ export const KNOBS: {
       },
       above: {
         label: "A little above",
-        hint: "Looks down a little, so the top of what lies flat shows",
+        hint: "Looks down on it a little",
         short: "a little above",
         text: "the camera a little above, looking down at about 30 degrees, so the top of anything lying flat shows",
       },
@@ -229,16 +228,13 @@ export interface EffectiveKnobs {
   stops: SceneKnobs;
   // The knobs the maker set.
   chosen: KnobKey[];
-  // Why Kiln picked a stop for this product.
-  why: Partial<Record<KnobKey, string>>;
 }
 
-// The slot's defaults, then what suits the product (a part lying flat shows
-// its top from a little above, never edge-on at eye level), then the maker's
-// own choices, which always win.
+// The slot's defaults, with the maker's own choices over them. (A part lying
+// flat once raised the camera on its own; on 10/20 "a little above" did not
+// show more of a flat base than eye level, so the stop stays the maker's.)
 export function effectiveKnobs(
   defaults: SceneKnobs,
-  product: Pick<Product, "parts"> | null,
   tuned: SceneKnobs = {},
 ): EffectiveKnobs {
   const offered = KnobKey.options.filter((k) => defaults[k] !== undefined);
@@ -246,18 +242,7 @@ export function effectiveKnobs(
   const stops: StopMap = Object.fromEntries(
     offered.map((k) => [k, tuned[k] ?? defaults[k]]),
   );
-  const why: EffectiveKnobs["why"] = {};
-  const flat = product?.parts?.find((p) => p.lies === "flat");
-  if (
-    flat &&
-    offered.includes("camera") &&
-    !chosen.includes("camera") &&
-    (stops.camera === "any" || stops.camera === "eye")
-  ) {
-    stops.camera = "above";
-    why.camera = `Its ${flat.name} lies flat; from a little above, its top shows`;
-  }
-  return { offered, stops: stops as SceneKnobs, chosen, why };
+  return { offered, stops: stops as SceneKnobs, chosen };
 }
 
 function stopOf(knob: KnobKey, stops: SceneKnobs): Stop | null {

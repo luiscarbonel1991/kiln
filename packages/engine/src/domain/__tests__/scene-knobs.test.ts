@@ -12,8 +12,6 @@ import {
   SavedKnobs,
   SceneKnobs,
 } from "@/domain/scene-knobs";
-import { CUTTING_BOARD } from "./fixtures/cutting-board";
-import { PLATE_ON_BASE } from "./fixtures/plate-on-base";
 
 const IN_USE = {
   camera: "eye",
@@ -55,44 +53,22 @@ describe("the knobs", () => {
 
 describe("effectiveKnobs", () => {
   it("offers the slot's knobs with its defaults", () => {
-    const e = effectiveKnobs(IN_USE, CUTTING_BOARD);
+    const e = effectiveKnobs(IN_USE);
     expect(e.offered).toEqual(["camera", "distance", "light", "props"]);
     expect(e.stops).toEqual(IN_USE);
     expect(e.chosen).toEqual([]);
-    expect(e.why).toEqual({});
-  });
-
-  it("raises the camera for a product with a part lying flat, and says why", () => {
-    const e = effectiveKnobs(IN_USE, PLATE_ON_BASE);
-    expect(e.stops.camera).toBe("above");
-    expect(e.why.camera).toBe(
-      "Its base lies flat; from a little above, its top shows",
-    );
-    expect(effectiveKnobs({ camera: "any" }, PLATE_ON_BASE).stops.camera).toBe(
-      "above",
-    );
   });
 
   it("lets the maker's choice win, even when it equals the default", () => {
-    const eye = effectiveKnobs(IN_USE, PLATE_ON_BASE, { camera: "eye" });
-    expect(eye.stops.camera).toBe("eye");
+    const above = effectiveKnobs(IN_USE, { camera: "above" });
+    expect(above.stops.camera).toBe("above");
+    expect(above.chosen).toEqual(["camera"]);
+    const eye = effectiveKnobs(IN_USE, { camera: "eye" });
     expect(eye.chosen).toEqual(["camera"]);
-    expect(eye.why).toEqual({});
-    const any = effectiveKnobs(IN_USE, PLATE_ON_BASE, { camera: "any" });
-    expect(any.stops.camera).toBe("any");
-  });
-
-  it("leaves a steep or absent camera alone", () => {
-    expect(
-      effectiveKnobs({ camera: "overhead" }, PLATE_ON_BASE).stops.camera,
-    ).toBe("overhead");
-    expect(effectiveKnobs({ light: "studio" }, PLATE_ON_BASE).stops).toEqual({
-      light: "studio",
-    });
   });
 
   it("ignores a choice for a knob the slot does not offer", () => {
-    const e = effectiveKnobs({ camera: "eye" }, null, { props: "none" });
+    const e = effectiveKnobs({ camera: "eye" }, { props: "none" });
     expect(e.offered).toEqual(["camera"]);
     expect(e.stops).toEqual({ camera: "eye" });
   });
@@ -106,18 +82,17 @@ describe("knobText and knobSummary", () => {
   });
 
   it("names the stops in one line, skipping 'any'", () => {
-    expect(knobSummary(effectiveKnobs(IN_USE, PLATE_ON_BASE))).toBe(
-      "A little above · medium · window light · a few props",
+    expect(knobSummary(effectiveKnobs(IN_USE))).toBe(
+      "Eye level · medium · window light · a few props",
     );
     expect(
-      knobSummary(effectiveKnobs({ camera: "any", distance: "wide" }, null)),
+      knobSummary(effectiveKnobs({ camera: "any", distance: "wide" })),
     ).toBe("Wide");
   });
 });
 
 describe("reasonMove", () => {
-  const at = (stops: Record<string, string>) =>
-    effectiveKnobs(stops as never, null);
+  const at = (stops: Record<string, string>) => effectiveKnobs(stops as never);
 
   it("moves its knob one step", () => {
     expect(reasonMove("top", at({ camera: "eye" }))).toEqual({

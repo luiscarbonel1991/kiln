@@ -52,34 +52,28 @@ function setup(
 }
 
 describe("tuneView", () => {
-  it("shows the slot's knobs, Kiln's pick and why, and what the model reads", () => {
+  it("shows the slot's knobs, their stops and what the model reads", () => {
     const { slot, card } = setup();
     const t = tuneView({
       slot,
       card,
       view: slotState(slot, card),
-      product: plate,
     });
-    expect(t?.summary).toBe(
-      "A little above · medium · window light · a few props",
-    );
+    expect(t?.summary).toBe("Eye level · medium · window light · a few props");
     expect(t?.knobs.map((k) => [k.key, k.stop, k.chosen])).toEqual([
-      ["camera", "above", false],
+      ["camera", "eye", false],
       ["distance", "medium", false],
       ["light", "window", false],
       ["shadow", "any", false],
       ["props", "few", false],
     ]);
-    expect(t?.knobs[0].why).toBe(
-      "Its base lies flat; from a little above, its top shows",
-    );
     expect(t?.knobs[0].stops.map((s) => s.label)).toEqual([
       "Any",
       "Eye level",
       "A little above",
       "From above",
     ]);
-    expect(t?.reads?.composition).toMatch(/^the camera a little above/);
+    expect(t?.reads?.composition).toMatch(/^eye level or slightly above/);
     expect(t?.locked).toBeNull();
     expect(t?.inert).toEqual({ prompt: false, fields: [] });
   });
@@ -94,12 +88,11 @@ describe("tuneView", () => {
           catalog: CATALOG,
         }),
         ref,
-        { knob: "camera", stop: "eye" },
+        { knob: "camera", stop: "above" },
       ),
     );
-    const t = tuneView({ slot, view: slotState(slot), product: plate });
-    expect(t?.knobs[0]).toMatchObject({ stop: "eye", chosen: true });
-    expect(t?.knobs[0].why).toBeUndefined();
+    const t = tuneView({ slot, view: slotState(slot) });
+    expect(t?.knobs[0]).toMatchObject({ stop: "above", chosen: true });
     expect(t?.reads).toBeNull();
   });
 
@@ -109,14 +102,12 @@ describe("tuneView", () => {
       slot,
       card,
       view: { state: "queued", failed: false, inBatch: true },
-      product: plate,
     });
     expect(queued?.locked).toBe("In the queue: tune it when it is done.");
     const approved = tuneView({
       slot,
       card,
       view: { state: "approved", failed: false },
-      product: plate,
     });
     expect(approved?.locked).toBe("Approved: undo the approval to tune it.");
     const edited = tuneView({
@@ -130,7 +121,6 @@ describe("tuneView", () => {
         },
       },
       view: slotState(slot, card),
-      product: plate,
     });
     expect(edited?.inert).toEqual({ prompt: true, fields: ["lighting"] });
   });
@@ -139,14 +129,10 @@ describe("tuneView", () => {
     const { plan } = setup();
     const colours = plan.destinations[0].slots.find((s) => s.key === "size");
     if (!colours) throw new Error("no size slot");
-    expect(
-      tuneView({ slot: colours, view: slotState(colours), product: plate }),
-    ).toBeNull();
+    expect(tuneView({ slot: colours, view: slotState(colours) })).toBeNull();
     const { slot } = setup();
     const { knobs: _k, ...old } = slot;
-    expect(
-      tuneView({ slot: old, view: slotState(old), product: plate }),
-    ).toBeNull();
+    expect(tuneView({ slot: old, view: slotState(old) })).toBeNull();
   });
 
   it("a take to review offers what may be off and a new take with its price", () => {
@@ -160,10 +146,9 @@ describe("tuneView", () => {
       slot,
       card: done,
       view: slotState(slot, done),
-      product: plate,
     });
     expect(t?.reasons.map((r) => [r.label, r.move])).toEqual([
-      ["Can't see its top", { knob: "camera", stop: "overhead" }],
+      ["Can't see its top", { knob: "camera", stop: "above" }],
       ["Product too small", { knob: "distance", stop: "close" }],
       ["Too busy", { knob: "props", stop: "none" }],
       ["Too dark", { knob: "light", stop: "studio" }],
@@ -185,7 +170,7 @@ describe("tuneView", () => {
       slotState(slot, card),
       { state: "approved" as const, failed: false },
     ]) {
-      const t = tuneView({ slot, card: done, view, product: plate });
+      const t = tuneView({ slot, card: done, view });
       expect(t?.reasons).toEqual([]);
       expect(t?.take).toBeNull();
     }
@@ -208,7 +193,6 @@ describe("tuneView", () => {
       card: done,
       view: slotState(slot, done, job),
       job,
-      product: plate,
     });
     expect(t?.error).toBe("provider timed out");
   });

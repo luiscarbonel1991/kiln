@@ -78,14 +78,11 @@ export function slotCards(
       recipe.style === "line-art"
         ? undefined
         : sceneVariants(
-            // Each slot applies its knobs: its defaults, what suits the
-            // product, then the maker's own choices.
+            // Each slot applies its knobs: its defaults, then the maker's
+            // own choices.
             scenes.map((s) =>
               s.knobs
-                ? {
-                    ...s,
-                    knobs: effectiveKnobs(s.knobs, product, s.tuned).stops,
-                  }
+                ? { ...s, knobs: effectiveKnobs(s.knobs, s.tuned).stops }
                 : s,
             ),
             recipe.fieldDefaults,

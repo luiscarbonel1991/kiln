@@ -118,9 +118,9 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
     ((await card(projectId)).fields as { composition: { value: string } })
       .composition.value;
 
-  it("starts a product with a base lying flat from a little above", async () => {
+  it("starts from the scene's default, a base lying flat or not", async () => {
     const { id } = await start(photo);
-    expect(await composition(id)).toMatch(/^the camera a little above/);
+    expect(await composition(id)).toMatch(/^eye level or slightly above, /);
   });
 
   it("writes the plan and the card's direction, keeping what the maker wrote", async () => {
@@ -135,13 +135,13 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
         },
       },
     });
-    expect(await tune(id, { knob: "camera", stop: "eye" })).toBeUndefined();
-    expect((await slotOf(id))?.tuned).toEqual({ camera: "eye" });
+    expect(await tune(id, { knob: "camera", stop: "above" })).toBeUndefined();
+    expect((await slotOf(id))?.tuned).toEqual({ camera: "above" });
     const after = (await card(id)).fields as Record<
       string,
       { value: string; source: string }
     >;
-    expect(after.composition.value).toMatch(/^eye level or slightly above, /);
+    expect(after.composition.value).toMatch(/^the camera a little above, /);
     expect(after.lighting).toEqual({
       value: "my own light",
       source: "local",
@@ -151,11 +151,11 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
 
     expect(await tune(id, { knob: "distance", stop: "close" })).toBeUndefined();
     expect((await slotOf(id))?.tuned).toEqual({
-      camera: "eye",
+      camera: "above",
       distance: "close",
     });
     expect(await composition(id)).toMatch(
-      /^eye level or slightly above, the product sharp and unmistakably the hero, framed close, filling most of the frame; /,
+      /^the camera a little above, .*, the product sharp and unmistakably the hero, framed close, filling most of the frame; /,
     );
   });
 

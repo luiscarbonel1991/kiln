@@ -140,10 +140,6 @@ export function SlotTune({
                           Reset
                         </button>
                       </>
-                    ) : knob.why ? (
-                      <span className="text-prov-brand">
-                        Kiln's pick: {knob.why}
-                      </span>
                     ) : (
                       "the scene's default"
                     )}

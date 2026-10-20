@@ -280,16 +280,16 @@ describe("slotCards with knobs", () => {
     expect(card?.fields.lighting.value).toBe("natural window light");
   });
 
-  it("raises the camera for a product with a part lying flat", () => {
+  it("a part lying flat leaves the camera at the scene's default", () => {
     expect(inUse(withKnobs(), onBase)?.fields.composition.value).toMatch(
-      /^the camera a little above, looking down at about 30 degrees/,
+      /^eye level or slightly above, /,
     );
   });
 
-  it("the maker's choice wins over the product's pick", () => {
+  it("the maker's choice wins over the default", () => {
     expect(
-      inUse(withKnobs({ camera: "eye" }), onBase)?.fields.composition.value,
-    ).toMatch(/^eye level or slightly above, /);
+      inUse(withKnobs({ camera: "above" }), onBase)?.fields.composition.value,
+    ).toMatch(/^the camera a little above, looking down at about 30 degrees/);
   });
 });
 

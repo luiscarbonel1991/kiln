@@ -150,7 +150,6 @@ export function ProjectBoard({
   projectId,
   board,
   product,
-  builtFrom,
   jobs,
   generation,
   estimate,
@@ -165,8 +164,6 @@ export function ProjectBoard({
   projectId: string;
   board: Board & { plan: ProjectPlan };
   product: Product;
-  // The product version the project follows (its knobs pick for it).
-  builtFrom: Product;
   jobs: Record<string, JobView>;
   generation: { version: string; batch: BatchProgress | null; budget: Budget };
   estimate: BatchEstimate | { refusal: string } | null;
@@ -323,7 +320,6 @@ export function ProjectBoard({
                             card,
                             view,
                             job: jobs[cardId],
-                            product: builtFrom,
                           })}
                           hasReference={board.master !== null}
                           model={card ? (card.model as ModelValue) : null}

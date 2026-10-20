@@ -198,9 +198,8 @@ gift) is tuned with knobs, never with prose: camera (eye level, a little above,
 from above), distance (close, medium, wide), light (window, studio, warm), shadow
 (faint, soft, strong) and props (none, a few, styled); "Any" adds nothing.
 - Under each scene a line says how it is set; Tune opens the knobs, with what each
-  stop does and whether it is the maker's choice, Kiln's pick for the product (a
-  part lying flat starts from a little above, so its top shows) or the scene's
-  default. Turning one is free and writes the scene's direction again at once.
+  stop does and whether it is the maker's choice or the scene's default. Turning one
+  is free and writes the scene's direction again at once.
 - A take to review offers "What's off?" chips ("Can't see its top", "Product too
   small", "Too busy", "Too dark", "Shadows too strong"), each moving one knob, and
   "New take", priced on the button.

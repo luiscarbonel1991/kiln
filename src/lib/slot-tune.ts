@@ -1,7 +1,6 @@
 import type { Card } from "@/domain/card";
 import { estimateGeneration } from "@/domain/generation-cost";
 import type { PlanSlot, SlotView } from "@/domain/plan";
-import type { Product } from "@/domain/product";
 import type { JobView } from "@/domain/queue";
 import {
   effectiveKnobs,
@@ -17,7 +16,7 @@ import {
 } from "@/domain/scene-knobs";
 
 // What the board's Tune shows for one scene slot: its knobs with the stop each
-// applies (the maker's, or Kiln's pick and why), whether they can be turned
+// applies (the maker's, or the scene's default), whether they can be turned
 // now, what keeps them from reaching the prompt, and what the model reads.
 // A take to review adds what may be off about it (each reason moves a knob)
 // and a new take with its price, priced as the queue prices it.
@@ -29,10 +28,8 @@ export interface TuneKnob {
   key: KnobKey;
   label: string;
   stop: string;
-  // The maker set it (else it is the slot's default or Kiln's pick).
+  // The maker set it (else it is the scene's default).
   chosen: boolean;
-  // Why Kiln picked this stop for the product.
-  why?: string;
   stops: { key: string; label: string; hint: string }[];
 }
 
@@ -60,11 +57,10 @@ export function tuneView(input: {
   card?: Card;
   view: SlotView;
   job?: JobView;
-  product: Product;
 }): TuneView | null {
-  const { slot, card, view, job, product } = input;
+  const { slot, card, view, job } = input;
   if (slot.fill !== "scene" || !slot.knobs) return null;
-  const knobs = effectiveKnobs(slot.knobs, product, slot.tuned);
+  const knobs = effectiveKnobs(slot.knobs, slot.tuned);
   const locked =
     view.inBatch || view.state === "generating" || view.state === "retrying"
       ? "In the queue: tune it when it is done."
@@ -89,7 +85,6 @@ export function tuneView(input: {
         label: KNOBS[key].label,
         stop: knobs.stops[key] ?? "any",
         chosen: knobs.chosen.includes(key),
-        ...(knobs.why[key] ? { why: knobs.why[key] } : {}),
         stops: (knobStops(key) as string[]).map((s) => ({
           key: s,
           label: stops[s].label,
