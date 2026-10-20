@@ -19,6 +19,7 @@ import { type Product, productImages } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import type { ProjectType } from "@/domain/project";
 import { productSceneCues, sceneVariants } from "@/domain/scene-direction";
+import { effectiveKnobs } from "@/domain/scene-knobs";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { projectTypeLabel } from "@/lib/project-types";
@@ -77,7 +78,16 @@ export function slotCards(
       recipe.style === "line-art"
         ? undefined
         : sceneVariants(
-            scenes,
+            // Each slot applies its knobs: its defaults, what suits the
+            // product, then the maker's own choices.
+            scenes.map((s) =>
+              s.knobs
+                ? {
+                    ...s,
+                    knobs: effectiveKnobs(s.knobs, product, s.tuned).stops,
+                  }
+                : s,
+            ),
             recipe.fieldDefaults,
             understanding,
             product.useContexts,

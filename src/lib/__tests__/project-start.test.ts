@@ -228,6 +228,71 @@ describe("slotCards", () => {
   });
 });
 
+describe("slotCards with knobs", () => {
+  const etsy = plan.destinations[0];
+  const withKnobs = (tuned?: { camera?: "eye" | "above" }) => ({
+    destinations: [
+      {
+        ...etsy,
+        slots: etsy.slots.map((s) =>
+          s.key === "in-use"
+            ? {
+                ...s,
+                composition: "the product sharp and unmistakably the hero",
+                lighting: undefined,
+                knobs: {
+                  camera: "eye" as const,
+                  distance: "medium" as const,
+                  light: "window" as const,
+                },
+                ...(tuned ? { tuned } : {}),
+              }
+            : s,
+        ),
+      },
+    ],
+  });
+  const onBase = {
+    ...board,
+    parts: [
+      {
+        name: "board",
+        lies: "upright" as const,
+        dimensions: { w: 16, h: 10, d: 0.75 },
+      },
+      {
+        name: "stand",
+        lies: "flat" as const,
+        dimensions: { w: 17, h: 0.5, d: 4 },
+      },
+    ],
+  };
+  const inUse = (p: ReturnType<typeof withKnobs>, product: Product) =>
+    slotCards(p, master, productUnderstanding(product), product).find(
+      (c) => c.id === "etsy.in-use",
+    );
+
+  it("applies the slot's stops", () => {
+    const card = inUse(withKnobs(), board);
+    expect(card?.fields.composition.value).toMatch(
+      /^eye level or slightly above, the product sharp and unmistakably the hero, a medium shot, its surroundings readable; /,
+    );
+    expect(card?.fields.lighting.value).toBe("natural window light");
+  });
+
+  it("raises the camera for a product with a part lying flat", () => {
+    expect(inUse(withKnobs(), onBase)?.fields.composition.value).toMatch(
+      /^the camera a little above, looking down at about 30 degrees/,
+    );
+  });
+
+  it("the maker's choice wins over the product's pick", () => {
+    expect(
+      inUse(withKnobs({ camera: "eye" }), onBase)?.fields.composition.value,
+    ).toMatch(/^eye level or slightly above, /);
+  });
+});
+
 describe("startEditorState", () => {
   it("opens in generation with the spec understanding and no paid step", () => {
     const state = startEditorState({
