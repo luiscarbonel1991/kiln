@@ -166,12 +166,21 @@ describe("productUnderstanding", () => {
     const u = productUnderstanding(sampled);
     expect(u.materials).toContain("material sample (the second image)");
     expect(u.subject).toContain(
-      "the side view (the third image) shows this same product from the side: its shape, its depth and how far its marks stand from the face; nothing else is taken from it",
+      "the side view (the third image) shows this same product from the side: its depth and how far its marks stand from the face; nothing else is taken from it",
     );
     // Without a sample, the view is the second image.
     expect(
       productUnderstanding({ ...CUTTING_BOARD, views: [side] }).subject,
     ).toContain("the side view (the second image)");
+    // A top view shows the outline and depth, not the marks.
+    expect(
+      productUnderstanding({
+        ...CUTTING_BOARD,
+        views: [{ label: "top", url: "https://stub.local/top.png" }],
+      }).subject,
+    ).toContain(
+      "the top view (the second image) shows this same product from above: its outline and its depth; nothing else is taken from it",
+    );
     // A video names no image.
     const video = productUnderstanding(sampled, { images: false });
     expect(`${video.subject} ${video.materials}`).not.toContain("image)");
@@ -185,9 +194,12 @@ describe("productUnderstanding", () => {
 
   it("names each part with its size, colour and material", () => {
     expect(productUnderstanding(PLATE_ON_BASE).subject).toContain(
-      "a 9 x 2.78 in name plate in maple hardwood, made of 2 parts: the plate (8 x 2.5 in, 0.14 in thick) and the base (9 x 2.25 in footprint, 1/4 in thick, black matte, two layers of the same sheet); every part true to its size",
+      "a 9 x 2.78 in overall name plate in maple hardwood, made of 2 parts: the plate (8 x 2.5 in, 0.14 in thick) and the base (9 x 2.25 in footprint, 1/4 in thick, black matte, two layers of the same sheet); every part true to its size",
     );
     expect(productUnderstanding(CUTTING_BOARD).subject).not.toContain("parts");
+    expect(productUnderstanding(CUTTING_BOARD).subject).not.toContain(
+      "overall",
+    );
   });
 
   it("takes the first place of use as the use context", () => {

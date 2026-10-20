@@ -57,12 +57,13 @@ function inkOf(colour: ColourOption): string | null {
 // would have extracted from a photo, written from the spec instead (no paid
 // call). Generic for any maker; the default colour and the wording examples
 // stand in for a buyer's choice until the project asks for one.
-// How a view's side reads in a sentence.
-const FROM: Record<ViewLabel, string> = {
-  side: "from the side",
-  top: "from above",
-  back: "from behind",
-  "three-quarter": "at three-quarter",
+// Where a view looks from, and what it shows that the front cannot.
+const VIEW_SHOWS: Record<ViewLabel, string> = {
+  side: "from the side: its depth and how far its marks stand from the face",
+  top: "from above: its outline and its depth",
+  back: "from behind: its back and its depth",
+  "three-quarter":
+    "at three-quarter: its shape, its depth and how far its marks stand from the face",
 };
 
 export function productUnderstanding(
@@ -97,7 +98,7 @@ export function productUnderstanding(
     .filter((i) => i.role !== "sample")
     .map(
       (i) =>
-        `; the ${i.role} view (the ${i.place} image) shows this same product ${FROM[i.role as ViewLabel]}: its shape, its depth and how far its marks stand from the face; nothing else is taken from it`,
+        `; the ${i.role} view (the ${i.place} image) shows this same product ${VIEW_SHOWS[i.role as ViewLabel]}; nothing else is taken from it`,
     )
     .join("");
   // A product of several pieces names each with its size, colour and
@@ -111,8 +112,10 @@ export function productUnderstanding(
     named.length > 0
       ? `, made of ${named.length} parts: ${named.slice(0, -1).join(", ")} and ${named.at(-1)}; every part true to its size`
       : "";
+  // With parts, the product's own size is the whole assembly's.
+  const size = `${dimensionsLabel(product.dimensions)}${named.length > 0 ? " overall" : ""}`;
   return {
-    subject: `${product.name}: a ${dimensionsLabel(product.dimensions)} ${product.shape} in ${material}${pieces}${wording}; keep every letter, mark and proportion exactly as in the master image${views}${forbidden}`,
+    subject: `${product.name}: a ${size} ${product.shape} in ${material}${pieces}${wording}; keep every letter, mark and proportion exactly as in the master image${views}${forbidden}`,
     productType: `${product.family.toLowerCase()}, ${product.shape}`,
     useContext: product.useContexts[0] ?? "",
     sceneProps: "",
