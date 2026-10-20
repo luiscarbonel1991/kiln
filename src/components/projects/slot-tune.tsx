@@ -4,6 +4,8 @@ import { SlidersHorizontal } from "lucide-react";
 import { Popover, ToggleGroup } from "radix-ui";
 import { useState, useTransition } from "react";
 import { setSlotKnobAction } from "@/app/actions/board";
+import { enqueueGenerationAction } from "@/app/actions/generation";
+import { toMicros } from "@/domain/generation-cost";
 import type { KnobChoice } from "@/domain/scene-knobs";
 import type { TuneView } from "@/lib/slot-tune";
 import { cn } from "@/lib/utils";
@@ -19,16 +21,20 @@ const DIRECTION_LABEL = {
 
 // A scene's knobs on the board (ROADMAP "Knobs, not prose"): a line says how
 // the scene is set, Tune opens its stops. Turning one is free and writes the
-// scene's direction again at once; only a new take costs.
+// scene's direction again at once; only a new take costs, its price on the
+// button. What's off about a take is a reason chip that moves a knob: the
+// reason is the next instruction, nobody rewrites a prompt.
 export function SlotTune({
   projectId,
   destinationId,
   slotKey,
+  cardId,
   tune,
 }: {
   projectId: string;
   destinationId: string;
   slotKey: string;
+  cardId: string;
   tune: TuneView;
 }) {
   const [pending, startTransition] = useTransition();
@@ -42,6 +48,17 @@ export function SlotTune({
         choice,
       });
       setError(result?.error ?? null);
+    });
+  const take = () =>
+    startTransition(async () => {
+      if (!tune.take) return;
+      const result = await enqueueGenerationAction({
+        projectId,
+        cardIds: [cardId],
+        // The price on the button: the queue refuses if its own is higher.
+        shownMaxMicros: toMicros(tune.take.max),
+      });
+      setError("error" in result ? result.error : null);
     });
   const disabled = pending || tune.locked !== null;
   return (
@@ -165,6 +182,50 @@ export function SlotTune({
                   ))}
                 </dl>
               </details>
+            ) : null}
+            {tune.reasons.length > 0 ? (
+              <div className="flex flex-col gap-1.5 border-border-soft border-t pt-3">
+                <span className={LABEL}>What's off?</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {tune.reasons.map((reason) => (
+                    <button
+                      key={reason.key}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => set(reason.move)}
+                      className="rounded-pill border border-border-soft bg-secondary px-3 py-1 font-sans text-xs text-on-surface-mid transition-colors hover:border-primary disabled:opacity-60"
+                    >
+                      {reason.label}
+                    </button>
+                  ))}
+                </div>
+                <span className={cn(NOTE, "text-on-surface-mid")}>
+                  Each moves a knob above; nothing is spent until a new take.
+                </span>
+              </div>
+            ) : null}
+            {tune.take ? (
+              <div className="flex items-center justify-between gap-3 border-border-soft border-t pt-3">
+                <span className={cn(NOTE, "text-on-surface-mid")}>
+                  The new take replaces this one.
+                </span>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={take}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-field bg-primary px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-primary-foreground transition-opacity disabled:opacity-60"
+                >
+                  New take
+                  <span className="font-mono text-[0.625rem] font-normal opacity-80">
+                    ≈ ${tune.take.typical.toFixed(2)}–{tune.take.max.toFixed(2)}
+                  </span>
+                </button>
+              </div>
+            ) : null}
+            {tune.error ? (
+              <p className="font-mono text-[0.6rem] text-prov-local">
+                Last take failed: {tune.error}
+              </p>
             ) : null}
             {error ? (
               <p className="font-mono text-[0.6rem] text-prov-local">{error}</p>

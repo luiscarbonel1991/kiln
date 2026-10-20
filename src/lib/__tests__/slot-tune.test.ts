@@ -148,4 +148,68 @@ describe("tuneView", () => {
       tuneView({ slot: old, view: slotState(old), product: plate }),
     ).toBeNull();
   });
+
+  it("a take to review offers what may be off and a new take with its price", () => {
+    const { slot, card } = setup();
+    const done = {
+      ...card,
+      status: "done" as const,
+      outputs: ["https://x/1.png"],
+    };
+    const t = tuneView({
+      slot,
+      card: done,
+      view: slotState(slot, done),
+      product: plate,
+    });
+    expect(t?.reasons.map((r) => [r.label, r.move])).toEqual([
+      ["Can't see its top", { knob: "camera", stop: "overhead" }],
+      ["Product too small", { knob: "distance", stop: "close" }],
+      ["Too busy", { knob: "props", stop: "none" }],
+      ["Too dark", { knob: "light", stop: "studio" }],
+      ["Shadows too strong", { knob: "shadow", stop: "soft" }],
+    ]);
+    expect(t?.take?.typical).toBeGreaterThan(0);
+    expect(t?.take?.max).toBeGreaterThanOrEqual(t?.take?.typical ?? 0);
+  });
+
+  it("no reasons and no new take while queued, before a take, or once approved", () => {
+    const { slot, card } = setup();
+    const done = {
+      ...card,
+      status: "done" as const,
+      outputs: ["https://x/1.png"],
+    };
+    for (const view of [
+      { state: "queued" as const, failed: false, inBatch: true },
+      slotState(slot, card),
+      { state: "approved" as const, failed: false },
+    ]) {
+      const t = tuneView({ slot, card: done, view, product: plate });
+      expect(t?.reasons).toEqual([]);
+      expect(t?.take).toBeNull();
+    }
+  });
+
+  it("says why the last take failed, even with an earlier one showing", () => {
+    const { slot, card } = setup();
+    const done = {
+      ...card,
+      status: "done" as const,
+      outputs: ["https://x/1.png"],
+    };
+    const job = {
+      status: "failed" as const,
+      attempt: 2,
+      error: "provider timed out",
+    };
+    const t = tuneView({
+      slot,
+      card: done,
+      view: slotState(slot, done, job),
+      job,
+      product: plate,
+    });
+    expect(t?.error).toBe("provider timed out");
+  });
 });

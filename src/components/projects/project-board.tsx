@@ -322,6 +322,7 @@ export function ProjectBoard({
                             slot,
                             card,
                             view,
+                            job: jobs[cardId],
                             product: builtFrom,
                           })}
                           hasReference={board.master !== null}
@@ -694,6 +695,7 @@ function SlotActions({
             projectId={projectId}
             destinationId={destinationId}
             slotKey={slot.key}
+            cardId={cardId}
             tune={tune}
           />
         ) : null,
