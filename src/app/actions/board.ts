@@ -14,8 +14,9 @@ import {
   ProviderId,
   VideoResolution,
 } from "@/domain/model-defaults";
-import { SlotMove } from "@/domain/plan";
+import { SlotMove, slotCardId } from "@/domain/plan";
 import { productUnderstanding } from "@/domain/product-understanding";
+import { KnobChoice } from "@/domain/scene-knobs";
 import { VideoChoice } from "@/domain/video";
 import { refreshCards } from "@/lib/project-refresh";
 import { slotCards, videoSlotCard } from "@/lib/project-start";
@@ -33,6 +34,7 @@ import {
   setSlotApproval,
   setSlotOff,
   setSlotOrder,
+  setSlotTuning,
   setVideoChoice,
 } from "@/server/project-repository";
 import { type Degraded, writeListing } from "@/server/text-calls";
@@ -69,6 +71,45 @@ export async function setSlotOffAction(
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Could not switch it.",
+    };
+  }
+  refresh();
+}
+
+const KnobWrite = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  slotKey: z.string().min(1),
+  choice: KnobChoice,
+});
+
+// Turn one of a scene's knobs (free): the plan keeps the stop and the slot's
+// card is written again from it, on its own destination only.
+export async function setSlotKnobAction(
+  input: unknown,
+): Promise<{ error: string } | undefined> {
+  const { projectId, destinationId, slotKey, choice } = KnobWrite.parse(input);
+  const cardId = slotCardId(destinationId, slotKey);
+  try {
+    await setSlotTuning(
+      projectId,
+      { destinationId, slotKey },
+      choice,
+      ({ plan, master, product }) =>
+        slotCards(
+          {
+            destinations: plan.destinations.filter(
+              (d) => d.destinationId === destinationId,
+            ),
+          },
+          master,
+          productUnderstanding(product),
+          product,
+        ).find((card) => card.id === cardId),
+    );
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Could not tune it.",
     };
   }
   refresh();

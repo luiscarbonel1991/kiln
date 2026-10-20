@@ -23,15 +23,18 @@ import {
   withDelivered,
   withListing,
   withSlotOff,
+  withSlotTuning,
   withVideoChoice,
 } from "@/domain/plan";
-import type { Product } from "@/domain/product";
+import { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
 import { ACTIVE_JOB_STATUSES } from "@/domain/queue";
+import type { KnobChoice } from "@/domain/scene-knobs";
 import type { ShotList } from "@/domain/shot-list";
 import { BaseUnderstanding } from "@/domain/understanding";
 import type { VideoChoice } from "@/domain/video";
 import { assertDatabaseUrl, db } from "@/lib/db";
+import { retuneFields } from "@/lib/project-refresh";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
 import { productHash } from "@/server/product-version";
@@ -574,6 +577,116 @@ export async function setSlotOff(
       data: {
         plan: withSlotOff(plan, ref, off) as unknown as Prisma.InputJsonValue,
       },
+    });
+  });
+}
+
+// Set one of a scene slot's knobs, and write the direction it makes into the
+// slot's card: `derive` builds the card from the locked plan and the product
+// version the project follows (an unreviewed product change waits for Update
+// the project). Refused while the scene is in the queue, and while it is
+// approved: its words must keep describing the approved picture, which the
+// video starts from. Locked like approvals; one transaction.
+export async function setSlotTuning(
+  projectId: string,
+  ref: SlotRef,
+  choice: KnobChoice,
+  derive: (input: {
+    plan: ProjectPlan;
+    master: MasterAsset;
+    product: Product;
+  }) => Card | undefined,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: {
+        plan: true,
+        master: true,
+        products: {
+          orderBy: { position: "asc" },
+          take: 1,
+          select: {
+            productSnapshot: true,
+            product: {
+              select: {
+                id: true,
+                sku: true,
+                name: true,
+                spec: true,
+                source: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    const plan = ProjectPlan.parse(project.plan);
+    const cardId = slotCardId(ref.destinationId, ref.slotKey);
+    const busy = await tx.generationJob.count({
+      where: { projectId, cardId, status: { in: ACTIVE_JOB_STATUSES } },
+    });
+    if (busy > 0) {
+      throw new Error("This scene is in the queue; tune it when it is done.");
+    }
+    const card = await tx.card.findUnique({
+      where: { projectId_cardId: { projectId, cardId } },
+      select: { fields: true, outputs: true },
+    });
+    const slot = plan.destinations
+      .find((d) => d.destinationId === ref.destinationId)
+      ?.slots.find((s) => s.key === ref.slotKey);
+    const outputs = Card.shape.outputs.safeParse(card?.outputs);
+    if (
+      slot?.approvedOutput &&
+      outputs.success &&
+      outputs.data[0] === slot.approvedOutput
+    ) {
+      throw new Error("Undo the approval to tune this scene.");
+    }
+    const next = withSlotTuning(plan, ref, choice);
+    const link = project.products[0];
+    const snapshot = Product.safeParse(link?.productSnapshot);
+    const product = snapshot.success
+      ? snapshot.data
+      : link
+        ? rowToProduct(link.product)
+        : null;
+    if (project.master && card && product) {
+      const derived = derive({
+        plan: next,
+        master: {
+          id: project.master.assetId,
+          origin: project.master.origin as MasterAsset["origin"],
+          sourcePrompt: project.master.sourcePrompt,
+          assetUrl: project.master.assetUrl,
+          mime: project.master.mime,
+        },
+        product,
+      });
+      const fields = Card.shape.fields.parse(card.fields);
+      if (derived) {
+        await tx.card.update({
+          where: { projectId_cardId: { projectId, cardId } },
+          data: {
+            fields: retuneFields(
+              fields,
+              derived.fields,
+            ) as unknown as Prisma.InputJsonValue,
+          },
+        });
+      }
+    }
+    await tx.project.update({
+      where: { id: projectId },
+      data: { plan: next as unknown as Prisma.InputJsonValue },
     });
   });
 }

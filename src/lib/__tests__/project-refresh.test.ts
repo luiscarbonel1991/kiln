@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "@/domain/card";
-import { cardsWithOwnPrompt, refreshCards } from "@/lib/project-refresh";
+import {
+  cardsWithOwnPrompt,
+  refreshCards,
+  retuneFields,
+} from "@/lib/project-refresh";
 
 const field = (value: string, source: "image" | "recipe" | "local") => ({
   value,
@@ -81,5 +85,23 @@ describe("refreshCards", () => {
         card("c", "x"),
       ]),
     ).toEqual(["a"]);
+  });
+});
+
+describe("retuneFields", () => {
+  it("takes only the direction the knobs write, keeping what the maker wrote", () => {
+    const current = card("a", "old").fields;
+    const derived = card("a", "new").fields;
+    const mine = { ...current, lighting: field("my light", "local") };
+    const next = retuneFields(mine, {
+      ...derived,
+      composition: field("from above", "recipe"),
+      lighting: field("studio", "recipe"),
+    });
+    expect(next.scene.value).toBe("new scene");
+    expect(next.composition.value).toBe("from above");
+    expect(next.lighting.value).toBe("my light");
+    expect(next.subject.value).toBe("old subject");
+    expect(next.materials.value).toBe("old materials");
   });
 });

@@ -27,6 +27,19 @@ export function refreshCards(
   });
 }
 
+// The direction a scene's knobs write. A tuned card takes these from the card
+// its slot now derives, except a field the maker wrote; the product's fields
+// stay as the project has them.
+const TUNED = ["scene", "composition", "lighting"] as const;
+
+export function retuneFields(current: Fields, derived: Fields): Fields {
+  const next = { ...current };
+  for (const key of TUNED) {
+    if (current[key].source !== "local") next[key] = derived[key];
+  }
+  return next;
+}
+
 // The cards that run their own prompt (the editor's override): they do not
 // follow the product, so an update says so.
 export function cardsWithOwnPrompt(cards: Card[]): string[] {
