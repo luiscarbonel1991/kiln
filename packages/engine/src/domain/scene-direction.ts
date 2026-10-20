@@ -1,5 +1,6 @@
 import { contrastInk, scaleReference } from "@/domain/exact";
 import { colourOf, dimensionsLabel, type Product } from "@/domain/product";
+import { knobText, type SceneKnobs } from "@/domain/scene-knobs";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
 
@@ -13,7 +14,10 @@ import type { VariantDirection } from "@/domain/variant-direction";
 // the product too big, too small to read, or lost against its wall.
 // `{surface}` (the close looks) takes how the product's treatment must show:
 // raised elements from a low angle that reveals their side walls, an
-// engraving flush with the face.
+// engraving flush with the face. A slot's knobs (scene-knobs.ts) add their
+// clauses: the camera before the composition and the distance after it, the
+// light in place of the slot's lighting with the shadow after, the props after
+// the scene.
 
 export interface SceneSlot {
   label: string;
@@ -21,6 +25,8 @@ export interface SceneSlot {
   scene?: string;
   composition?: string;
   lighting?: string;
+  // The stops the slot applies (its defaults, the product's pick, the maker's).
+  knobs?: SceneKnobs;
 }
 
 export interface SceneDefaults {
@@ -40,7 +46,7 @@ const SURFACE = "{surface}";
 // What the product adds to its scenes' direction: the cues of a scene set in
 // a place of use, and how a close look shows its surface.
 export interface ProductSceneCues {
-  inPlace(place: string): string[];
+  inPlace(place: string, knobs?: SceneKnobs): string[];
   surface: string;
 }
 
@@ -130,8 +136,13 @@ function widthAgainst(
 // against the objects its place names (else the nearest everyday reference,
 // as in the exact scale frame), never enlarged to fill the frame (the frame
 // comes closer instead, so its text reads), and a background its face stands
-// out from.
-export function sceneCues(product: Product, place = ""): string[] {
+// out from. A wide shot keeps the product true to size without asking to
+// frame closer.
+export function sceneCues(
+  product: Product,
+  place = "",
+  knobs: SceneKnobs = {},
+): string[] {
   const dims = product.dimensions;
   const widthIn = dims.unit === "mm" ? dims.w / 25.4 : dims.w;
   const objects = placeObjects(place);
@@ -153,7 +164,9 @@ export function sceneCues(product: Product, place = ""): string[] {
     contrastInk(colourOf(product, product.defaultColour).face) === "#ffffff";
   return [
     size,
-    "never enlarged beyond its real size: frame closer to it instead, so its text and design still read",
+    knobs.distance === "wide"
+      ? "never enlarged beyond its real size, even in a wider shot, its design still recognizable"
+      : "never enlarged beyond its real size: frame closer to it instead, so its text and design still read",
     dark
       ? "its dark face set against a lighter background, so it stands out"
       : "its light face set against a darker background, so it stands out",
@@ -181,7 +194,7 @@ export function surfaceCue(product: Product): string {
 
 export function productSceneCues(product: Product): ProductSceneCues {
   return {
-    inPlace: (place) => sceneCues(product, place),
+    inPlace: (place, knobs) => sceneCues(product, place, knobs),
     surface: surfaceCue(product),
   };
 }
@@ -200,24 +213,34 @@ export function sceneVariants(
   const baseScene = defaults.scene ?? "soft neutral sweep";
   const surface = (text: string) =>
     text.replaceAll(SURFACE, cues?.surface ?? GENERIC_SURFACE);
+  const clauses = (...parts: (string | undefined)[]) =>
+    parts.filter(Boolean).join(", ");
   return slots.map((slot) => {
+    const knob = knobText(slot.knobs ?? {});
     const where = slot.scene?.includes(USE) ? place() : null;
     const scene = slot.scene
       ? where
         ? slot.scene.replaceAll(USE, where)
         : slot.scene
       : `${baseScene} — ${inSentence(slot.purpose)}`;
-    const composition = surface(
-      slot.composition ?? defaults.composition ?? understanding.composition,
+    const composition = clauses(
+      knob.camera,
+      surface(
+        slot.composition ?? defaults.composition ?? understanding.composition,
+      ),
+      knob.distance,
     );
     return {
       direction: slot.label,
-      scene: surface(scene),
+      scene: clauses(surface(scene), knob.props),
       composition:
         where && cues
-          ? [composition, ...cues.inPlace(where)].join("; ")
+          ? [composition, ...cues.inPlace(where, slot.knobs)].join("; ")
           : composition,
-      lighting: slot.lighting ?? understanding.lighting,
+      lighting: clauses(
+        knob.light ?? slot.lighting ?? understanding.lighting,
+        knob.shadow,
+      ),
     };
   });
 }

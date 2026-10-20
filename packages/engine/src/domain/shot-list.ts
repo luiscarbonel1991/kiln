@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Aspect } from "@/domain/destination";
 import { ProjectType } from "@/domain/project";
+import { SceneKnobs } from "@/domain/scene-knobs";
 
 // Render style drives the prompt framing: "photographic" (a product photo) vs
 // "line-art" (clean black strokes on white, for vector workflows).
@@ -30,6 +31,8 @@ export type ExactKind = z.infer<typeof ExactKind>;
 // lighting); `{use}` in its scene takes the product's places of use and
 // `{surface}` how a close look shows the product's treatment (see
 // scene-direction.ts). Without them it leans the list's defaults to its purpose.
+// `knobs` are the knobs a scene slot offers the maker, with its default stops
+// (scene-knobs.ts); its prose then leaves what they say to them.
 export const ShotSlotFields = z.object({
   key: z.string().regex(/^[a-z0-9-]+$/, "kebab-case slot key"),
   label: z.string().min(1),
@@ -41,6 +44,7 @@ export const ShotSlotFields = z.object({
   scene: z.string().min(1).optional(),
   composition: z.string().min(1).optional(),
   lighting: z.string().min(1).optional(),
+  knobs: SceneKnobs.optional(),
 });
 
 export const exactKindMatchesFill = {
@@ -51,6 +55,8 @@ export const exactKindMatchesFill = {
 
 export const ShotSlot = ShotSlotFields.refine(exactKindMatchesFill.check, {
   message: exactKindMatchesFill.message,
+}).refine((s) => !s.knobs || s.fill === "scene", {
+  message: "only a scene slot has knobs",
 });
 export type ShotSlot = z.infer<typeof ShotSlot>;
 
@@ -71,6 +77,9 @@ export const ShotList = z
   })
   .refine((l) => new Set(l.slots.map((s) => s.key)).size === l.slots.length, {
     message: "slot keys must be unique within a shot list",
+  })
+  .refine((l) => l.style !== "line-art" || l.slots.every((s) => !s.knobs), {
+    message: "a line-art list has no knobs: it frames, it does not light",
   });
 export type ShotList = z.infer<typeof ShotList>;
 

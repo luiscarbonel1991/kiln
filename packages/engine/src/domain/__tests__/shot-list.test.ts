@@ -28,6 +28,18 @@ describe("ShotSlot", () => {
     expect(ShotSlot.parse(exact).exact).toBe("colour-grid");
   });
 
+  it("lets only a scene slot offer knobs, with stops that exist", () => {
+    expect(
+      ShotSlot.parse({ ...scene, knobs: { camera: "eye" } }).knobs,
+    ).toEqual({ camera: "eye" });
+    expect(() =>
+      ShotSlot.parse({ ...exact, knobs: { camera: "eye" } }),
+    ).toThrow();
+    expect(() =>
+      ShotSlot.parse({ ...scene, knobs: { camera: "eyes" } }),
+    ).toThrow();
+  });
+
   it("rejects a non kebab-case key and a malformed aspect", () => {
     expect(() => ShotSlot.parse({ ...scene, key: "Hero Shot" })).toThrow();
     expect(() => ShotSlot.parse({ ...scene, aspect: "square" })).toThrow();
@@ -46,6 +58,16 @@ describe("ShotList", () => {
     expect(() =>
       ShotList.parse({ ...list, slots: [scene, { ...scene }] }),
     ).toThrow();
+  });
+
+  it("a line-art list has no knobs", () => {
+    const knobbed = { ...scene, knobs: { camera: "eye" } };
+    expect(() =>
+      ShotList.parse({ ...list, style: "line-art", slots: [knobbed] }),
+    ).toThrow();
+    expect(
+      ShotList.parse({ ...list, slots: [knobbed] }).slots[0].knobs,
+    ).toEqual({ camera: "eye" });
   });
 
   it("sceneSlots keeps only scene slots, in order", () => {

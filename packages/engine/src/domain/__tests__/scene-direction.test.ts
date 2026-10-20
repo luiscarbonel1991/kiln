@@ -4,6 +4,7 @@ import {
   GENERIC_USE,
   inSentence,
   placeObjects,
+  productSceneCues,
   sceneCues,
   sceneVariants,
   surfaceCue,
@@ -87,6 +88,100 @@ describe("sceneVariants", () => {
       [],
     );
     expect([v.composition, v.lighting]).toEqual(["macro", "raking"]);
+  });
+});
+
+describe("a slot's knobs", () => {
+  const tuned = {
+    label: "In use",
+    purpose: "Show it used.",
+    scene: "in use at {use}",
+    composition: "the product the hero",
+    lighting: "natural window light",
+  };
+
+  it("put the camera before the composition and the distance after it", () => {
+    const [v] = sceneVariants(
+      [{ ...tuned, knobs: { camera: "above", distance: "medium" } }],
+      {},
+      understanding,
+      ["a desk"],
+    );
+    expect(v.composition).toBe(
+      "the camera a little above, looking down at about 30 degrees, so the top of anything lying flat shows, the product the hero, a medium shot, its surroundings readable",
+    );
+  });
+
+  it("light takes the slot's lighting's place; the shadow follows", () => {
+    const [v] = sceneVariants(
+      [{ ...tuned, knobs: { light: "studio", shadow: "strong" } }],
+      {},
+      understanding,
+      [],
+    );
+    expect(v.lighting).toBe(
+      "soft, even studio light, crisp, defined shadows, as in direct sun",
+    );
+  });
+
+  it("'any' light keeps the slot's, else the understanding's, before the shadow", () => {
+    const [own, none] = sceneVariants(
+      [
+        { ...tuned, knobs: { light: "any", shadow: "soft" } },
+        {
+          label: "Hero",
+          purpose: "Win the click.",
+          knobs: { light: "any", shadow: "soft" },
+        },
+      ],
+      {},
+      understanding,
+      [],
+    );
+    expect(own.lighting).toBe("natural window light, a soft contact shadow");
+    expect(none.lighting).toBe("soft natural light, a soft contact shadow");
+  });
+
+  it("props follow the scene, after its place", () => {
+    const [v] = sceneVariants(
+      [{ ...tuned, knobs: { props: "none" } }],
+      {},
+      understanding,
+      ["a desk"],
+    );
+    expect(v.scene).toBe("in use at a desk, no props beyond the place itself");
+  });
+
+  it("a wide shot keeps the product true to size without asking to frame closer", () => {
+    const cues = productSceneCues(CUTTING_BOARD);
+    const [wide, medium] = sceneVariants(
+      [
+        { ...tuned, knobs: { distance: "wide" } },
+        { ...tuned, knobs: { distance: "medium" } },
+      ],
+      {},
+      understanding,
+      ["a kitchen counter"],
+      cues,
+    );
+    expect(wide.composition).toContain(
+      "never enlarged beyond its real size, even in a wider shot, its design still recognizable",
+    );
+    expect(wide.composition).not.toContain("frame closer");
+    expect(medium.composition).toContain("frame closer to it instead");
+  });
+
+  it("'any' everywhere reads as a slot without knobs", () => {
+    const any = {
+      camera: "any",
+      distance: "any",
+      light: "any",
+      shadow: "any",
+      props: "any",
+    } as const;
+    expect(
+      sceneVariants([{ ...tuned, knobs: any }], {}, understanding, ["a desk"]),
+    ).toEqual(sceneVariants([tuned], {}, understanding, ["a desk"]));
   });
 });
 

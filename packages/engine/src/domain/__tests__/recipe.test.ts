@@ -50,6 +50,24 @@ describe("composeRecipe", () => {
     ]);
   });
 
+  it("carries a slot's knobs into its direction", () => {
+    const tuned = ShotList.parse({
+      ...list,
+      slots: [
+        {
+          key: "hero",
+          label: "Hero",
+          purpose: "Win the click.",
+          knobs: { distance: "close", light: "studio" },
+        },
+      ],
+    });
+    expect(
+      composeRecipe({ id: "r", name: "R", shotList: tuned, destination: shop })
+        .directions[0].knobs,
+    ).toEqual({ distance: "close", light: "studio" });
+  });
+
   it("merges destination then shot-list negatives without duplicates", () => {
     expect(recipe.constraints.negative).toEqual([
       "text overlay",
