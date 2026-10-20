@@ -27,6 +27,7 @@ import {
   slotPosition,
 } from "@/components/projects/slot-frame";
 import { SlotModel } from "@/components/projects/slot-model";
+import { SlotTune } from "@/components/projects/slot-tune";
 import { VideoArt } from "@/components/projects/video-art";
 import {
   AddVideoButton,
@@ -65,6 +66,7 @@ import { plateHref } from "@/lib/plate-href";
 import { plural } from "@/lib/plural";
 import { projectTypeLabel } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
+import { type TuneView, tuneView } from "@/lib/slot-tune";
 import type { BatchProgress, Budget } from "@/server/generation-repository";
 import type { ProductDrift } from "@/server/product-version";
 import type { ProjectBoard as Board } from "@/server/project-mapper";
@@ -148,6 +150,7 @@ export function ProjectBoard({
   projectId,
   board,
   product,
+  builtFrom,
   jobs,
   generation,
   estimate,
@@ -162,6 +165,8 @@ export function ProjectBoard({
   projectId: string;
   board: Board & { plan: ProjectPlan };
   product: Product;
+  // The product version the project follows (its knobs pick for it).
+  builtFrom: Product;
   jobs: Record<string, JobView>;
   generation: { version: string; batch: BatchProgress | null; budget: Budget };
   estimate: BatchEstimate | { refusal: string } | null;
@@ -313,6 +318,12 @@ export function ProjectBoard({
                           cardId={cardId}
                           view={view}
                           onView={onView}
+                          tune={tuneView({
+                            slot,
+                            card,
+                            view,
+                            product: builtFrom,
+                          })}
                           hasReference={board.master !== null}
                           model={card ? (card.model as ModelValue) : null}
                           notes={notes}
@@ -570,6 +581,7 @@ function SlotActions({
   cardId,
   view: actual,
   onView,
+  tune,
   hasReference,
   order,
   video,
@@ -582,6 +594,8 @@ function SlotActions({
   cardId: string;
   view: SlotView;
   onView: SlotView;
+  // The scene's knobs (a slot planned with them), else null.
+  tune: TuneView | null;
   hasReference: boolean;
   order: { place: number; last: number; firstLabel: string } | null;
   video: {
@@ -674,6 +688,16 @@ function SlotActions({
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {keep(
+        tune ? (
+          <SlotTune
+            projectId={projectId}
+            destinationId={destinationId}
+            slotKey={slot.key}
+            tune={tune}
+          />
+        ) : null,
+      )}
       {ordering}
       {keep(
         view.state === "to-review" || view.state === "approved" ? (

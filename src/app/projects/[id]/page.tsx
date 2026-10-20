@@ -10,6 +10,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
 import { defaultTextModel, modelLabel } from "@/domain/model-defaults";
 import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
+import { Product } from "@/domain/product";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerMode } from "@/providers/mode";
 import { estimateProjectCards } from "@/server/generation-queue";
@@ -103,6 +104,9 @@ export default async function ProjectBoardPage({
   // Whether the product changed since the project was built from it, and the
   // cards whose current output shows an earlier version.
   const drift = product && version ? productDrift(product, version) : null;
+  // The version the project follows: a scene's knobs pick for it.
+  const snapshot = Product.safeParse(version?.snapshot);
+  const builtFrom = snapshot.success ? snapshot.data : product;
   const shown = board.cards.flatMap((c) => c.outputs.slice(0, 1));
   const versions = version?.hash
     ? await outputVersions(board.id, shown)
@@ -146,6 +150,7 @@ export default async function ProjectBoardPage({
           projectId={board.id}
           board={{ ...board, plan: board.plan }}
           product={product}
+          builtFrom={builtFrom ?? product}
           jobs={generation.jobs}
           generation={generation}
           estimate={estimate}

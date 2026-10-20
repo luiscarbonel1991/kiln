@@ -1,0 +1,151 @@
+import { describe, expect, it } from "vitest";
+import type { MasterAsset } from "@/domain/master-asset";
+import { planProject, slotState, withSlotTuning } from "@/domain/plan";
+import { Product } from "@/domain/product";
+import { productUnderstanding } from "@/domain/product-understanding";
+import { slotCards } from "@/lib/project-start";
+import { CATALOG } from "@/lib/recipes";
+import { tuneView } from "@/lib/slot-tune";
+
+const plate = Product.parse({
+  id: "prod-t",
+  sku: "PT-01",
+  name: "Desk plate",
+  family: "Desk",
+  dimensions: { w: 9, h: 2.78, d: 2.25, unit: "in" },
+  shape: "name plate",
+  material: "birch plywood",
+  treatment: "engraved",
+  colours: [{ key: "birch", name: "Birch", face: "#E3C9A0" }],
+  defaultColour: "birch",
+  typography: { family: "Fraunces" },
+  useContexts: ["a desk beside a laptop"],
+  parts: [
+    { name: "plate", dimensions: { w: 8, h: 2.5, d: 0.14 } },
+    { name: "base", lies: "flat", dimensions: { w: 9, h: 0.28, d: 2.25 } },
+  ],
+  source: { kind: "photo", assetUrl: "https://cdn.example.com/plate.jpg" },
+});
+const master: MasterAsset = {
+  id: "m-1",
+  origin: "product",
+  sourcePrompt: null,
+  assetUrl: "https://cdn.example.com/plate.jpg",
+  mime: "image/jpeg",
+};
+const ref = { destinationId: "etsy", slotKey: "in-use" };
+
+function setup(
+  plan = planProject({
+    product: plate,
+    type: "listing-kit",
+    destinationIds: ["etsy"],
+    catalog: CATALOG,
+  }),
+) {
+  const slot = plan.destinations[0].slots.find((s) => s.key === "in-use");
+  const card = slotCards(plan, master, productUnderstanding(plate), plate).find(
+    (c) => c.id === "etsy.in-use",
+  );
+  if (!slot || !card) throw new Error("no in-use");
+  return { plan, slot, card };
+}
+
+describe("tuneView", () => {
+  it("shows the slot's knobs, Kiln's pick and why, and what the model reads", () => {
+    const { slot, card } = setup();
+    const t = tuneView({
+      slot,
+      card,
+      view: slotState(slot, card),
+      product: plate,
+    });
+    expect(t?.summary).toBe(
+      "A little above · medium · window light · a few props",
+    );
+    expect(t?.knobs.map((k) => [k.key, k.stop, k.chosen])).toEqual([
+      ["camera", "above", false],
+      ["distance", "medium", false],
+      ["light", "window", false],
+      ["shadow", "any", false],
+      ["props", "few", false],
+    ]);
+    expect(t?.knobs[0].why).toBe(
+      "Its base lies flat; from a little above, its top shows",
+    );
+    expect(t?.knobs[0].stops.map((s) => s.label)).toEqual([
+      "Any",
+      "Eye level",
+      "A little above",
+      "From above",
+    ]);
+    expect(t?.reads?.composition).toMatch(/^the camera a little above/);
+    expect(t?.locked).toBeNull();
+    expect(t?.inert).toEqual({ prompt: false, fields: [] });
+  });
+
+  it("marks the maker's own stops", () => {
+    const { slot } = setup(
+      withSlotTuning(
+        planProject({
+          product: plate,
+          type: "listing-kit",
+          destinationIds: ["etsy"],
+          catalog: CATALOG,
+        }),
+        ref,
+        { knob: "camera", stop: "eye" },
+      ),
+    );
+    const t = tuneView({ slot, view: slotState(slot), product: plate });
+    expect(t?.knobs[0]).toMatchObject({ stop: "eye", chosen: true });
+    expect(t?.knobs[0].why).toBeUndefined();
+    expect(t?.reads).toBeNull();
+  });
+
+  it("locks while queued or approved, and says what keeps the knobs out", () => {
+    const { slot, card } = setup();
+    const queued = tuneView({
+      slot,
+      card,
+      view: { state: "queued", failed: false, inBatch: true },
+      product: plate,
+    });
+    expect(queued?.locked).toBe("In the queue: tune it when it is done.");
+    const approved = tuneView({
+      slot,
+      card,
+      view: { state: "approved", failed: false },
+      product: plate,
+    });
+    expect(approved?.locked).toBe("Approved: undo the approval to tune it.");
+    const edited = tuneView({
+      slot,
+      card: {
+        ...card,
+        promptOverride: "my own prompt",
+        fields: {
+          ...card.fields,
+          lighting: { value: "mine", source: "local", locked: false },
+        },
+      },
+      view: slotState(slot, card),
+      product: plate,
+    });
+    expect(edited?.inert).toEqual({ prompt: true, fields: ["lighting"] });
+  });
+
+  it("nothing for an exact slot or a slot planned before knobs", () => {
+    const { plan } = setup();
+    const colours = plan.destinations[0].slots.find((s) => s.key === "size");
+    if (!colours) throw new Error("no size slot");
+    expect(
+      tuneView({ slot: colours, view: slotState(colours), product: plate }),
+    ).toBeNull();
+    const { slot } = setup();
+    const { knobs: _k, ...old } = slot;
+    expect(
+      tuneView({ slot: old, view: slotState(old), product: plate }),
+    ).toBeNull();
+  });
+});
