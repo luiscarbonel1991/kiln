@@ -177,8 +177,8 @@ any test runs (`vitest.setup.ts`), so a test never makes a paid call.
 
 Planned projects generate in the background: the board's "Generate N scenes"
 (one confirmation listing each card's model and price, the total and the
-month's budget), the slot editor's Generate and a video slot's "Generate
-video" all queue jobs that a worker in the server process runs (started from
+month's budget), a scene's "New take", the slot editor's Generate and Re-roll
+(each with its price) and a video slot's "Generate video" all queue jobs that a worker in the server process runs (started from
 `src/instrumentation.ts`). Every paid call counts against the maker's monthly
 cap (`Maker.monthlyCapCents`, $25 by default), one cap for both providers;
 vision and art direction count too. A video animates a scene the maker
@@ -192,6 +192,22 @@ change, which keeps the product exact; the push-in is a choice. The same rules h
   nothing.
 - A timeout or a failed render counts at its estimate.
 - A render is never paid twice.
+
+**Scene knobs.** A scene planned on the Etsy shot list (hero, in-use, lifestyle,
+gift) is tuned with knobs, never with prose: camera (eye level, a little above,
+from above), distance (close, medium, wide), light (window, studio, warm), shadow
+(faint, soft, strong) and props (none, a few, styled); "Any" adds nothing.
+- Under each scene a line says how it is set; Tune opens the knobs, with what each
+  stop does and whether it is the maker's choice, Kiln's pick for the product (a
+  part lying flat starts from a little above, so its top shows) or the scene's
+  default. Turning one is free and writes the scene's direction again at once.
+- A take to review offers "What's off?" chips ("Can't see its top", "Product too
+  small", "Too busy", "Too dark", "Shadows too strong"), each moving one knob, and
+  "New take", priced on the button.
+- The stops and their words are data (`packages/engine/src/domain/scene-knobs.ts`);
+  a shot-list slot names the knobs it offers with its defaults, and the plan keeps
+  the maker's choices. Knobs lock while the scene is queued or approved. Projects
+  planned before knobs keep their prose.
 
 The worker is a `globalThis` singleton started from `src/instrumentation.ts`.
 It restarts with the current code on the next enqueue after a code reload: it
