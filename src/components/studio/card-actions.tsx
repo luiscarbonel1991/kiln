@@ -11,8 +11,9 @@ import { cn } from "@/lib/utils";
 // - done → Re-roll | To video (image) / Re-roll full-width (video — already video).
 // In a planned project (`busyLabel`, `generateHint`, `canPromote`,
 // `disabledReason`) the bar reflects the queue: "Queued…" / "Retrying…" while a
-// job is active, the estimated cost on the Generate button, no "To video" (the
-// queue makes images only), and a reason when the card cannot be queued.
+// job is active, the estimated cost on Generate and Re-roll (each is a paid
+// call), no "To video" (the queue makes images only), and a reason when the
+// card cannot be queued.
 export function CardActions({
   type,
   status,
@@ -91,6 +92,11 @@ export function CardActions({
         )}
       >
         <RefreshCw className="size-3" /> Re-roll
+        {generateHint ? (
+          <span className="font-mono text-[0.625rem] font-normal text-on-surface-mid">
+            {generateHint}
+          </span>
+        ) : null}
       </button>
       {isVideo || !canPromote ? null : (
         <button
