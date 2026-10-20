@@ -63,7 +63,7 @@ export function SlotTune({
   const disabled = pending || tune.locked !== null;
   return (
     <div className="flex w-full min-w-0 basis-full items-center gap-2">
-      <span className="min-w-0 flex-1 truncate font-mono text-[0.625rem] text-on-surface-mid">
+      <span className="w-0 min-w-0 flex-1 truncate font-mono text-[0.625rem] text-on-surface-mid">
         {tune.summary || "Any camera, distance and light"}
       </span>
       <Popover.Root>
