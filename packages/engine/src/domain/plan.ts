@@ -4,6 +4,7 @@ import { ListingText } from "@/domain/listing";
 import type { VideoResolution } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
+import { type KnobChoice, SavedKnobs } from "@/domain/scene-knobs";
 import {
   exactKindMatchesFill,
   type ShotList,
@@ -32,6 +33,11 @@ export const PlanSlot = ShotSlotFields.extend({
   off: z.boolean().optional(),
   // A video slot's choices (start frame, motion, length, orientation).
   video: VideoChoiceSchema.optional(),
+  // A scene slot's knobs (its defaults, snapshotted with the slot) and the
+  // stops the maker chose, read tolerantly: a stop a later version drops reads
+  // as unset instead of breaking the plan.
+  knobs: SavedKnobs.optional(),
+  tuned: SavedKnobs.optional(),
 }).refine(exactKindMatchesFill.check, {
   message: exactKindMatchesFill.message,
 });
@@ -494,6 +500,26 @@ export function withSlotOff(
   return updateSlot(plan, ref, ({ off: _o, ...slot }) =>
     off ? { ...slot, off: true } : slot,
   );
+}
+
+// Set one of a scene slot's knobs, or return it to the slot's default (null).
+// A slot planned before knobs, or one without this knob, refuses.
+export function withSlotTuning(
+  plan: ProjectPlan,
+  ref: SlotRef,
+  choice: KnobChoice,
+): ProjectPlan {
+  return updateSlot(plan, ref, ({ tuned: before, ...slot }) => {
+    if (slot.fill !== "scene") throw new Error("not a scene slot");
+    if (!slot.knobs) throw new Error("this scene was planned before knobs");
+    if (slot.knobs[choice.knob] === undefined) {
+      throw new Error(`this scene has no ${choice.knob} knob`);
+    }
+    const { [choice.knob]: _old, ...rest } = before ?? {};
+    const tuned =
+      choice.stop === null ? rest : { ...rest, [choice.knob]: choice.stop };
+    return Object.keys(tuned).length > 0 ? { ...slot, tuned } : slot;
+  });
 }
 
 function updateSlot(

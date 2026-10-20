@@ -22,6 +22,7 @@ import {
   withDelivered,
   withListing,
   withSlotOff,
+  withSlotTuning,
   withVideoChoice,
 } from "@/domain/plan";
 import { ShotList } from "@/domain/shot-list";
@@ -299,6 +300,90 @@ describe("slotState with the queue", () => {
       state: "queued",
       failed: false,
     });
+  });
+});
+
+describe("a slot's tuning", () => {
+  const knobbed = ShotList.parse({
+    ...shopKit,
+    slots: [
+      {
+        key: "hero",
+        label: "Hero",
+        purpose: "Win the click.",
+        knobs: { camera: "eye", light: "studio" },
+      },
+      ...shopKit.slots.slice(1),
+    ],
+  });
+  const tuneCatalog = { ...catalog, shotLists: [knobbed, socialCarousel] };
+  const start = () =>
+    planProject({
+      product: CUTTING_BOARD,
+      type: "listing-kit",
+      destinationIds: ["shop"],
+      catalog: tuneCatalog,
+    });
+  const hero = { destinationId: "shop", slotKey: "hero" };
+
+  it("snapshots the slot's knobs, and keeps what the maker sets", () => {
+    const plan = start();
+    expect(plan.destinations[0].slots[0].knobs).toEqual({
+      camera: "eye",
+      light: "studio",
+    });
+    const tuned = withSlotTuning(plan, hero, { knob: "camera", stop: "above" });
+    expect(tuned.destinations[0].slots[0].tuned).toEqual({ camera: "above" });
+    const both = withSlotTuning(tuned, hero, { knob: "light", stop: "warm" });
+    expect(both.destinations[0].slots[0].tuned).toEqual({
+      camera: "above",
+      light: "warm",
+    });
+  });
+
+  it("null returns a knob to its default; nothing tuned leaves no trace", () => {
+    const tuned = withSlotTuning(start(), hero, {
+      knob: "camera",
+      stop: "above",
+    });
+    const back = withSlotTuning(tuned, hero, { knob: "camera", stop: null });
+    expect(back.destinations[0].slots[0]).not.toHaveProperty("tuned");
+  });
+
+  it("refuses an exact slot, a slot planned before knobs, and a knob it lacks", () => {
+    expect(() =>
+      withSlotTuning(
+        start(),
+        { destinationId: "shop", slotKey: "colours" },
+        { knob: "camera", stop: "eye" },
+      ),
+    ).toThrow("not a scene slot");
+    const old = planProject({
+      product: CUTTING_BOARD,
+      type: "listing-kit",
+      destinationIds: ["shop"],
+      catalog,
+    });
+    expect(() =>
+      withSlotTuning(old, hero, { knob: "camera", stop: "eye" }),
+    ).toThrow("planned before knobs");
+    expect(() =>
+      withSlotTuning(start(), hero, { knob: "props", stop: "none" }),
+    ).toThrow("no props knob");
+  });
+
+  it("a saved plan with a stop that no longer exists still parses", () => {
+    const plan = withSlotTuning(start(), hero, {
+      knob: "camera",
+      stop: "above",
+    });
+    const saved = JSON.parse(JSON.stringify(plan));
+    saved.destinations[0].slots[0].tuned.camera = "gone";
+    saved.destinations[0].slots[0].knobs.light = "gone";
+    const read = ProjectPlan.parse(saved).destinations[0].slots[0];
+    expect(read.tuned?.camera).toBeUndefined();
+    expect(read.knobs?.light).toBeUndefined();
+    expect(read.knobs?.camera).toBe("eye");
   });
 });
 

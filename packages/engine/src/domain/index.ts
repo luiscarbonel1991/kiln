@@ -123,6 +123,7 @@ export {
   videoSettings,
   withListing,
   withSlotOff,
+  withSlotTuning,
   withVideoChoice,
 } from "@/domain/plan";
 export {
