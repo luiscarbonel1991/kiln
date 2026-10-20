@@ -53,12 +53,13 @@ export function colourWord(hex: string): string {
 const word = (w: string) => w.toLowerCase().replace(/[^a-z0-9-]/g, "");
 
 // "Matte Black" + "matte powder-coated steel" reads "matte black powder-coated
-// steel": the material drops the words the colour name already says.
+// steel": the colour name takes the place of the words it repeats at the start
+// of the material. Words further on stay, so a sentence keeps its grammar and a
+// second part keeps its own colour ("... in a black matte base").
 export function colourMaterial(colourName: string, material: string): string {
   const said = new Set(colourName.split(/\s+/).map(word).filter(Boolean));
-  const rest = material
-    .split(/\s+/)
-    .filter((w) => !said.has(word(w)))
-    .join(" ");
+  const words = material.split(/\s+/).filter(Boolean);
+  const lead = words.findIndex((w) => !said.has(word(w)));
+  const rest = words.slice(lead === -1 ? words.length : lead).join(" ");
   return `${colourName.toLowerCase()} ${rest}`.trim();
 }

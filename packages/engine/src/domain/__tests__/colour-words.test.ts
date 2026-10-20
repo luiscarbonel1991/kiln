@@ -14,15 +14,41 @@ describe("colourWord", () => {
 });
 
 describe("colourMaterial", () => {
-  it("drops the material's words the colour name already says", () => {
+  it("drops the words the colour name repeats at the start", () => {
     expect(colourMaterial("Matte Black", "matte powder-coated steel")).toBe(
       "matte black powder-coated steel",
     );
-    expect(
-      colourMaterial("Black Matte", "matte panel with a zero-gloss matte face"),
-    ).toBe("black matte panel with a zero-gloss face");
+    expect(colourMaterial("Matte Black", "black matte steel")).toBe(
+      "matte black steel",
+    );
     expect(colourMaterial("Maple", "solid hardwood")).toBe(
       "maple solid hardwood",
+    );
+    expect(colourMaterial("Black Matte", "black matte")).toBe("black matte");
+  });
+
+  it("leaves the words further on, so the sentence keeps its grammar", () => {
+    expect(
+      colourMaterial(
+        "Oak finish",
+        "thin pale wood plate with an oak finish and visible straight grain",
+      ),
+    ).toBe(
+      "oak finish thin pale wood plate with an oak finish and visible straight grain",
+    );
+    expect(
+      colourMaterial("Black Matte", "matte panel with a zero-gloss matte face"),
+    ).toBe("black matte panel with a zero-gloss matte face");
+  });
+
+  it("keeps a second part's own colour", () => {
+    expect(
+      colourMaterial(
+        "Black Matte",
+        "matte cast acrylic plate, standing in a black matte acrylic base",
+      ),
+    ).toBe(
+      "black matte cast acrylic plate, standing in a black matte acrylic base",
     );
   });
 });
