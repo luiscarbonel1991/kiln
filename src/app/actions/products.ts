@@ -12,6 +12,7 @@ import type { Product } from "@/domain/product";
 import {
   type FormIssue,
   formIssues,
+  mergeForm,
   ProductForm,
   productFromForm,
 } from "@/lib/product-form";
@@ -36,11 +37,16 @@ import {
   storeProductSvg,
 } from "@/server/product-files";
 import {
+  deleteProduct,
+  getProduct,
   type ImportedProduct,
   importCatalog,
   listProducts,
+  productProjects,
+  updateProduct,
   upsertProducts,
 } from "@/server/product-repository";
+import { productHash } from "@/server/product-version";
 import { type Degraded, draftProduct } from "@/server/text-calls";
 
 // Server Functions are POST-reachable: the package parse is the trust boundary.
@@ -360,4 +366,76 @@ export async function draftProductAction(
     parsed.data.assetUrl,
     parsed.data.model ?? defaultTextModel(await getMakerModels()),
   );
+}
+
+const Edit = z.object({ id: z.string().min(1), form: z.unknown() });
+
+// Save an edited product over itself, through the same checks as a new one.
+// Says what changed and which projects still follow an earlier version (each
+// offers its update on its board). A product from a catalog connector is
+// changed in the catalog, not here.
+export async function updateProductAction(input: unknown): Promise<
+  | {
+      product: Product;
+      status: ImportedProduct["status"];
+      changed: string[];
+      behind: { projectId: string; name: string }[];
+      warning?: string;
+    }
+  | { error: string; issues?: FormIssue[] }
+> {
+  const { id, form } = Edit.parse(input);
+  const stored = await getProduct(id);
+  if (!stored) return { error: "That product no longer exists." };
+  if (stored.source.kind === "catalog") {
+    return {
+      error:
+        "This product comes from your catalog: change it there and import it again.",
+    };
+  }
+  const merged = mergeForm(stored, form as ProductForm);
+  if ("error" in merged) return merged;
+  if (blockedAsset(merged.product)) {
+    return { error: "That file is not in Kiln's storage; upload it again." };
+  }
+  let withImages: Product;
+  try {
+    withImages = await withStoredImages(merged.product);
+  } catch (error) {
+    return {
+      error: `An image could not be stored: ${(error as Error).message}`,
+    };
+  }
+  const measured = await withOutline(withImages);
+  const saved = await updateProduct(id, measured.product);
+  const now = productHash(saved.product);
+  const behind = (await productProjects(id))
+    .filter((use) => use.hash !== now)
+    .map(({ projectId, name }) => ({ projectId, name }));
+  return {
+    ...saved,
+    behind,
+    ...(measured.warning ? { warning: measured.warning } : {}),
+  };
+}
+
+// Delete a product no project uses; otherwise say which projects do.
+export async function deleteProductAction(
+  input: unknown,
+): Promise<
+  | { deleted: true }
+  | { error: string; usedBy?: { projectId: string; name: string }[] }
+> {
+  const id = z.string().min(1).parse(input);
+  try {
+    const result = await deleteProduct(id);
+    if ("deleted" in result) return result;
+    const names = result.usedBy.map((u) => u.name).join(", ");
+    return {
+      error: `Used by ${names}: delete ${result.usedBy.length === 1 ? "that project" : "those projects"} first.`,
+      usedBy: result.usedBy.map(({ projectId, name }) => ({ projectId, name })),
+    };
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
 }
