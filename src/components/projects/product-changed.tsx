@@ -51,10 +51,13 @@ export function ProductChangedBanner({
   projectId,
   changed,
   ownPrompts,
+  planChanges = [],
 }: {
   projectId: string;
   changed: string[];
   ownPrompts: string[];
+  // What the update does to the plan, a line per destination.
+  planChanges?: string[];
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-card bg-prov-brand/10 p-5">
@@ -75,6 +78,14 @@ export function ProductChangedBanner({
             the editor and will not follow the product.
           </p>
         ) : null}
+        {planChanges.map((line) => (
+          <p
+            key={line}
+            className="font-sans text-[0.8rem] leading-snug text-foreground"
+          >
+            {line}
+          </p>
+        ))}
       </div>
       <UpdateProjectButton projectId={projectId} />
     </div>

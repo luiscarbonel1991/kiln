@@ -916,6 +916,8 @@ export async function refreshProjectProduct(
     // A destination's text rules: its saved listing's spec fields are
     // drafted again from the product (refreshListing).
     textRules?: (destinationId: string) => DestinationText | undefined;
+    // The plan the new version implies (replan), applied to the locked plan.
+    replan?: (plan: ProjectPlan) => ProjectPlan;
   },
 ): Promise<void> {
   assertDatabaseUrl();
@@ -946,9 +948,14 @@ export async function refreshProjectProduct(
       where: { id: projectId },
       select: { plan: true },
     });
-    const plan = ProjectPlan.safeParse(row.plan);
+    const parsed = ProjectPlan.safeParse(row.plan);
+    const plan =
+      parsed.success && input.replan
+        ? { success: true as const, data: input.replan(parsed.data) }
+        : parsed;
     const listed = plan.success
       ? {
+          ...plan.data,
           destinations: plan.data.destinations.map((d) => {
             const rules = input.textRules?.(d.destinationId);
             return d.listing && rules

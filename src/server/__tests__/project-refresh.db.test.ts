@@ -45,7 +45,7 @@ describe.skipIf(!enabled)(
 
     afterAll(async () => {
       await db.project.deleteMany({ where: { id: { in: created } } });
-      await db.product.deleteMany({ where: { sku } });
+      await db.product.deleteMany({ where: { sku: { startsWith: sku } } });
     });
 
     it("brings the project to the product's current version, keeping the maker's own edits", async () => {
@@ -146,6 +146,93 @@ describe.skipIf(!enabled)(
       });
       const row = await db.project.findUniqueOrThrow({ where: { id } });
       expect(JSON.stringify(row.understanding)).toContain("solid oak");
+    });
+
+    it("reflects the plan: a second colour adds Colour options, keeping approvals", async () => {
+      const { replan } = await import("@/domain/plan");
+      const one = Product.parse({
+        ...product,
+        id: "pkg:PR-02",
+        sku: `${sku}-B`,
+      });
+      const [saved] = await upsertProducts([one]);
+      const plan = planProject({
+        product: saved,
+        type: "launch",
+        destinationIds: ["etsy"],
+        catalog: CATALOG,
+      });
+      const keys = (p: typeof plan | null | undefined) =>
+        p?.destinations[0].slots.map((s) => s.key) ?? [];
+      expect(keys(plan)).not.toContain("colours");
+      const scene = plan.destinations[0].slots.find((s) => s.fill === "scene");
+      if (!scene) throw new Error("no scene slot");
+      const approved = {
+        ...plan,
+        destinations: [
+          {
+            ...plan.destinations[0],
+            slots: plan.destinations[0].slots.map((s) =>
+              s.key === scene.key
+                ? { ...s, approvedOutput: "https://stub.local/ok.png" }
+                : s,
+            ),
+          },
+        ],
+      };
+      const id = await repo.createProject({
+        type: "launch",
+        product: saved,
+        plan: approved,
+        editor: startEditorState({
+          product: saved,
+          type: "launch",
+          plan: approved,
+          master: photoReference(saved),
+        }),
+      });
+      created.push(id);
+
+      const [two] = await upsertProducts([
+        {
+          ...saved,
+          colours: [
+            ...saved.colours,
+            { key: "walnut", name: "Walnut", face: "#5C4033", inStock: true },
+          ],
+        },
+      ]);
+      const before = await repo.loadProjectBoard(id);
+      if (!before?.board.plan) throw new Error("no plan");
+      // The banner's preview is what the update then does.
+      const preview = replan(before.board.plan, two, CATALOG.shotLists);
+      expect(preview.changes).toEqual([
+        {
+          destinationId: "etsy",
+          key: "colours",
+          label: "Colour options",
+          change: "adds",
+        },
+      ]);
+
+      expect(
+        await updateProjectProductAction({ projectId: id }),
+      ).toBeUndefined();
+      const after = await repo.loadProjectBoard(id);
+      expect(keys(after?.board.plan)).toEqual(keys(preview.plan));
+      expect(keys(after?.board.plan)).toContain("colours");
+      expect(
+        after?.board.plan?.destinations[0].slots.find(
+          (s) => s.key === scene.key,
+        )?.approvedOutput,
+      ).toBe("https://stub.local/ok.png");
+
+      // Again: nothing left to add.
+      expect(
+        await updateProjectProductAction({ projectId: id }),
+      ).toBeUndefined();
+      const again = await repo.loadProjectBoard(id);
+      expect(keys(again?.board.plan)).toEqual(keys(after?.board.plan));
     });
   },
 );

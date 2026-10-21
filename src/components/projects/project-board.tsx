@@ -47,6 +47,7 @@ import {
   deliveryBlockers,
   type PlanSlot,
   type ProjectPlan,
+  replan,
   type SlotView,
   slotCardId,
   slotState,
@@ -62,6 +63,7 @@ import {
 import type { JobView } from "@/domain/queue";
 import { VIDEO_MOTIONS } from "@/domain/video";
 import { isRenderableUrl } from "@/lib/asset-url";
+import { planChangeLines } from "@/lib/plan-changes";
 import { plateHref } from "@/lib/plate-href";
 import { plural } from "@/lib/plural";
 import { projectTypeLabel } from "@/lib/project-types";
@@ -219,6 +221,10 @@ export function ProjectBoard({
             projectId={projectId}
             changed={drift.changed}
             ownPrompts={ownPrompts.map((id) => labelOf.get(id) ?? id)}
+            planChanges={(() => {
+              const next = replan(board.plan, product, CATALOG.shotLists);
+              return planChangeLines(next.changes, next.redeliver);
+            })()}
           />
         ) : null}
 

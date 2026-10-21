@@ -14,7 +14,7 @@ import {
   ProviderId,
   VideoResolution,
 } from "@/domain/model-defaults";
-import { SlotMove, slotCardId } from "@/domain/plan";
+import { replan, SlotMove, slotCardId } from "@/domain/plan";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { KnobChoice } from "@/domain/scene-knobs";
 import { VideoChoice } from "@/domain/video";
@@ -200,6 +200,7 @@ export async function updateProjectProductAction(
       master: fresh,
       cards,
       textRules: (id) => CATALOG.destinations.find((d) => d.id === id)?.text,
+      replan: (p) => replan(p, product, CATALOG.shotLists).plan,
     });
   } catch (error) {
     return {
