@@ -26,7 +26,13 @@ import {
 import { DegradedNotice } from "@/components/studio/degraded-notice";
 import { Button } from "@/components/ui/button";
 import type { Product, Treatment, Unit, ViewLabel } from "@/domain/product";
-import { FINISHES } from "@/lib/product-form";
+import {
+  counter,
+  ratioCheck,
+  sizePreview,
+  stillNeeded,
+} from "@/lib/product-checks";
+import { FINISHES, type ProductForm } from "@/lib/product-form";
 import { cn } from "@/lib/utils";
 import type { StoredProductFile } from "@/server/product-files";
 import type { Degraded } from "@/server/text-calls";
@@ -37,6 +43,31 @@ const FIELD =
   "h-9 w-full min-w-0 rounded-field border border-border bg-secondary px-3 font-sans text-sm text-foreground outline-none focus:ring-1 focus:ring-ring";
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+const NOTE = "font-sans text-[0.75rem] text-on-surface-mid";
+
+// A field's label, with its count once it nears the limit.
+function Label({
+  text,
+  value,
+  limit,
+}: {
+  text: string;
+  value?: string;
+  limit?: number;
+}) {
+  const count = value !== undefined && limit ? counter(value, limit) : null;
+  return (
+    <span className="flex items-baseline justify-between gap-2">
+      <span className={LABEL}>{text}</span>
+      {count ? (
+        <span className="font-mono text-[0.625rem] text-on-surface-dim">
+          {count}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 const VIEW_LABELS: { value: ViewLabel; label: string }[] = [
   { value: "side", label: "Side" },
@@ -212,46 +243,55 @@ export function NewProductForm({
     });
   }
 
+  // What Save sends: the form's state as the schema reads it.
+  function formInput(): ProductForm {
+    return {
+      name,
+      whatItIs,
+      width: Number(width),
+      height: Number(height),
+      unit,
+      material,
+      treatment,
+      colours,
+      wording: wording
+        .filter((w) => w.label.trim() || w.example.trim())
+        .map((w) => ({
+          label: w.label,
+          ...(w.example.trim() ? { example: w.example } : {}),
+          maxChars: Number(w.maxChars) > 0 ? Number(w.maxChars) : null,
+          required: !w.optional,
+        })),
+      ...(useContext.trim() ? { useContext } : {}),
+      ...(Number(price) > 0 ? { price: Number(price) } : {}),
+      views,
+      ...(file
+        ? {
+            file:
+              file.kind === "vector"
+                ? {
+                    kind: "vector",
+                    url: file.url,
+                    drawnWidthPx: file.drawnWidthPx,
+                  }
+                : { kind: "photo", url: file.url },
+          }
+        : {}),
+    };
+  }
+
   function save() {
     setError(null);
     startSave(async () => {
-      const result = await createProductAction({
-        name,
-        whatItIs,
-        width: Number(width),
-        height: Number(height),
-        unit,
-        material,
-        treatment,
-        colours,
-        wording: wording
-          .filter((w) => w.label.trim() || w.example.trim())
-          .map((w) => ({
-            label: w.label,
-            ...(w.example.trim() ? { example: w.example } : {}),
-            maxChars: Number(w.maxChars) > 0 ? Number(w.maxChars) : null,
-            required: !w.optional,
-          })),
-        ...(useContext.trim() ? { useContext } : {}),
-        ...(Number(price) > 0 ? { price: Number(price) } : {}),
-        views,
-        ...(file
-          ? {
-              file:
-                file.kind === "vector"
-                  ? {
-                      kind: "vector",
-                      url: file.url,
-                      drawnWidthPx: file.drawnWidthPx,
-                    }
-                  : { kind: "photo", url: file.url },
-            }
-          : {}),
-      });
+      const result = await createProductAction(formInput());
       if ("error" in result) setError(result.error);
       else onCreated(result.product, result.warning);
     });
   }
+
+  const preview = sizePreview(Number(width), Number(height), unit);
+  const ratioNote = ratioCheck(ratio, Number(width), Number(height));
+  const needed = stillNeeded(formInput());
 
   return (
     <div className="col-span-full flex flex-col gap-5 rounded-card bg-card p-6 shadow-card">
@@ -376,7 +416,7 @@ export function NewProductForm({
 
       <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
-          <span className={LABEL}>Name</span>
+          <Label text="Name" value={name} limit={80} />
           <input
             className={FIELD}
             value={name}
@@ -385,7 +425,7 @@ export function NewProductForm({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className={LABEL}>What it is</span>
+          <Label text="What it is" value={whatItIs} limit={60} />
           <input
             className={FIELD}
             value={whatItIs}
@@ -438,9 +478,19 @@ export function NewProductForm({
               ))}
             </ToggleGroup.Root>
           </div>
+          {preview ? (
+            <span className="font-mono text-[0.7rem] text-on-surface-mid">
+              {preview}
+            </span>
+          ) : null}
+          {ratioNote ? (
+            <span className="font-sans text-[0.75rem] text-prov-local">
+              {ratioNote}
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-col gap-1.5">
-          <span className={LABEL}>Material</span>
+          <Label text="Material" value={material} limit={60} />
           <MaterialCombobox
             label="Material"
             value={material}
@@ -736,6 +786,9 @@ export function NewProductForm({
         <Button variant="ghost" disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
+        {needed.length > 0 ? (
+          <span className={NOTE}>Still needed: {needed.join(", ")}.</span>
+        ) : null}
         <span className="font-sans text-[0.75rem] text-on-surface-mid">
           Only an idea so far?{" "}
           <Link href="/studio?new=1" className="font-semibold text-primary">

@@ -2,6 +2,7 @@
 
 import { Check, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { wordingHint } from "@/lib/product-checks";
 import { cn } from "@/lib/utils";
 
 // What the buyer personalizes, one line per row with its columns named: what
@@ -52,64 +53,83 @@ export function WordingRows({
           <span />
         </div>
       ) : null}
-      {rows.map((row, i) => (
-        <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place
-          key={i}
-          className={GRID}
-        >
-          <input
-            aria-label={`Line ${i + 1}: what the buyer writes`}
-            data-field={`wording.${i}.label`}
-            className={field}
-            value={row.label}
-            placeholder="Name"
-            onChange={(e) => set(i, { label: e.target.value })}
-          />
-          <input
-            aria-label={`Line ${i + 1}: example`}
-            data-field={`wording.${i}.example`}
-            className={field}
-            value={row.example}
-            placeholder="Sofia"
-            onChange={(e) => set(i, { example: e.target.value })}
-          />
-          <input
-            aria-label={`Line ${i + 1}: most characters`}
-            data-field={`wording.${i}.maxChars`}
-            className={cn(field, "px-2")}
-            inputMode="numeric"
-            value={row.maxChars}
-            placeholder="—"
-            onChange={(e) =>
-              set(i, { maxChars: e.target.value.replace(/[^0-9]/g, "") })
-            }
-          />
-          <button
-            type="button"
-            aria-pressed={row.optional}
-            aria-label={`Line ${i + 1}: the buyer may leave it out`}
-            onClick={() => set(i, { optional: !row.optional })}
-            className={cn(
-              "inline-flex h-9 items-center justify-center gap-1 rounded-field px-2 font-sans text-[0.75rem] transition-colors",
-              row.optional
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-on-surface-mid hover:bg-surface-soft",
-            )}
+      {rows.map((row, i) => {
+        const hint = wordingHint(row);
+        return (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place
+            key={i}
+            className="flex flex-col gap-1"
           >
-            {row.optional ? <Check className="size-3" /> : null}
-            {row.optional ? "Optional" : "Required"}
-          </button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Remove line ${i + 1}`}
-            onClick={() => onChange(rows.filter((_, j) => j !== i))}
-          >
-            <Trash2 />
-          </Button>
-        </div>
-      ))}
+            <div className={GRID}>
+              <input
+                aria-label={`Line ${i + 1}: what the buyer writes`}
+                data-field={`wording.${i}.label`}
+                className={field}
+                value={row.label}
+                placeholder="Name"
+                onChange={(e) => set(i, { label: e.target.value })}
+              />
+              <input
+                aria-label={`Line ${i + 1}: example`}
+                data-field={`wording.${i}.example`}
+                className={field}
+                value={row.example}
+                placeholder="Sofia"
+                onChange={(e) => set(i, { example: e.target.value })}
+              />
+              <input
+                aria-label={`Line ${i + 1}: most characters`}
+                data-field={`wording.${i}.maxChars`}
+                className={cn(field, "px-2")}
+                inputMode="numeric"
+                value={row.maxChars}
+                placeholder="—"
+                onChange={(e) =>
+                  set(i, { maxChars: e.target.value.replace(/[^0-9]/g, "") })
+                }
+              />
+              <button
+                type="button"
+                aria-pressed={row.optional}
+                aria-label={`Line ${i + 1}: the buyer may leave it out`}
+                onClick={() => set(i, { optional: !row.optional })}
+                className={cn(
+                  "inline-flex h-9 items-center justify-center gap-1 rounded-field px-2 font-sans text-[0.75rem] transition-colors",
+                  row.optional
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-on-surface-mid hover:bg-surface-soft",
+                )}
+              >
+                {row.optional ? <Check className="size-3" /> : null}
+                {row.optional ? "Optional" : "Required"}
+              </button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Remove line ${i + 1}`}
+                onClick={() => onChange(rows.filter((_, j) => j !== i))}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+            {hint ? (
+              <span className="flex flex-wrap items-center gap-2 font-sans text-[0.75rem] text-prov-local">
+                {hint.words}
+                {hint.swap ? (
+                  <button
+                    type="button"
+                    onClick={() => set(i, { label: "", example: hint.swap })}
+                    className="rounded-pill border border-border-soft bg-secondary px-2.5 py-0.5 text-xs text-on-surface-mid transition-colors hover:border-primary"
+                  >
+                    Use “{hint.swap}” as the example
+                  </button>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+        );
+      })}
       {rows.length < max ? (
         <Button
           variant="ghost"
