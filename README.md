@@ -100,6 +100,20 @@ imports a catalog:
   updated (with what changed), unchanged, set aside. Re-importing a SKU updates that
   product in place. One whose content is the same is not written.
 
+**Making and editing a product.** New product is a form, and it explains itself.
+- Size shows the other unit and an everyday object under it ("2.3 x 1.25 in (58 x 32
+  mm) · smaller than a credit card"), so a mistyped number reads wrong.
+- Material suggests the ones already used and takes a new one. Each personalization
+  line has its columns named: what the buyer writes, an example, a maximum, optional.
+  A line whose label looks like its example offers to swap them.
+- Places of use, the default colour and, folded, depth, relief, hook, call to action
+  and description complete it. Save says what is still needed, and a field Kiln
+  refuses is marked under it with the reason.
+- Every product has its own page (Edit on Home, on New project's picker and on the
+  board): edit it, see which projects use it, download its package for what the form
+  does not show (parts, icons, variants), and delete it once no project uses it.
+  Saving keeps the sku and writes nothing when nothing changed.
+
 Each colour can carry a **material sample** (`swatchUrl`, or "Material photo" on the
 form). It is a close photo of the material in that colour, with even light and no text;
 a real photo carries the grain better than a drawn texture. Every scene sends the
@@ -137,7 +151,11 @@ changes, the board says what changed and offers "Update the project · free". Th
 update rewrites the product's text and reference into the project and keeps the
 maker's own card edits. Scenes made from the earlier version are marked, and so are
 the generate confirmation and the Deliver checklist. Kiln never blocks Generate over
-this.
+this. The update also reflects the plan where the product decides it: a second colour
+adds Colour options, lines removed take How to personalize with them, and scenes,
+approvals, knobs and the order stay. The banner says what it will do before the click
+("Etsy: adds Colour options.") and names a delivered destination whose photos
+renumber. The board's title renames in place.
 
 ## Models and providers
 
