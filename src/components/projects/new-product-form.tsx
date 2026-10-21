@@ -1,13 +1,23 @@
 "use client";
 
-import { ImagePlus, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
+import {
+  ChevronDown,
+  ImagePlus,
+  Loader2,
+  Plus,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
 import Link from "next/link";
+import { DropdownMenu, ToggleGroup } from "radix-ui";
 import { useRef, useState, useTransition } from "react";
 import {
   createProductAction,
   draftProductAction,
   uploadProductFileAction,
 } from "@/app/actions/products";
+import { MaterialCombobox } from "@/components/projects/material-combobox";
 import {
   emptyWordingRow,
   type WordingRow,
@@ -27,6 +37,15 @@ const FIELD =
   "h-9 w-full min-w-0 rounded-field border border-border bg-secondary px-3 font-sans text-sm text-foreground outline-none focus:ring-1 focus:ring-ring";
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+const VIEW_LABELS: { value: ViewLabel; label: string }[] = [
+  { value: "side", label: "Side" },
+  { value: "top", label: "Top" },
+  { value: "back", label: "Back" },
+  { value: "three-quarter", label: "Three-quarter" },
+];
+const viewName = (label: ViewLabel) =>
+  VIEW_LABELS.find((v) => v.value === label)?.label ?? label;
 
 interface Colour {
   name: string;
@@ -77,7 +96,6 @@ export function NewProductForm({
   const [price, setPrice] = useState("");
   // Up to two more views of the piece (the front one is the reference).
   const [views, setViews] = useState<{ label: ViewLabel; url: string }[]>([]);
-  const [viewLabel, setViewLabel] = useState<ViewLabel>("side");
   const viewInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [degraded, setDegraded] = useState<Degraded | null>(null);
@@ -158,7 +176,14 @@ export function NewProductForm({
         setError(result.error);
         return;
       }
-      setViews((all) => [...all, { label: viewLabel, url: result.url }]);
+      // The first side not shown yet; the maker can change it beside the
+      // thumbnail.
+      setViews((all) => {
+        const taken = new Set(all.map((v) => v.label));
+        const label =
+          VIEW_LABELS.find((v) => !taken.has(v.value))?.value ?? "side";
+        return [...all, { label, url: result.url }];
+      });
     });
   }
 
@@ -388,32 +413,46 @@ export function NewProductForm({
               placeholder="height"
               onChange={(e) => setHeight(e.target.value)}
             />
-            <select
+            <ToggleGroup.Root
+              type="single"
               aria-label="Unit"
-              className={cn(FIELD, "w-[4.75rem] flex-shrink-0 px-2")}
               value={unit}
-              onChange={(e) => setUnit(e.target.value as Unit)}
+              onValueChange={(next) => {
+                if (next) setUnit(next as Unit);
+              }}
+              className="flex flex-shrink-0 gap-1 rounded-field bg-secondary p-1"
             >
-              <option value="in">in</option>
-              <option value="mm">mm</option>
-            </select>
+              {(["in", "mm"] as const).map((u) => (
+                <ToggleGroup.Item
+                  key={u}
+                  value={u}
+                  className={cn(
+                    "h-7 rounded-[9px] px-2.5 font-sans text-[0.8rem] transition-colors",
+                    unit === u
+                      ? "bg-primary text-primary-foreground"
+                      : "text-on-surface-mid hover:bg-surface-soft",
+                  )}
+                >
+                  {u}
+                </ToggleGroup.Item>
+              ))}
+            </ToggleGroup.Root>
           </div>
         </div>
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           <span className={LABEL}>Material</span>
-          <input
-            className={FIELD}
-            list="kiln-materials"
+          <MaterialCombobox
+            label="Material"
             value={material}
+            onChange={setMaterial}
+            options={materials}
+            field={FIELD}
             placeholder="solid walnut, glazed stoneware…"
-            onChange={(e) => setMaterial(e.target.value)}
           />
-          <datalist id="kiln-materials">
-            {materials.map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
-        </label>
+          <span className="font-sans text-[0.75rem] text-on-surface-mid">
+            Pick one you've used or type a new one.
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -596,51 +635,74 @@ export function NewProductForm({
             {views.map((v, i) => (
               <span
                 key={v.url}
-                className="relative flex items-center gap-2 rounded-field bg-surface-soft py-1 pr-6 pl-1"
+                className="flex items-center gap-2 rounded-field bg-surface-soft py-1 pr-1 pl-1"
               >
                 {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
                 <img
                   src={v.url}
-                  alt={`${v.label} view`}
+                  alt={`${viewName(v.label)} view`}
                   className="size-9 rounded-swatch object-cover"
                 />
-                <span className="font-sans text-[0.8rem] text-foreground">
-                  {v.label}
-                </span>
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <button
+                      type="button"
+                      aria-label={`Which view: ${viewName(v.label)}`}
+                      className="inline-flex items-center gap-1 rounded-[9px] px-1.5 py-1 font-sans text-[0.8rem] text-foreground hover:bg-secondary"
+                    >
+                      {viewName(v.label)}
+                      <ChevronDown className="size-3 text-on-surface-mid" />
+                    </button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      align="start"
+                      sideOffset={4}
+                      className="z-50 min-w-[9rem] rounded-field bg-card p-1 shadow-card ring-1 ring-border"
+                    >
+                      {VIEW_LABELS.map((option) => (
+                        <DropdownMenu.Item
+                          key={option.value}
+                          disabled={views.some(
+                            (other, j) =>
+                              j !== i && other.label === option.value,
+                          )}
+                          onSelect={() =>
+                            setViews((all) =>
+                              all.map((x, j) =>
+                                j === i ? { ...x, label: option.value } : x,
+                              ),
+                            )
+                          }
+                          className="cursor-pointer rounded-[9px] px-2.5 py-1.5 font-sans text-sm text-foreground outline-none data-[disabled]:cursor-default data-[disabled]:text-on-surface-dim data-[highlighted]:bg-secondary"
+                        >
+                          {option.label}
+                        </DropdownMenu.Item>
+                      ))}
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
                 <button
                   type="button"
-                  aria-label={`Remove the ${v.label} view`}
+                  aria-label={`Remove the ${viewName(v.label)} view`}
                   onClick={() =>
                     setViews((all) => all.filter((_, j) => j !== i))
                   }
-                  className="absolute top-1/2 right-1.5 -translate-y-1/2 text-on-surface-mid hover:text-foreground"
+                  className="p-1 text-on-surface-mid hover:text-foreground"
                 >
                   <X className="size-3" />
                 </button>
               </span>
             ))}
             {views.length < 2 ? (
-              <>
-                <select
-                  aria-label="Which view"
-                  className={cn(FIELD, "w-auto")}
-                  value={viewLabel}
-                  onChange={(e) => setViewLabel(e.target.value as ViewLabel)}
-                >
-                  <option value="side">Side</option>
-                  <option value="top">Top</option>
-                  <option value="back">Back</option>
-                  <option value="three-quarter">Three-quarter</option>
-                </select>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  disabled={busy}
-                  onClick={() => viewInput.current?.click()}
-                >
-                  <ImagePlus /> Add a view
-                </Button>
-              </>
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={busy}
+                onClick={() => viewInput.current?.click()}
+              >
+                <ImagePlus /> Add a view
+              </Button>
             ) : null}
           </div>
           <input
