@@ -17,7 +17,7 @@ import type { PlateRenderer } from "@/providers/interfaces";
 // Output: an opaque square PNG on a flat ground, the layout fitted to 86 % of
 // the card on BOTH axes, rasterized with resvg (no browser, no system deps).
 
-const FIT = 0.86;
+export const FIT = 0.86;
 const GAP = 0.03;
 
 export interface SvgBox {
@@ -101,6 +101,27 @@ export function measureOutline(
   };
 }
 
+// The drawing as a nested <svg> drawn into `at` (px), showing `viewBox` of it
+// (the drawing's own units): fitted whole ("meet") or stretched to fill
+// ("none"). Its root's own position, size and fit are dropped.
+export function nestSvg(
+  svg: string,
+  at: SvgBox,
+  viewBox: SvgBox,
+  fit: "meet" | "none",
+): string {
+  const inner = svg
+    .replace(/<\?xml[^>]*>/i, "")
+    .replace(/<!DOCTYPE[^>]*>/i, "");
+  return inner.replace(/<svg\b([^>]*)>/i, (_m, attrs: string) => {
+    const cleaned = attrs
+      .replace(/\s(x|y|width|height)\s*=\s*["'][^"']*["']/gi, "")
+      .replace(/\sviewBox\s*=\s*["'][^"']*["']/i, "")
+      .replace(/\spreserveAspectRatio\s*=\s*["'][^"']*["']/i, "");
+    return `<svg${cleaned} x="${at.x.toFixed(2)}" y="${at.y.toFixed(2)}" width="${at.w.toFixed(2)}" height="${at.h.toFixed(2)}" viewBox="${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}" preserveAspectRatio="${fit === "meet" ? "xMidYMid meet" : "none"}">`;
+  });
+}
+
 // Wraps n copies of the drawing in a square document: ground rect + one nested
 // <svg> per piece, laid out single / row / stack. Returns the document and the
 // pixel boxes, so the PNG and the QC hints come from the same numbers.
@@ -126,9 +147,6 @@ export function composePlateSvg(
   const x0 = (S - totalW) / 2;
   const y0 = (S - totalH) / 2;
   const boxes: SvgBox[] = [];
-  const inner = svg
-    .replace(/<\?xml[^>]*>/i, "")
-    .replace(/<!DOCTYPE[^>]*>/i, "");
   const pieces = request.pieces
     .map((_, i) => {
       const x = request.layout === "row" ? x0 + i * (pw + gap) : x0;
@@ -139,13 +157,7 @@ export function composePlateSvg(
         w: Math.round(pw),
         h: Math.round(ph),
       });
-      const nested = inner.replace(/<svg\b([^>]*)>/i, (_m, attrs: string) => {
-        const cleaned = attrs
-          .replace(/\s(x|y|width|height)\s*=\s*["'][^"']*["']/gi, "")
-          .replace(/\sviewBox\s*=\s*["'][^"']*["']/i, "");
-        return `<svg${cleaned} x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${pw.toFixed(2)}" height="${ph.toFixed(2)}" viewBox="${box.x} ${box.y} ${box.w} ${box.h}" preserveAspectRatio="xMidYMid meet">`;
-      });
-      return nested;
+      return nestSvg(svg, { x, y, w: pw, h: ph }, box, "meet");
     })
     .join("\n");
   const doc = `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"><rect width="${S}" height="${S}" fill="${request.ground}"/>${pieces}</svg>`;

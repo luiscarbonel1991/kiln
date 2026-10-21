@@ -23,6 +23,15 @@ export {
   svgPlateRenderer,
 } from "@/providers/plates/svg";
 export {
+  renderThreeQuarter,
+  type StandingLayout,
+  standingLayout,
+  type ThreeQuarterGeometry,
+  type ThreeQuarterOptions,
+  threeQuarterGeometry,
+  threeQuarterPlateSvg,
+} from "@/providers/plates/three-quarter";
+export {
   CAPABILITY_MAP,
   getArtDirector,
   getCapabilities,
