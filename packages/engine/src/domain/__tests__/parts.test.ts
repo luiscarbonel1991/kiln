@@ -27,6 +27,30 @@ describe("parts", () => {
   });
 });
 
+describe("a part's corners seen from above", () => {
+  const base = (corner?: number) => ({
+    ...PLATE_ON_BASE,
+    parts: [
+      PLATE_ON_BASE.parts?.[0],
+      {
+        ...PLATE_ON_BASE.parts?.[1],
+        ...(corner === undefined ? {} : { corner }),
+      },
+    ],
+  });
+
+  it("are square unless given; half the depth rounds the ends fully", () => {
+    expect(Product.parse(base()).parts?.[1]).not.toHaveProperty("corner");
+    expect(Product.parse(base(1.125)).parts?.[1].corner).toBe(1.125);
+  });
+
+  it("can be no rounder than half the width or depth, and positive", () => {
+    for (const corner of [1.2, 0, -1]) {
+      expect(Product.safeParse(base(corner)).success).toBe(false);
+    }
+  });
+});
+
 describe("views", () => {
   it("up to two more views, each named by its side", () => {
     const view = (label: string) => ({

@@ -29,21 +29,36 @@ export type Dimensions = z.infer<typeof Dimensions>;
 // its size in the product's unit — w across, h up, d front to back — whether
 // it stands upright (its face toward the camera) or lies flat, and its own
 // material and a fixed colour when they differ from the product's (a base
-// always black, whatever colour the plate). The first part is the main one:
-// what the buyer chooses and personalizes.
-export const ProductPart = z.object({
-  name: z.string().trim().min(1).max(40),
-  dimensions: z.object({
-    w: z.number().positive(),
-    h: z.number().positive(),
-    d: z.number().positive(),
-  }),
-  lies: z.enum(["upright", "flat"]).default("upright"),
-  material: z.string().trim().min(1).max(120).optional(),
-  colour: z
-    .object({ name: z.string().trim().min(1).max(40), hex: Hex })
-    .optional(),
-});
+// always black, whatever colour the plate), and how round its corners are seen
+// from above (a pill-shaped base). The first part is the main one: what the
+// buyer chooses and personalizes.
+export const ProductPart = z
+  .object({
+    name: z.string().trim().min(1).max(40),
+    dimensions: z.object({
+      w: z.number().positive(),
+      h: z.number().positive(),
+      d: z.number().positive(),
+    }),
+    lies: z.enum(["upright", "flat"]).default("upright"),
+    material: z.string().trim().min(1).max(120).optional(),
+    colour: z
+      .object({ name: z.string().trim().min(1).max(40), hex: Hex })
+      .optional(),
+    corner: z
+      .number()
+      .positive()
+      .describe(
+        "The radius of its corners seen from above, in the product's unit; half its depth rounds its ends fully. Absent: square corners.",
+      )
+      .optional(),
+  })
+  .refine(
+    (p) =>
+      p.corner === undefined ||
+      p.corner <= Math.min(p.dimensions.w, p.dimensions.d) / 2,
+    { path: ["corner"], message: "at most half its width or depth" },
+  );
 export type ProductPart = z.infer<typeof ProductPart>;
 
 // Another view of the product, beside the front one the reference shows: the
