@@ -35,6 +35,7 @@ export default async function ProductPage({
   const products = await listProducts();
   const models = await getMakerModels();
   const draft = textEstimate(models.text, TEXT_CALL_BUDGETS.productDraft);
+  const review = textEstimate(models.text, TEXT_CALL_BUDGETS.productReview);
   const now = productHash(product);
   const uses = (await productProjects(id)).map((use) => ({
     projectId: use.projectId,
@@ -55,6 +56,7 @@ export default async function ProductPage({
         uses={uses}
         materials={[...new Set(products.map((p) => p.material))].sort()}
         draftPrice={draft === null ? null : `≈ $${draft.toFixed(2)}`}
+        reviewPrice={review === null ? null : `≈ $${review.toFixed(2)}`}
         back={typeof back === "string" && BACK.test(back) ? back : "/"}
       />
     </div>

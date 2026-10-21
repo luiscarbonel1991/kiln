@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -10,11 +11,15 @@ export function PlacesOfUse({
   places,
   onChange,
   field,
+  notes,
   max = 6,
 }: {
   places: string[];
   onChange: (places: string[]) => void;
   field: string;
+  // The review's note for a place, if any ("useContexts.1"); one past the
+  // last offers a new place.
+  notes?: (field: string) => ReactNode;
   max?: number;
 }) {
   return (
@@ -23,28 +28,32 @@ export function PlacesOfUse({
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place
           key={i}
-          className="flex items-center gap-2"
+          className="flex flex-col gap-1"
         >
-          <input
-            aria-label={`Place ${i + 1}`}
-            data-field={`useContexts.${i}`}
-            className={cn(field)}
-            value={place}
-            placeholder={i === 0 ? "a kitchen counter" : "a dinner table"}
-            onChange={(e) =>
-              onChange(places.map((p, j) => (j === i ? e.target.value : p)))
-            }
-          />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Remove place ${i + 1}`}
-            onClick={() => onChange(places.filter((_, j) => j !== i))}
-          >
-            <Trash2 />
-          </Button>
+          <div className="flex items-center gap-2">
+            <input
+              aria-label={`Place ${i + 1}`}
+              data-field={`useContexts.${i}`}
+              className={cn(field)}
+              value={place}
+              placeholder={i === 0 ? "a kitchen counter" : "a dinner table"}
+              onChange={(e) =>
+                onChange(places.map((p, j) => (j === i ? e.target.value : p)))
+              }
+            />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Remove place ${i + 1}`}
+              onClick={() => onChange(places.filter((_, j) => j !== i))}
+            >
+              <Trash2 />
+            </Button>
+          </div>
+          {notes?.(`useContexts.${i}`)}
         </div>
       ))}
+      {notes?.(`useContexts.${places.length}`)}
       {places.length < max ? (
         <Button
           variant="ghost"

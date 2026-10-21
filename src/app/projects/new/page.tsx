@@ -24,6 +24,7 @@ export default async function NewProjectPage({
   const brand = await getMakerBrand();
   const models = await getMakerModels();
   const draft = textEstimate(models.text, TEXT_CALL_BUDGETS.productDraft);
+  const review = textEstimate(models.text, TEXT_CALL_BUDGETS.productReview);
   return (
     <div className="flex min-h-full flex-col">
       <ProjectsHeader />
@@ -32,6 +33,7 @@ export default async function NewProjectPage({
         initialBrand={brand}
         makerModels={models}
         draftPrice={draft === null ? null : `≈ $${draft.toFixed(2)}`}
+        reviewPrice={review === null ? null : `≈ $${review.toFixed(2)}`}
         initialDesign={initialDesign}
         initialProductId={
           typeof product === "string" && products.some((p) => p.id === product)

@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Plus, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { wordingHint } from "@/lib/product-checks";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ export function WordingRows({
   field,
   onChange,
   problems = {},
+  notes,
   max = 3,
 }: {
   rows: WordingRow[];
@@ -41,6 +43,8 @@ export function WordingRows({
   onChange: (rows: WordingRow[]) => void;
   // The form's problems by field ("wording.0.label"), once Save was tried.
   problems?: Record<string, string>;
+  // The review's note for a field, if any ("wording.0.example").
+  notes?: (field: string) => ReactNode;
   max?: number;
 }) {
   const set = (i: number, patch: Partial<WordingRow>) =>
@@ -137,6 +141,9 @@ export function WordingRows({
                 ) : null}
               </span>
             ) : null}
+            {notes?.(`wording.${i}.label`)}
+            {notes?.(`wording.${i}.example`)}
+            {notes?.(`wording.${i}.maxChars`)}
           </div>
         );
       })}

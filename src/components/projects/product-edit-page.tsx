@@ -50,6 +50,7 @@ export function ProductEditPage({
   uses,
   materials,
   draftPrice,
+  reviewPrice,
   back,
 }: {
   productId: string;
@@ -63,6 +64,7 @@ export function ProductEditPage({
   uses: Use[];
   materials: string[];
   draftPrice: string | null;
+  reviewPrice: string | null;
   back: string;
 }) {
   const router = useRouter();
@@ -137,6 +139,7 @@ export function ProductEditPage({
         <ProductEditor
           materials={materials}
           draftPrice={draftPrice}
+          reviewPrice={reviewPrice}
           editing={{ productId, form, limits }}
           onSaved={(result) => {
             setSaved(result);

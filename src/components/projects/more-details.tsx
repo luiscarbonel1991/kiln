@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { Treatment, Unit } from "@/domain/product";
 import { counter } from "@/lib/product-checks";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,8 @@ export function MoreDetails({
   treatment,
   field,
   label,
+  notes,
+  reveal = false,
 }: {
   details: Details;
   onChange: (details: Details) => void;
@@ -45,10 +47,17 @@ export function MoreDetails({
   treatment: Treatment;
   field: string;
   label: string;
+  // The review's note for a field, if any ("hook").
+  notes?: (field: string) => ReactNode;
+  // Open it: the review has something to say inside.
+  reveal?: boolean;
 }) {
   const set = (patch: Partial<Details>) => onChange({ ...details, ...patch });
   const filled = Object.values(details).some((v) => v.trim() !== "");
   const [open, setOpen] = useState(filled);
+  useEffect(() => {
+    if (reveal) setOpen(true);
+  }, [reveal]);
   const relief = RELIEF[treatment];
   const count = (value: string, limit: number) => {
     const c = counter(value, limit);
@@ -112,6 +121,7 @@ export function MoreDetails({
               placeholder="Your name, on your desk."
               onChange={(e) => set({ hook: e.target.value })}
             />
+            {notes?.("hook")}
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="flex items-baseline justify-between gap-2">
@@ -125,6 +135,7 @@ export function MoreDetails({
               placeholder="Order yours"
               onChange={(e) => set({ cta: e.target.value })}
             />
+            {notes?.("cta")}
           </label>
           <label className="flex flex-col gap-1.5 sm:col-span-2">
             <span className="flex items-baseline justify-between gap-2">
@@ -138,6 +149,7 @@ export function MoreDetails({
               placeholder="What it is made of, how it is made, what comes with it."
               onChange={(e) => set({ description: e.target.value })}
             />
+            {notes?.("description")}
           </label>
         </div>
       ) : null}

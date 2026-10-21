@@ -68,6 +68,7 @@ export function NewProjectFlow({
   initialBrand,
   makerModels,
   draftPrice,
+  reviewPrice,
   initialDesign,
   initialProductId = null,
 }: {
@@ -75,6 +76,7 @@ export function NewProjectFlow({
   initialBrand: BrandKit | null;
   makerModels: MakerModels;
   draftPrice: string | null;
+  reviewPrice: string | null;
   // A design handed over from the studio ("Make it a product").
   initialDesign: StoredProductFile | null;
   // A product picked on Home.
@@ -229,6 +231,7 @@ export function NewProjectFlow({
             <ProductEditor
               materials={[...new Set(products.map((p) => p.material))].sort()}
               draftPrice={draftPrice}
+              reviewPrice={reviewPrice}
               initialFile={initialDesign}
               onCreated={(created, warning) => {
                 setProducts((current) =>

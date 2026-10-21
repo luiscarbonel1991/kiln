@@ -15,6 +15,7 @@ import { useRef, useState, useTransition } from "react";
 import {
   createProductAction,
   draftProductAction,
+  reviewProductAction,
   updateProductAction,
   uploadProductFileAction,
 } from "@/app/actions/products";
@@ -25,6 +26,7 @@ import {
   MoreDetails,
 } from "@/components/projects/more-details";
 import { PlacesOfUse } from "@/components/projects/places-of-use";
+import { ReviewNote } from "@/components/projects/review-note";
 import {
   emptyWordingRow,
   type WordingRow,
@@ -32,7 +34,13 @@ import {
 } from "@/components/projects/wording-rows";
 import { DegradedNotice } from "@/components/studio/degraded-notice";
 import { Button } from "@/components/ui/button";
-import type { Product, Treatment, Unit, ViewLabel } from "@/domain/product";
+import {
+  type Product,
+  Treatment,
+  type Unit,
+  type ViewLabel,
+} from "@/domain/product";
+import { plural } from "@/lib/plural";
 import {
   counter,
   ratioCheck,
@@ -46,6 +54,13 @@ import {
   formIssues,
   type ProductForm,
 } from "@/lib/product-form";
+import {
+  type CleanReview,
+  MAX_PLACES,
+  type ReviewForm,
+  reviewFields,
+  type Suggestion,
+} from "@/lib/product-review";
 import { cn } from "@/lib/utils";
 import type { StoredProductFile } from "@/server/product-files";
 import type { Degraded } from "@/server/text-calls";
@@ -123,6 +138,21 @@ function storedFile(form: ProductForm): StoredProductFile | null {
 
 const text = (n: number | undefined | null) => (n ? String(n) : "");
 
+// "GPT-6.1 Sol: 2 suggestions and 1 check, under their fields."
+function reviewSummary(model: string, suggestions: number, checks: number) {
+  if (suggestions + checks === 0)
+    return `${model} has nothing more to suggest.`;
+  const counts = [
+    suggestions > 0 ? plural(suggestions, "suggestion") : null,
+    checks > 0 ? plural(checks, "check") : null,
+  ].filter(Boolean);
+  const where = suggestions + checks === 1 ? "its field" : "their fields";
+  return `${model}: ${counts.join(" and ")}, under ${where}. Nothing is saved until you save.`;
+}
+
+// The review's fields that live under More details.
+const DETAIL_FIELDS = new Set(["hook", "cta", "description"]);
+
 // The colour a new product starts with, until the maker names its own.
 const STARTER_COLOUR: Colour = { name: "Natural", hex: "#D9B98C" };
 
@@ -136,6 +166,7 @@ const STARTER_COLOUR: Colour = { name: "Natural", hex: "#D9B98C" };
 export function ProductEditor({
   materials,
   draftPrice,
+  reviewPrice,
   initialFile,
   onCreated,
   onCancel,
@@ -146,6 +177,8 @@ export function ProductEditor({
   materials: string[];
   // "≈ $0.03" for "Fill from the photo" on the maker's text model.
   draftPrice: string | null;
+  // "≈ $0.03" for "Review with AI" on the maker's text model.
+  reviewPrice: string | null;
   // A design handed over from the studio ("Make it a product").
   initialFile?: StoredProductFile | null;
   onCreated?: (product: Product, warning?: string) => void;
@@ -219,7 +252,15 @@ export function ProductEditor({
   const sampleRow = useRef<number | null>(null);
 
   const ratio = file?.kind === "vector" ? file.ratio : null;
-  const busy = uploading || drafting || saving;
+  // "Review with AI": what the text model suggests and asks to check, under
+  // each field, until used or dismissed. Nothing is saved until Save.
+  const [review, setReview] = useState<
+    (CleanReview & { model: string }) | null
+  >(null);
+  const [reviewDegraded, setReviewDegraded] = useState<Degraded | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewing, startReview] = useTransition();
+  const busy = uploading || drafting || saving || reviewing;
 
   function setWidthFollowing(value: string) {
     setWidth(value);
@@ -370,6 +411,117 @@ export function ProductEditor({
     };
   }
 
+  // What the review reads: the form as it is held, rows in place, so a
+  // suggestion names the row it means.
+  function reviewInput(): ReviewForm {
+    return {
+      name,
+      whatItIs,
+      width: Number(width),
+      height: Number(height),
+      unit,
+      material,
+      treatment,
+      colours: colours.map((c) => ({ name: c.name })),
+      wording: wording.map((w) => ({
+        label: w.label,
+        example: w.example,
+        maxChars: Number(w.maxChars) > 0 ? Number(w.maxChars) : null,
+      })),
+      useContexts: places,
+      hook: details.hook,
+      cta: details.cta,
+      description: details.description,
+    };
+  }
+
+  function runReview(model?: { provider: "google" | "openai"; model: string }) {
+    setReviewError(null);
+    startReview(async () => {
+      const result = await reviewProductAction({
+        form: reviewInput(),
+        productId: editing?.productId,
+        model,
+      });
+      if (result.error) setReviewError(result.error);
+      setReviewDegraded(result.degraded ?? null);
+      if (!result.review) return;
+      setReview(result.review);
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLElement>("[data-review]")
+          ?.scrollIntoView({ block: "center", behavior: "smooth" }),
+      );
+    });
+  }
+
+  // Lay one suggestion into the form (cleanReview kept only what the field
+  // takes), then drop it.
+  function takeSuggestion(s: Suggestion) {
+    const [head, index, part] = s.field.split(".");
+    const i = Number(index);
+    if (head === "name") setName(s.value);
+    if (head === "whatItIs") setWhatItIs(s.value);
+    if (head === "material") setMaterial(s.value);
+    if (head === "treatment") {
+      const finish = Treatment.safeParse(s.value);
+      if (finish.success) setTreatment(finish.data);
+    }
+    if (head === "colours") {
+      if (i === 0) setStarterName(false);
+      setColours((all) =>
+        all.map((c, j) => (j === i ? { ...c, name: s.value } : c)),
+      );
+    }
+    if (
+      head === "wording" &&
+      (part === "label" || part === "example" || part === "maxChars")
+    ) {
+      setWording((rows) =>
+        rows.map((r, j) => (j === i ? { ...r, [part]: s.value } : r)),
+      );
+    }
+    if (head === "useContexts") {
+      setPlaces((all) =>
+        i < all.length
+          ? all.map((p, j) => (j === i ? s.value : p))
+          : [...all, s.value].slice(0, MAX_PLACES),
+      );
+    }
+    if (head === "hook" || head === "cta" || head === "description") {
+      setDetails((d) => ({ ...d, [head]: s.value }));
+    }
+    dismiss(s.field, "suggestion");
+  }
+
+  function dismiss(field: string, kind: "suggestion" | "check") {
+    setReview((r) =>
+      r
+        ? kind === "suggestion"
+          ? {
+              ...r,
+              suggestions: r.suggestions.filter((x) => x.field !== field),
+            }
+          : { ...r, checks: r.checks.filter((x) => x.field !== field) }
+        : r,
+    );
+  }
+
+  // A row added or removed moves the others: the review's notes on that list
+  // no longer name the right row, so they go.
+  function forget(list: "colours" | "wording" | "useContexts") {
+    const kept = (field: string) => !field.startsWith(`${list}.`);
+    setReview((r) =>
+      r
+        ? {
+            ...r,
+            suggestions: r.suggestions.filter((x) => kept(x.field)),
+            checks: r.checks.filter((x) => kept(x.field)),
+          }
+        : r,
+    );
+  }
+
   function save() {
     setError(null);
     setAttempted(true);
@@ -398,6 +550,27 @@ export function ProductEditor({
     });
   }
 
+  // The fields as the review reads them now: a suggestion already typed in by
+  // hand is not shown.
+  const current = new Map(
+    reviewFields(reviewInput(), limits).map((f) => [f.field, f.value.trim()]),
+  );
+  const open = review
+    ? review.suggestions.filter((s) => current.get(s.field) !== s.value)
+    : [];
+  const note = (field: string) => {
+    if (!review) return null;
+    const suggestion = open.find((s) => s.field === field);
+    const check = review.checks.find((c) => c.field === field);
+    return (
+      <ReviewNote
+        suggestion={suggestion}
+        check={check}
+        onUse={takeSuggestion}
+        onDismiss={(kind) => dismiss(field, kind)}
+      />
+    );
+  };
   const preview = sizePreview(Number(width), Number(height), unit);
   const ratioNote = ratioCheck(ratio, Number(width), Number(height));
   const needed = stillNeeded(formInput(), limits);
@@ -548,6 +721,7 @@ export function ProductEditor({
             onChange={(e) => setName(e.target.value)}
           />
           {problem("name")}
+          {note("name")}
         </label>
         <label className="flex flex-col gap-1.5">
           <Label text="What it is" value={whatItIs} limit={limits.whatItIs} />
@@ -559,6 +733,7 @@ export function ProductEditor({
             onChange={(e) => setWhatItIs(e.target.value)}
           />
           {problem("whatItIs")}
+          {note("whatItIs")}
         </label>
         <div className="flex flex-col gap-1.5">
           <span className={LABEL}>Size</span>
@@ -618,6 +793,7 @@ export function ProductEditor({
               {ratioNote}
             </span>
           ) : null}
+          {note("size")}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label text="Material" value={material} limit={limits.material} />
@@ -634,6 +810,7 @@ export function ProductEditor({
               Pick one you've used or type a new one.
             </span>
           )}
+          {note("material")}
         </div>
       </div>
 
@@ -659,6 +836,7 @@ export function ProductEditor({
         <span className="font-sans text-[0.75rem] text-on-surface-mid">
           {FINISHES.find((f) => f.value === treatment)?.hint}
         </span>
+        {note("treatment")}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -668,104 +846,112 @@ export function ProductEditor({
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place
               key={i}
-              className="flex items-center gap-2"
+              className="flex flex-col gap-1"
             >
-              <input
-                type="color"
-                aria-label={`Colour ${i + 1}`}
-                value={c.hex}
-                onChange={(e) =>
-                  setColours((all) =>
-                    all.map((x, j) =>
-                      j === i ? { ...x, hex: e.target.value.toUpperCase() } : x,
-                    ),
-                  )
-                }
-                className="size-9 flex-shrink-0 cursor-pointer rounded-swatch border border-border bg-transparent"
-              />
-              <input
-                aria-label={`Colour ${i + 1} name`}
-                data-field={`colours.${i}.name`}
-                className={cn(FIELD, "max-w-[260px]")}
-                value={c.name}
-                onFocus={(e) => {
-                  if (isStarter(i, c)) e.currentTarget.select();
-                }}
-                onMouseUp={(e) => {
-                  if (isStarter(i, c)) e.preventDefault();
-                }}
-                onChange={(e) => {
-                  if (i === 0) setStarterName(false);
-                  setColours((all) =>
-                    all.map((x, j) =>
-                      j === i ? { ...x, name: e.target.value } : x,
-                    ),
-                  );
-                }}
-              />
-              {c.swatchUrl ? (
-                <span className="relative flex-shrink-0">
-                  {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
-                  <img
-                    src={c.swatchUrl}
-                    alt={`${c.name || `Colour ${i + 1}`} material`}
-                    className="size-9 rounded-swatch border border-border object-cover"
-                  />
-                  <button
-                    type="button"
-                    aria-label="Remove the material photo"
-                    onClick={() =>
-                      setColours((all) =>
-                        all.map((x, j) =>
-                          j === i ? { ...x, swatchUrl: undefined } : x,
-                        ),
-                      )
-                    }
-                    className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-pill bg-card text-on-surface-mid shadow-render hover:text-foreground"
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  aria-label={`Colour ${i + 1}`}
+                  value={c.hex}
+                  onChange={(e) =>
+                    setColours((all) =>
+                      all.map((x, j) =>
+                        j === i
+                          ? { ...x, hex: e.target.value.toUpperCase() }
+                          : x,
+                      ),
+                    )
+                  }
+                  className="size-9 flex-shrink-0 cursor-pointer rounded-swatch border border-border bg-transparent"
+                />
+                <input
+                  aria-label={`Colour ${i + 1} name`}
+                  data-field={`colours.${i}.name`}
+                  className={cn(FIELD, "max-w-[260px]")}
+                  value={c.name}
+                  onFocus={(e) => {
+                    if (isStarter(i, c)) e.currentTarget.select();
+                  }}
+                  onMouseUp={(e) => {
+                    if (isStarter(i, c)) e.preventDefault();
+                  }}
+                  onChange={(e) => {
+                    if (i === 0) setStarterName(false);
+                    setColours((all) =>
+                      all.map((x, j) =>
+                        j === i ? { ...x, name: e.target.value } : x,
+                      ),
+                    );
+                  }}
+                />
+                {c.swatchUrl ? (
+                  <span className="relative flex-shrink-0">
+                    {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
+                    <img
+                      src={c.swatchUrl}
+                      alt={`${c.name || `Colour ${i + 1}`} material`}
+                      className="size-9 rounded-swatch border border-border object-cover"
+                    />
+                    <button
+                      type="button"
+                      aria-label="Remove the material photo"
+                      onClick={() =>
+                        setColours((all) =>
+                          all.map((x, j) =>
+                            j === i ? { ...x, swatchUrl: undefined } : x,
+                          ),
+                        )
+                      }
+                      className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-pill bg-card text-on-surface-mid shadow-render hover:text-foreground"
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </span>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    disabled={busy}
+                    title="A close photo of the material in this colour, even light, no text: scenes copy its look"
+                    onClick={() => {
+                      sampleRow.current = i;
+                      sampleInput.current?.click();
+                    }}
                   >
-                    <X className="size-2.5" />
-                  </button>
-                </span>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  disabled={busy}
-                  title="A close photo of the material in this colour, even light, no text: scenes copy its look"
-                  onClick={() => {
-                    sampleRow.current = i;
-                    sampleInput.current?.click();
-                  }}
-                >
-                  <ImagePlus /> Material photo
-                </Button>
-              )}
-              {i === defaultColour ? (
-                <span className="font-mono text-[0.625rem] text-on-surface-dim">
-                  default
-                </span>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setDefaultColour(i)}
-                >
-                  Make default
-                </Button>
-              )}
-              {colours.length > 1 ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Remove colour ${i + 1}`}
-                  onClick={() => {
-                    setColours((all) => all.filter((_, j) => j !== i));
-                    setDefaultColour((d) => (i === d ? 0 : i < d ? d - 1 : d));
-                  }}
-                >
-                  <Trash2 />
-                </Button>
-              ) : null}
+                    <ImagePlus /> Material photo
+                  </Button>
+                )}
+                {i === defaultColour ? (
+                  <span className="font-mono text-[0.625rem] text-on-surface-dim">
+                    default
+                  </span>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setDefaultColour(i)}
+                  >
+                    Make default
+                  </Button>
+                )}
+                {colours.length > 1 ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Remove colour ${i + 1}`}
+                    onClick={() => {
+                      forget("colours");
+                      setColours((all) => all.filter((_, j) => j !== i));
+                      setDefaultColour((d) =>
+                        i === d ? 0 : i < d ? d - 1 : d,
+                      );
+                    }}
+                  >
+                    <Trash2 />
+                  </Button>
+                ) : null}
+              </div>
+              {note(`colours.${i}.name`)}
             </div>
           ))}
           <input
@@ -796,9 +982,10 @@ export function ProductEditor({
               variant="ghost"
               size="xs"
               className="self-start"
-              onClick={() =>
-                setColours((all) => [...all, { name: "", hex: "#808080" }])
-              }
+              onClick={() => {
+                forget("colours");
+                setColours((all) => [...all, { name: "", hex: "#808080" }]);
+              }}
             >
               <Plus /> Add colour
             </Button>
@@ -812,13 +999,25 @@ export function ProductEditor({
           <WordingRows
             rows={wording}
             field={FIELD}
-            onChange={setWording}
+            onChange={(rows) => {
+              if (rows.length !== wording.length) forget("wording");
+              setWording(rows);
+            }}
             problems={problems}
+            notes={note}
           />
         </div>
         <div className="flex flex-col gap-1.5">
           <span className={LABEL}>Where it's used (optional)</span>
-          <PlacesOfUse places={places} onChange={setPlaces} field={FIELD} />
+          <PlacesOfUse
+            places={places}
+            onChange={(next) => {
+              if (next.length !== places.length) forget("useContexts");
+              setPlaces(next);
+            }}
+            field={FIELD}
+            notes={note}
+          />
         </div>
         <label className="flex flex-col gap-1.5">
           <span className={LABEL}>Price (optional)</span>
@@ -939,7 +1138,43 @@ export function ProductEditor({
         treatment={treatment}
         field={FIELD}
         label={LABEL}
+        notes={note}
+        reveal={
+          open.some((x) => DETAIL_FIELDS.has(x.field)) ||
+          (review?.checks ?? []).some((x) => DETAIL_FIELDS.has(x.field))
+        }
       />
+
+      {reviewDegraded ? (
+        <DegradedNotice
+          degraded={reviewDegraded}
+          fellBackTo="nothing: the form is as you left it"
+          verb="Review it"
+          pending={reviewing}
+          onAlternative={(model) => runReview(model)}
+        />
+      ) : null}
+      {review ? (
+        <output className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-field bg-secondary px-4 py-3">
+          <Sparkles className="size-3.5 text-primary" />
+          <span className="font-sans text-[0.8125rem] text-foreground">
+            {reviewSummary(review.model, open.length, review.checks.length)}
+          </span>
+          {open.length > 1 ? (
+            <Button
+              size="xs"
+              onClick={() => {
+                for (const s of open) takeSuggestion(s);
+              }}
+            >
+              Use all
+            </Button>
+          ) : null}
+          <Button size="xs" variant="ghost" onClick={() => setReview(null)}>
+            {open.length + review.checks.length === 0 ? "Close" : "Dismiss all"}
+          </Button>
+        </output>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border-soft pt-4">
         <Button
@@ -952,6 +1187,10 @@ export function ProductEditor({
         </Button>
         <Button variant="ghost" disabled={busy} onClick={onCancel}>
           Cancel
+        </Button>
+        <Button variant="secondary" disabled={busy} onClick={() => runReview()}>
+          {reviewing ? <Loader2 className="animate-spin" /> : <Sparkles />}
+          Review with AI{reviewPrice ? ` · ${reviewPrice}` : ""}
         </Button>
         {needed.length > 0 ? (
           <span className={NOTE}>Still needed: {needed.join(", ")}.</span>
@@ -966,6 +1205,11 @@ export function ProductEditor({
         {error ? (
           <span className="w-full font-mono text-[0.7rem] text-prov-local">
             {error}
+          </span>
+        ) : null}
+        {reviewError ? (
+          <span className="w-full font-mono text-[0.7rem] text-prov-local">
+            {reviewError}
           </span>
         ) : null}
       </div>
