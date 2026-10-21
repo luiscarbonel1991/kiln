@@ -45,67 +45,86 @@ export const ProductFile = z.discriminatedUnion("kind", [
 ]);
 export type ProductFile = z.infer<typeof ProductFile>;
 
-export const ProductForm = z.object({
-  name: z.string().trim().min(1, "Name the product.").max(80),
-  whatItIs: z
-    .string()
-    .trim()
-    .min(1, "Say what it is, like “round coaster”.")
-    .max(60),
-  width: z.number().positive("Give its width."),
-  height: z.number().positive("Give its height."),
-  unit: Unit,
-  material: z.string().trim().min(1, "Name its material.").max(60),
-  treatment: Treatment,
-  colours: z
-    .array(
-      z.object({
-        name: z.string().trim().min(1, "Name this colour.").max(40),
-        hex: Hex,
-        // A photo of the material in this colour, uploaded to Kiln's storage.
-        swatchUrl: z.string().min(1).optional(),
-      }),
-    )
-    .min(1, "Add at least one colour.")
-    .max(8),
-  wording: z
-    .array(
-      z
-        .object({
-          label: z
-            .string()
-            .trim()
-            .min(1, "Say what the buyer writes, like “Name”.")
-            .max(40),
-          example: z.string().trim().max(60).optional(),
-          // The most characters the buyer may type; null when the text is
-          // fitted to the piece.
-          maxChars: z.number().int().min(1).max(200).nullable().default(null),
-          required: z.boolean().default(true),
-        })
-        .refine(
-          (w) =>
-            w.maxChars === null ||
-            w.example === undefined ||
-            w.example.length <= w.maxChars,
-          {
-            path: ["example"],
-            message: "The example is longer than the most characters allowed.",
-          },
-        ),
-    )
-    .max(3)
-    .default([]),
-  useContext: z.string().trim().max(80).optional(),
-  // The maker's price, in the shop's currency (optional; a listing needs it).
-  price: z.number().positive("A price is more than 0.").optional(),
-  // Up to two more views of the piece, uploaded to Kiln's storage.
-  views: z
-    .array(z.object({ label: ViewLabel, url: z.string().min(1) }))
-    .max(2)
-    .default([]),
-  file: ProductFile.optional(),
-});
+export const ProductForm = z
+  .object({
+    name: z.string().trim().min(1, "Name the product.").max(80),
+    whatItIs: z
+      .string()
+      .trim()
+      .min(1, "Say what it is, like “round coaster”.")
+      .max(60),
+    width: z.number().positive("Give its width."),
+    height: z.number().positive("Give its height."),
+    unit: Unit,
+    material: z.string().trim().min(1, "Name its material.").max(60),
+    treatment: Treatment,
+    colours: z
+      .array(
+        z.object({
+          name: z.string().trim().min(1, "Name this colour.").max(40),
+          hex: Hex,
+          // A photo of the material in this colour, uploaded to Kiln's storage.
+          swatchUrl: z.string().min(1).optional(),
+        }),
+      )
+      .min(1, "Add at least one colour.")
+      .max(8),
+    wording: z
+      .array(
+        z
+          .object({
+            label: z
+              .string()
+              .trim()
+              .min(1, "Say what the buyer writes, like “Name”.")
+              .max(40),
+            example: z.string().trim().max(60).optional(),
+            // The most characters the buyer may type; null when the text is
+            // fitted to the piece.
+            maxChars: z.number().int().min(1).max(200).nullable().default(null),
+            required: z.boolean().default(true),
+          })
+          .refine(
+            (w) =>
+              w.maxChars === null ||
+              w.example === undefined ||
+              w.example.length <= w.maxChars,
+            {
+              path: ["example"],
+              message:
+                "The example is longer than the most characters allowed.",
+            },
+          ),
+      )
+      .max(3)
+      .default([]),
+    // Where it's used, the most typical first.
+    useContexts: z
+      .array(
+        z.string().trim().min(1, "Describe the place, or remove it.").max(80),
+      )
+      .max(6)
+      .default([]),
+    // Which colour is the default (its row).
+    defaultColour: z.number().int().min(0).default(0),
+    depth: z.number().positive("A thickness is more than 0.").optional(),
+    relief: z.number().positive("A relief is more than 0.").optional(),
+    hook: z.string().trim().max(80).optional(),
+    cta: z.string().trim().max(40).optional(),
+    description: z.string().trim().max(1000).optional(),
+    // The maker's price, in the shop's currency (optional; a listing needs it).
+    price: z.number().positive("A price is more than 0.").optional(),
+    // Up to two more views of the piece, uploaded to Kiln's storage.
+    views: z
+      .array(z.object({ label: ViewLabel, url: z.string().min(1) }))
+      .max(2)
+      .default([]),
+    file: ProductFile.optional(),
+  })
+  .refine((f) => f.colours.length === 0 || f.defaultColour < f.colours.length, {
+    path: ["defaultColour"],
+    message: "The default colour must be one of its colours.",
+  });
 // What a form sends (defaults filled on parse).
 export type ProductForm = z.input<typeof ProductForm>;
 
@@ -198,7 +217,13 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
     sku,
     name: form.name,
     family: "General",
-    dimensions: { w: form.width, h: form.height, unit: form.unit },
+    dimensions: {
+      w: form.width,
+      h: form.height,
+      unit: form.unit,
+      ...(form.depth ? { d: form.depth } : {}),
+      ...(form.relief ? { relief: form.relief } : {}),
+    },
     shape: form.whatItIs,
     material: form.material,
     treatment: form.treatment,
@@ -208,7 +233,7 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
       face: c.hex.toUpperCase(),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
     })),
-    defaultColour: keys[0],
+    defaultColour: keys[form.defaultColour] ?? keys[0],
     typography: { family: "Hanken Grotesk" },
     wording: form.wording.map((w) => ({
       label: w.label,
@@ -216,7 +241,10 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
       required: w.required,
       ...(w.example ? { example: w.example } : {}),
     })),
-    useContexts: form.useContext ? [form.useContext] : [],
+    useContexts: form.useContexts,
+    ...(form.hook ? { hook: form.hook } : {}),
+    ...(form.cta ? { cta: form.cta } : {}),
+    ...(form.description ? { description: form.description } : {}),
     ...(form.price ? { price: form.price } : {}),
     ...(form.views.length > 0 ? { views: form.views } : {}),
     source,

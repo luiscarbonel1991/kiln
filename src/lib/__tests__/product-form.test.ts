@@ -23,7 +23,7 @@ const form: ProductForm = {
     { name: "Natural", hex: "#5B3A29" },
   ],
   wording: [{ label: "Initials", example: "A & J" }],
-  useContext: "a coffee table",
+  useContexts: ["a coffee table"],
   views: [],
 };
 
@@ -72,6 +72,36 @@ describe("product form", () => {
     });
     expect(parsed.success).toBe(false);
     expect(parsed.error?.issues[0].path).toEqual(["wording", 0, "example"]);
+  });
+
+  it("keeps several places, the default colour and the more details", () => {
+    const product = productFromForm(
+      {
+        ...form,
+        useContexts: ["a coffee table", "a reading nook"],
+        defaultColour: 1,
+        depth: 0.25,
+        relief: 0.04,
+        hook: "Coffee, on the table.",
+        cta: "Order yours",
+        description: "Cut from one sheet.",
+      },
+      "7k2",
+    );
+    expect(product).toMatchObject({
+      useContexts: ["a coffee table", "a reading nook"],
+      defaultColour: "natural-2",
+      dimensions: { w: 4, h: 4, d: 0.25, relief: 0.04, unit: "in" },
+      hook: "Coffee, on the table.",
+      cta: "Order yours",
+      description: "Cut from one sheet.",
+    });
+  });
+
+  it("refuses a default colour that is not one of its rows", () => {
+    expect(ProductForm.safeParse({ ...form, defaultColour: 2 }).success).toBe(
+      false,
+    );
   });
 
   it("keeps the maker's price when given", () => {

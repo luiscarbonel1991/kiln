@@ -19,6 +19,12 @@ import {
 } from "@/app/actions/products";
 import { MaterialCombobox } from "@/components/projects/material-combobox";
 import {
+  type Details,
+  emptyDetails,
+  MoreDetails,
+} from "@/components/projects/more-details";
+import { PlacesOfUse } from "@/components/projects/places-of-use";
+import {
   emptyWordingRow,
   type WordingRow,
   WordingRows,
@@ -123,7 +129,9 @@ export function NewProductForm({
       : [{ name: "Natural", hex: "#D9B98C" }],
   );
   const [wording, setWording] = useState<WordingRow[]>([]);
-  const [useContext, setUseContext] = useState("");
+  const [places, setPlaces] = useState<string[]>([]);
+  const [defaultColour, setDefaultColour] = useState(0);
+  const [details, setDetails] = useState<Details>(emptyDetails());
   const [price, setPrice] = useState("");
   // Up to two more views of the piece (the front one is the reference).
   const [views, setViews] = useState<{ label: ViewLabel; url: string }[]>([]);
@@ -241,7 +249,7 @@ export function NewProductForm({
           example: w.example,
         })),
       );
-      setUseContext(draft.useContext);
+      setPlaces(draft.useContext ? [draft.useContext] : []);
     });
   }
 
@@ -264,7 +272,15 @@ export function NewProductForm({
           maxChars: Number(w.maxChars) > 0 ? Number(w.maxChars) : null,
           required: !w.optional,
         })),
-      ...(useContext.trim() ? { useContext } : {}),
+      useContexts: places.map((p) => p.trim()).filter(Boolean),
+      defaultColour,
+      ...(Number(details.depth) > 0 ? { depth: Number(details.depth) } : {}),
+      ...(Number(details.relief) > 0 ? { relief: Number(details.relief) } : {}),
+      ...(details.hook.trim() ? { hook: details.hook } : {}),
+      ...(details.cta.trim() ? { cta: details.cta } : {}),
+      ...(details.description.trim()
+        ? { description: details.description }
+        : {}),
       ...(Number(price) > 0 ? { price: Number(price) } : {}),
       views,
       ...(file
@@ -633,22 +649,32 @@ export function NewProductForm({
                   <ImagePlus /> Material photo
                 </Button>
               )}
-              {i === 0 ? (
+              {i === defaultColour ? (
                 <span className="font-mono text-[0.625rem] text-on-surface-dim">
                   default
                 </span>
               ) : (
                 <Button
                   variant="ghost"
+                  size="xs"
+                  onClick={() => setDefaultColour(i)}
+                >
+                  Make default
+                </Button>
+              )}
+              {colours.length > 1 ? (
+                <Button
+                  variant="ghost"
                   size="icon-sm"
-                  aria-label="Remove colour"
-                  onClick={() =>
-                    setColours((all) => all.filter((_, j) => j !== i))
-                  }
+                  aria-label={`Remove colour ${i + 1}`}
+                  onClick={() => {
+                    setColours((all) => all.filter((_, j) => j !== i));
+                    setDefaultColour((d) => (i === d ? 0 : i < d ? d - 1 : d));
+                  }}
                 >
                   <Trash2 />
                 </Button>
-              )}
+              ) : null}
             </div>
           ))}
           <input
@@ -699,18 +725,10 @@ export function NewProductForm({
             problems={problems}
           />
         </div>
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           <span className={LABEL}>Where it's used (optional)</span>
-          <input
-            className={FIELD}
-            value={useContext}
-            placeholder="a kitchen counter"
-            onChange={(e) => setUseContext(e.target.value)}
-          />
-          <span className="font-sans text-[0.75rem] text-on-surface-mid">
-            The in-use and lifestyle scenes take place there.
-          </span>
-        </label>
+          <PlacesOfUse places={places} onChange={setPlaces} field={FIELD} />
+        </div>
         <label className="flex flex-col gap-1.5">
           <span className={LABEL}>Price (optional)</span>
           <input
@@ -822,6 +840,15 @@ export function NewProductForm({
           </span>
         </div>
       </div>
+
+      <MoreDetails
+        details={details}
+        onChange={setDetails}
+        unit={unit}
+        treatment={treatment}
+        field={FIELD}
+        label={LABEL}
+      />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border-soft pt-4">
         <Button
