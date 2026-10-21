@@ -185,6 +185,14 @@ export const ProductSource = z.discriminatedUnion("kind", [
 ]);
 export type ProductSource = z.infer<typeof ProductSource>;
 
+// What no product shows unless its maker says otherwise.
+export const DEFAULT_FORBIDDEN = [
+  "other text",
+  "logos",
+  "people",
+  "extra objects on the product",
+] as const;
+
 export const Product = z.object({
   id: z.string().min(1),
   sku: z.string().min(1),
@@ -206,9 +214,7 @@ export const Product = z.object({
   wording: z.array(WordingLine).default([]),
   icons: z.array(ProductIcon).default([]),
   variants: z.array(VariantAxis).default([]),
-  forbidden: z
-    .array(z.string())
-    .default(["other text", "logos", "people", "extra objects on the product"]),
+  forbidden: z.array(z.string()).default([...DEFAULT_FORBIDDEN]),
   // Where the product is used, the most typical first ("a kitchen counter",
   // "an exterior front door"): scenes that show it in context take these in
   // order, so the in-use and lifestyle shots land where buyers will use it.

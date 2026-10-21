@@ -132,6 +132,7 @@ export {
   buyerSizeLabel,
   ColourOption,
   colourOf,
+  DEFAULT_FORBIDDEN,
   Dimensions,
   dimensionsLabel,
   PlatePiece,

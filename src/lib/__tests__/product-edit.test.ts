@@ -1,0 +1,127 @@
+import { describe, expect, it } from "vitest";
+import { CUTTING_BOARD } from "@/domain/__tests__/fixtures/cutting-board";
+import { PLATE_ON_BASE } from "@/domain/__tests__/fixtures/plate-on-base";
+import { Product } from "@/domain/product";
+import { canonicalJson } from "@/lib/product-diff";
+import {
+  editLimits,
+  formFromProduct,
+  keptWords,
+  mergeForm,
+  productFromForm,
+} from "@/lib/product-form";
+import { parseProductPackage } from "@/lib/product-package";
+import pkg from "../__fixtures__/product-package.json";
+
+const parsed = parseProductPackage(pkg);
+if (!parsed.ok) throw new Error("fixture package does not parse");
+
+const merged = (product: Product, change = {}) => {
+  const out = mergeForm(product, { ...formFromProduct(product), ...change });
+  if ("error" in out) throw new Error(out.error);
+  return out.product;
+};
+
+const formMade = productFromForm(
+  {
+    name: "Engraved wood name keychain",
+    whatItIs: "rounded rectangle keychain tag",
+    width: 2.5,
+    height: 1.25,
+    unit: "in",
+    material: "3 mm birch plywood, natural wood grain",
+    treatment: "engraved",
+    colours: [
+      { name: "Natural birch", hex: "#D9B98C" },
+      { name: "Walnut stain", hex: "#6E4A33" },
+    ],
+    wording: [
+      { label: "Name", example: "Sofia" },
+      { label: "Date", example: "06.14.2026", required: false },
+    ],
+    useContexts: ["a set of house keys on an entryway table"],
+    price: 12,
+    views: [],
+  },
+  "68iy",
+);
+
+describe("editing a product", () => {
+  it("opening and saving without a change gives the same product", () => {
+    for (const product of [
+      ...parsed.products,
+      CUTTING_BOARD,
+      PLATE_ON_BASE,
+      formMade,
+    ]) {
+      expect(canonicalJson(merged(product))).toBe(canonicalJson(product));
+    }
+  });
+
+  it("keeps the sku when renamed, and what the form does not show", () => {
+    const withInlay = Product.parse({
+      ...PLATE_ON_BASE,
+      colours: PLATE_ON_BASE.colours.map((c, i) =>
+        i === 0 ? { ...c, edge: "#45301F", inlayName: "dark engraved" } : c,
+      ),
+    });
+    const edited = merged(withInlay, { name: "Desk plate on a base" });
+    expect(edited.sku).toBe(PLATE_ON_BASE.sku);
+    expect(edited.id).toBe(PLATE_ON_BASE.id);
+    expect(edited.name).toBe("Desk plate on a base");
+    expect(edited.parts).toEqual(PLATE_ON_BASE.parts);
+    expect(edited.colours[0]).toMatchObject({
+      edge: "#45301F",
+      inlayName: "dark engraved",
+    });
+  });
+
+  it("gives a new colour its own key, and takes the default by row", () => {
+    const form = formFromProduct(formMade);
+    const edited = merged(formMade, {
+      colours: [...form.colours, { name: "Natural birch", hex: "#EEDDCC" }],
+      defaultColour: 2,
+    });
+    expect(edited.colours.map((c) => c.key)).toEqual([
+      "natural-birch",
+      "walnut-stain",
+      "natural-birch-2",
+    ]);
+    expect(edited.defaultColour).toBe("natural-birch-2");
+  });
+
+  it("removes an optional field left empty, and fixes the width", () => {
+    const { price: _price, ...form } = formFromProduct(formMade);
+    const out = mergeForm(formMade, { ...form, width: 2.5, useContexts: [] });
+    if ("error" in out) throw new Error(out.error);
+    expect(out.product).not.toHaveProperty("price");
+    expect(out.product.useContexts).toEqual([]);
+  });
+
+  it("keeps an imported product's long text editable at its own length", () => {
+    const long = Product.parse({
+      ...CUTTING_BOARD,
+      material: "m".repeat(140),
+    });
+    expect(editLimits(long).material).toBe(140);
+    expect(canonicalJson(merged(long))).toBe(canonicalJson(long));
+    const out = mergeForm(long, {
+      ...formFromProduct(long),
+      material: "m".repeat(141),
+    });
+    expect("error" in out).toBe(true);
+  });
+
+  it("will not change the unit of a product with parts", () => {
+    const out = mergeForm(PLATE_ON_BASE, {
+      ...formFromProduct(PLATE_ON_BASE),
+      unit: "mm",
+    });
+    expect(out).toMatchObject({ issues: [{ path: "unit" }] });
+  });
+
+  it("names what it keeps that the form does not show", () => {
+    expect(keptWords(PLATE_ON_BASE)).toContain("2 parts (plate, base)");
+    expect(keptWords(formMade)).toEqual(["typeface Hanken Grotesk"]);
+  });
+});
