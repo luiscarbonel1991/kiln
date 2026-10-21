@@ -159,9 +159,6 @@ export function shopLine(brand: BrandKit | null | undefined): string | null {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-// The longest fact a size sheet prints on one line.
-const FACT_MAX = 44;
-
 const DEFAULT_TITLE: Record<ExactKind, string> = {
   "colour-grid": "Available in {colours.counted}",
   "size-spec": "{product.dimensions}",
@@ -183,8 +180,10 @@ export type ExactView =
       // say "overall"; the parts' own sizes are rows in the facts.
       overall?: boolean;
       product: ProductOutline;
-      // Buyer-facing facts only: no internal fields such as the typeface.
-      facts: { label: string; value: string }[];
+      // Buyer-facing facts only: no internal fields such as the typeface. A
+      // droppable fact (the shape, the material) is left off the sheet when
+      // it is too long to print, a visual brief the drawing already shows.
+      facts: { label: string; value: string; droppable?: boolean }[];
     }
   | {
       kind: "personalize";
@@ -227,8 +226,6 @@ export function exactView(
     case "size-spec": {
       const d = product.dimensions;
       const parts = product.parts ?? [];
-      // A long visual brief does not fit a fact line; the drawing shows it.
-      const short = (value: string) => value.length <= FACT_MAX;
       return {
         kind,
         title,
@@ -238,12 +235,8 @@ export function exactView(
         ...(parts.length > 0 ? { overall: true } : d.d ? { depth: d.d } : {}),
         product: productOutline(product),
         facts: [
-          ...(short(product.shape)
-            ? [{ label: "Shape", value: product.shape }]
-            : []),
-          ...(short(product.material)
-            ? [{ label: "Material", value: product.material }]
-            : []),
+          { label: "Shape", value: product.shape, droppable: true },
+          { label: "Material", value: product.material, droppable: true },
           ...parts.map((part) => ({
             label: part.name,
             value: `${partLabel(part, d.unit)}${part.colour ? `, ${part.colour.name}` : ""}`,

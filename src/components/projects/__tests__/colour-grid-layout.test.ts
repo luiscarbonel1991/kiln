@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   colourGridLayout,
-  textWidth,
   wrapName,
 } from "@/components/projects/colour-grid-layout";
+import { textWidth } from "@/components/projects/text-fit";
 
 // Eight real-length colour names (the review's live product had names like
 // these; the fixtures' two or three short ones hid the overlap).

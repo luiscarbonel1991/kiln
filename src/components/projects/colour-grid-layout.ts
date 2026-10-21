@@ -3,6 +3,8 @@
 // font no smaller than 11 px, and the swatches sized so every row — swatch,
 // name and stock note — fits the frame without touching the next one.
 
+import { textWidth } from "@/components/projects/text-fit";
+
 export interface ColourCell {
   cx: number;
   swatchY: number;
@@ -37,13 +39,6 @@ const NAME_GAP = 8;
 const STOCK_LINE = 14;
 const ROW_GAP = 14;
 const COL_GAP = 12;
-const GLYPH = 0.58;
-
-// A conservative width estimate for the sans semibold label (no DOM to
-// measure): average glyph ~0.58 em.
-export function textWidth(text: string, fontSize: number): number {
-  return text.length * fontSize * GLYPH;
-}
 
 // Split a name into at most two lines that each fit `maxWidth`, breaking at
 // the space nearest the middle; null when it cannot fit.
@@ -157,7 +152,10 @@ export function colourGridLayout(frame: Frame): ColourGridLayout {
   // densest layout at the smallest font, names cut to their column.
   const cols = Math.max(...columnChoices(n));
   const pitch = (frame.width - MARGIN * 2) / cols;
-  const maxChars = Math.max(3, Math.floor((pitch - COL_GAP) / (11 * GLYPH)));
+  const maxChars = Math.max(
+    3,
+    Math.floor((pitch - COL_GAP) / textWidth("x", 11)),
+  );
   const cut = frame.names.map((name) => [
     name.length > maxChars ? `${name.slice(0, maxChars - 1)}…` : name,
   ]);

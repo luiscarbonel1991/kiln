@@ -1,5 +1,10 @@
 import { colourGridLayout } from "@/components/projects/colour-grid-layout";
 import {
+  LABEL_SIZE,
+  LABEL_SPACING,
+  sizeSpecLayout,
+} from "@/components/projects/size-spec-layout";
+import {
   contrastInk,
   type ExactView,
   type ProductOutline,
@@ -548,14 +553,17 @@ function SizeSpec({
   height: number;
   plate: PlateImage | null;
 }) {
-  const boxMaxW = WIDTH - 140;
-  const boxMaxH = height * 0.3;
-  const scale = Math.min(boxMaxW / view.width, boxMaxH / view.height);
-  const w = view.width * scale;
-  const h = view.height * scale;
-  const x = (WIDTH - w) / 2;
-  const y = 92;
   const fmt = (n: number) => String(Number(n.toFixed(2)));
+  const heightLabel = `${fmt(view.height)} ${view.unit}`;
+  const layout = sizeSpecLayout({
+    width: WIDTH,
+    height,
+    product: { width: view.width, height: view.height },
+    heightLabel,
+    facts: view.facts,
+    depth: view.depth !== undefined,
+  });
+  const { x, y, w, h } = layout.box;
   return (
     <g>
       <Title text={view.title} />
@@ -576,7 +584,7 @@ function SizeSpec({
         strokeWidth={1}
       />
       <text
-        x={WIDTH / 2}
+        x={x + w / 2}
         y={y + h + 36}
         textAnchor="middle"
         fill={INK.foreground}
@@ -599,26 +607,37 @@ function SizeSpec({
         fill={INK.foreground}
         style={{ ...MONO, fontSize: 12 }}
       >
-        {fmt(view.height)} {view.unit}
+        {heightLabel}
       </text>
-      {view.facts.map((f, i) => (
-        <g key={f.label}>
-          <text
-            x={70}
-            y={y + h + 62 + i * 22}
-            fill={INK.dim}
-            style={{ ...SANS, fontSize: 10, fontWeight: 700, letterSpacing: 1 }}
-          >
-            {f.label.toUpperCase()}
-          </text>
-          <text
-            x={170}
-            y={y + h + 62 + i * 22}
-            fill={INK.foreground}
-            style={{ ...SANS, fontSize: 13 }}
-          >
-            {f.value}
-          </text>
+      {layout.rows.map((row) => (
+        <g key={`${row.label.join(" ")}-${row.y}`}>
+          {row.label.map((line, i) => (
+            <text
+              key={line}
+              x={layout.labelX}
+              y={row.y + i * layout.lineHeight}
+              fill={INK.dim}
+              style={{
+                ...SANS,
+                fontSize: LABEL_SIZE,
+                fontWeight: 700,
+                letterSpacing: LABEL_SPACING,
+              }}
+            >
+              {line}
+            </text>
+          ))}
+          {row.value.map((line, i) => (
+            <text
+              key={line}
+              x={layout.valueX}
+              y={row.y + i * layout.lineHeight}
+              fill={INK.foreground}
+              style={{ ...SANS, fontSize: layout.fontSize }}
+            >
+              {line}
+            </text>
+          ))}
         </g>
       ))}
       {view.depth ? (

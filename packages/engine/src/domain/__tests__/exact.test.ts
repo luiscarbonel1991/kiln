@@ -102,8 +102,8 @@ describe("size & spec of a product with parts", () => {
     expect(view).toMatchObject({ width: 9, height: 2.78, overall: true });
     expect(view).not.toHaveProperty("depth");
     expect(view.facts).toEqual([
-      { label: "Shape", value: "name plate" },
-      { label: "Material", value: "hardwood" },
+      { label: "Shape", value: "name plate", droppable: true },
+      { label: "Material", value: "hardwood", droppable: true },
       { label: "plate", value: "8 x 2.5 in, 0.14 in thick" },
       {
         label: "base",
@@ -113,14 +113,13 @@ describe("size & spec of a product with parts", () => {
     ]);
   });
 
-  it("leaves out a shape or material too long for one line", () => {
-    const view = exactView("size-spec", {
-      ...PLATE_ON_BASE,
-      shape:
-        "a rectangular name plate with rounded corners standing upright in a base",
-    });
+  it("lets the sheet leave out the shape and material, never a part or the finish", () => {
+    const view = exactView("size-spec", PLATE_ON_BASE);
     if (view.kind !== "size-spec") throw new Error();
-    expect(view.facts.map((f) => f.label)).not.toContain("Shape");
+    expect(view.facts.filter((f) => f.droppable).map((f) => f.label)).toEqual([
+      "Shape",
+      "Material",
+    ]);
   });
 });
 

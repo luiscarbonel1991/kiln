@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { Resvg } from "@resvg/resvg-js";
 import { describe, expect, it } from "vitest";
+import { sizeSpecLayout } from "@/components/projects/size-spec-layout";
 import { exactView } from "@/domain/exact";
 import { parseProductPackage } from "@/lib/product-package";
 import {
@@ -99,6 +100,37 @@ describe("exact frames to files", () => {
       ["JetBrains Mono", "normal"],
     ]) {
       expect(bbox(text(family, style))?.width ?? 0).toBeGreaterThan(20);
+    }
+  });
+});
+
+describe("Size & spec with the real fonts", () => {
+  it("every fact line the layout keeps fits the frame in Hanken Grotesk", () => {
+    const view = exactView("size-spec", {
+      ...coaster,
+      shape: "rounded rectangle keychain tag",
+      material: "3 mm birch plywood, natural wood grain, laser cut by hand",
+    });
+    if (view.kind !== "size-spec") throw new Error();
+    const layout = sizeSpecLayout({
+      width: 400,
+      height: 400,
+      product: { width: view.width, height: view.height },
+      heightLabel: `${view.height} ${view.unit}`,
+      facts: view.facts,
+      depth: view.depth !== undefined,
+    });
+    const width = (line: string, size: number) =>
+      new Resvg(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 60"><text x="0" y="40" style="font-family:Hanken Grotesk;font-size:${size}px">${line}</text></svg>`,
+        { font: { ...EXPORT_FONT_OPTIONS, loadSystemFonts: false } },
+      ).getBBox()?.width ?? 0;
+    const lines = layout.rows.flatMap((r) => r.value);
+    expect(lines.length).toBeGreaterThan(3);
+    for (const line of lines) {
+      expect(layout.valueX + width(line, layout.fontSize)).toBeLessThanOrEqual(
+        392,
+      );
     }
   });
 });
