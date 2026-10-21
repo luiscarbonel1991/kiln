@@ -6,7 +6,12 @@ import type { PlateRequest, PlateResult, Product } from "@/domain/product";
 import type { Recipe } from "@/domain/recipe";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
-import type { ListingCopy, ProductDraft } from "@/providers/text-prompts";
+import type {
+  ListingCopy,
+  ProductDraft,
+  ProductReview,
+  ReviewField,
+} from "@/providers/text-prompts";
 import type {
   Capabilities,
   GenerationResult,
@@ -50,8 +55,13 @@ export interface VisionProvider {
 // (b) Art director: text model -> diverse per-direction creative specs (scene,
 // composition, lighting), orthogonal not variations. buildCards combines these
 // with the shared planning (subject + palette) into the cards. The same text
-// model, with no image, writes a listing's prose (writeListing).
+// model, with no image, writes a listing's prose (writeListing) and reviews a
+// product form (reviewProduct).
 export interface ArtDirector {
+  reviewProduct(
+    input: { fields: ReviewField[] },
+    options: TextCallOptions,
+  ): Promise<TextResult<ProductReview>>;
   writeListing(
     input: {
       channel: string;

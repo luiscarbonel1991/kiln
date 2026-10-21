@@ -9,6 +9,7 @@ import type { ArtDirector } from "@/providers/interfaces";
 import {
   fallbackVariants,
   mockListingCopy,
+  mockProductReview,
 } from "@/providers/mock/art-director";
 import { providerMode } from "@/providers/mode";
 import {
@@ -16,7 +17,9 @@ import {
   DirectionsAnswer,
   ListingCopy,
   listingCopyPrompt,
+  ProductReview,
   pinToSlots,
+  productReviewPrompt,
 } from "@/providers/text-prompts";
 
 // The answer shape in Gemini's schema dialect (the same as DirectionsAnswer).
@@ -52,11 +55,71 @@ export const LISTING_COPY_SCHEMA = {
   required: ["title", "description", "tags", "materials"],
 };
 
+// A product review in Gemini's schema dialect (the same as ProductReview).
+export const PRODUCT_REVIEW_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    suggestions: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          field: { type: Type.STRING },
+          value: { type: Type.STRING },
+          why: { type: Type.STRING },
+        },
+        required: ["field", "value", "why"],
+      },
+    },
+    checks: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          field: { type: Type.STRING },
+          why: { type: Type.STRING },
+        },
+        required: ["field", "why"],
+      },
+    },
+  },
+  required: ["suggestions", "checks"],
+};
+
 // Gemini text art director: a diverse scene/composition/lighting per listing
 // slot, serving each slot's commercial purpose. One paid request, marked by
 // `beforeCall`; a failure throws (the caller offers the recipe's directions or
 // the other provider, never a silent stand-in).
 export const googleArtDirector: ArtDirector = {
+  async reviewProduct({ fields }, options) {
+    const model = assertModel(
+      { provider: "google", model: options.model },
+      "text",
+    ).id;
+    if (!hasGoogleKey()) {
+      if (providerMode() === "mock") {
+        return { value: mockProductReview(fields), model };
+      }
+      throw new ProviderKeyMissing("google");
+    }
+    await options.beforeCall?.();
+    const res = await getGenAI().models.generateContent({
+      model,
+      contents: [{ text: productReviewPrompt(fields) }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: PRODUCT_REVIEW_SCHEMA,
+        maxOutputTokens: TEXT_CALL_BUDGETS.productReview.outputTokens,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        httpOptions: { timeout: TEXT_TIMEOUT_MS },
+      },
+    });
+    return {
+      value: ProductReview.parse(JSON.parse(res.text ?? "{}")),
+      model,
+      usage: textUsage(res.usageMetadata),
+    };
+  },
   async writeListing(input, options) {
     const model = assertModel(
       { provider: "google", model: options.model },

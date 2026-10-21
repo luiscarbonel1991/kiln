@@ -106,6 +106,9 @@ export function mockProductReview(fields: ReviewField[]): ProductReview {
 }
 
 export const mockArtDirector: ArtDirector = {
+  async reviewProduct({ fields }, options) {
+    return { value: mockProductReview(fields), model: options.model };
+  },
   async writeListing({ draft }, options) {
     return { value: mockListingCopy(draft), model: options.model };
   },
