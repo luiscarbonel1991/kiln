@@ -1,4 +1,4 @@
-import { contrastInk, scaleReference } from "@/domain/exact";
+import { contrastInk, sizeComparison } from "@/domain/exact";
 import { colourOf, dimensionsLabel, type Product } from "@/domain/product";
 import { knobText, type SceneKnobs } from "@/domain/scene-knobs";
 import type { BaseUnderstanding } from "@/domain/understanding";
@@ -150,15 +150,7 @@ export function sceneCues(
   if (objects.length > 0) {
     size = `the product true to its real size: ${dimensionsLabel(dims)}, ${objects.map((o) => widthAgainst(widthIn, o)).join(" and ")}`;
   } else {
-    const ref = scaleReference(dims);
-    const ratio = Math.max(dims.w, dims.h) / Math.max(ref.width, ref.height);
-    const compared =
-      ratio < 0.85
-        ? "smaller than"
-        : ratio > 1.15
-          ? "larger than"
-          : "about the size of";
-    size = `the product true to its real size (${dimensionsLabel(dims)}, ${compared} ${ref.name}) against every object around it`;
+    size = `the product true to its real size (${dimensionsLabel(dims)}, ${sizeComparison(dims).words}) against every object around it`;
   }
   const dark =
     contrastInk(colourOf(product, product.defaultColour).face) === "#ffffff";

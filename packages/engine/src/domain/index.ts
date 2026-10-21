@@ -29,6 +29,8 @@ export {
   type ExactView,
   exactView,
   renderTextTemplate,
+  type SizeRelation,
+  sizeComparison,
 } from "@/domain/exact";
 export { Field, FieldSource } from "@/domain/field";
 export {

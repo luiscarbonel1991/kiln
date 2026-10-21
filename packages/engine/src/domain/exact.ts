@@ -114,6 +114,28 @@ export function scaleReference(dimensions: Dimensions): ScaleReference {
   };
 }
 
+export type SizeRelation = "smaller than" | "about the size of" | "larger than";
+
+// The product beside its everyday reference, in words: "smaller than a
+// credit card" (by the longest sides; within 15 % reads "about the size of").
+export function sizeComparison(dimensions: Dimensions): {
+  reference: ScaleReference;
+  relation: SizeRelation;
+  words: string;
+} {
+  const reference = scaleReference(dimensions);
+  const ratio =
+    Math.max(dimensions.w, dimensions.h) /
+    Math.max(reference.width, reference.height);
+  const relation: SizeRelation =
+    ratio < 0.85
+      ? "smaller than"
+      : ratio > 1.15
+        ? "larger than"
+        : "about the size of";
+  return { reference, relation, words: `${relation} ${reference.name}` };
+}
+
 // Readable ink on a colour: near-black on light colours, white on dark ones
 // (WCAG relative luminance).
 export function contrastInk(hex: string): "#241f18" | "#ffffff" {

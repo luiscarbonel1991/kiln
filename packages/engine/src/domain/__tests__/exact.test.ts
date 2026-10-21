@@ -7,6 +7,7 @@ import {
   renderTextTemplate,
   scaleReference,
   shopLine,
+  sizeComparison,
   textLayerColours,
 } from "@/domain/exact";
 import { defaultSwatch } from "@/domain/product";
@@ -303,5 +304,22 @@ describe("text layers and the maker's brand kit", () => {
     );
     expect(shopLine({ palette: [] })).toBeNull();
     expect(shopLine(null)).toBeNull();
+  });
+});
+
+describe("sizeComparison", () => {
+  it("names the product beside its everyday reference", () => {
+    expect(sizeComparison({ w: 2.3, h: 1.25, unit: "in" }).words).toBe(
+      "smaller than a credit card",
+    );
+    expect(sizeComparison({ w: 3.4, h: 2.1, unit: "in" }).words).toBe(
+      "about the size of a credit card",
+    );
+    expect(sizeComparison({ w: 16, h: 10, unit: "in" }).words).toBe(
+      "larger than a letter sheet",
+    );
+    expect(sizeComparison({ w: 85, h: 54, unit: "mm" }).relation).toBe(
+      "about the size of",
+    );
   });
 });
