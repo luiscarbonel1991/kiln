@@ -8,7 +8,12 @@ const enabled =
 
 describe.skipIf(!enabled)("product repository (database)", async () => {
   const { db } = await import("@/lib/db");
-  const { importCatalog } = await import("@/server/product-repository");
+  const { deleteProduct, importCatalog, productProjects, updateProduct } =
+    await import("@/server/product-repository");
+  const repo = await import("@/server/project-repository");
+  const { planProject } = await import("@/domain/plan");
+  const { CATALOG } = await import("@/lib/recipes");
+  const { startEditorState } = await import("@/lib/project-start");
   const { getCurrentMaker } = await import("@/server/maker-repository");
   const { Product } = await import("@/domain/product");
 
@@ -28,9 +33,14 @@ describe.skipIf(!enabled)("product repository (database)", async () => {
     source: { kind: "form" },
   });
 
+  const projects: string[] = [];
+
   afterAll(async () => {
     const maker = await getCurrentMaker();
-    await db.product.deleteMany({ where: { makerId: maker.id, sku } });
+    await db.project.deleteMany({ where: { id: { in: projects } } });
+    await db.product.deleteMany({
+      where: { makerId: maker.id, sku: { in: [sku, `${sku}-E`] } },
+    });
   });
 
   it("says whether each product is new, updated (and what changed) or unchanged", async () => {
@@ -50,5 +60,60 @@ describe.skipIf(!enabled)("product repository (database)", async () => {
     ]);
     expect(updated).toMatchObject({ status: "updated", changed: ["material"] });
     expect(updated.product.id).toBe(first.product.id);
+  });
+
+  it("saves an edit over its own row, keeping its sku, or writes nothing", async () => {
+    const [created] = await importCatalog([{ ...product, sku: `${sku}-E` }]);
+    const id = created.product.id;
+    const row = await db.product.findFirstOrThrow({ where: { id } });
+
+    const same = await updateProduct(id, created.product);
+    expect(same).toMatchObject({ status: "unchanged", changed: [] });
+    expect(
+      (await db.product.findFirstOrThrow({ where: { id } })).updatedAt,
+    ).toEqual(row.updatedAt);
+
+    const edited = await updateProduct(id, {
+      ...created.product,
+      name: "Renamed board",
+      sku: "something-else",
+      material: "solid oak",
+    });
+    expect(edited.status).toBe("updated");
+    expect(edited.changed).toEqual(["name", "material"]);
+    expect(edited.product).toMatchObject({ id, sku: `${sku}-E` });
+  });
+
+  it("deletes a product no project uses, and names the projects that do", async () => {
+    const [created] = await importCatalog([
+      { ...product, sku: `${sku}-E`, name: "Delete test board" },
+    ]);
+    const id = created.product.id;
+    const plan = planProject({
+      product: created.product,
+      type: "listing-kit",
+      destinationIds: ["etsy"],
+      catalog: CATALOG,
+    });
+    const projectId = await repo.createProject({
+      type: "listing-kit",
+      product: created.product,
+      plan,
+      editor: startEditorState({
+        product: created.product,
+        type: "listing-kit",
+        plan,
+        master: null,
+      }),
+    });
+    projects.push(projectId);
+    const uses = await productProjects(id);
+    expect(uses.map((u) => u.projectId)).toEqual([projectId]);
+    expect(await deleteProduct(id)).toMatchObject({
+      usedBy: [{ projectId }],
+    });
+    await db.project.delete({ where: { id: projectId } });
+    expect(await deleteProduct(id)).toEqual({ deleted: true });
+    expect(await db.product.findFirst({ where: { id } })).toBeNull();
   });
 });

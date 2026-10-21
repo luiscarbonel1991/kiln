@@ -131,3 +131,91 @@ export async function importCatalog(
     return imported;
   });
 }
+
+// Save an edited product over its own row (the sku is the row's, whatever
+// the name), or leave it alone when its content is the same, so a project
+// is never marked behind for nothing. Says what changed.
+export async function updateProduct(
+  id: string,
+  product: Product,
+): Promise<ImportedProduct> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  return db.$transaction(async (tx) => {
+    const row = await tx.product.findFirst({
+      where: { id, makerId: maker.id },
+      select: SELECT,
+    });
+    const before = row ? rowToProduct(row) : null;
+    if (!row || !before) throw new Error("That product no longer exists.");
+    if (productHash(before) === productHash(product)) {
+      return { product: before, status: "unchanged", changed: [] };
+    }
+    const { name, spec, source } = productToRow({ ...product, sku: row.sku });
+    const updated = await tx.product.update({
+      where: { id },
+      data: {
+        name,
+        spec: spec as Prisma.InputJsonValue,
+        source: source as Prisma.InputJsonValue,
+      },
+      select: SELECT,
+    });
+    const saved = rowToProduct(updated);
+    if (!saved) throw new Error("The product could not be read back.");
+    return {
+      product: saved,
+      status: "updated",
+      changed: productChanges(before, saved),
+    };
+  });
+}
+
+export interface ProductUse {
+  projectId: string;
+  name: string;
+  // The version the project follows (null: from before versions).
+  hash: string | null;
+}
+
+// The projects that use a product, by name.
+export async function productProjects(id: string): Promise<ProductUse[]> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  const links = await db.projectProduct.findMany({
+    where: { productId: id, project: { makerId: maker.id } },
+    select: {
+      productHash: true,
+      project: { select: { id: true, name: true } },
+    },
+    orderBy: { project: { name: "asc" } },
+  });
+  return links.map((l) => ({
+    projectId: l.project.id,
+    name: l.project.name,
+    hash: l.productHash,
+  }));
+}
+
+// Delete a product no project uses; otherwise say which projects do.
+export async function deleteProduct(
+  id: string,
+): Promise<{ deleted: true } | { usedBy: ProductUse[] }> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  const usedBy = await productProjects(id);
+  if (usedBy.length > 0) return { usedBy };
+  try {
+    const { count } = await db.product.deleteMany({
+      where: { id, makerId: maker.id },
+    });
+    if (count === 0) throw new Error("That product no longer exists.");
+    return { deleted: true };
+  } catch (error) {
+    // A project started from it in between: the foreign key refuses.
+    if ((error as { code?: string }).code === "P2003") {
+      return { usedBy: await productProjects(id) };
+    }
+    throw error;
+  }
+}
