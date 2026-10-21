@@ -113,6 +113,12 @@ imports a catalog:
   board): edit it, see which projects use it, download its package for what the form
   does not show (parts, icons, variants), and delete it once no project uses it.
   Saving keeps the sku and writes nothing when nothing changed.
+- "Review with AI" (≈ $0.03 on GPT-6.1 Sol, beside Save, new or saved) sends the form
+  as typed to the text model. Each suggestion shows under its field with why, to Use or
+  Dismiss, and "Use all". Checks name what only the maker can confirm, like a size that
+  reads wrong. It never suggests a size or a price, and Kiln keeps only a value the field
+  takes (its limit, its options, a change). Nothing is saved until Save; a failed review
+  offers the other provider with its price.
 
 Each colour can carry a **material sample** (`swatchUrl`, or "Material photo" on the
 form). It is a close photo of the material in that colour, with even light and no text;
