@@ -13,6 +13,7 @@ import {
   parseSlotRecipeId,
   planCounts,
   planProject,
+  replan,
   sceneCardIds,
   slotCardId,
   slotRecipeId,
@@ -25,6 +26,7 @@ import {
   withSlotTuning,
   withVideoChoice,
 } from "@/domain/plan";
+import type { Product } from "@/domain/product";
 import { ShotList } from "@/domain/shot-list";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
 
@@ -384,6 +386,94 @@ describe("a slot's tuning", () => {
     expect(read.tuned?.camera).toBeUndefined();
     expect(read.knobs?.light).toBeUndefined();
     expect(read.knobs?.camera).toBe("eye");
+  });
+});
+
+describe("replan", () => {
+  const plain: Product = {
+    ...CUTTING_BOARD,
+    colours: CUTTING_BOARD.colours.slice(0, 1),
+    wording: [],
+  };
+  const start = (product: Product = plain) =>
+    planProject({
+      product,
+      type: "listing-kit",
+      destinationIds: ["shop"],
+      catalog,
+    });
+  const keys = (plan: ProjectPlan) =>
+    plan.destinations[0].slots.map((s) => s.key);
+
+  it("adds the frames the new version calls for, where the list puts them", () => {
+    const plan = start();
+    expect(keys(plan)).toEqual(["hero"]);
+    const next = replan(plan, CUTTING_BOARD, catalog.shotLists);
+    expect(keys(next.plan)).toEqual(["hero", "colours", "personalize"]);
+    expect(next.changes.map((c) => [c.change, c.key])).toEqual([
+      ["adds", "colours"],
+      ["adds", "personalize"],
+    ]);
+    expect(replan(next.plan, CUTTING_BOARD, catalog.shotLists).changes).toEqual(
+      [],
+    );
+  });
+
+  it("removes the ones it no longer calls for, keeping the maker's work", () => {
+    const card = { status: "done" as const, outputs: ["https://x/1.png"] };
+    const plan = approveSlot(
+      withSlotOff(
+        start(CUTTING_BOARD),
+        { destinationId: "shop", slotKey: "colours" },
+        true,
+      ),
+      { destinationId: "shop", slotKey: "hero" },
+      card,
+    );
+    const next = replan(plan, plain, catalog.shotLists);
+    expect(keys(next.plan)).toEqual(["hero"]);
+    expect(next.plan.destinations[0].slots[0].approvedOutput).toBe(
+      "https://x/1.png",
+    );
+    expect(next.changes.map((c) => [c.change, c.key])).toEqual([
+      ["removes", "colours"],
+      ["removes", "personalize"],
+    ]);
+  });
+
+  it("never makes an added frame the first photo", () => {
+    const listFirst = ShotList.parse({
+      ...shopKit,
+      slots: [shopKit.slots[1], shopKit.slots[0], shopKit.slots[2]],
+    });
+    const plan = planProject({
+      product: plain,
+      type: "listing-kit",
+      destinationIds: ["shop"],
+      catalog: { ...catalog, shotLists: [listFirst, socialCarousel] },
+    });
+    const next = replan(plan, CUTTING_BOARD, [listFirst]);
+    expect(keys(next.plan)[0]).toBe("hero");
+  });
+
+  it("clears a delivery when the photos renumber, and says so", () => {
+    const plan = withDelivered(
+      start(),
+      "shop",
+      [{ key: "hero", approvedOutput: undefined }],
+      "2026-10-21T10:00:00Z",
+    );
+    const hero = plan.destinations[0].slots[0];
+    // A scene is delivered only once approved: stamp it as delivered.
+    plan.destinations[0].slots[0] = {
+      ...hero,
+      deliveredAt: "2026-10-21T10:00:00Z",
+    };
+    const next = replan(plan, CUTTING_BOARD, catalog.shotLists);
+    expect(next.redeliver).toEqual(["shop"]);
+    expect(next.plan.destinations[0].slots.some((s) => s.deliveredAt)).toBe(
+      false,
+    );
   });
 });
 

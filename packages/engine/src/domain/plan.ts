@@ -6,6 +6,7 @@ import type { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
 import { type KnobChoice, SavedKnobs } from "@/domain/scene-knobs";
 import {
+  type ExactKind,
   exactKindMatchesFill,
   type ShotList,
   ShotSlotFields,
@@ -117,10 +118,94 @@ export function offeredDestinations(
 // An exact slot that has nothing to show for this product is left out of the
 // plan: "how to personalize" for a product with no wording lines, the colour
 // sheet for a product sold in one colour.
-function exactApplies(slot: ShotList["slots"][number], product: Product) {
-  if (slot.exact === "personalize") return product.wording.length > 0;
-  if (slot.exact === "colour-grid") return product.colours.length > 1;
-  return true;
+const EXACT_RULES: Partial<Record<ExactKind, (product: Product) => boolean>> = {
+  personalize: (p) => p.wording.length > 0,
+  "colour-grid": (p) => p.colours.length > 1,
+};
+
+function exactApplies(
+  slot: { fill: string; exact?: ExactKind },
+  product: Product,
+) {
+  const rule = slot.exact ? EXACT_RULES[slot.exact] : undefined;
+  return rule ? rule(product) : true;
+}
+
+// A slot the product decides: an exact slot with a rule.
+const ruled = (slot: { fill: string; exact?: ExactKind }) =>
+  slot.fill === "exact" &&
+  slot.exact !== undefined &&
+  !!EXACT_RULES[slot.exact];
+
+export interface PlanChange {
+  destinationId: string;
+  key: string;
+  label: string;
+  change: "adds" | "removes";
+}
+
+// The plan a product's new version implies, keeping everything the maker
+// did: only the exact slots the product decides are added (where the shot
+// list puts them, never as the first photo, before the video) or removed; a
+// destination never empties (its last slot is switched off instead). Scenes,
+// the video, what is switched off, the knobs, approvals, the order and the
+// listing stay. When a slot that is on comes or goes, the destination's
+// photos renumber, so a delivery is cleared and named in `redeliver`.
+export function replan(
+  plan: ProjectPlan,
+  product: Product,
+  shotLists: ShotList[],
+): { plan: ProjectPlan; changes: PlanChange[]; redeliver: string[] } {
+  const changes: PlanChange[] = [];
+  const redeliver: string[] = [];
+  const destinations = plan.destinations.map((d) => {
+    const list = shotLists.find((l) => l.id === d.shotListId);
+    if (!list) return d;
+    const order = new Map(list.slots.map((s, i) => [s.key, i]));
+    let renumbered = false;
+    let slots = d.slots.flatMap((s) => {
+      if (!ruled(s) || exactApplies(s, product)) return [s];
+      changes.push({
+        destinationId: d.destinationId,
+        key: s.key,
+        label: s.label,
+        change: "removes",
+      });
+      if (!s.off) renumbered = true;
+      return [];
+    });
+    if (slots.length === 0) {
+      slots = d.slots.map((s) => ({ ...s, off: true }));
+    }
+    for (const listed of list.slots) {
+      if (!ruled(listed) || !exactApplies(listed, product)) continue;
+      if (slots.some((s) => s.key === listed.key)) continue;
+      const at = order.get(listed.key) ?? 0;
+      let i = slots.findIndex(
+        (s) => s.fill === "video" || (order.get(s.key) ?? -1) > at,
+      );
+      if (i === -1) i = slots.length;
+      if (i === 0 && slots.length > 0) i = 1;
+      slots = [...slots.slice(0, i), PlanSlot.parse(listed), ...slots.slice(i)];
+      changes.push({
+        destinationId: d.destinationId,
+        key: listed.key,
+        label: listed.label,
+        change: "adds",
+      });
+      renumbered = true;
+    }
+    if (renumbered && slots.some((s) => s.deliveredAt)) {
+      redeliver.push(d.destinationId);
+      slots = slots.map(({ deliveredAt: _d, ...s }) => s);
+    }
+    return { ...d, slots };
+  });
+  return {
+    plan: ProjectPlan.parse({ ...plan, destinations }),
+    changes,
+    redeliver,
+  };
 }
 
 export function planProject(input: {
