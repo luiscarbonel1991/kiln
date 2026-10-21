@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   colourName,
-  type ProductForm,
+  ProductForm,
   productFromForm,
   skuFor,
   svgColours,
@@ -46,6 +46,32 @@ describe("product form", () => {
       useContexts: ["a coffee table"],
       source: { kind: "form" },
     });
+  });
+
+  it("keeps a line's most characters and whether the buyer may skip it", () => {
+    const product = productFromForm(
+      {
+        ...form,
+        wording: [
+          { label: "Name", example: "Sofia", maxChars: 12 },
+          { label: "Date", example: "06.14.2026", required: false },
+        ],
+      },
+      "7k2",
+    );
+    expect(product.wording).toEqual([
+      { label: "Name", example: "Sofia", maxChars: 12, required: true },
+      { label: "Date", example: "06.14.2026", maxChars: null, required: false },
+    ]);
+  });
+
+  it("refuses an example longer than its line allows, at the example", () => {
+    const parsed = ProductForm.safeParse({
+      ...form,
+      wording: [{ label: "Name", example: "Alexandria", maxChars: 6 }],
+    });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0].path).toEqual(["wording", 0, "example"]);
   });
 
   it("keeps the maker's price when given", () => {

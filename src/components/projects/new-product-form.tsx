@@ -8,6 +8,11 @@ import {
   draftProductAction,
   uploadProductFileAction,
 } from "@/app/actions/products";
+import {
+  emptyWordingRow,
+  type WordingRow,
+  WordingRows,
+} from "@/components/projects/wording-rows";
 import { DegradedNotice } from "@/components/studio/degraded-notice";
 import { Button } from "@/components/ui/button";
 import type { Product, Treatment, Unit, ViewLabel } from "@/domain/product";
@@ -67,9 +72,7 @@ export function NewProductForm({
       ? initialFile.colours
       : [{ name: "Natural", hex: "#D9B98C" }],
   );
-  const [wording, setWording] = useState<{ label: string; example: string }[]>(
-    [],
-  );
+  const [wording, setWording] = useState<WordingRow[]>([]);
   const [useContext, setUseContext] = useState("");
   const [price, setPrice] = useState("");
   // Up to two more views of the piece (the front one is the reference).
@@ -173,7 +176,13 @@ export function NewProductForm({
       setMaterial(draft.material);
       setTreatment(draft.treatment);
       if (draft.colours.length > 0) setColours(draft.colours);
-      setWording(draft.wording);
+      setWording(
+        draft.wording.map((w) => ({
+          ...emptyWordingRow(),
+          label: w.label,
+          example: w.example,
+        })),
+      );
       setUseContext(draft.useContext);
     });
   }
@@ -191,10 +200,12 @@ export function NewProductForm({
         treatment,
         colours,
         wording: wording
-          .filter((w) => w.label.trim())
+          .filter((w) => w.label.trim() || w.example.trim())
           .map((w) => ({
             label: w.label,
             ...(w.example.trim() ? { example: w.example } : {}),
+            maxChars: Number(w.maxChars) > 0 ? Number(w.maxChars) : null,
+            required: !w.optional,
           })),
         ...(useContext.trim() ? { useContext } : {}),
         ...(Number(price) > 0 ? { price: Number(price) } : {}),
@@ -546,65 +557,9 @@ export function NewProductForm({
       </div>
 
       <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
           <span className={LABEL}>Text the buyer personalizes</span>
-          {wording.map((w, i) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place
-              key={i}
-              className="flex items-center gap-2"
-            >
-              <input
-                aria-label="What the buyer writes"
-                className={FIELD}
-                value={w.label}
-                placeholder="Family name"
-                onChange={(e) =>
-                  setWording((all) =>
-                    all.map((x, j) =>
-                      j === i ? { ...x, label: e.target.value } : x,
-                    ),
-                  )
-                }
-              />
-              <input
-                aria-label="Example"
-                className={FIELD}
-                value={w.example}
-                placeholder="The Johnsons"
-                onChange={(e) =>
-                  setWording((all) =>
-                    all.map((x, j) =>
-                      j === i ? { ...x, example: e.target.value } : x,
-                    ),
-                  )
-                }
-              />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Remove line"
-                onClick={() =>
-                  setWording((all) => all.filter((_, j) => j !== i))
-                }
-              >
-                <Trash2 />
-              </Button>
-            </div>
-          ))}
-          {wording.length < 3 ? (
-            <Button
-              variant="ghost"
-              size="xs"
-              className="self-start"
-              onClick={() =>
-                setWording((all) => [...all, { label: "", example: "" }])
-              }
-            >
-              <Plus />{" "}
-              {wording.length === 0 ? "Add a line (optional)" : "Add a line"}
-            </Button>
-          ) : null}
+          <WordingRows rows={wording} field={FIELD} onChange={setWording} />
         </div>
         <label className="flex flex-col gap-1.5">
           <span className={LABEL}>Where it's used (optional)</span>

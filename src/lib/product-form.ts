@@ -70,10 +70,29 @@ export const ProductForm = z.object({
     .max(8),
   wording: z
     .array(
-      z.object({
-        label: z.string().trim().min(1).max(40),
-        example: z.string().trim().max(60).optional(),
-      }),
+      z
+        .object({
+          label: z
+            .string()
+            .trim()
+            .min(1, "Say what the buyer writes, like “Name”.")
+            .max(40),
+          example: z.string().trim().max(60).optional(),
+          // The most characters the buyer may type; null when the text is
+          // fitted to the piece.
+          maxChars: z.number().int().min(1).max(200).nullable().default(null),
+          required: z.boolean().default(true),
+        })
+        .refine(
+          (w) =>
+            w.maxChars === null ||
+            w.example === undefined ||
+            w.example.length <= w.maxChars,
+          {
+            path: ["example"],
+            message: "The example is longer than the most characters allowed.",
+          },
+        ),
     )
     .max(3)
     .default([]),
@@ -87,7 +106,8 @@ export const ProductForm = z.object({
     .default([]),
   file: ProductFile.optional(),
 });
-export type ProductForm = z.infer<typeof ProductForm>;
+// What a form sends (defaults filled on parse).
+export type ProductForm = z.input<typeof ProductForm>;
 
 const slug = (text: string) =>
   text
@@ -173,7 +193,8 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
     typography: { family: "Hanken Grotesk" },
     wording: form.wording.map((w) => ({
       label: w.label,
-      maxChars: null,
+      maxChars: w.maxChars,
+      required: w.required,
       ...(w.example ? { example: w.example } : {}),
     })),
     useContexts: form.useContext ? [form.useContext] : [],
