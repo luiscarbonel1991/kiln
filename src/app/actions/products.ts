@@ -7,9 +7,15 @@ import {
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
 import type { BrandKit } from "@/domain/brand";
-import { defaultTextModel, ProviderId } from "@/domain/model-defaults";
+import {
+  defaultTextModel,
+  modelLabel,
+  ProviderId,
+} from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
 import {
+  editLimits,
+  FORM_LIMITS,
   type FormIssue,
   formIssues,
   mergeForm,
@@ -21,6 +27,12 @@ import {
   productLabel,
   type RejectedProduct,
 } from "@/lib/product-package";
+import {
+  type CleanReview,
+  cleanReview,
+  ReviewForm,
+  reviewFields,
+} from "@/lib/product-review";
 import { sanitizeSvg } from "@/lib/svg-sanitize";
 import {
   assertAllowedAssetUrl,
@@ -47,7 +59,11 @@ import {
   upsertProducts,
 } from "@/server/product-repository";
 import { productHash } from "@/server/product-version";
-import { type Degraded, draftProduct } from "@/server/text-calls";
+import {
+  type Degraded,
+  draftProduct,
+  reviewProduct,
+} from "@/server/text-calls";
 
 // Server Functions are POST-reachable: the package parse is the trust boundary.
 
@@ -366,6 +382,43 @@ export async function draftProductAction(
     parsed.data.assetUrl,
     parsed.data.model ?? defaultTextModel(await getMakerModels()),
   );
+}
+
+const Review = z.object({
+  form: ReviewForm,
+  // The saved product being edited: its own limits apply.
+  productId: z.string().min(1).optional(),
+  model: z
+    .object({ provider: ProviderId, model: z.string().min(1) })
+    .optional(),
+});
+
+// "Review with AI": the form as typed, saved or not, reviewed by the maker's
+// text model (or the one the degraded notice offers) under the cap. Returns
+// the suggestions the form can take and the checks, with the model's name;
+// nothing is saved.
+export async function reviewProductAction(input: unknown): Promise<{
+  review?: CleanReview & { model: string };
+  degraded?: Degraded;
+  error?: string;
+}> {
+  const parsed = Review.safeParse(input);
+  if (!parsed.success) return { error: "Nothing to review yet." };
+  const { form, productId, model } = parsed.data;
+  if (!form.name.trim() && !form.whatItIs.trim()) {
+    return { error: "Name the product or say what it is first." };
+  }
+  const stored = productId ? await getProduct(productId) : null;
+  const fields = reviewFields(form, stored ? editLimits(stored) : FORM_LIMITS);
+  const textModel = model ?? defaultTextModel(await getMakerModels());
+  const result = await reviewProduct(fields, textModel);
+  if (!result.review) return { degraded: result.degraded };
+  return {
+    review: {
+      ...cleanReview(result.review, fields),
+      model: modelLabel(textModel),
+    },
+  };
 }
 
 const Edit = z.object({ id: z.string().min(1), form: z.unknown() });

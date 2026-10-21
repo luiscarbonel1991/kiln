@@ -23,7 +23,12 @@ import {
 import type { VariantDirection } from "@/domain/variant-direction";
 import { fallbackVariants } from "@/providers/mock/art-director";
 import { getArtDirector, getVisionProvider } from "@/providers/registry";
-import type { ListingCopy, ProductDraft } from "@/providers/text-prompts";
+import type {
+  ListingCopy,
+  ProductDraft,
+  ProductReview,
+  ReviewField,
+} from "@/providers/text-prompts";
 import { textCall, withDirectSpend } from "@/server/direct-spend";
 
 // Vision and the art director on the maker's text model, under the monthly cap
@@ -195,5 +200,30 @@ export async function writeListing(
   } catch (error) {
     console.warn("[kiln] listing copy degraded:", errorMessage(error));
     return { degraded: degraded(model, "listingCopy", error) };
+  }
+}
+
+// The product form's "Review with AI": suggestions and checks on the form as
+// typed, under the cap. Nothing is applied here (cleanReview keeps what the
+// form can take, the maker accepts each). On failure the form stays as it was
+// and the answer says why.
+export async function reviewProduct(
+  fields: ReviewField[],
+  model: TextModel,
+): Promise<{ review?: ProductReview; degraded?: Degraded }> {
+  try {
+    assertModel(model, "text");
+    const result = await withDirectSpend(
+      textCall<ProductReview>(model, "productReview"),
+      (beforeCall) =>
+        getArtDirector(model.provider).reviewProduct(
+          { fields },
+          { model: model.model, beforeCall },
+        ),
+    );
+    return { review: result.value };
+  } catch (error) {
+    console.warn("[kiln] product review degraded:", errorMessage(error));
+    return { degraded: degraded(model, "productReview", error) };
   }
 }
