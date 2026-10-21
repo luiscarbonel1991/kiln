@@ -15,6 +15,7 @@ import { useRef, useState, useTransition } from "react";
 import {
   createProductAction,
   draftProductAction,
+  updateProductAction,
   uploadProductFileAction,
 } from "@/app/actions/products";
 import { MaterialCombobox } from "@/components/projects/material-combobox";
@@ -38,7 +39,13 @@ import {
   sizePreview,
   stillNeeded,
 } from "@/lib/product-checks";
-import { FINISHES, formIssues, type ProductForm } from "@/lib/product-form";
+import {
+  FINISHES,
+  FORM_LIMITS,
+  type FormLimits,
+  formIssues,
+  type ProductForm,
+} from "@/lib/product-form";
 import { cn } from "@/lib/utils";
 import type { StoredProductFile } from "@/server/product-files";
 import type { Degraded } from "@/server/text-calls";
@@ -85,6 +92,8 @@ const viewName = (label: ViewLabel) =>
   VIEW_LABELS.find((v) => v.value === label)?.label ?? label;
 
 interface Colour {
+  // The stored colour this row edits (absent for a new one).
+  key?: string;
   name: string;
   hex: string;
   // A photo of the material in this colour: it travels with the reference
@@ -92,17 +101,43 @@ interface Colour {
   swatchUrl?: string;
 }
 
-// New product (New project, step 1): what a maker knows about a piece, on one
-// screen. A photo or a design file is optional: it prefills the colours (free)
-// and, for a design, the height from its proportions; a photo can fill the
-// rest with the maker's text model (priced, on a click). Saving runs the
-// import's checks and selects the product.
-export function NewProductForm({
+export type SavedProduct = Extract<
+  Awaited<ReturnType<typeof updateProductAction>>,
+  { product: Product }
+>;
+
+// The form's file as the editor holds it.
+function storedFile(form: ProductForm): StoredProductFile | null {
+  const file = form.file;
+  if (!file) return null;
+  return file.kind === "photo"
+    ? { kind: "photo", url: file.url, colours: [] }
+    : {
+        kind: "vector",
+        url: file.url,
+        colours: [],
+        drawnWidthPx: file.drawnWidthPx ?? 0,
+        ratio: form.width / form.height,
+      };
+}
+
+const text = (n: number | undefined | null) => (n ? String(n) : "");
+
+// A product's editor: what a maker knows about a piece, on one screen. New
+// (New project, step 1): a photo or a design file is optional, it prefills
+// the colours (free) and, for a design, the height from its proportions; a
+// photo can fill the rest with the maker's text model (priced, on a click).
+// Editing: the same form, opened on the saved product; saving lays it over
+// the product (what the form does not show is kept). Either runs the
+// import's checks.
+export function ProductEditor({
   materials,
   draftPrice,
   initialFile,
   onCreated,
   onCancel,
+  editing,
+  onSaved,
 }: {
   // The maker's materials so far, as suggestions.
   materials: string[];
@@ -110,31 +145,56 @@ export function NewProductForm({
   draftPrice: string | null;
   // A design handed over from the studio ("Make it a product").
   initialFile?: StoredProductFile | null;
-  onCreated: (product: Product, warning?: string) => void;
+  onCreated?: (product: Product, warning?: string) => void;
   onCancel: () => void;
+  // A saved product being edited: its form and its text limits.
+  editing?: { productId: string; form: ProductForm; limits: FormLimits };
+  onSaved?: (saved: SavedProduct) => void;
 }) {
+  const start = editing?.form;
+  const limits = editing?.limits ?? FORM_LIMITS;
   const [file, setFile] = useState<StoredProductFile | null>(
-    initialFile ?? null,
+    start ? storedFile(start) : (initialFile ?? null),
   );
-  const [name, setName] = useState("");
-  const [whatItIs, setWhatItIs] = useState("");
-  const [width, setWidth] = useState("");
-  const [height, setHeight] = useState("");
-  const [unit, setUnit] = useState<Unit>("in");
-  const [material, setMaterial] = useState("");
-  const [treatment, setTreatment] = useState<Treatment>("engraved");
+  const [name, setName] = useState(start?.name ?? "");
+  const [whatItIs, setWhatItIs] = useState(start?.whatItIs ?? "");
+  const [width, setWidth] = useState(text(start?.width));
+  const [height, setHeight] = useState(text(start?.height));
+  const [unit, setUnit] = useState<Unit>(start?.unit ?? "in");
+  const [material, setMaterial] = useState(start?.material ?? "");
+  const [treatment, setTreatment] = useState<Treatment>(
+    start?.treatment ?? "engraved",
+  );
   const [colours, setColours] = useState<Colour[]>(
-    initialFile?.colours.length
-      ? initialFile.colours
-      : [{ name: "Natural", hex: "#D9B98C" }],
+    start
+      ? start.colours
+      : initialFile?.colours.length
+        ? initialFile.colours
+        : [{ name: "Natural", hex: "#D9B98C" }],
   );
-  const [wording, setWording] = useState<WordingRow[]>([]);
-  const [places, setPlaces] = useState<string[]>([]);
-  const [defaultColour, setDefaultColour] = useState(0);
-  const [details, setDetails] = useState<Details>(emptyDetails());
-  const [price, setPrice] = useState("");
+  const [wording, setWording] = useState<WordingRow[]>(
+    (start?.wording ?? []).map((w) => ({
+      label: w.label,
+      example: w.example ?? "",
+      maxChars: text(w.maxChars),
+      optional: w.required === false,
+    })),
+  );
+  const [places, setPlaces] = useState<string[]>(start?.useContexts ?? []);
+  const [defaultColour, setDefaultColour] = useState(start?.defaultColour ?? 0);
+  const [details, setDetails] = useState<Details>({
+    ...emptyDetails(),
+    depth: text(start?.depth),
+    relief: text(start?.relief),
+    hook: start?.hook ?? "",
+    cta: start?.cta ?? "",
+    description: start?.description ?? "",
+  });
+  const [price, setPrice] = useState(text(start?.price));
   // Up to two more views of the piece (the front one is the reference).
-  const [views, setViews] = useState<{ label: ViewLabel; url: string }[]>([]);
+  const [views, setViews] = useState<{ label: ViewLabel; url: string }[]>(
+    start?.views ?? [],
+  );
   const viewInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   // After the first Save, each field shows its problem as it is fixed.
@@ -290,7 +350,9 @@ export function NewProductForm({
                 ? {
                     kind: "vector",
                     url: file.url,
-                    drawnWidthPx: file.drawnWidthPx,
+                    ...(file.drawnWidthPx > 0
+                      ? { drawnWidthPx: file.drawnWidthPx }
+                      : {}),
                   }
                 : { kind: "photo", url: file.url },
           }
@@ -301,7 +363,7 @@ export function NewProductForm({
   function save() {
     setError(null);
     setAttempted(true);
-    const first = formIssues(formInput())[0];
+    const first = formIssues(formInput(), limits)[0];
     if (first) {
       const at = document.querySelector<HTMLElement>(
         `[data-field="${first.path}"]`,
@@ -311,17 +373,29 @@ export function NewProductForm({
       return;
     }
     startSave(async () => {
+      if (editing) {
+        const saved = await updateProductAction({
+          id: editing.productId,
+          form: formInput(),
+        });
+        if ("error" in saved) setError(saved.error);
+        else onSaved?.(saved);
+        return;
+      }
       const result = await createProductAction(formInput());
       if ("error" in result) setError(result.error);
-      else onCreated(result.product, result.warning);
+      else onCreated?.(result.product, result.warning);
     });
   }
 
   const preview = sizePreview(Number(width), Number(height), unit);
   const ratioNote = ratioCheck(ratio, Number(width), Number(height));
-  const needed = stillNeeded(formInput());
+  const needed = stillNeeded(formInput(), limits);
   const problems = Object.fromEntries(
-    (attempted ? formIssues(formInput()) : []).map((i) => [i.path, i.message]),
+    (attempted ? formIssues(formInput(), limits) : []).map((i) => [
+      i.path,
+      i.message,
+    ]),
   );
   const problem = (...paths: string[]) => {
     const message = paths.map((p) => problems[p]).find(Boolean);
@@ -340,12 +414,12 @@ export function NewProductForm({
             className="font-serif text-xl italic text-foreground"
             style={{ fontVariationSettings: "'opsz' 40" }}
           >
-            New product
+            {editing ? "Edit product" : "New product"}
           </h3>
           <p className="mt-1 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
-            Tell Kiln what the piece is. A photo becomes the reference every
-            scene starts from; a design file (SVG) is drawn to scale, so you can
-            plan the listing before it is made.
+            {editing
+              ? "Change what is wrong and save: the projects that use it show what changed and offer the update."
+              : "Tell Kiln what the piece is. A photo becomes the reference every scene starts from; a design file (SVG) is drawn to scale, so you can plan the listing before it is made."}
           </p>
         </div>
         <Button
@@ -455,7 +529,7 @@ export function NewProductForm({
 
       <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
-          <Label text="Name" value={name} limit={80} />
+          <Label text="Name" value={name} limit={limits.name} />
           <input
             data-field="name"
             className={FIELD}
@@ -466,7 +540,7 @@ export function NewProductForm({
           {problem("name")}
         </label>
         <label className="flex flex-col gap-1.5">
-          <Label text="What it is" value={whatItIs} limit={60} />
+          <Label text="What it is" value={whatItIs} limit={limits.whatItIs} />
           <input
             data-field="whatItIs"
             className={FIELD}
@@ -536,7 +610,7 @@ export function NewProductForm({
           ) : null}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label text="Material" value={material} limit={60} />
+          <Label text="Material" value={material} limit={limits.material} />
           <MaterialCombobox
             label="Material"
             value={material}
@@ -857,7 +931,7 @@ export function NewProductForm({
           className="h-10 rounded-field px-5 font-semibold shadow-button"
         >
           {saving ? <Loader2 className="animate-spin" /> : null}
-          Save product
+          {editing ? "Save changes" : "Save product"}
         </Button>
         <Button variant="ghost" disabled={busy} onClick={onCancel}>
           Cancel

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Eye, EyeOff, Loader2, Plus } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, PenLine, Plus } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { createProjectAction } from "@/app/actions/new-project";
@@ -11,7 +11,7 @@ import {
   type ImportOutcome,
   ImportResultPanel,
 } from "@/components/projects/import-catalog";
-import { NewProductForm } from "@/components/projects/new-product-form";
+import { ProductEditor } from "@/components/projects/product-editor";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
   onIndexes,
@@ -226,7 +226,7 @@ export function NewProjectFlow({
         ) : null}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {creating ? (
-            <NewProductForm
+            <ProductEditor
               materials={[...new Set(products.map((p) => p.material))].sort()}
               draftPrice={draftPrice}
               initialFile={initialDesign}
@@ -245,40 +245,48 @@ export function NewProjectFlow({
             />
           ) : null}
           {products.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setProductId(p.id)}
-              className={cn(
-                "flex flex-col gap-2 rounded-card bg-card p-5 text-left shadow-card transition-shadow",
-                p.id === productId
-                  ? "ring-2 ring-primary"
-                  : "hover:ring-1 hover:ring-border",
-              )}
-            >
-              <span className="font-mono text-[0.625rem] text-on-surface-dim">
-                {p.sku} · {p.source.kind}
-              </span>
-              <span className="font-serif text-lg italic leading-tight text-foreground">
-                {p.name}
-              </span>
-              <span className="font-sans text-[0.8rem] text-on-surface-mid">
-                {buyerSizeLabel(p)} · {p.material}
-              </span>
-              <span className="flex gap-1.5 pt-1">
-                {p.colours.map((c) => (
-                  <span
-                    key={c.key}
-                    title={c.inStock ? c.name : `${c.name} (out of stock)`}
-                    className="size-4 rounded-swatch border border-border"
-                    style={{
-                      backgroundColor: c.face,
-                      opacity: c.inStock ? 1 : 0.35,
-                    }}
-                  />
-                ))}
-              </span>
-            </button>
+            <div key={p.id} className="group/product relative flex">
+              <button
+                type="button"
+                onClick={() => setProductId(p.id)}
+                className={cn(
+                  "flex w-full flex-col gap-2 rounded-card bg-card p-5 text-left shadow-card transition-shadow",
+                  p.id === productId
+                    ? "ring-2 ring-primary"
+                    : "hover:ring-1 hover:ring-border",
+                )}
+              >
+                <span className="font-mono text-[0.625rem] text-on-surface-dim">
+                  {p.sku} · {p.source.kind}
+                </span>
+                <span className="font-serif text-lg italic leading-tight text-foreground">
+                  {p.name}
+                </span>
+                <span className="font-sans text-[0.8rem] text-on-surface-mid">
+                  {buyerSizeLabel(p)} · {p.material}
+                </span>
+                <span className="flex gap-1.5 pt-1">
+                  {p.colours.map((c) => (
+                    <span
+                      key={c.key}
+                      title={c.inStock ? c.name : `${c.name} (out of stock)`}
+                      className="size-4 rounded-swatch border border-border"
+                      style={{
+                        backgroundColor: c.face,
+                        opacity: c.inStock ? 1 : 0.35,
+                      }}
+                    />
+                  ))}
+                </span>
+              </button>
+              <Link
+                href={`/products/${encodeURIComponent(p.id)}?back=${encodeURIComponent(`/projects/new?product=${p.id}`)}`}
+                aria-label={`Edit ${p.name}`}
+                className="absolute top-3 right-3 rounded-pill bg-card p-1.5 text-on-surface-mid opacity-0 shadow-card transition group-hover/product:opacity-100 hover:text-foreground focus-visible:opacity-100"
+              >
+                <PenLine className="size-3.5" />
+              </Link>
+            </div>
           ))}
           {creating ? null : (
             <button

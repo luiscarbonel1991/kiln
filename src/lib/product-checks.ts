@@ -1,6 +1,10 @@
 import { sizeComparison } from "@/domain/exact";
 import type { Unit } from "@/domain/product";
-import { ProductForm } from "@/lib/product-form";
+import {
+  FORM_LIMITS,
+  type FormLimits,
+  productFormSchema,
+} from "@/lib/product-form";
 
 // Free checks the product form runs as the maker types: no model call, only
 // what the spec already says. Each returns words to show, or null.
@@ -84,8 +88,11 @@ const NEEDS: [RegExp, string][] = [
 ];
 
 // What the form still needs before Save, in words ("a name, its size").
-export function stillNeeded(input: unknown): string[] {
-  const parsed = ProductForm.safeParse(input);
+export function stillNeeded(
+  input: unknown,
+  limits: FormLimits = FORM_LIMITS,
+): string[] {
+  const parsed = productFormSchema(limits).safeParse(input);
   if (parsed.success) return [];
   const words = parsed.error.issues.flatMap((issue) => {
     const path = issue.path.join(".");

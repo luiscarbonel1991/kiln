@@ -1,0 +1,62 @@
+import { notFound } from "next/navigation";
+import { connection } from "next/server";
+import { ProductEditPage } from "@/components/projects/product-edit-page";
+import { ProjectsHeader } from "@/components/projects/projects-header";
+import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
+import { editLimits, formFromProduct, keptWords } from "@/lib/product-form";
+import { getMakerModels } from "@/server/maker-repository";
+import {
+  getProduct,
+  listProducts,
+  productProjects,
+} from "@/server/product-repository";
+import { productHash } from "@/server/product-version";
+
+// Where the page may send the maker back to: Home, a project's board, or a
+// new project with this product picked.
+const BACK =
+  /^\/(projects\/[A-Za-z0-9_-]+|projects\/new\?product=[A-Za-z0-9_-]+)?$/;
+
+// A product's own page: edit it (each project using it then shows what
+// changed and offers its update), see who uses it, download its package,
+// delete it when nothing uses it. Rendered per request.
+export default async function ProductPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  await connection();
+  const { id } = await params;
+  const { back } = await searchParams;
+  const product = await getProduct(id);
+  if (!product) notFound();
+  const products = await listProducts();
+  const models = await getMakerModels();
+  const draft = textEstimate(models.text, TEXT_CALL_BUDGETS.productDraft);
+  const now = productHash(product);
+  const uses = (await productProjects(id)).map((use) => ({
+    projectId: use.projectId,
+    name: use.name,
+    behind: use.hash !== now,
+  }));
+  return (
+    <div className="flex min-h-full flex-col">
+      <ProjectsHeader />
+      <ProductEditPage
+        productId={product.id}
+        sku={product.sku}
+        name={product.name}
+        catalog={product.source.kind === "catalog"}
+        form={formFromProduct(product)}
+        limits={editLimits(product)}
+        kept={keptWords(product)}
+        uses={uses}
+        materials={[...new Set(products.map((p) => p.material))].sort()}
+        draftPrice={draft === null ? null : `≈ $${draft.toFixed(2)}`}
+        back={typeof back === "string" && BACK.test(back) ? back : "/"}
+      />
+    </div>
+  );
+}

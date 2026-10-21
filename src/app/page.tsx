@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { PenLine, Plus } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { HomeProjects } from "@/components/home/home-projects";
@@ -162,12 +162,20 @@ export default async function HomePage() {
                       />
                     ))}
                   </span>
-                  <Link
-                    href={`/projects/new?product=${encodeURIComponent(p.id)}`}
-                    className="inline-flex items-center gap-1 self-start pt-1 font-sans text-[0.75rem] font-semibold text-primary hover:underline"
-                  >
-                    <Plus className="size-3" /> New project
-                  </Link>
+                  <span className="flex flex-wrap items-center gap-4 pt-1">
+                    <Link
+                      href={`/projects/new?product=${encodeURIComponent(p.id)}`}
+                      className="inline-flex items-center gap-1 font-sans text-[0.75rem] font-semibold text-primary hover:underline"
+                    >
+                      <Plus className="size-3" /> New project
+                    </Link>
+                    <Link
+                      href={`/products/${encodeURIComponent(p.id)}`}
+                      className="inline-flex items-center gap-1 font-sans text-[0.75rem] font-semibold text-on-surface-mid hover:text-foreground hover:underline"
+                    >
+                      <PenLine className="size-3" /> Edit
+                    </Link>
+                  </span>
                 </div>
               ))}
             </div>
