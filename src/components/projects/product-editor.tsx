@@ -123,6 +123,9 @@ function storedFile(form: ProductForm): StoredProductFile | null {
 
 const text = (n: number | undefined | null) => (n ? String(n) : "");
 
+// The colour a new product starts with, until the maker names its own.
+const STARTER_COLOUR: Colour = { name: "Natural", hex: "#D9B98C" };
+
 // A product's editor: what a maker knows about a piece, on one screen. New
 // (New project, step 1): a photo or a design file is optional, it prefills
 // the colours (free) and, for a design, the height from its proportions; a
@@ -170,8 +173,15 @@ export function ProductEditor({
       ? start.colours
       : initialFile?.colours.length
         ? initialFile.colours
-        : [{ name: "Natural", hex: "#D9B98C" }],
+        : [STARTER_COLOUR],
   );
+  // The first row starts as "Natural": until it is edited, focusing it selects
+  // the whole name, so typing replaces it instead of adding to it.
+  const [starterName, setStarterName] = useState(
+    !start && !initialFile?.colours.length,
+  );
+  const isStarter = (i: number, c: Colour) =>
+    starterName && i === 0 && c.name === STARTER_COLOUR.name;
   const [wording, setWording] = useState<WordingRow[]>(
     (start?.wording ?? []).map((w) => ({
       label: w.label,
@@ -678,13 +688,20 @@ export function ProductEditor({
                 data-field={`colours.${i}.name`}
                 className={cn(FIELD, "max-w-[260px]")}
                 value={c.name}
-                onChange={(e) =>
+                onFocus={(e) => {
+                  if (isStarter(i, c)) e.currentTarget.select();
+                }}
+                onMouseUp={(e) => {
+                  if (isStarter(i, c)) e.preventDefault();
+                }}
+                onChange={(e) => {
+                  if (i === 0) setStarterName(false);
                   setColours((all) =>
                     all.map((x, j) =>
                       j === i ? { ...x, name: e.target.value } : x,
                     ),
-                  )
-                }
+                  );
+                }}
               />
               {c.swatchUrl ? (
                 <span className="relative flex-shrink-0">
