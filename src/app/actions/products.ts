@@ -9,7 +9,12 @@ import {
 import type { BrandKit } from "@/domain/brand";
 import { defaultTextModel, ProviderId } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
-import { ProductForm, productFromForm } from "@/lib/product-form";
+import {
+  type FormIssue,
+  formIssues,
+  ProductForm,
+  productFromForm,
+} from "@/lib/product-form";
 import {
   parseProductPackage,
   productLabel,
@@ -298,10 +303,14 @@ export async function uploadProductFileAction(
 // (its file where Kiln fetches, a design's outline measured against its size).
 export async function createProductAction(
   input: unknown,
-): Promise<{ product: Product; warning?: string } | { error: string }> {
+): Promise<
+  | { product: Product; warning?: string }
+  | { error: string; issues?: FormIssue[] }
+> {
   const parsed = ProductForm.safeParse(input);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    const issues = formIssues(input);
+    return { error: issues[0]?.message ?? "Check the form.", issues };
   }
   const product = productFromForm(
     parsed.data,

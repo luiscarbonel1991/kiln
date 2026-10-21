@@ -32,7 +32,7 @@ import {
   sizePreview,
   stillNeeded,
 } from "@/lib/product-checks";
-import { FINISHES, type ProductForm } from "@/lib/product-form";
+import { FINISHES, formIssues, type ProductForm } from "@/lib/product-form";
 import { cn } from "@/lib/utils";
 import type { StoredProductFile } from "@/server/product-files";
 import type { Degraded } from "@/server/text-calls";
@@ -129,6 +129,8 @@ export function NewProductForm({
   const [views, setViews] = useState<{ label: ViewLabel; url: string }[]>([]);
   const viewInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  // After the first Save, each field shows its problem as it is fixed.
+  const [attempted, setAttempted] = useState(false);
   const [degraded, setDegraded] = useState<Degraded | null>(null);
   const [uploading, startUpload] = useTransition();
   const [drafting, startDraft] = useTransition();
@@ -282,6 +284,16 @@ export function NewProductForm({
 
   function save() {
     setError(null);
+    setAttempted(true);
+    const first = formIssues(formInput())[0];
+    if (first) {
+      const at = document.querySelector<HTMLElement>(
+        `[data-field="${first.path}"]`,
+      );
+      at?.scrollIntoView({ block: "center" });
+      at?.focus({ preventScroll: true });
+      return;
+    }
     startSave(async () => {
       const result = await createProductAction(formInput());
       if ("error" in result) setError(result.error);
@@ -292,6 +304,17 @@ export function NewProductForm({
   const preview = sizePreview(Number(width), Number(height), unit);
   const ratioNote = ratioCheck(ratio, Number(width), Number(height));
   const needed = stillNeeded(formInput());
+  const problems = Object.fromEntries(
+    (attempted ? formIssues(formInput()) : []).map((i) => [i.path, i.message]),
+  );
+  const problem = (...paths: string[]) => {
+    const message = paths.map((p) => problems[p]).find(Boolean);
+    return message ? (
+      <span className="font-sans text-[0.75rem] text-prov-local">
+        {message}
+      </span>
+    ) : null;
+  };
 
   return (
     <div className="col-span-full flex flex-col gap-5 rounded-card bg-card p-6 shadow-card">
@@ -418,26 +441,31 @@ export function NewProductForm({
         <label className="flex flex-col gap-1.5">
           <Label text="Name" value={name} limit={80} />
           <input
+            data-field="name"
             className={FIELD}
             value={name}
             placeholder="Engraved family cutting board"
             onChange={(e) => setName(e.target.value)}
           />
+          {problem("name")}
         </label>
         <label className="flex flex-col gap-1.5">
           <Label text="What it is" value={whatItIs} limit={60} />
           <input
+            data-field="whatItIs"
             className={FIELD}
             value={whatItIs}
             placeholder="cutting board, round coaster…"
             onChange={(e) => setWhatItIs(e.target.value)}
           />
+          {problem("whatItIs")}
         </label>
         <div className="flex flex-col gap-1.5">
           <span className={LABEL}>Size</span>
           <div className="flex items-center gap-2">
             <input
               aria-label="Width"
+              data-field="width"
               className={FIELD}
               inputMode="decimal"
               value={width}
@@ -447,6 +475,7 @@ export function NewProductForm({
             <span className="font-sans text-sm text-on-surface-mid">×</span>
             <input
               aria-label="Height"
+              data-field="height"
               className={FIELD}
               inputMode="decimal"
               value={height}
@@ -478,6 +507,7 @@ export function NewProductForm({
               ))}
             </ToggleGroup.Root>
           </div>
+          {problem("width", "height")}
           {preview ? (
             <span className="font-mono text-[0.7rem] text-on-surface-mid">
               {preview}
@@ -499,9 +529,11 @@ export function NewProductForm({
             field={FIELD}
             placeholder="solid walnut, glazed stoneware…"
           />
-          <span className="font-sans text-[0.75rem] text-on-surface-mid">
-            Pick one you've used or type a new one.
-          </span>
+          {problem("material") ?? (
+            <span className="font-sans text-[0.75rem] text-on-surface-mid">
+              Pick one you've used or type a new one.
+            </span>
+          )}
         </div>
       </div>
 
@@ -553,6 +585,7 @@ export function NewProductForm({
               />
               <input
                 aria-label={`Colour ${i + 1} name`}
+                data-field={`colours.${i}.name`}
                 className={cn(FIELD, "max-w-[260px]")}
                 value={c.name}
                 onChange={(e) =>
@@ -630,6 +663,17 @@ export function NewProductForm({
               e.target.value = "";
             }}
           />
+          {colours.map((_, i) =>
+            problems[`colours.${i}.name`] ? (
+              <span
+                // biome-ignore lint/suspicious/noArrayIndexKey: one note per row
+                key={i}
+                className="font-sans text-[0.75rem] text-prov-local"
+              >
+                Colour {i + 1}: {problems[`colours.${i}.name`]}
+              </span>
+            ) : null,
+          )}
           {colours.length < 8 ? (
             <Button
               variant="ghost"
@@ -648,7 +692,12 @@ export function NewProductForm({
       <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5 sm:col-span-2">
           <span className={LABEL}>Text the buyer personalizes</span>
-          <WordingRows rows={wording} field={FIELD} onChange={setWording} />
+          <WordingRows
+            rows={wording}
+            field={FIELD}
+            onChange={setWording}
+            problems={problems}
+          />
         </div>
         <label className="flex flex-col gap-1.5">
           <span className={LABEL}>Where it's used (optional)</span>

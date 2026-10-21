@@ -60,7 +60,7 @@ export const ProductForm = z.object({
   colours: z
     .array(
       z.object({
-        name: z.string().trim().min(1).max(40),
+        name: z.string().trim().min(1, "Name this colour.").max(40),
         hex: Hex,
         // A photo of the material in this colour, uploaded to Kiln's storage.
         swatchUrl: z.string().min(1).optional(),
@@ -108,6 +108,25 @@ export const ProductForm = z.object({
 });
 // What a form sends (defaults filled on parse).
 export type ProductForm = z.input<typeof ProductForm>;
+
+// A form problem at its field ("wording.0.label"), in words.
+export interface FormIssue {
+  path: string;
+  message: string;
+}
+
+// The form's problems, the first per field.
+export function formIssues(input: unknown): FormIssue[] {
+  const parsed = ProductForm.safeParse(input);
+  if (parsed.success) return [];
+  const seen = new Set<string>();
+  return parsed.error.issues.flatMap((issue) => {
+    const path = issue.path.join(".");
+    if (seen.has(path)) return [];
+    seen.add(path);
+    return [{ path, message: issue.message }];
+  });
+}
 
 const slug = (text: string) =>
   text

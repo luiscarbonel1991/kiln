@@ -159,6 +159,22 @@ describe("createProductAction", () => {
   it("refuses an incomplete form, or a file outside Kiln's storage", async () => {
     expect(await createProductAction({ ...form, colours: [] })).toEqual({
       error: "Add at least one colour.",
+      issues: [{ path: "colours", message: "Add at least one colour." }],
+    });
+    expect(
+      await createProductAction({
+        ...form,
+        name: "",
+        wording: [{ label: "", example: "Sofia" }],
+      }),
+    ).toMatchObject({
+      issues: [
+        { path: "name", message: "Name the product." },
+        {
+          path: "wording.0.label",
+          message: "Say what the buyer writes, like “Name”.",
+        },
+      ],
     });
     expect(
       await createProductAction({

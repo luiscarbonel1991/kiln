@@ -32,12 +32,15 @@ export function WordingRows({
   rows,
   field,
   onChange,
+  problems = {},
   max = 3,
 }: {
   rows: WordingRow[];
   // The input class the form uses.
   field: string;
   onChange: (rows: WordingRow[]) => void;
+  // The form's problems by field ("wording.0.label"), once Save was tried.
+  problems?: Record<string, string>;
   max?: number;
 }) {
   const set = (i: number, patch: Partial<WordingRow>) =>
@@ -55,6 +58,8 @@ export function WordingRows({
       ) : null}
       {rows.map((row, i) => {
         const hint = wordingHint(row);
+        const problem =
+          problems[`wording.${i}.label`] ?? problems[`wording.${i}.example`];
         return (
           <div
             // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place
@@ -113,6 +118,11 @@ export function WordingRows({
                 <Trash2 />
               </Button>
             </div>
+            {problem ? (
+              <span className="font-sans text-[0.75rem] text-prov-local">
+                {problem}
+              </span>
+            ) : null}
             {hint ? (
               <span className="flex flex-wrap items-center gap-2 font-sans text-[0.75rem] text-prov-local">
                 {hint.words}
