@@ -201,3 +201,98 @@ export const ListingCopy = z.object({
   materials: z.array(z.string()),
 });
 export type ListingCopy = z.infer<typeof ListingCopy>;
+
+// One field of the product form as the review reads it: its path
+// ("wording.0.label"), what the maker typed ("" when empty), its limit or its
+// options, and whether it only takes a check (a size is the maker's to
+// measure).
+export interface ReviewField {
+  field: string;
+  value: string;
+  maxChars?: number;
+  options?: string[];
+  checkOnly?: boolean;
+}
+
+// What each field is for, so the model judges it by what reads it.
+const FIELD_USE: [RegExp, string][] = [
+  [
+    /^name$/,
+    "the name a shop lists it under; it titles the listing and the frames",
+  ],
+  [
+    /^whatItIs$/,
+    "the object itself in a short noun phrase, like 'round coaster'; every image prompt and Size & spec name it",
+  ],
+  [
+    /^size$/,
+    "the size as typed, in both units and beside an everyday object; only the maker can measure it",
+  ],
+  [
+    /^material$/,
+    "what it is made of, as a buyer says it; the image prompts, Size & spec and the listing's materials read it",
+  ],
+  [/^treatment$/, "how its marks are made; the close-up scenes show it"],
+  [
+    /^colours\.\d+\.name$/,
+    "a finish colour's name, as a buyer picks it; Colour options and the listing's variations show it",
+  ],
+  [
+    /^wording\.\d+\.label$/,
+    "what the buyer is asked to write, a short label like 'Name' or 'Date'; How to personalize and the listing ask it",
+  ],
+  [
+    /^wording\.\d+\.example$/,
+    "the example the frames show for that line, like 'Sofia'; real buyer text that fits the line's most characters",
+  ],
+  [
+    /^wording\.\d+\.maxChars$/,
+    "the most characters the buyer may type in that line, a whole number; empty means the text is fitted to the piece",
+  ],
+  [
+    /^useContexts\.\d+$/,
+    "a place where it is used, the most typical first, a short phrase like 'a kitchen counter'; the in-use and lifestyle scenes take place there",
+  ],
+  [/^hook$/, "the first line of a carousel"],
+  [/^cta$/, "the call to action at the end of a carousel"],
+  [
+    /^description$/,
+    "the maker's own description; the listing reads it for what the other fields do not say",
+  ],
+];
+
+const fieldUse = (field: string) =>
+  FIELD_USE.find(([re]) => re.test(field))?.[1] ?? "";
+
+// The product form's review (the form's "Review with AI"): suggestions the
+// maker accepts one by one, and checks only the maker can settle. From the
+// form alone: never a size, a price or a feature it does not give.
+export function productReviewPrompt(fields: ReviewField[]): string {
+  const listed = fields.map((f) => ({
+    field: f.field,
+    value: f.value,
+    use: fieldUse(f.field),
+    ...(f.maxChars ? { maxCharacters: f.maxChars } : {}),
+    ...(f.options ? { options: f.options } : {}),
+    ...(f.checkOnly ? { checkOnly: true } : {}),
+  }));
+  return [
+    "Review a small maker's product form before they save it. Kiln turns the form into exact frames (Size & spec, How to personalize, Colour options), image prompts and a listing, so each field is read by an image model and by a buyer. Return JSON.",
+    "The form, one entry per field: its path, what the maker typed ('' when empty), what reads it, and its limit or options:",
+    JSON.stringify(listed, null, 2),
+    "Rules:",
+    "- suggestions: only where a change makes a real difference to the frames, the scenes or the listing, for example: an empty field the product needs; the example typed where the label belongs; a vague material; a colour name a buyer would not choose by; an example longer than its line. Each has field (a path from the list), value (the whole new value, within its limit; one of the options where a field has them; digits for maxChars) and why (one short sentence to the maker on what it changes).",
+    "- Use only what the form says. Invent no feature, material, size, price or claim. Keep the maker's words where they work, and never suggest the value a field already has.",
+    "- Never suggest a size or a price. A field marked checkOnly takes a check, never a suggestion.",
+    "- checks: what only the maker can confirm, for example a size that reads wrong beside its everyday object, or a material that could mean two things. Each has field and why (one short sentence).",
+    "- At most 8 suggestions and 4 checks; empty lists when the form is right. Write in English.",
+  ].join("\n");
+}
+
+export const ProductReview = z.object({
+  suggestions: z.array(
+    z.object({ field: z.string(), value: z.string(), why: z.string() }),
+  ),
+  checks: z.array(z.object({ field: z.string(), why: z.string() })),
+});
+export type ProductReview = z.infer<typeof ProductReview>;
