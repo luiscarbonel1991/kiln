@@ -19,6 +19,7 @@ import {
 import { GenerationPoller } from "@/components/projects/generation-poller";
 import { ListingPanel } from "@/components/projects/listing-panel";
 import { ProductChangedBanner } from "@/components/projects/product-changed";
+import { ProjectTitle } from "@/components/projects/project-title";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
   onIndexes,
@@ -205,14 +206,16 @@ export function ProjectBoard({
           <p className="font-sans text-[0.656rem] font-bold uppercase tracking-[0.18em] text-prov-brand">
             {projectTypeLabel(board.type)}
           </p>
-          <h1
-            className="mt-2 font-serif text-[1.875rem] font-semibold leading-tight text-foreground"
-            style={{ fontVariationSettings: "'opsz' 144" }}
-          >
-            {board.name}
-          </h1>
+          <ProjectTitle projectId={projectId} name={board.name} />
           <p className="mt-1 font-sans text-sm text-on-surface-mid">
             {product.name} · {buyerSizeLabel(product)} · {product.material}
+            {" · "}
+            <Link
+              href={`/products/${product.id}?back=${encodeURIComponent(`/projects/${projectId}`)}`}
+              className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+            >
+              <PenLine className="size-3" /> Edit product
+            </Link>
           </p>
         </div>
 
