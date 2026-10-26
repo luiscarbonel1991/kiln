@@ -36,6 +36,25 @@ model Maker {
   projects        Project[]
   products        Product[]
   moduleSettings  ModuleSettings[]
+  accessTokens    AccessToken[]
+}
+
+// A personal access token for Kiln's HTTP API (/api/import, a colour's
+// material photo): what a script, an agent or another system sends as
+// `Authorization: Bearer kiln_pat_...`. Only its SHA-256 is kept, so the token
+// is shown once, when it is made; `prefix` (its first characters) names it in
+// Settings. Revoking deletes the row.
+model AccessToken {
+  id         String    @id @default(cuid())
+  makerId    String
+  maker      Maker     @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  name       String
+  prefix     String
+  hash       String    @unique
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([makerId])
 }
 
 // An optional module's saved settings for a maker (src/modules; an instance

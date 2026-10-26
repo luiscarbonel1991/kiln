@@ -1,10 +1,12 @@
 import { CircleAlert, CircleCheck, KeyRound } from "lucide-react";
 import { connection } from "next/server";
 import { ProjectsHeader } from "@/components/projects/projects-header";
+import { AccessTokens } from "@/components/settings/access-tokens";
 import { ModelsForm } from "@/components/settings/models-form";
 import { fromMicros } from "@/domain/generation-cost";
 import { hasDatabase } from "@/lib/db";
 import { providerMode } from "@/providers/mode";
+import { listAccessTokens } from "@/server/access-tokens";
 import { budget } from "@/server/generation-repository";
 import { getCurrentMaker, getMakerModels } from "@/server/maker-repository";
 import { providerHealth } from "@/server/provider-health";
@@ -22,13 +24,15 @@ const when = (iso: string) =>
 // Settings (per request: it reads the maker's defaults and the providers'
 // health). Models: the default per kind. Providers: each key and its last
 // calls, read for free — no ping, no paid call. The month's cap, read only.
+// Access tokens: for the HTTP API (README "HTTP API").
 export default async function SettingsPage() {
   await connection();
   const maker = hasDatabase() ? await getCurrentMaker() : null;
-  const [models, health, month] = await Promise.all([
+  const [models, health, month, tokens] = await Promise.all([
     getMakerModels(),
     providerHealth(maker?.id ?? null),
     maker ? budget(maker.id) : Promise.resolve(null),
+    maker ? listAccessTokens() : Promise.resolve(null),
   ]);
   const mode = providerMode();
   return (
@@ -117,6 +121,32 @@ export default async function SettingsPage() {
               {money(fromMicros(month.capMicros))}, one cap for both providers
               (calendar month, UTC).
             </p>
+          </section>
+        ) : null}
+
+        {tokens ? (
+          <section className="rounded-card bg-card p-6 shadow-card">
+            <h2
+              className="font-serif text-xl italic text-foreground"
+              style={{ fontVariationSettings: "'opsz' 40" }}
+            >
+              Access tokens
+            </h2>
+            <p className="mt-1 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
+              For scripts, agents and other systems: they send a product package
+              or a colour&apos;s material photo over HTTP, with no file picker.
+              A token acts as this studio; make one per system, so each can be
+              revoked on its own.
+            </p>
+            <ul className="mt-3 mb-5 flex flex-col gap-1 font-mono text-[0.68rem] text-on-surface-mid">
+              <li>POST /api/import · a product package (JSON)</li>
+              <li>
+                POST /api/products/&lt;id or sku&gt;/colours/&lt;key&gt;/swatch
+                · a material photo
+              </li>
+              <li>pnpm kiln validate | import | swatch · from a terminal</li>
+            </ul>
+            <AccessTokens tokens={tokens} />
           </section>
         ) : null}
       </main>

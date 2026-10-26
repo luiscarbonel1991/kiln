@@ -1,0 +1,61 @@
+import { bearerToken, verifyAccessToken } from "@/server/access-tokens";
+
+// What Kiln's HTTP API routes share (README "HTTP API"): a personal access
+// token on every call, errors as { error } in words, bodies read under a cap.
+
+const NO_STORE = { "Cache-Control": "no-store" };
+
+export function apiJson(body: unknown, status = 200): Response {
+  return Response.json(body, { status, headers: NO_STORE });
+}
+
+export function apiError(
+  status: number,
+  error: string,
+  headers: Record<string, string> = {},
+): Response {
+  return Response.json(
+    { error },
+    { status, headers: { ...NO_STORE, ...headers } },
+  );
+}
+
+// Null when the request carries a token of the current maker; otherwise the
+// 401 to send back, saying what is missing.
+export async function authorize(request: Request): Promise<Response | null> {
+  const token = bearerToken(request.headers.get("authorization"));
+  if (token && (await verifyAccessToken(token))) return null;
+  return apiError(
+    401,
+    token
+      ? "That token is not valid here: it was revoked, or it was made for another maker."
+      : "Send a personal access token: Authorization: Bearer kiln_pat_... (make one in Settings → Access tokens).",
+    { "WWW-Authenticate": 'Bearer realm="kiln"' },
+  );
+}
+
+// The request's body, or null when it is larger than `max` bytes: a declared
+// length over it is refused before reading, and reading stops once it passes.
+export async function readBody(
+  request: Request,
+  max: number,
+): Promise<Uint8Array | null> {
+  if (Number(request.headers.get("content-length") ?? 0) > max) return null;
+  const reader = request.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
+export const megabytes = (bytes: number) => `${bytes / (1024 * 1024)} MB`;
