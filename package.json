@@ -2,6 +2,9 @@
   "name": "kiln",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "kiln": "scripts/kiln.mjs"
+  },
   "scripts": {
     "dev": "next dev",
     "dev:mock": "KILN_PROVIDERS=mock KILN_MOCK_DELAY_MS=4000 next dev",
@@ -22,6 +25,7 @@
     "db:mock:setup": "node scripts/mock-db.mjs",
     "postinstall": "prisma generate",
     "brief": "node scripts/brief.mjs",
+    "kiln": "node scripts/kiln.mjs",
     "engine:build": "pnpm --filter @kiln/engine build"
   },
   "dependencies": {

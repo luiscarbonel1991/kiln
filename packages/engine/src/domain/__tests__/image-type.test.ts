@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rasterType } from "@/lib/image-type";
+import { rasterType } from "@/domain/image-type";
 
 const PNG_1PX = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",

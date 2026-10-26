@@ -1,5 +1,5 @@
+import { rasterType } from "@/domain/image-type";
 import type { Product } from "@/domain/product";
-import { rasterType } from "@/lib/image-type";
 import { colourName } from "@/lib/product-form";
 import { storeAsset } from "@/providers/asset-bytes";
 import { photoColours } from "@/server/product-files";

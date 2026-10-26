@@ -54,6 +54,7 @@ export {
   buildGenerationRequest,
   GenerationRequest,
 } from "@/domain/generation-request";
+export { type RasterType, rasterType } from "@/domain/image-type";
 export {
   checkListing,
   type ListingField,
