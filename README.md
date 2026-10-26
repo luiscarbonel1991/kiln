@@ -310,6 +310,14 @@ from above), distance (close, medium, wide), light (window, studio, warm), shado
   a shot-list slot names the knobs it offers with its defaults, and the plan keeps
   the maker's choices. Knobs lock while the scene is queued or approved. Projects
   planned before knobs keep their prose.
+- **The hero's setting** (Etsy's marketplace hero): Plain backdrop (a seamless
+  sweep) or In its place (the product at its first place of use, true to size, as
+  page-1 heroes show what is mounted where it is used). New project's plan proposes
+  it and says why: the maker's last choice for that product family on that
+  destination, else In its place when the product is mounted where it is used (its
+  first place names a wall, a door, a gate, a porch…), else Plain backdrop. The
+  setting a project starts with, or one changed in Tune, is remembered for the
+  family (`Maker.preferences`). A product's family is a field of the product form.
 
 The worker is a `globalThis` singleton started from `src/instrumentation.ts`.
 It restarts with the current code on the next enqueue after a code reload: it
