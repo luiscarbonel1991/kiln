@@ -112,6 +112,19 @@ importers:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@20.19.41)(msw@2.14.6(@types/node@20.19.41)(typescript@5.9.3))(vite@8.0.14(@types/node@20.19.41)(jiti@2.7.0))
 
+  packages/cli:
+    dependencies:
+      '@kiln/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      tsc-alias:
+        specifier: ^1.8.16
+        version: 1.8.17
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   packages/engine:
     dependencies:
       '@aws-sdk/client-s3':

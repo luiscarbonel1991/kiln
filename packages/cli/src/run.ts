@@ -1,4 +1,11 @@
-#!/usr/bin/env node
+import { resolve } from "node:path";
+import type { rasterType } from "@kiln/engine/domain/image-type";
+import type {
+  packageJsonSchema,
+  parseProductPackage,
+  RejectedProduct,
+} from "@kiln/engine/domain/product-package";
+
 // kiln — feed Kiln without a file picker (ROADMAP 2026-10-26, P0-1).
 //
 //   kiln validate <package.json>             the import's own checks, offline
@@ -7,17 +14,12 @@
 //   kiln swatch <product> <colour> --remove
 //   kiln schema                              the package's JSON Schema
 //
-// The checks are the engine's (`parseProductPackage`, `rasterType`, from
-// packages/engine/dist: `pnpm engine:build` once), so an exporter fails at
-// build time with the words the import would use. KILN_URL and KILN_TOKEN
-// (Settings → Access tokens) say where to send. `run` takes its I/O as
-// arguments, for tests.
+// The checks are the engine's (`parseProductPackage`, `rasterType`), so an
+// exporter fails at build time with the words the import would use. KILN_URL
+// and KILN_TOKEN (Settings → Access tokens) say where to send. `run` takes
+// its I/O as arguments, for tests.
 
-import { readFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-
-const USAGE = `Usage:
+export const USAGE = `Usage:
   kiln validate <package.json>             check a product package, offline
   kiln import <package.json>               check it, then import it into Kiln
   kiln swatch <product> <colour> <photo>   set a colour's material photo
@@ -33,18 +35,48 @@ KILN_TOKEN (a personal access token: Settings → Access tokens).
 Exit: 0 done · 1 something set aside or refused · 2 usage · 3 Kiln did not
 answer, or refused the token.`;
 
+export interface Engine {
+  parseProductPackage: typeof parseProductPackage;
+  packageJsonSchema: typeof packageJsonSchema;
+  rasterType: typeof rasterType;
+}
+
+export interface Io {
+  engine: Engine;
+  // Where relative paths start: the caller's folder.
+  cwd: string;
+  env: Record<string, string | undefined>;
+  fetch: (url: string, init: RequestInit) => Promise<Response>;
+  readText: (path: string) => Promise<string>;
+  readBytes: (path: string) => Promise<Uint8Array>;
+  out: (line: string) => void;
+  err: (line: string) => void;
+}
+
+type Product = Extract<
+  ReturnType<typeof parseProductPackage>,
+  { ok: true }
+>["products"][number];
+
+interface Flags {
+  json: boolean;
+  remove: boolean;
+  strict: boolean;
+}
+
 const RASTER = new Set(["image/png", "image/jpeg", "image/webp"]);
 
-const dataMime = (url) => /^data:([^;,]+)/.exec(url)?.[1]?.toLowerCase();
+const dataMime = (url: string) =>
+  /^data:([^;,]+)/.exec(url)?.[1]?.toLowerCase();
 
 // What the import refuses that the schema cannot say, read without a
 // network: an inline photo or material sample that is not a PNG, JPEG or
 // WebP. Assets at other addresses are the server's to allow.
-function inlineProblems(product) {
-  const problems = [];
+function inlineProblems(product: Product): string[] {
+  const problems: string[] = [];
   const photo =
-    product.source?.kind === "photo" ? product.source.assetUrl : null;
-  if (photo?.startsWith("data:") && !RASTER.has(dataMime(photo))) {
+    product.source.kind === "photo" ? product.source.assetUrl : null;
+  if (photo?.startsWith("data:") && !RASTER.has(dataMime(photo) ?? "")) {
     problems.push(
       "source › assetUrl: its photo must be a PNG, JPEG or WebP image",
     );
@@ -52,7 +84,7 @@ function inlineProblems(product) {
   for (const c of product.colours) {
     if (
       c.swatchUrl?.startsWith("data:") &&
-      !RASTER.has(dataMime(c.swatchUrl))
+      !RASTER.has(dataMime(c.swatchUrl) ?? "")
     ) {
       problems.push(
         `colours › ${c.key} › swatchUrl: a material sample must be a PNG, JPEG or WebP image`,
@@ -62,89 +94,148 @@ function inlineProblems(product) {
   return problems;
 }
 
-const label = (p) => `"${p.sku}" ${p.name}`;
+const label = (p: { sku: string; name: string }) => `"${p.sku}" ${p.name}`;
+
+type Checked =
+  | { ok: false; errors: string[] }
+  | {
+      ok: true;
+      ready: Product[];
+      rejected: RejectedProduct[];
+      brandErrors: string[];
+    };
 
 // The package checked as the import checks it: the products that pass, those
 // set aside with why, and the maker block's errors.
-function check(engine, json) {
+function check(engine: Engine, json: unknown): Checked {
   const parsed = engine.parseProductPackage(json);
   if (!parsed.ok) return { ok: false, errors: parsed.errors };
-  const ready = [];
+  const ready: Product[] = [];
   const rejected = [...parsed.rejected];
   for (const product of parsed.products) {
     const problems = inlineProblems(product);
-    if (problems.length > 0)
+    if (problems.length > 0) {
       rejected.push({ label: label(product), errors: problems });
-    else ready.push(product);
+    } else {
+      ready.push(product);
+    }
   }
   return { ok: true, ready, rejected, brandErrors: parsed.brandErrors };
 }
 
-function printRejected(out, rejected) {
+const isClean = (c: Checked) =>
+  c.ok && c.rejected.length === 0 && c.brandErrors.length === 0;
+
+function printRejected(
+  print: (line: string) => void,
+  rejected: RejectedProduct[],
+) {
   for (const r of rejected) {
-    out(`set aside ${r.label}`);
-    for (const e of r.errors) out(`  - ${e}`);
+    print(`set aside ${r.label}`);
+    for (const e of r.errors) print(`  - ${e}`);
   }
 }
 
-async function readJson(io, file) {
-  const text = await io.readFile(file, "utf8");
+async function readJson(
+  io: Io,
+  file: string,
+): Promise<{ json: unknown } | { error: string }> {
+  const text = await io.readText(file);
   try {
     return { json: JSON.parse(text) };
   } catch (error) {
-    return { error: `${file}: not JSON (${error.message})` };
+    return { error: `${file}: not JSON (${(error as Error).message})` };
   }
 }
 
-function connection(io) {
+interface Connection {
+  url: string;
+  token: string;
+}
+
+function connection(io: Io): Connection | null {
   const url = io.env.KILN_URL?.replace(/\/+$/, "");
   const token = io.env.KILN_TOKEN;
-  if (!url || !token) {
-    io.err(
-      `Set ${!url ? "KILN_URL (where Kiln runs, e.g. http://localhost:3009)" : ""}${!url && !token ? " and " : ""}${!token ? "KILN_TOKEN (Settings → Access tokens)" : ""}.`,
-    );
-    return null;
-  }
-  return { url, token };
+  if (url && token) return { url, token };
+  const missing = [
+    url ? null : "KILN_URL (where Kiln runs, e.g. http://localhost:3009)",
+    token ? null : "KILN_TOKEN (Settings → Access tokens)",
+  ].filter(Boolean);
+  io.err(`Set ${missing.join(" and ")}.`);
+  return null;
 }
+
+// What Kiln answers (README "HTTP API"), as far as the CLI reads it.
+interface ImportAnswer {
+  imported: {
+    id: string;
+    sku: string;
+    name: string;
+    status: string;
+    changed: string[];
+  }[];
+  rejected: RejectedProduct[];
+  brandSaved: boolean;
+  brandErrors: string[];
+  warnings: string[];
+}
+
+interface SwatchAnswer {
+  product: { id: string; sku: string; name: string };
+  colour: { key: string; name: string; face: string; swatchUrl: string | null };
+  status: "updated" | "unchanged";
+  behind: { projectId: string; name: string }[];
+  photoColour?: { name: string; hex: string };
+}
+
+type Answer = { exit: number } | { status: number; body: unknown };
+
+const errorOf = (body: unknown) => (body as { error?: string }).error;
 
 // One call to Kiln: its JSON answer and status, or an exit code when it did
 // not answer or refused the token.
-async function call(io, conn, path, init) {
-  let res;
+async function call(
+  io: Io,
+  conn: Connection,
+  path: string,
+  init: RequestInit & { headers: Record<string, string> },
+): Promise<Answer> {
+  let res: Response;
   try {
     res = await io.fetch(`${conn.url}${path}`, {
       ...init,
       headers: { ...init.headers, Authorization: `Bearer ${conn.token}` },
     });
   } catch (error) {
+    const e = error as Error & { cause?: { code?: string } };
     io.err(
-      `Kiln did not answer at ${conn.url} (${error.cause?.code ?? error.message}). Is it running?`,
+      `Kiln did not answer at ${conn.url} (${e.cause?.code ?? e.message}). Is it running?`,
     );
     return { exit: 3 };
   }
-  const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+  const body: unknown = await res
+    .json()
+    .catch(() => ({ error: `HTTP ${res.status}` }));
   if (res.status === 401) {
-    io.err(body.error ?? "Kiln refused the token.");
+    io.err(errorOf(body) ?? "Kiln refused the token.");
     return { exit: 3 };
   }
   return { status: res.status, body };
 }
 
-async function validate(io, engine, file, flags) {
+async function validate(io: Io, file: string, flags: Flags): Promise<number> {
   const read = await readJson(io, file);
-  if (read.error) {
+  if ("error" in read) {
     io.err(read.error);
     return 1;
   }
-  const result = check(engine, read.json);
+  const result = check(io.engine, read.json);
   if (flags.json) {
     io.out(
       JSON.stringify(
         result.ok
           ? {
-              ok:
-                result.rejected.length === 0 && result.brandErrors.length === 0,
+              ok: isClean(result),
               ready: result.ready.map((p) => ({ sku: p.sku, name: p.name })),
               rejected: result.rejected,
               brandErrors: result.brandErrors,
@@ -158,9 +249,8 @@ async function validate(io, engine, file, flags) {
     for (const e of result.errors) io.out(e);
   } else {
     for (const p of result.ready) {
-      io.out(
-        `ok        ${label(p)} · ${p.colours.length} colour${p.colours.length === 1 ? "" : "s"}`,
-      );
+      const n = p.colours.length;
+      io.out(`ok        ${label(p)} · ${n} colour${n === 1 ? "" : "s"}`);
     }
     printRejected(io.out, result.rejected);
     for (const e of result.brandErrors) io.out(`maker block not saved: ${e}`);
@@ -168,32 +258,33 @@ async function validate(io, engine, file, flags) {
       `${result.ready.length} ready, ${result.rejected.length} set aside${result.brandErrors.length > 0 ? ", maker block refused" : ""}.`,
     );
   }
-  return result.ok &&
-    result.rejected.length === 0 &&
-    result.brandErrors.length === 0
-    ? 0
-    : 1;
+  return isClean(result) ? 0 : 1;
 }
 
-async function importPackage(io, engine, file, flags) {
+async function importPackage(
+  io: Io,
+  file: string,
+  flags: Flags,
+): Promise<number> {
   const conn = connection(io);
   if (!conn) return 2;
   const read = await readJson(io, file);
-  if (read.error) {
+  if ("error" in read) {
     io.err(read.error);
     return 1;
   }
-  const checked = check(engine, read.json);
-  if (!checked.ok || checked.ready.length === 0) {
-    if (!checked.ok) for (const e of checked.errors) io.err(e);
-    else printRejected(io.err, checked.rejected);
+  const checked = check(io.engine, read.json);
+  if (!checked.ok) {
+    for (const e of checked.errors) io.err(e);
     io.err("Nothing to import: nothing was sent.");
     return 1;
   }
-  if (
-    flags.strict &&
-    (checked.rejected.length > 0 || checked.brandErrors.length > 0)
-  ) {
+  if (checked.ready.length === 0) {
+    printRejected(io.err, checked.rejected);
+    io.err("Nothing to import: nothing was sent.");
+    return 1;
+  }
+  if (flags.strict && !isClean(checked)) {
     printRejected(io.err, checked.rejected);
     for (const e of checked.brandErrors) io.err(`maker block: ${e}`);
     io.err("--strict: nothing was sent.");
@@ -204,12 +295,12 @@ async function importPackage(io, engine, file, flags) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(read.json),
   });
-  if (answer.exit) return answer.exit;
+  if ("exit" in answer) return answer.exit;
   if (answer.status !== 200) {
-    io.err(answer.body.error ?? `Kiln answered ${answer.status}.`);
+    io.err(errorOf(answer.body) ?? `Kiln answered ${answer.status}.`);
     return 1;
   }
-  const result = answer.body;
+  const result = answer.body as ImportAnswer;
   if (flags.json) {
     io.out(JSON.stringify(result, null, 2));
   } else {
@@ -225,7 +316,11 @@ async function importPackage(io, engine, file, flags) {
   return result.rejected.length > 0 || result.brandErrors.length > 0 ? 1 : 0;
 }
 
-async function swatch(io, args, flags) {
+async function swatch(
+  io: Io,
+  args: (string | undefined)[],
+  flags: Flags,
+): Promise<number> {
   const [product, colour, photo] = args;
   if (!product || !colour || (!photo && !flags.remove)) {
     io.err(USAGE);
@@ -234,9 +329,12 @@ async function swatch(io, args, flags) {
   const conn = connection(io);
   if (!conn) return 2;
   const path = `/api/products/${encodeURIComponent(product)}/colours/${encodeURIComponent(colour)}/swatch`;
-  let init = { method: "DELETE", headers: {} };
-  if (!flags.remove) {
-    const bytes = await io.readFile(photo);
+  let init: RequestInit & { headers: Record<string, string> } = {
+    method: "DELETE",
+    headers: {},
+  };
+  if (!flags.remove && photo) {
+    const bytes = await io.readBytes(photo);
     const type = io.engine.rasterType(bytes);
     if (!type) {
       io.err(
@@ -244,15 +342,19 @@ async function swatch(io, args, flags) {
       );
       return 1;
     }
-    init = { method: "POST", headers: { "Content-Type": type }, body: bytes };
+    init = {
+      method: "POST",
+      headers: { "Content-Type": type },
+      body: bytes as BodyInit,
+    };
   }
   const answer = await call(io, conn, path, init);
-  if (answer.exit) return answer.exit;
+  if ("exit" in answer) return answer.exit;
   if (answer.status !== 200) {
-    io.err(answer.body.error ?? `Kiln answered ${answer.status}.`);
+    io.err(errorOf(answer.body) ?? `Kiln answered ${answer.status}.`);
     return 1;
   }
-  const r = answer.body;
+  const r = answer.body as SwatchAnswer;
   if (flags.json) {
     io.out(JSON.stringify(r, null, 2));
     return 0;
@@ -285,8 +387,8 @@ async function swatch(io, args, flags) {
   return 0;
 }
 
-export async function run(argv, io) {
-  const flags = {
+export async function run(argv: string[], io: Io): Promise<number> {
+  const flags: Flags = {
     json: argv.includes("--json"),
     remove: argv.includes("--remove"),
     strict: argv.includes("--strict"),
@@ -295,11 +397,11 @@ export async function run(argv, io) {
   const file = args[0] ? resolve(io.cwd, args[0]) : null;
   switch (command) {
     case "validate":
-      if (!file) break;
-      return validate(io, io.engine, file, flags);
+      if (file) return validate(io, file, flags);
+      break;
     case "import":
-      if (!file) break;
-      return importPackage(io, io.engine, file, flags);
+      if (file) return importPackage(io, file, flags);
+      break;
     case "swatch":
       return swatch(
         io,
@@ -316,38 +418,4 @@ export async function run(argv, io) {
   }
   io.err(USAGE);
   return 2;
-}
-
-// The engine's package contract and image check, from its build.
-async function loadEngine() {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const dist = (name) =>
-    pathToFileURL(
-      join(here, "..", "packages", "engine", "dist", "domain", `${name}.js`),
-    ).href;
-  try {
-    return {
-      ...(await import(dist("product-package"))),
-      ...(await import(dist("image-type"))),
-    };
-  } catch {
-    console.error(
-      "The engine is not built: run `pnpm engine:build` in Kiln's folder once.",
-    );
-    process.exit(2);
-  }
-}
-
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const code = await run(process.argv.slice(2), {
-    engine: await loadEngine(),
-    // `pnpm kiln …` runs in Kiln's folder; paths are the caller's.
-    cwd: process.env.INIT_CWD ?? process.cwd(),
-    env: process.env,
-    fetch,
-    readFile,
-    out: (line) => console.log(line),
-    err: (line) => console.error(line),
-  });
-  process.exitCode = code;
 }

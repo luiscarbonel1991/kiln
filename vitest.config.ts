@@ -6,15 +6,18 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: [
-      "src/**/*.test.ts",
-      "packages/**/*.test.ts",
-      "scripts/**/*.test.ts",
-    ],
+    include: ["src/**/*.test.ts", "packages/**/*.test.ts"],
     setupFiles: ["./vitest.setup.ts"],
   },
   resolve: {
     alias: [
+      // @kiln/cli imports the engine by its package name; tests use its sources.
+      {
+        find: /^@kiln\/engine\/domain\//,
+        replacement: fileURLToPath(
+          new URL("./packages/engine/src/domain/", import.meta.url),
+        ),
+      },
       {
         find: /^@\/domain\//,
         replacement: fileURLToPath(

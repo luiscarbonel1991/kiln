@@ -19,6 +19,7 @@
       }
     ],
     "paths": {
+      "@kiln/engine/domain/*": ["./packages/engine/src/domain/*"],
       "@/domain/*": ["./packages/engine/src/domain/*"],
       "@/providers/*": ["./packages/engine/src/providers/*"],
       "@/*": ["./src/*"]

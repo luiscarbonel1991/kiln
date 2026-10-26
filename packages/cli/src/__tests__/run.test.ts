@@ -1,11 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { rasterType } from "@/domain/image-type";
+import { rasterType } from "@kiln/engine/domain/image-type";
 import {
   packageJsonSchema,
   parseProductPackage,
-} from "@/domain/product-package";
-import pkg from "@/lib/__fixtures__/product-package.json";
-import { run } from "../kiln.mjs";
+} from "@kiln/engine/domain/product-package";
+import { describe, expect, it } from "vitest";
+import { type Io, run } from "../run";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
@@ -14,10 +13,37 @@ const PNG = Buffer.from(
 
 interface Sent {
   url: string;
-  method: string;
-  headers: Record<string, string>;
+  method?: string;
+  headers?: HeadersInit;
   body?: unknown;
 }
+
+const product = (sku: string, name: string, colours: string[]) => ({
+  id: `cli:${sku}`,
+  sku,
+  name,
+  family: "Kitchen",
+  dimensions: { w: 12, h: 8, unit: "in" },
+  shape: "rectangular board",
+  material: "hardwood",
+  treatment: "engraved",
+  colours: colours.map((key) => ({
+    key,
+    name: key[0].toUpperCase() + key.slice(1),
+    face: "#C8A165",
+  })),
+  defaultColour: colours[0],
+  typography: { family: "Fraunces" },
+  source: { kind: "form" },
+});
+
+// A package the import takes: two products, one with two colours.
+const pkg = {
+  products: [
+    product("CB-01", "Cutting board", ["maple", "walnut"]),
+    product("CO-02", "Coaster", ["natural"]),
+  ],
+};
 
 // The CLI with its I/O in memory: files by absolute path, Kiln answering
 // from `answer`, what it printed and what it sent.
@@ -35,19 +61,21 @@ function cli(
   const out: string[] = [];
   const err: string[] = [];
   const sent: Sent[] = [];
-  const io = {
+  const file = (path: string) => {
+    const content = files[path];
+    if (content === undefined) throw new Error(`ENOENT: ${path}`);
+    return content;
+  };
+  const io: Io = {
     engine: { parseProductPackage, packageJsonSchema, rasterType },
     cwd: "/work",
     env,
-    out: (line: string) => out.push(line),
-    err: (line: string) => err.push(line),
-    readFile: async (path: string, encoding?: string) => {
-      const file = files[path];
-      if (file === undefined) throw new Error(`ENOENT: ${path}`);
-      return encoding ? file.toString() : Buffer.from(file);
-    },
-    fetch: async (url: string, init: Omit<Sent, "url">) => {
-      const s = { url, ...init };
+    out: (line) => out.push(line),
+    err: (line) => err.push(line),
+    readText: async (path) => file(path).toString(),
+    readBytes: async (path) => new Uint8Array(Buffer.from(file(path))),
+    fetch: async (url, init) => {
+      const s: Sent = { url, ...init };
       sent.push(s);
       const { status, body } = answer(s);
       return new Response(JSON.stringify(body), { status });

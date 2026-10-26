@@ -1,0 +1,31 @@
+{
+  "name": "@kiln/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "kiln — feed Kiln without a file picker: check a product package offline with the import's own rules, import it, and send a colour's material photo.",
+  "license": "FSL-1.1-Apache-2.0",
+  "type": "module",
+  "bin": {
+    "kiln": "./dist/kiln.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "prepublishOnly": "pnpm run clean && pnpm run build"
+  },
+  "dependencies": {
+    "@kiln/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5"
+  }
+}
