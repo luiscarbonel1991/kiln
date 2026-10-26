@@ -308,6 +308,7 @@ export function NewProjectFlow({
           {creating ? (
             <ProductEditor
               materials={[...new Set(products.map((p) => p.material))].sort()}
+              families={[...new Set(products.map((p) => p.family))].sort()}
               draftPrice={draftPrice}
               reviewPrice={reviewPrice}
               initialFile={initialDesign}

@@ -120,6 +120,22 @@ describe("editing a product", () => {
     expect(out).toMatchObject({ issues: [{ path: "unit" }] });
   });
 
+  it("edits the family; an empty one keeps the stored family, and a new product without one is General", () => {
+    expect(formFromProduct(CUTTING_BOARD).family).toBe(CUTTING_BOARD.family);
+    expect(merged(CUTTING_BOARD, { family: "Kitchen boards" }).family).toBe(
+      "Kitchen boards",
+    );
+    expect(merged(CUTTING_BOARD, { family: "  " }).family).toBe(
+      CUTTING_BOARD.family,
+    );
+    expect(formMade.family).toBe("General");
+    const named = productFromForm(
+      { ...formFromProduct(formMade), family: "Key rings" },
+      "x1",
+    );
+    expect(named.family).toBe("Key rings");
+  });
+
   it("names what it keeps that the form does not show", () => {
     expect(keptWords(PLATE_ON_BASE)).toContain("2 parts (plate, base)");
     expect(keptWords(formMade)).toEqual(["typeface Hanken Grotesk"]);

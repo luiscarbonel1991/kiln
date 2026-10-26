@@ -165,6 +165,7 @@ const STARTER_COLOUR: Colour = { name: "Natural", hex: "#D9B98C" };
 // import's checks.
 export function ProductEditor({
   materials,
+  families = [],
   draftPrice,
   reviewPrice,
   initialFile,
@@ -175,6 +176,8 @@ export function ProductEditor({
 }: {
   // The maker's materials so far, as suggestions.
   materials: string[];
+  // The maker's product families so far, as suggestions.
+  families?: string[];
   // "≈ $0.03" for "Fill from the photo" on the maker's text model.
   draftPrice: string | null;
   // "≈ $0.03" for "Review with AI" on the maker's text model.
@@ -194,6 +197,7 @@ export function ProductEditor({
   );
   const [name, setName] = useState(start?.name ?? "");
   const [whatItIs, setWhatItIs] = useState(start?.whatItIs ?? "");
+  const [family, setFamily] = useState(start?.family ?? "");
   const [width, setWidth] = useState(text(start?.width));
   const [height, setHeight] = useState(text(start?.height));
   const [unit, setUnit] = useState<Unit>(start?.unit ?? "in");
@@ -369,6 +373,7 @@ export function ProductEditor({
     return {
       name,
       whatItIs,
+      family,
       width: Number(width),
       height: Number(height),
       unit,
@@ -811,6 +816,26 @@ export function ProductEditor({
             </span>
           )}
           {note("material")}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            text="Family (optional)"
+            value={family}
+            limit={limits.family}
+          />
+          <MaterialCombobox
+            label="Family"
+            value={family}
+            onChange={setFamily}
+            options={families.filter((f) => f !== "General")}
+            field={FIELD}
+            placeholder="wall decor, kitchen, desk…"
+          />
+          {problem("family") ?? (
+            <span className="font-sans text-[0.75rem] text-on-surface-mid">
+              Kiln remembers your choices per family, like the hero's setting.
+            </span>
+          )}
         </div>
       </div>
 

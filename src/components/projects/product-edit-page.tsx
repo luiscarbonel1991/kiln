@@ -49,6 +49,7 @@ export function ProductEditPage({
   kept,
   uses,
   materials,
+  families,
   draftPrice,
   reviewPrice,
   back,
@@ -63,6 +64,7 @@ export function ProductEditPage({
   kept: string[];
   uses: Use[];
   materials: string[];
+  families: string[];
   draftPrice: string | null;
   reviewPrice: string | null;
   back: string;
@@ -138,6 +140,7 @@ export function ProductEditPage({
       ) : (
         <ProductEditor
           materials={materials}
+          families={families}
           draftPrice={draftPrice}
           reviewPrice={reviewPrice}
           editing={{ productId, form, limits }}

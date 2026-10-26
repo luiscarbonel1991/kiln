@@ -79,6 +79,7 @@ describe("reviewProductAction", () => {
   it("uses a saved product's own limits when editing", async () => {
     getProduct.mockResolvedValueOnce({
       name: "x".repeat(120),
+      family: "Key rings",
       shape: "keychain",
       material: "birch",
       colours: [{ key: "n", name: "Natural", face: "#D9B98C", inStock: true }],

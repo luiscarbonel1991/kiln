@@ -57,6 +57,7 @@ export type ProductFile = z.infer<typeof ProductFile>;
 export interface FormLimits {
   name: number;
   whatItIs: number;
+  family: number;
   material: number;
   colourName: number;
   label: number;
@@ -67,6 +68,7 @@ export interface FormLimits {
 export const FORM_LIMITS: FormLimits = {
   name: 80,
   whatItIs: 60,
+  family: 40,
   material: 60,
   colourName: 40,
   label: 40,
@@ -83,6 +85,9 @@ export function productFormSchema(limits: FormLimits = FORM_LIMITS) {
         .trim()
         .min(1, "Say what it is, like “round coaster”.")
         .max(limits.whatItIs),
+      // The product's family ("Wall decor", "Kitchen"): Kiln remembers choices
+      // per family, like the hero's setting. Empty reads as "General".
+      family: z.string().trim().max(limits.family).default(""),
       width: z.number().positive("Give its width."),
       height: z.number().positive("Give its height."),
       unit: Unit,
@@ -273,7 +278,7 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
     id: sku,
     sku,
     name: form.name,
-    family: "General",
+    family: form.family || "General",
     dimensions: {
       w: form.width,
       h: form.height,
@@ -338,6 +343,7 @@ export function editLimits(product: Product): FormLimits {
   return {
     name: Math.max(FORM_LIMITS.name, product.name.length),
     whatItIs: Math.max(FORM_LIMITS.whatItIs, product.shape.length),
+    family: Math.max(FORM_LIMITS.family, product.family.length),
     material: Math.max(FORM_LIMITS.material, product.material.length),
     colourName: Math.max(
       FORM_LIMITS.colourName,
@@ -378,6 +384,7 @@ export function formFromProduct(product: Product): ProductForm {
   return {
     name: product.name,
     whatItIs: product.shape,
+    family: product.family,
     width: d.w,
     height: d.h,
     unit: d.unit,
@@ -422,7 +429,7 @@ function freshKey(name: string, taken: Set<string>): string {
 
 // The form laid over the stored product: what the form shows is replaced
 // (an optional field left empty is removed), everything else is kept as it
-// was — the sku (even when renamed), family, typography, parts, icons,
+// was — the sku (even when renamed), typography, parts, icons,
 // variants, things to avoid, and each kept colour's edge, inlay and stock.
 // Opening and saving without a change gives the same product.
 export function mergeForm(
@@ -490,6 +497,7 @@ export function mergeForm(
     product: Product.parse({
       ...base,
       name: form.name,
+      family: form.family || stored.family,
       shape: form.whatItIs,
       material: form.material,
       treatment: form.treatment,
@@ -536,7 +544,6 @@ export function keptWords(product: Product): string[] {
       ? [`${product.forbidden.length} things to avoid`]
       : []),
     ...(extras ? ["each colour's edge and inlay"] : []),
-    ...(product.family !== "General" ? [`family “${product.family}”`] : []),
     `typeface ${product.typography.family}`,
   ];
 }
