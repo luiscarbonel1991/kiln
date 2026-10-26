@@ -345,7 +345,7 @@ async function swatch(
     init = {
       method: "POST",
       headers: { "Content-Type": type },
-      body: bytes as BodyInit,
+      body: bytes as RequestInit["body"],
     };
   }
   const answer = await call(io, conn, path, init);
