@@ -89,7 +89,8 @@ imports a catalog:
   vectorize), then "Make it a product".
 - **Import a catalog (.json)** takes a product package exported from your own system,
   as a file or pasted in ("Paste JSON": an assistant or a browser automation can type,
-  not attach). Start from `public/templates/product-package.json` ("Download the
+  not attach), or over HTTP from a script or another system (see "HTTP API and the
+  `kiln` CLI"). Start from `public/templates/product-package.json` ("Download the
   template"). Every field and limit is in the JSON Schema served at
   `/templates/product-package.schema.json`, generated from the engine's schema; the
   model is in `docs/app-idea/PRODUCT-MODEL.md`.
@@ -120,8 +121,8 @@ imports a catalog:
   takes (its limit, its options, a change). Nothing is saved until Save; a failed review
   offers the other provider with its price.
 
-Each colour can carry a **material sample** (`swatchUrl`, or "Material photo" on the
-form). It is a close photo of the material in that colour, with even light and no text;
+Each colour can carry a **material sample** (`swatchUrl`, "Material photo" on the
+form, or `kiln swatch` over HTTP). It is a close photo of the material in that colour, with even light and no text;
 a real photo carries the grain better than a drawn texture. Every scene sends the
 default colour's sample as the image after the product's reference, and the prompt
 says the surfaces take its material, colour and grain. On gpt-image-2 that adds about
@@ -162,6 +163,67 @@ adds Colour options, lines removed take How to personalize with them, and scenes
 approvals, knobs and the order stay. The banner says what it will do before the click
 ("Etsy: adds Colour options.") and names a delivered destination whose photos
 renumber. The board's title renames in place.
+
+## HTTP API and the `kiln` CLI
+
+Packages and material photos can reach Kiln without a file picker: from a script, an
+agent, a scheduled job or another system (an ERP, a shop's export).
+
+**A token.** Settings → Access tokens: name it after what will use it, then Make a
+token. Copy it at once: Kiln keeps only its SHA-256 and cannot show it again. A token
+acts as this studio; make one per system, so each can be revoked on its own. Every
+call sends `Authorization: Bearer kiln_pat_…`. Kiln itself has no sign-in yet, so run
+it where only you can reach it; the token is what lets the API be called from
+elsewhere.
+
+**The routes.** Answers are JSON; a refusal is `{ "error": "…" }`, in words.
+
+| Call | Body | Answer |
+|---|---|---|
+| `POST /api/import` | the product package (JSON, at most 32 MB) | each product's Kiln `id`, `sku`, `status` (new, updated, unchanged), what `changed` and its colour keys; `rejected` with the page's reasons; `warnings`. 400 not JSON, 413 too large, 422 nothing reads as a package |
+| `POST /api/products/:id/colours/:key/swatch` | a PNG, JPEG or WebP (at most 15 MB), as the body or a multipart `file` | the colour with its stored `swatchUrl`, `status`, `changed`, the projects now `behind`, and `photoColour` (a suggestion: the swatch hex stays yours). 404 unknown product or colour, 409 a catalog connector's product, 415 not a photo |
+| `DELETE /api/products/:id/colours/:key/swatch` | none | the same, with `swatchUrl: null` |
+
+- `:id` is the product's Kiln id or its SKU. A photo is read from its bytes, not its
+  name, and stored by them: the same photo sent twice changes nothing.
+- The import is the page's own (`src/server/product-import.ts`), product by product. A
+  package with a product set aside still answers 200: read `rejected`.
+- A re-import keeps a colour's material photo when the package gives none, and says so
+  ("kept the material photo of Maple"). Remove one on the product page or with DELETE.
+- There is no import from a URL: the caller sends the bytes (a server that fetches any
+  address it is given is an SSRF hole).
+
+```bash
+curl -X POST "$KILN_URL/api/import" -H "Authorization: Bearer $KILN_TOKEN" \
+  -H "Content-Type: application/json" --data-binary @package.json
+curl -X POST "$KILN_URL/api/products/CB-01/colours/maple/swatch" \
+  -H "Authorization: Bearer $KILN_TOKEN" -H "Content-Type: image/jpeg" --data-binary @maple.jpg
+```
+
+**The CLI** (`packages/cli`, `@kiln/cli`, bin `kiln`; run `pnpm cli:build` once,
+which builds the engine and then the CLI, since it uses the engine's own checks):
+
+```bash
+pnpm kiln validate package.json          # the import's checks, offline
+pnpm kiln import package.json            # check, then POST /api/import
+pnpm kiln swatch CB-01 maple maple.jpg   # a colour's material photo
+pnpm kiln swatch CB-01 maple --remove
+pnpm kiln schema                         # the package's JSON Schema
+```
+
+- `validate` needs no running Kiln. An exporter can run it at build time and fail with
+  the words the import would use ("colours › oak › inlayName: at most 40 characters
+  (this one has 52)"), plus what the schema cannot say: an inline photo or sample that
+  is not a PNG, JPEG or WebP.
+- `import` and `swatch` read `KILN_URL` (where Kiln runs) and `KILN_TOKEN` from the
+  environment (`node --env-file=kiln.env packages/cli/dist/kiln.js …` works too). `import`
+  sends nothing when no product passes; `--strict` sends nothing when one does not.
+  `--json` prints Kiln's answer for scripts and agents.
+- Exit codes: 0 done, 1 something set aside or refused, 2 usage, 3 Kiln did not answer
+  or refused the token.
+- From another folder: `node /path/to/kiln/packages/cli/dist/kiln.js validate
+  package.json` (paths are the caller's, under `pnpm kiln` too). The package is meant
+  for npm later, so an exporter in any repository can add it as a dev dependency.
 
 ## Models and providers
 
