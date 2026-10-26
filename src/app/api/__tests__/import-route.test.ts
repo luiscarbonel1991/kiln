@@ -186,6 +186,29 @@ describe("POST /api/products/:id/colours/:key/swatch", () => {
     expect(swatch.calls).toEqual([{ ref: "p1", key: "oak", photo: null }]);
   });
 
+  it("a 15 MB photo fits in a multipart form; a larger one is refused", async () => {
+    const photoOfSize = (bytes: number) => {
+      const photo = Buffer.alloc(bytes);
+      PNG.copy(photo);
+      const form = new FormData();
+      form.set("file", new File([photo], "oak.png", { type: "image/png" }));
+      return swatchRoute.POST(
+        new Request("http://kiln.test/api/products/p1/colours/oak/swatch", {
+          method: "POST",
+          headers: authed(),
+          body: form,
+        }),
+        ctx("p1", "oak"),
+      );
+    };
+    swatch.calls.length = 0;
+    const atCap = await photoOfSize(15 * 1024 * 1024);
+    expect(atCap.status).toBe(200);
+    expect(swatch.calls[0].photo?.length).toBe(15 * 1024 * 1024);
+    const over = await photoOfSize(15 * 1024 * 1024 + 1);
+    expect(over.status).toBe(413);
+  });
+
   it("refuses without a token, and over 15 MB", async () => {
     auth.ok = false;
     const denied = await swatchRoute.DELETE(

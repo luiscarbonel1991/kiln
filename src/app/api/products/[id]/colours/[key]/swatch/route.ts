@@ -10,13 +10,21 @@ import { setColourSwatch } from "@/server/product-swatch";
 
 type Context = { params: Promise<{ id: string; key: string }> };
 
+// A multipart form carries the photo plus its boundaries and headers: the
+// body may pass the photo's cap by this much, and the photo itself is held to
+// the cap once read.
+const FORM_ENVELOPE_BYTES = 1024 * 1024;
+
+const isForm = (request: Request) =>
+  (request.headers.get("content-type") ?? "").startsWith("multipart/form-data");
+
 // A photo from a multipart form's `file` field, or the body itself.
 async function photoOf(
   request: Request,
   body: Uint8Array,
 ): Promise<Uint8Array | null> {
+  if (!isForm(request)) return body;
   const type = request.headers.get("content-type") ?? "";
-  if (!type.startsWith("multipart/form-data")) return body;
   try {
     const form = await new Response(Buffer.from(body), {
       headers: { "content-type": type },
@@ -41,14 +49,18 @@ export async function POST(request: Request, { params }: Context) {
   const denied = await authorize(request);
   if (denied) return denied;
   const { id, key } = await params;
-  const body = await readBody(request, MAX_UPLOAD_BYTES);
-  if (!body) {
-    return apiError(
+  const tooLarge = () =>
+    apiError(
       413,
       `A material photo is at most ${megabytes(MAX_UPLOAD_BYTES)}.`,
     );
-  }
+  const body = await readBody(
+    request,
+    MAX_UPLOAD_BYTES + (isForm(request) ? FORM_ENVELOPE_BYTES : 0),
+  );
+  if (!body) return tooLarge();
   const photo = await photoOf(request, body);
+  if (photo && photo.length > MAX_UPLOAD_BYTES) return tooLarge();
   if (!photo || photo.length === 0) {
     return apiError(
       400,
