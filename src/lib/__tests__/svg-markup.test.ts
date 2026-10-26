@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import { exactView } from "@/domain/exact";
-import type { ExactKind } from "@/domain/shot-list";
 import { parseProductPackage } from "@/domain/product-package";
+import type { ExactKind } from "@/domain/shot-list";
 import { escapeMarkup, toSvgMarkup } from "@/lib/svg-markup";
 import pkg from "../__fixtures__/product-package.json";
 

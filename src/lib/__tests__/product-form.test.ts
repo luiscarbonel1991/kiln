@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parseProductPackage } from "@/domain/product-package";
 import {
   colourName,
   ProductForm,
@@ -8,7 +9,6 @@ import {
   skuFor,
   svgColours,
 } from "@/lib/product-form";
-import { parseProductPackage } from "@/domain/product-package";
 
 const form: ProductForm = {
   name: "Botanical round coaster",

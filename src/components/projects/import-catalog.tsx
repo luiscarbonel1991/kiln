@@ -4,8 +4,8 @@ import { ClipboardPaste, Download, FileUp, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ImportResult } from "@/app/actions/products";
 import { Button } from "@/components/ui/button";
-import { plural } from "@/lib/plural";
 import { productLabel } from "@/domain/product-package";
+import { plural } from "@/lib/plural";
 
 export type ImportOutcome = ImportResult | { error: string };
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import pkg from "@/lib/__fixtures__/product-package.json";
 import { parseProductPackage } from "@/domain/product-package";
+import pkg from "@/lib/__fixtures__/product-package.json";
 import { productDrift, productHash } from "@/server/product-version";
 
 const parsed = parseProductPackage(pkg);

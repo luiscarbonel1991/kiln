@@ -14,6 +14,11 @@ import {
 } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
 import {
+  parseProductPackage,
+  productLabel,
+  type RejectedProduct,
+} from "@/domain/product-package";
+import {
   editLimits,
   FORM_LIMITS,
   type FormIssue,
@@ -22,11 +27,6 @@ import {
   ProductForm,
   productFromForm,
 } from "@/lib/product-form";
-import {
-  parseProductPackage,
-  productLabel,
-  type RejectedProduct,
-} from "@/domain/product-package";
 import {
   type CleanReview,
   cleanReview,

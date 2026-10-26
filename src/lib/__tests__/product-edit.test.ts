@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CUTTING_BOARD } from "@/domain/__tests__/fixtures/cutting-board";
 import { PLATE_ON_BASE } from "@/domain/__tests__/fixtures/plate-on-base";
 import { Product } from "@/domain/product";
+import { parseProductPackage } from "@/domain/product-package";
 import { canonicalJson } from "@/lib/product-diff";
 import {
   editLimits,
@@ -10,7 +11,6 @@ import {
   mergeForm,
   productFromForm,
 } from "@/lib/product-form";
-import { parseProductPackage } from "@/domain/product-package";
 import pkg from "../__fixtures__/product-package.json";
 
 const parsed = parseProductPackage(pkg);
