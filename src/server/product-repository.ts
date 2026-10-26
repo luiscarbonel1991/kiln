@@ -40,6 +40,23 @@ export async function getProduct(id: string): Promise<Product | null> {
   return row ? rowToProduct(row) : null;
 }
 
+// A product by Kiln's id or, failing that, by its sku: what an API caller
+// knows of it.
+export async function findProduct(ref: string): Promise<Product | null> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  const row =
+    (await db.product.findFirst({
+      where: { id: ref, makerId: maker.id },
+      select: SELECT,
+    })) ??
+    (await db.product.findFirst({
+      where: { sku: ref, makerId: maker.id },
+      select: SELECT,
+    }));
+  return row ? rowToProduct(row) : null;
+}
+
 // Insert or update by [makerId, sku], so re-importing a package keeps each
 // product's id (and every project that uses it). All or nothing.
 export async function upsertProducts(products: Product[]): Promise<Product[]> {
