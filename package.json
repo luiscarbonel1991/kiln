@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:mock": "KILN_PROVIDERS=mock KILN_MOCK_DELAY_MS=4000 next dev",
+    "dev": "next dev -H 127.0.0.1",
+    "dev:mock": "KILN_PROVIDERS=mock KILN_MOCK_DELAY_MS=4000 next dev -H 127.0.0.1",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 127.0.0.1",
     "lint": "biome check",
     "format": "biome format --write",
     "test": "vitest run",

@@ -172,9 +172,11 @@ agent, a scheduled job or another system (an ERP, a shop's export).
 **A token.** Settings → Access tokens: name it after what will use it, then Make a
 token. Copy it at once: Kiln keeps only its SHA-256 and cannot show it again. A token
 acts as this studio; make one per system, so each can be revoked on its own. Every
-call sends `Authorization: Bearer kiln_pat_…`. Kiln itself has no sign-in yet, so run
-it where only you can reach it; the token is what lets the API be called from
-elsewhere.
+call sends `Authorization: Bearer kiln_pat_…`. Kiln itself has no sign-in yet, so
+`pnpm dev`, `pnpm dev:mock` and `pnpm start` listen on 127.0.0.1 only: anyone who can
+open Kiln can open Settings and make a token. To reach it from another machine, put it
+behind your own sign-in (a VPN, a reverse proxy with authentication) and start it with
+`-H 0.0.0.0` there.
 
 **The routes.** Answers are JSON; a refusal is `{ "error": "…" }`, in words.
 
