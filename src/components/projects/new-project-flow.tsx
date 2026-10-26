@@ -2,15 +2,22 @@
 
 import { ArrowRight, Eye, EyeOff, Loader2, PenLine, Plus } from "lucide-react";
 import Link from "next/link";
+import { ToggleGroup } from "radix-ui";
 import { useMemo, useState, useTransition } from "react";
 import { createProjectAction } from "@/app/actions/new-project";
 import { importProductsAction } from "@/app/actions/products";
+import { BeforeAfter } from "@/components/projects/before-after";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import {
   ImportCatalogCard,
   type ImportOutcome,
   ImportResultPanel,
 } from "@/components/projects/import-catalog";
+import {
+  LiveListingStep,
+  type LiveRow,
+} from "@/components/projects/live-listing-step";
+import { PhotoArt } from "@/components/projects/photo-art";
 import { ProductEditor } from "@/components/projects/product-editor";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
@@ -31,7 +38,9 @@ import { defaultImageModel, type MakerModels } from "@/domain/model-defaults";
 import {
   offeredDestinations,
   type ProjectPlan,
+  planFromListing,
   planProject,
+  replacementFrames,
   slotCardId,
 } from "@/domain/plan";
 import { buyerSizeLabel, type Product, productImages } from "@/domain/product";
@@ -94,6 +103,11 @@ export function NewProjectFlow({
       (initialProducts.length === 1 ? initialProducts[0].id : null),
   );
   const [type, setType] = useState<BoardType | null>(null);
+  // A Listing kit starts from the product, or from a listing already selling
+  // (its address and its photos, some to replace).
+  const [startFrom, setStartFrom] = useState<"product" | "live">("product");
+  const [listingUrl, setListingUrl] = useState("");
+  const [liveRows, setLiveRows] = useState<LiveRow[]>([]);
   const [destinationIds, setDestinationIds] = useState<string[]>([]);
   // Slot card ids ("etsy.gift") the maker switched off for this product.
   const [offSlots, setOffSlots] = useState<string[]>([]);
@@ -108,15 +122,48 @@ export function NewProjectFlow({
 
   const product = products.find((p) => p.id === productId) ?? null;
   const offered = type ? offeredDestinations(type, CATALOG) : [];
+  const live = type === "listing-kit" && startFrom === "live";
+  const frames =
+    live && product && destinationIds[0]
+      ? replacementFrames(product, destinationIds[0], CATALOG).map((f) => ({
+          key: f.key,
+          label: f.label,
+        }))
+      : [];
 
-  const plan = useMemo<ProjectPlan | null>(() => {
-    if (!product || !type || destinationIds.length === 0) return null;
-    try {
-      return planProject({ product, type, destinationIds, catalog: CATALOG });
-    } catch {
-      return null;
+  // The plan, or why there is none yet (a live listing's photos to mark).
+  const { plan, planError } = useMemo<{
+    plan: ProjectPlan | null;
+    planError: string | null;
+  }>(() => {
+    if (!product || !type || destinationIds.length === 0) {
+      return { plan: null, planError: null };
     }
-  }, [product, type, destinationIds]);
+    try {
+      if (live) {
+        if (liveRows.length === 0) return { plan: null, planError: null };
+        return {
+          plan: planFromListing({
+            product,
+            destinationId: destinationIds[0],
+            catalog: CATALOG,
+            photos: liveRows.map(({ url, aspect, replaceWith }) => ({
+              url,
+              aspect,
+              ...(replaceWith ? { replaceWith } : {}),
+            })),
+          }),
+          planError: null,
+        };
+      }
+      return {
+        plan: planProject({ product, type, destinationIds, catalog: CATALOG }),
+        planError: null,
+      };
+    } catch (error) {
+      return { plan: null, planError: (error as Error).message };
+    }
+  }, [product, type, destinationIds, live, liveRows]);
 
   const planned =
     plan?.destinations.flatMap((d) =>
@@ -128,6 +175,8 @@ export function NewProjectFlow({
   const off = planned.filter((p) => offSlots.includes(p.id)).map((p) => p.id);
   const slots = planned.filter((p) => !off.includes(p.id)).map((p) => p.slot);
   const scenes = slots.filter((s) => s.fill === "scene");
+  const kept = slots.filter((s) => s.fill === "photo").length;
+  const exact = slots.filter((s) => s.fill === "exact").length;
   const model = defaultImageModel(makerModels);
   // Each scene reads the sample and the views beside the reference.
   const estimate = estimateScenes(
@@ -144,10 +193,27 @@ export function NewProjectFlow({
 
   function chooseType(next: BoardType) {
     setType(next);
-    setDestinationIds(offeredDestinations(next, CATALOG).map((d) => d.id));
+    if (next !== "listing-kit") setStartFrom("product");
+    const ids = offeredDestinations(next, CATALOG).map((d) => d.id);
+    setDestinationIds(
+      next === "listing-kit" && startFrom === "live" ? ids.slice(0, 1) : ids,
+    );
+  }
+
+  // A live listing is on one destination: its first offered one to start.
+  function chooseStart(next: "product" | "live") {
+    setStartFrom(next);
+    setOffSlots([]);
+    const ids = offeredDestinations("listing-kit", CATALOG).map((d) => d.id);
+    setDestinationIds(next === "live" ? ids.slice(0, 1) : ids);
   }
 
   function toggleDestination(id: string) {
+    if (live) {
+      setDestinationIds([id]);
+      setLiveRows((rows) => rows.map(({ replaceWith: _r, ...row }) => row));
+      return;
+    }
     setDestinationIds((ids) =>
       ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
     );
@@ -196,6 +262,18 @@ export function NewProjectFlow({
         type,
         destinationIds,
         offSlots: off,
+        ...(live
+          ? {
+              live: {
+                ...(listingUrl.trim() ? { listingUrl: listingUrl.trim() } : {}),
+                photos: liveRows.map(({ url, aspect, replaceWith }) => ({
+                  url,
+                  aspect,
+                  ...(replaceWith ? { replaceWith } : {}),
+                })),
+              },
+            }
+          : {}),
       });
       if (result?.error) setStartError(result.error);
     });
@@ -358,6 +436,48 @@ export function NewProjectFlow({
             ),
           )}
         </div>
+        {type === "listing-kit" ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-sans text-[0.59375rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
+              Start from
+            </span>
+            <ToggleGroup.Root
+              type="single"
+              aria-label="Start the listing kit from"
+              value={startFrom}
+              onValueChange={(next) => {
+                if (next) chooseStart(next as "product" | "live");
+              }}
+              className="flex gap-1 rounded-field bg-secondary p-1"
+            >
+              {(
+                [
+                  ["product", "The product"],
+                  ["live", "A live listing"],
+                ] as const
+              ).map(([value, label]) => (
+                <ToggleGroup.Item
+                  key={value}
+                  value={value}
+                  data-testid={`start-from-${value}`}
+                  className={cn(
+                    "h-8 rounded-[9px] px-3 font-sans text-[0.8rem] transition-colors",
+                    startFrom === value
+                      ? "bg-primary text-primary-foreground"
+                      : "text-on-surface-mid hover:bg-surface-soft",
+                  )}
+                >
+                  {label}
+                </ToggleGroup.Item>
+              ))}
+            </ToggleGroup.Root>
+            <span className="font-sans text-[0.75rem] text-on-surface-mid">
+              {startFrom === "live"
+                ? "Refresh a listing already selling: keep its photos and replace the ones that need it."
+                : "Every frame planned from the product's spec."}
+            </span>
+          </div>
+        ) : null}
       </Step>
 
       {/* 3 · Destinations */}
@@ -392,10 +512,33 @@ export function NewProjectFlow({
             Pick a type first.
           </p>
         )}
+        {live ? (
+          <p className="font-sans text-[0.75rem] text-on-surface-mid">
+            A live listing is on one destination.
+          </p>
+        ) : null}
       </Step>
 
-      {/* 4 · Plan */}
-      <Step n={4} title="Plan" muted={!plan}>
+      {live ? (
+        <Step n={4} title="Live listing" muted={destinationIds.length === 0}>
+          {product && destinationIds[0] ? (
+            <LiveListingStep
+              frames={frames}
+              url={listingUrl}
+              onUrl={setListingUrl}
+              rows={liveRows}
+              onRows={setLiveRows}
+            />
+          ) : (
+            <p className="font-sans text-sm text-on-surface-dim">
+              Pick a destination first.
+            </p>
+          )}
+        </Step>
+      ) : null}
+
+      {/* Plan */}
+      <Step n={live ? 5 : 4} title="Plan" muted={!plan}>
         {plan && product ? (
           <div className="flex flex-col gap-6">
             {plan.destinations.map((d) => {
@@ -443,7 +586,9 @@ export function NewProjectFlow({
                               ? "off"
                               : slot.fill === "exact"
                                 ? "exact"
-                                : "queued",
+                                : slot.fill === "photo"
+                                  ? "kept"
+                                  : "queued",
                             failed: false,
                           }}
                           actions={
@@ -457,31 +602,40 @@ export function NewProjectFlow({
                             </Button>
                           }
                         >
-                          {slot.exact ? (
-                            <ExactSlotArt
-                              view={exactView(
-                                slot.exact,
-                                product,
-                                slot.textTemplate,
-                                brand,
-                              )}
-                              aspect={slot.aspect}
-                              plate={plateHref(product)}
-                            />
-                          ) : (
-                            <SceneArt
-                              seed={`${d.destinationId}.${slot.key}`}
-                              text={
-                                slot.textTemplate
-                                  ? renderTextTemplate(
-                                      slot.textTemplate,
-                                      product,
-                                    )
-                                  : undefined
-                              }
-                              band={textLayerColours(brand)}
-                              badge="scene"
-                            />
+                          {withBefore(
+                            slot.before,
+                            id,
+                            slot.fill === "photo" && slot.photo ? (
+                              <PhotoArt
+                                url={slot.photo}
+                                alt={`${slotPosition(destination, place)} now`}
+                              />
+                            ) : slot.exact ? (
+                              <ExactSlotArt
+                                view={exactView(
+                                  slot.exact,
+                                  product,
+                                  slot.textTemplate,
+                                  brand,
+                                )}
+                                aspect={slot.aspect}
+                                plate={plateHref(product)}
+                              />
+                            ) : (
+                              <SceneArt
+                                seed={`${d.destinationId}.${slot.key}`}
+                                text={
+                                  slot.textTemplate
+                                    ? renderTextTemplate(
+                                        slot.textTemplate,
+                                        product,
+                                      )
+                                    : undefined
+                                }
+                                band={textLayerColours(brand)}
+                                badge="scene"
+                              />
+                            ),
                           )}
                         </SlotFrame>
                       );
@@ -494,11 +648,24 @@ export function NewProjectFlow({
             <div className="flex flex-col gap-4 rounded-card bg-card p-6 shadow-card sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-1.5">
                 <p className="font-sans text-sm text-foreground">
-                  <strong>
-                    {slots.length - scenes.length} of {slots.length}
-                  </strong>{" "}
-                  {slots.length === 1 ? "frame is" : "frames are"} exact — drawn
-                  from the spec, free and final.{" "}
+                  {live ? (
+                    <>
+                      <strong>{plural(kept, "photo")}</strong>{" "}
+                      {kept === 1 ? "stays" : "stay"} as{" "}
+                      {kept === 1 ? "it is" : "they are"}.{" "}
+                      {plural(exact, "exact frame")} — drawn from the spec, free
+                      and final —{" "}
+                    </>
+                  ) : (
+                    <>
+                      <strong>
+                        {exact} of {slots.length}
+                      </strong>{" "}
+                      {slots.length === 1 ? "frame is" : "frames are"} exact —
+                      drawn from the spec, free and final.{" "}
+                    </>
+                  )}
+                  {live ? "and " : ""}
                   {plural(scenes.length, "scene")}{" "}
                   {scenes.length === 1 ? "needs" : "need"} the image model.
                   {off.length > 0
@@ -532,12 +699,30 @@ export function NewProjectFlow({
           </div>
         ) : (
           <p className="font-sans text-sm text-on-surface-dim">
-            The plan appears once a product, a type and a destination are
-            chosen.
+            {planError
+              ? `${planError[0].toUpperCase()}${planError.slice(1)}.`
+              : live
+                ? "The plan appears once the listing's photos are here and one is marked to replace."
+                : "The plan appears once a product, a type and a destination are chosen."}
           </p>
         )}
       </Step>
     </main>
+  );
+}
+
+// A frame that replaces a live photo carries the photo, a click away.
+function withBefore(
+  before: { url: string; aspect: string } | undefined,
+  id: string,
+  art: React.ReactNode,
+) {
+  return before ? (
+    <BeforeAfter before={before} testId={`before-${id}`}>
+      {art}
+    </BeforeAfter>
+  ) : (
+    art
   );
 }
 
