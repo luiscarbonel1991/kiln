@@ -185,6 +185,61 @@ describe("a slot's knobs", () => {
   });
 });
 
+describe("the hero's setting", () => {
+  const cues = productSceneCues(CUTTING_BOARD);
+  const hero = (setting: "any" | "sweep" | "place") => ({
+    label: "Hero",
+    purpose: "Win the click.",
+    composition: "the product centered",
+    knobs: { setting, distance: "close" as const },
+  });
+  const inUse = {
+    label: "In use",
+    purpose: "Show it used.",
+    scene: "in use at {use}",
+  };
+  const places = ["beside a front door", "a kitchen counter"];
+
+  it("a plain backdrop reads as the seamless sweep the hero always had", () => {
+    const [v] = sceneVariants([hero("sweep")], {}, understanding, places, cues);
+    expect(v.scene).toBe(
+      "a clean seamless sweep in a soft neutral tone, no props",
+    );
+    expect(v.composition).toBe(
+      "the product centered, framed close, filling most of the frame",
+    );
+  });
+
+  it("in its place, it stands at the first place of use, true to size, and leaves that place to in-use too", () => {
+    const [h, u] = sceneVariants(
+      [hero("place"), inUse],
+      {},
+      understanding,
+      places,
+      cues,
+    );
+    expect(h.scene).toBe(
+      "in its place (beside a front door), set or mounted as it is used, no props beyond the place itself",
+    );
+    expect(h.composition).toContain("the product true to its real size");
+    expect(h.composition).toContain("everything around it plain and unbranded");
+    expect(u.scene).toBe("in use at beside a front door");
+  });
+
+  it("'any' leaves the scene to the defaults and the purpose; without places, a generic place", () => {
+    const [v] = sceneVariants(
+      [hero("any")],
+      { scene: "soft neutral sweep" },
+      understanding,
+      [],
+      cues,
+    );
+    expect(v.scene).toBe("soft neutral sweep — win the click");
+    const [p] = sceneVariants([hero("place")], {}, understanding, [], cues);
+    expect(p.scene).toContain(GENERIC_USE);
+  });
+});
+
 describe("inSentence", () => {
   it("lowers only the first letter and drops the final period", () => {
     expect(inSentence("Show it on Etsy.")).toBe("show it on Etsy");

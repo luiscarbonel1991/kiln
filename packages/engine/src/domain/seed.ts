@@ -112,11 +112,12 @@ export const SEED_SHOT_LISTS: ShotList[] = [
       {
         key: "hero",
         label: "Marketplace hero",
-        purpose: "Win the click: clean seamless background, no props.",
+        purpose:
+          "Win the click: the product clear at a glance, on a plain backdrop or in its place.",
         aspect: "1:1",
-        scene: "a clean seamless sweep in a soft neutral tone, no props",
         composition: "the product centered at a slight three-quarter angle",
         knobs: {
+          setting: "sweep",
           camera: "any",
           distance: "close",
           light: "studio",

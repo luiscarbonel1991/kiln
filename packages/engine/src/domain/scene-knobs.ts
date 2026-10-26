@@ -6,6 +6,7 @@ import { z } from "zod";
 // model. A slot offers the knobs it names, with its default stops.
 
 export const KnobKey = z.enum([
+  "setting",
   "camera",
   "distance",
   "light",
@@ -14,6 +15,10 @@ export const KnobKey = z.enum([
 ]);
 export type KnobKey = z.infer<typeof KnobKey>;
 
+// A marketplace hero's setting (ROADMAP P0-3, DOGFOOD #63): a plain backdrop,
+// or the product in its place of use, as page-1 heroes show what is mounted
+// where it is used. It replaces the slot's scene instead of adding to it.
+export const SettingStop = z.enum(["any", "sweep", "place"]);
 export const CameraStop = z.enum(["any", "eye", "above", "overhead"]);
 export const DistanceStop = z.enum(["any", "close", "medium", "wide"]);
 export const LightStop = z.enum(["any", "window", "studio", "warm"]);
@@ -21,6 +26,7 @@ export const ShadowStop = z.enum(["any", "faint", "soft", "strong"]);
 export const PropsStop = z.enum(["any", "none", "few", "styled"]);
 
 const STOPS = {
+  setting: SettingStop,
   camera: CameraStop,
   distance: DistanceStop,
   light: LightStop,
@@ -55,6 +61,26 @@ export const KNOBS: {
     stops: Record<KnobStop<K>, Stop>;
   };
 } = {
+  setting: {
+    label: "Setting",
+    field: "scene",
+    stops: {
+      any: ANY,
+      sweep: {
+        label: "Plain backdrop",
+        hint: "A clean seamless sweep, nothing else",
+        short: "plain backdrop",
+        text: "a clean seamless sweep in a soft neutral tone, no props",
+      },
+      place: {
+        label: "In its place",
+        hint: "Where it is used, as the buyer will see it",
+        short: "in its place",
+        // {use} is the product's first place of use.
+        text: "in its place ({use}), set or mounted as it is used, no props beyond the place itself",
+      },
+    },
+  },
   camera: {
     label: "Camera",
     field: "composition",
@@ -190,6 +216,7 @@ export function knobStops<K extends KnobKey>(knob: K): KnobStop<K>[] {
 // The stops a slot writes (its defaults, in the seed): a typo fails.
 export const SceneKnobs = z
   .object({
+    setting: SettingStop.optional(),
     camera: CameraStop.optional(),
     distance: DistanceStop.optional(),
     light: LightStop.optional(),
@@ -202,6 +229,7 @@ export type SceneKnobs = z.infer<typeof SceneKnobs>;
 // The stops a plan keeps: a stop a later version drops reads as unset, so a
 // saved plan never stops parsing.
 export const SavedKnobs = z.object({
+  setting: SettingStop.optional().catch(undefined),
   camera: CameraStop.optional().catch(undefined),
   distance: DistanceStop.optional().catch(undefined),
   light: LightStop.optional().catch(undefined),
@@ -211,6 +239,7 @@ export const SavedKnobs = z.object({
 
 // One knob set by the maker; null returns it to the slot's default.
 export const KnobChoice = z.discriminatedUnion("knob", [
+  z.object({ knob: z.literal("setting"), stop: SettingStop.nullable() }),
   z.object({ knob: z.literal("camera"), stop: CameraStop.nullable() }),
   z.object({ knob: z.literal("distance"), stop: DistanceStop.nullable() }),
   z.object({ knob: z.literal("light"), stop: LightStop.nullable() }),

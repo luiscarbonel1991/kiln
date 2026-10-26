@@ -209,12 +209,24 @@ export function sceneVariants(
     parts.filter(Boolean).join(", ");
   return slots.map((slot) => {
     const knob = knobText(slot.knobs ?? {});
-    const where = slot.scene?.includes(USE) ? place() : null;
-    const scene = slot.scene
-      ? where
-        ? slot.scene.replaceAll(USE, where)
-        : slot.scene
-      : `${baseScene} — ${inSentence(slot.purpose)}`;
+    // A setting (the hero's backdrop or its place) replaces the slot's scene.
+    // In its place it stands at the first place of use, which it does not take
+    // from the slots that follow: in-use keeps the most typical place too.
+    const setting = knob.setting;
+    const where = setting
+      ? setting.includes(USE)
+        ? (places[0] ?? GENERIC_USE)
+        : null
+      : slot.scene?.includes(USE)
+        ? place()
+        : null;
+    const scene = setting
+      ? setting.replaceAll(USE, where ?? GENERIC_USE)
+      : slot.scene
+        ? where
+          ? slot.scene.replaceAll(USE, where)
+          : slot.scene
+        : `${baseScene} — ${inSentence(slot.purpose)}`;
     const composition = clauses(
       knob.camera,
       surface(

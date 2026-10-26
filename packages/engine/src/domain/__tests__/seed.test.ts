@@ -65,6 +65,7 @@ describe("the Etsy scenes speak through knobs", () => {
 
   it("each scene slot offers its knobs; the macro keeps its own angle", () => {
     expect(slot("hero")?.knobs).toEqual({
+      setting: "sweep",
       camera: "any",
       distance: "close",
       light: "studio",
