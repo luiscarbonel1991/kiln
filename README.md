@@ -164,6 +164,21 @@ approvals, knobs and the order stay. The banner says what it will do before the 
 ("Etsy: adds Colour options.") and names a delivered destination whose photos
 renumber. The board's title renames in place.
 
+**Refresh a live listing.** Most days the job is one photo of a listing that already
+sells (a weak hero), not a new kit. New project → Listing kit → Start from **A live
+listing**, on one sale destination:
+- The listing's address is optional and kept, never opened ("Etsy listing
+  4413933723"): it names what the project refreshes, for the before/after read later.
+- Its photos come from the maker, in the listing's order (Kiln never fetches them).
+  Each is kept as it is or replaced by one of the kit's frames the product can have
+  (the hero, the in-use mockup, Size & spec…), each frame once; photo 1 starts
+  replaced by the hero. The plan prices only the scenes to make.
+- On the board a kept photo reads "your photo", uncropped; a new frame carries the
+  photo it replaces in its corner ("live now"), a click away. Deliver hands back the
+  whole numbered set: the new frames in their places, the kept photos as they are.
+- A product update never adds frames to such a plan; a frame that no longer applies
+  gives the photo its place back.
+
 ## HTTP API and the `kiln` CLI
 
 Packages and material photos can reach Kiln without a file picker: from a script, an
@@ -326,7 +341,7 @@ KILN_MODULES=laser-pricing pnpm dev
 ## Deliver
 
 Each destination on a project's board ends with **Export <destination> (.zip)**, ready
-once every slot switched on is exact or approved. The zip holds the photos in the
+once every slot switched on is exact, approved or the maker's own photo. The zip holds the photos in the
 board's order (`01-in-use.jpg`, `02-hero.jpg`, `03-colours.png`, …; photo 1 is the
 listing's thumbnail, chosen with "Make photo 1"), each at the destination's pixel target
 on its short side (Etsy: 2000), plus `README.txt` and `manifest.json` (each file's slot
@@ -342,6 +357,8 @@ it. Exported slots read "delivered" until an approval or the order changes.
   one.
 - The approved listing video goes in as `video.mp4`, as rendered, outside the photo
   numbering.
+- The maker's own photos (a live listing's, kept) go in their place as they are: a
+  JPEG or PNG untouched, a WebP as a JPEG, never cropped or resized.
 - Scenes with text on the image (Instagram's hook) are not exported yet.
 
 ## System dependencies (vectorize, Deliver)
