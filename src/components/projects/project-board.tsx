@@ -4,6 +4,7 @@ import type {
   ModelValue,
   ProviderNote,
 } from "@/components/models/model-choice";
+import { BeforeAfter } from "@/components/projects/before-after";
 import {
   ApproveButton,
   DeliverButton,
@@ -18,6 +19,7 @@ import {
 } from "@/components/projects/generation-panel";
 import { GenerationPoller } from "@/components/projects/generation-poller";
 import { ListingPanel } from "@/components/projects/listing-panel";
+import { PhotoArt } from "@/components/projects/photo-art";
 import { ProductChangedBanner } from "@/components/projects/product-changed";
 import { ProjectTitle } from "@/components/projects/project-title";
 import { SceneArt } from "@/components/projects/scene-art";
@@ -43,6 +45,7 @@ import {
 } from "@/domain/exact";
 import { fromMicros } from "@/domain/generation-cost";
 import { checkListing, listingDraft } from "@/domain/listing";
+import { etsyListingId } from "@/domain/live-listing";
 import {
   addVideoSlot,
   deliveryBlockers,
@@ -275,6 +278,21 @@ export function ProjectBoard({
                     : ""}{" "}
                   · {destination.formats.map((f) => f.aspect).join(" / ")}
                 </span>
+                {plan.listingUrl ? (
+                  <a
+                    href={plan.listingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={`live-listing-${plan.destinationId}`}
+                    className="font-sans text-[0.75rem] font-semibold text-primary hover:underline"
+                  >
+                    Live listing
+                    {etsyListingId(plan.listingUrl)
+                      ? ` ${etsyListingId(plan.listingUrl)}`
+                      : ""}{" "}
+                    ↗
+                  </a>
+                ) : null}
                 {canAddVideo ? (
                   <AddVideoButton
                     projectId={projectId}
@@ -371,6 +389,24 @@ export function ProjectBoard({
                               : "Approve a scene to animate"
                           }
                         />
+                      ) : slot.fill === "photo" && slot.photo ? (
+                        <PhotoArt
+                          url={slot.photo}
+                          alt={`${slotPosition(destination, places[i])}, as on the listing`}
+                        />
+                      ) : slot.before ? (
+                        <BeforeAfter
+                          before={slot.before}
+                          testId={`before-${cardId}`}
+                        >
+                          <SlotArt
+                            slot={slot}
+                            cardId={cardId}
+                            output={card?.outputs[0]}
+                            product={product}
+                            brand={brand}
+                          />
+                        </BeforeAfter>
                       ) : slot.exact ? (
                         <ExactSlotArt
                           view={exactView(
@@ -490,7 +526,11 @@ export function ProjectBoard({
             slots.filter((s) => s.view.state === state).length;
           const on = slots.filter((s) => !s.slot.off);
           const scenes = on.filter((s) => s.slot.fill === "scene").length;
-          const done = count("exact") + count("approved") + count("delivered");
+          const done =
+            count("exact") +
+            count("kept") +
+            count("approved") +
+            count("delivered");
           // What the listing text still needs, when the destination has text
           // rules (errors only: what the channel would refuse).
           const listingErrors = destination.text
@@ -528,6 +568,12 @@ export function ProjectBoard({
               <ul className="flex flex-col gap-1 pt-1 font-mono text-[0.65rem] text-on-surface-mid">
                 {count("delivered") > 0 ? (
                   <li>{count("delivered")} delivered</li>
+                ) : null}
+                {count("kept") > 0 ? (
+                  <li>
+                    {plural(count("kept"), "photo")} of yours, kept as{" "}
+                    {count("kept") === 1 ? "it is" : "they are"}
+                  </li>
                 ) : null}
                 <li>{count("exact")} exact, from the spec</li>
                 <li>
@@ -577,6 +623,40 @@ export function ProjectBoard({
         active={generation.batch !== null}
       />
     </main>
+  );
+}
+
+// An exact frame or a scene's candidate, as the frame shows it.
+function SlotArt({
+  slot,
+  cardId,
+  output,
+  product,
+  brand,
+}: {
+  slot: PlanSlot;
+  cardId: string;
+  output?: string;
+  product: Product;
+  brand: BrandKit | null;
+}) {
+  return slot.exact ? (
+    <ExactSlotArt
+      view={exactView(slot.exact, product, slot.textTemplate, brand)}
+      aspect={slot.aspect}
+      plate={plateHref(product)}
+    />
+  ) : (
+    <SceneArt
+      seed={cardId}
+      output={output}
+      text={
+        slot.textTemplate
+          ? renderTextTemplate(slot.textTemplate, product)
+          : undefined
+      }
+      band={textLayerColours(brand)}
+    />
   );
 }
 
@@ -684,7 +764,7 @@ function SlotActions({
       </div>
     );
   }
-  if (slot.fill === "exact") {
+  if (slot.fill === "exact" || slot.fill === "photo") {
     return (
       <div className="flex flex-wrap items-center gap-2">
         {toggle}
