@@ -126,6 +126,17 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
     expect(again).toMatchObject({ status: "unchanged", changed: [] });
   });
 
+  it("a re-import that gives no photo keeps it, and says so (#54)", async () => {
+    const body = await (await send(JSON.stringify(pkg))).json();
+    expect(body.imported[0]).toMatchObject({ status: "unchanged" });
+    expect(body.warnings).toEqual([
+      `"${sku}" API test coaster: kept the material photo of Oak (the package gives none).`,
+    ]);
+    expect((await findProduct(sku))?.colours[0].swatchUrl).toMatch(
+      /storage\.test/,
+    );
+  });
+
   it("refuses what is not a photo, a colour it does not have and a product it does not know", async () => {
     const svg = await photo("oak", "<svg xmlns='http://www.w3.org/2000/svg'/>");
     expect(svg.status).toBe(415);

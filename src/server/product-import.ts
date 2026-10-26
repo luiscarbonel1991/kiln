@@ -235,12 +235,19 @@ export async function importPackage(
       return { error: `Nothing was saved: ${(error as Error).message}` };
     }
   }
+  const keptNotes = imported.flatMap(({ product, kept }) =>
+    kept
+      ? [
+          `${productLabel(product)}: kept the material ${kept.length === 1 ? "photo" : "photos"} of ${kept.join(", ")} (the package gives none).`,
+        ]
+      : [],
+  );
   return {
     imported,
     rejected,
     ...(parsed.brand ? { brand: parsed.brand } : {}),
     brandErrors: parsed.brandErrors,
-    warnings,
+    warnings: [...warnings, ...keptNotes],
   };
 }
 

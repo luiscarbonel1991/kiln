@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { BrandKit } from "@/domain/brand";
 import type { Product } from "@/domain/product";
 import { assertDatabaseUrl, db } from "@/lib/db";
+import { keepSwatches } from "@/lib/kept-swatches";
 import { productChanges } from "@/lib/product-diff";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { productToRow, rowToProduct } from "@/server/product-mapper";
@@ -89,12 +90,16 @@ export interface ImportedProduct {
   status: "new" | "updated" | "unchanged";
   // What an update changed, in the maker's words (product-diff.ts).
   changed: string[];
+  // The colours whose material photo was kept because the package gives
+  // none (kept-swatches.ts).
+  kept?: string[];
 }
 
 // Import a catalog: each product inserted, updated in place by
 // [makerId, sku] (its id and every project using it stay), or left alone when
 // its content is the same (so `updatedAt` means a real change), with the
-// brand kit in the same transaction. All or nothing.
+// brand kit in the same transaction. A material photo the package does not
+// give is kept. All or nothing.
 export async function importCatalog(
   products: Product[],
   brand?: BrandKit,
@@ -108,8 +113,10 @@ export async function importCatalog(
     });
     const bySku = new Map(existing.map((row) => [row.sku, rowToProduct(row)]));
     const imported: ImportedProduct[] = [];
-    for (const product of products) {
-      const before = bySku.get(product.sku);
+    for (const incoming of products) {
+      const before = bySku.get(incoming.sku);
+      const { product, kept } = keepSwatches(incoming, before);
+      const keptNote = kept.length > 0 ? { kept } : {};
       const { sku, name, spec, source } = productToRow(product);
       const json = {
         name,
@@ -117,7 +124,12 @@ export async function importCatalog(
         source: source as Prisma.InputJsonValue,
       };
       if (before && productHash(before) === productHash(product)) {
-        imported.push({ product: before, status: "unchanged", changed: [] });
+        imported.push({
+          product: before,
+          status: "unchanged",
+          changed: [],
+          ...keptNote,
+        });
         continue;
       }
       const row = await tx.product.upsert({
@@ -135,6 +147,7 @@ export async function importCatalog(
               status: "updated",
               // A stored row that no longer reads has nothing to compare.
               changed: before ? productChanges(before, saved) : [],
+              ...keptNote,
             }
           : { product: saved, status: "new", changed: [] },
       );
