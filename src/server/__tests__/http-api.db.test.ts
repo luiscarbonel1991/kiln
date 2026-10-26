@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // The HTTP API end to end against the throwaway Postgres (see
 // project-repository.db.test.ts for the setup): a real token, the routes, the
@@ -29,7 +29,14 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
     "@/app/api/products/[id]/colours/[key]/swatch/route"
   );
 
-  const { token, created } = await tokens.createAccessToken("API test");
+  // Made when the suite runs, never while a skipped suite is collected.
+  let token = "";
+  let tokenId = "";
+  beforeAll(async () => {
+    const made = await tokens.createAccessToken("API test");
+    token = made.token;
+    tokenId = made.created.id;
+  });
   const sku = `HA-${Date.now()}`;
   const pkg = {
     products: [
@@ -52,12 +59,12 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
       },
     ],
   };
-  const headers = { Authorization: `Bearer ${token}` };
+  const auth = () => ({ Authorization: `Bearer ${token}` });
   const send = (body: BodyInit) =>
     importPost(
       new Request("http://kiln.test/api/import", {
         method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { ...auth(), "Content-Type": "application/json" },
         body,
       }),
     );
@@ -67,7 +74,7 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
         `http://kiln.test/api/products/${ref}/colours/${key}/swatch`,
         {
           method: "POST",
-          headers: { ...headers, "Content-Type": "image/png" },
+          headers: { ...auth(), "Content-Type": "image/png" },
           body,
         },
       ),
@@ -76,7 +83,7 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
 
   afterAll(async () => {
     await db.product.deleteMany({ where: { sku } });
-    await tokens.revokeAccessToken(created.id);
+    await tokens.revokeAccessToken(tokenId);
   });
 
   it("imports a package and answers with each product's id and colour keys", async () => {
@@ -153,7 +160,7 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
     const res = await swatch.DELETE(
       new Request(`http://kiln.test/api/products/${sku}/colours/oak/swatch`, {
         method: "DELETE",
-        headers,
+        headers: auth(),
       }),
       { params: Promise.resolve({ id: sku, key: "oak" }) },
     );

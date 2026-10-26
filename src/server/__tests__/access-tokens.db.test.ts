@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Integration test against the throwaway Postgres (see
 // project-repository.db.test.ts for the setup).
@@ -10,13 +10,19 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/access-tokens");
   const { getCurrentMaker } = await import("@/server/maker-repository");
-  const maker = await getCurrentMaker();
-  const other = await db.maker.upsert({
-    where: { slug: "tokens-other-maker" },
-    create: { slug: "tokens-other-maker", name: "Another maker" },
-    update: {},
-  });
+  // Set up when the suite runs, never while a skipped suite is collected.
+  let maker: { id: string };
+  let other: { id: string };
   const made: string[] = [];
+
+  beforeAll(async () => {
+    maker = await getCurrentMaker();
+    other = await db.maker.upsert({
+      where: { slug: "tokens-other-maker" },
+      create: { slug: "tokens-other-maker", name: "Another maker" },
+      update: {},
+    });
+  });
 
   afterAll(async () => {
     await db.accessToken.deleteMany({ where: { id: { in: made } } });
