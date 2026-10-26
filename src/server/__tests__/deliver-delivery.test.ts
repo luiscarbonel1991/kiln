@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { DestinationProfile } from "@/domain/destination";
+import { imageSize } from "@/domain/image-type";
 import { PlanDestination } from "@/domain/plan";
 import { parseProductPackage } from "@/domain/product-package";
 import { buildDelivery, DeliveryRefusal } from "@/server/deliver/delivery";
@@ -151,10 +152,11 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
         "video.mp4",
       ].map((f) => `${folder}/${f}`),
     );
-    const size = (bytes: Uint8Array) =>
-      execFileSync("magick", ["identify", "-format", "%w %h", "-"], {
-        input: bytes,
-      }).toString();
+    // Read from each file's header: an identify through a pipe could hang.
+    const size = (bytes: Uint8Array) => {
+      const read = imageSize(bytes);
+      return read ? `${read.width} ${read.height}` : "unreadable";
+    };
     expect(size(files[`${folder}/01-in-use.jpg`])).toBe("2000 2500");
     expect(size(files[`${folder}/02-hero.jpg`])).toBe("2000 2000");
     expect(size(files[`${folder}/03-colours.png`])).toBe("2000 2000");

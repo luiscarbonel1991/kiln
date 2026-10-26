@@ -3,6 +3,7 @@ import { Resvg } from "@resvg/resvg-js";
 import { describe, expect, it } from "vitest";
 import { sizeSpecLayout } from "@/components/projects/size-spec-layout";
 import { exactView } from "@/domain/exact";
+import { imageSize, rasterType } from "@/domain/image-type";
 import { parseProductPackage } from "@/domain/product-package";
 import {
   EXPORT_FONT_OPTIONS,
@@ -154,13 +155,8 @@ describe.skipIf(!hasMagick)("scenes to files", { timeout: 30_000 }, () => {
       "png:-",
     ]);
     const jpg = await upscaleScene(source, { width: 2000, height: 2500 });
-    const size = execFileSync(
-      "magick",
-      ["identify", "-format", "%w %h %m", "-"],
-      {
-        input: jpg,
-      },
-    ).toString();
-    expect(size).toBe("2000 2500 JPEG");
+    // Read from the file's header: an identify through a pipe could hang.
+    expect(imageSize(jpg)).toEqual({ width: 2000, height: 2500 });
+    expect(rasterType(jpg)).toBe("image/jpeg");
   });
 });
