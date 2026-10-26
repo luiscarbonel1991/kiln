@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ImportResult } from "@/app/actions/products";
 import { Button } from "@/components/ui/button";
 import { plural } from "@/lib/plural";
-import { productLabel } from "@/lib/product-package";
+import { productLabel } from "@/domain/product-package";
 
 export type ImportOutcome = ImportResult | { error: string };
 

@@ -6,7 +6,9 @@ import { Product } from "@/domain/product";
 // maker's catalog exports and Kiln imports. A package is one Product, an array
 // of them, or { maker?, products: [...] }: each product validated by the
 // engine's Product schema, the optional `maker` block by BrandKit (the brand
-// kit for text layers). Example: src/lib/__fixtures__/product-package.json.
+// kit for text layers). Example: the app's /templates/product-package.json.
+// In the engine so an exporter can check a package before uploading it (the
+// `kiln validate` CLI) with the very checks the import runs.
 //
 // Products are read one by one: a product that does not parse is set aside
 // with its reasons and the others still import, so one long field never

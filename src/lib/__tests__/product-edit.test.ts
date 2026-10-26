@@ -10,7 +10,7 @@ import {
   mergeForm,
   productFromForm,
 } from "@/lib/product-form";
-import { parseProductPackage } from "@/lib/product-package";
+import { parseProductPackage } from "@/domain/product-package";
 import pkg from "../__fixtures__/product-package.json";
 
 const parsed = parseProductPackage(pkg);

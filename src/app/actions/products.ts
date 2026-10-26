@@ -26,7 +26,7 @@ import {
   parseProductPackage,
   productLabel,
   type RejectedProduct,
-} from "@/lib/product-package";
+} from "@/domain/product-package";
 import {
   type CleanReview,
   cleanReview,

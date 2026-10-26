@@ -8,7 +8,7 @@ import {
   skuFor,
   svgColours,
 } from "@/lib/product-form";
-import { parseProductPackage } from "@/lib/product-package";
+import { parseProductPackage } from "@/domain/product-package";
 
 const form: ProductForm = {
   name: "Botanical round coaster",

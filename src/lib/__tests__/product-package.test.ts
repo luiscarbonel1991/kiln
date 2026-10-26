@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import {
+  packageJsonSchema,
+  parseProductPackage,
+} from "@/domain/product-package";
 import pkg from "@/lib/__fixtures__/product-package.json";
-import { packageJsonSchema, parseProductPackage } from "@/lib/product-package";
 
 const [board] = pkg.products;
 

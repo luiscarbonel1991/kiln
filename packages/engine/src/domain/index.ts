@@ -155,6 +155,13 @@ export {
   validateWording,
   WordingLine,
 } from "@/domain/product";
+export {
+  type PackageResult,
+  packageJsonSchema,
+  parseProductPackage,
+  productLabel,
+  type RejectedProduct,
+} from "@/domain/product-package";
 export { productUnderstanding } from "@/domain/product-understanding";
 export { ProjectType } from "@/domain/project";
 export {

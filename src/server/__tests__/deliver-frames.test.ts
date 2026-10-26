@@ -3,7 +3,7 @@ import { Resvg } from "@resvg/resvg-js";
 import { describe, expect, it } from "vitest";
 import { sizeSpecLayout } from "@/components/projects/size-spec-layout";
 import { exactView } from "@/domain/exact";
-import { parseProductPackage } from "@/lib/product-package";
+import { parseProductPackage } from "@/domain/product-package";
 import {
   EXPORT_FONT_OPTIONS,
   exactFrameSvg,

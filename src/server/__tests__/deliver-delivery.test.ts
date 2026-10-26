@@ -3,7 +3,7 @@ import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { DestinationProfile } from "@/domain/destination";
 import { PlanDestination } from "@/domain/plan";
-import { parseProductPackage } from "@/lib/product-package";
+import { parseProductPackage } from "@/domain/product-package";
 import { buildDelivery, DeliveryRefusal } from "@/server/deliver/delivery";
 import pkg from "../../lib/__fixtures__/product-package.json";
 
