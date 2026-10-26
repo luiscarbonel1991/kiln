@@ -54,7 +54,12 @@ export {
   buildGenerationRequest,
   GenerationRequest,
 } from "@/domain/generation-request";
-export { type RasterType, rasterType } from "@/domain/image-type";
+export {
+  imageSize,
+  type RasterType,
+  rasterType,
+  sizeAspect,
+} from "@/domain/image-type";
 export {
   checkListing,
   type ListingField,
@@ -69,6 +74,12 @@ export {
   TextSource,
   withCopy,
 } from "@/domain/listing";
+export {
+  etsyListingId,
+  ListingUrl,
+  LivePhoto,
+  MAX_LIVE_PHOTOS,
+} from "@/domain/live-listing";
 export { lockByDefault } from "@/domain/locks";
 export { MasterAsset } from "@/domain/master-asset";
 export { ModelConfig } from "@/domain/model-config";
@@ -104,6 +115,7 @@ export {
   approveSlot,
   type Catalog,
   destinationsFor,
+  fromLiveListing,
   generableCardIds,
   offeredDestinations,
   type PlanChange,
@@ -113,7 +125,9 @@ export {
   parseSlotCardId,
   parseSlotRecipeId,
   planCounts,
+  planFromListing,
   planProject,
+  replacementFrames,
   replan,
   type SlotRef,
   SlotState,

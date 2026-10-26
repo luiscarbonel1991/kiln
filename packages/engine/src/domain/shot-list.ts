@@ -8,11 +8,13 @@ import { SceneKnobs } from "@/domain/scene-knobs";
 export const RenderStyle = z.enum(["photographic", "line-art"]);
 export type RenderStyle = z.infer<typeof RenderStyle>;
 
-// How a slot gets filled. "exact" = rendered from the product spec (free,
-// instant, never an image model); "scene" = staged by an image model.
-// "exact" is drawn from the spec; "scene" is an image model's edit of the
-// product; "video" animates an approved scene.
-export const SlotFill = z.enum(["exact", "scene", "video"]);
+// How a slot gets filled. "exact" is drawn from the spec (free, instant,
+// never an image model); "scene" is an image model's edit of the product;
+// "video" animates an approved scene; "photo" is the maker's own photo,
+// delivered as it is (a live listing's photo the maker keeps). A shot list
+// plans frames, so it never holds a photo slot: plans get them from a live
+// listing (planFromListing).
+export const SlotFill = z.enum(["exact", "scene", "video", "photo"]);
 export type SlotFill = z.infer<typeof SlotFill>;
 
 export const ExactKind = z.enum([
@@ -77,6 +79,9 @@ export const ShotList = z
   })
   .refine((l) => new Set(l.slots.map((s) => s.key)).size === l.slots.length, {
     message: "slot keys must be unique within a shot list",
+  })
+  .refine((l) => l.slots.every((s) => s.fill !== "photo"), {
+    message: "a shot list plans frames; a photo slot is the maker's own photo",
   })
   .refine((l) => l.style !== "line-art" || l.slots.every((s) => !s.knobs), {
     message: "a line-art list has no knobs: it frames, it does not light",

@@ -47,7 +47,9 @@ export async function homeStats(makerId: string): Promise<HomeStats> {
     const plan = ProjectPlan.safeParse(row.plan);
     if (!plan.success) continue;
     const slots = plan.data.destinations.flatMap((d) =>
-      d.slots.filter((s) => s.fill !== "exact" && !s.off),
+      d.slots.filter(
+        (s) => (s.fill === "scene" || s.fill === "video") && !s.off,
+      ),
     );
     const approved = slots.flatMap((s) =>
       s.approvedOutput ? [s.approvedOutput] : [],

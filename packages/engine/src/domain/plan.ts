@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { DestinationKind, DestinationProfile } from "@/domain/destination";
 import { ListingText } from "@/domain/listing";
+import {
+  ListingUrl,
+  type LivePhoto,
+  MAX_LIVE_PHOTOS,
+} from "@/domain/live-listing";
 import type { VideoResolution } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
@@ -39,9 +44,21 @@ export const PlanSlot = ShotSlotFields.extend({
   // as unset instead of breaking the plan.
   knobs: SavedKnobs.optional(),
   tuned: SavedKnobs.optional(),
-}).refine(exactKindMatchesFill.check, {
-  message: exactKindMatchesFill.message,
-});
+  // A photo slot's photo: the maker's own image, in Kiln's storage, delivered
+  // as it is.
+  photo: z.string().min(1).optional(),
+  // The live listing's photo this frame replaces (a refresh), shown beside it
+  // on the board, and back in its place if the frame no longer applies.
+  before: z
+    .object({ url: z.string().min(1), aspect: z.string().min(1) })
+    .optional(),
+})
+  .refine(exactKindMatchesFill.check, {
+    message: exactKindMatchesFill.message,
+  })
+  .refine((s) => (s.fill === "photo") === (s.photo !== undefined), {
+    message: "a photo slot carries its photo; no other slot does",
+  });
 export type PlanSlot = z.infer<typeof PlanSlot>;
 
 export const PlanDestination = z.object({
@@ -51,6 +68,8 @@ export const PlanDestination = z.object({
   // The listing text once saved (edited, or written by the text model); until
   // then the board shows the free draft from the spec.
   listing: ListingText.optional(),
+  // The live listing this destination refreshes (never fetched).
+  listingUrl: ListingUrl.optional(),
 });
 export type PlanDestination = z.infer<typeof PlanDestination>;
 
@@ -62,6 +81,7 @@ export type ProjectPlan = z.infer<typeof ProjectPlan>;
 export const SlotState = z.enum([
   "off",
   "exact",
+  "kept",
   "queued",
   "generating",
   "retrying",
@@ -163,6 +183,7 @@ export function replan(
     if (!list) return d;
     const order = new Map(list.slots.map((s, i) => [s.key, i]));
     let renumbered = false;
+    const live = fromLiveListing(d);
     let slots = d.slots.flatMap((s) => {
       if (!ruled(s) || exactApplies(s, product)) return [s];
       changes.push({
@@ -171,13 +192,15 @@ export function replan(
         label: s.label,
         change: "removes",
       });
+      // A frame that replaced a live photo gives the photo its place back.
+      if (s.before) return [livePhotoSlot(`live-${s.key}`, s.before)];
       if (!s.off) renumbered = true;
       return [];
     });
     if (slots.length === 0) {
       slots = d.slots.map((s) => ({ ...s, off: true }));
     }
-    for (const listed of list.slots) {
+    for (const listed of live ? [] : list.slots) {
       if (!ruled(listed) || !exactApplies(listed, product)) continue;
       if (slots.some((s) => s.key === listed.key)) continue;
       const at = order.get(listed.key) ?? 0;
@@ -234,6 +257,98 @@ export function planProject(input: {
   });
 }
 
+// A live listing's photo kept as it is.
+function livePhotoSlot(
+  key: string,
+  photo: { url: string; aspect: string },
+): PlanSlot {
+  return PlanSlot.parse({
+    key,
+    label: "Your photo",
+    purpose: "On the live listing now, kept as it is.",
+    aspect: photo.aspect,
+    fill: "photo",
+    photo: photo.url,
+  });
+}
+
+// A destination started from a live listing: its photos, and the frames that
+// replace some of them. Only the maker adds frames to it.
+export function fromLiveListing(destination: PlanDestination): boolean {
+  return destination.slots.some((s) => s.fill === "photo" || s.before);
+}
+
+// The frames a live listing's photo can be replaced with: the Listing kit's
+// shot list on that destination, every frame but the video, without the exact
+// ones that have nothing to show for this product.
+export function replacementFrames(
+  product: Product,
+  destinationId: string,
+  catalog: Catalog,
+): ShotList["slots"] {
+  const list = shotListFor(destinationId, "listing-kit", catalog.shotLists);
+  return (list?.slots ?? []).filter(
+    (s) => s.fill !== "video" && exactApplies(s, product),
+  );
+}
+
+// A Listing kit started from a live listing (P0-2, Luis 2026-10-26: not a
+// fifth project type): the listing's photos in their order, each kept as it
+// is or replaced, in its place, by one of the shot list's frames (each frame
+// once). Only the replacing frames are made; the rest is delivered as it is.
+export function planFromListing(input: {
+  product: Product;
+  destinationId: string;
+  catalog: Catalog;
+  listingUrl?: string;
+  photos: LivePhoto[];
+}): ProjectPlan {
+  const { product, destinationId, catalog, photos } = input;
+  if (photos.length === 0) throw new Error("add the listing's photos");
+  if (photos.length > MAX_LIVE_PHOTOS) {
+    throw new Error(`a listing shows at most ${MAX_LIVE_PHOTOS} photos`);
+  }
+  if (
+    !destinationsFor("listing-kit", catalog.destinations).some(
+      (d) => d.id === destinationId,
+    )
+  ) {
+    throw new Error(`"${destinationId}" is not a sale destination`);
+  }
+  const list = shotListFor(destinationId, "listing-kit", catalog.shotLists);
+  if (!list) throw new Error(`no listing kit shot list on "${destinationId}"`);
+  const frames = new Map(
+    replacementFrames(product, destinationId, catalog).map((s) => [s.key, s]),
+  );
+  const used = new Set<string>();
+  const slots = photos.map((photo, i) => {
+    const before = { url: photo.url, aspect: photo.aspect };
+    if (!photo.replaceWith) return livePhotoSlot(`live-${i + 1}`, before);
+    const frame = frames.get(photo.replaceWith);
+    if (!frame) {
+      throw new Error(
+        `"${photo.replaceWith}" is not a frame this product can have on ${list.name}`,
+      );
+    }
+    if (used.has(frame.key)) {
+      throw new Error(`"${frame.label}" can replace one photo only`);
+    }
+    used.add(frame.key);
+    return PlanSlot.parse({ ...frame, before });
+  });
+  if (used.size === 0) throw new Error("mark a photo to replace");
+  return ProjectPlan.parse({
+    destinations: [
+      {
+        destinationId,
+        shotListId: list.id,
+        slots,
+        ...(input.listingUrl ? { listingUrl: input.listingUrl } : {}),
+      },
+    ],
+  });
+}
+
 // Ids that tie a scene slot to its editor card and recipe. A card id is unique
 // per project; the recipe id resolves by composing the shot list on its
 // destination (see findRecipe in the app).
@@ -264,7 +379,7 @@ export function sceneCardIds(plan: ProjectPlan): string[] {
 export function generableCardIds(plan: ProjectPlan): string[] {
   return plan.destinations.flatMap((d) =>
     d.slots
-      .filter((s) => s.fill !== "exact" && !s.off)
+      .filter((s) => (s.fill === "scene" || s.fill === "video") && !s.off)
       .map((s) => slotCardId(d.destinationId, s.key)),
   );
 }
@@ -396,6 +511,9 @@ export function slotState(
   if (slot.fill === "exact") {
     return { state: slot.deliveredAt ? "delivered" : "exact", failed: false };
   }
+  if (slot.fill === "photo") {
+    return { state: slot.deliveredAt ? "delivered" : "kept", failed: false };
+  }
   if (job?.status === "running") {
     return {
       state: job.attempt >= 2 ? "retrying" : "generating",
@@ -443,6 +561,8 @@ export function approveSlot(
 ): ProjectPlan {
   return updateSlot(plan, ref, (slot) => {
     if (slot.fill === "exact") throw new Error("exact slots need no approval");
+    if (slot.fill === "photo")
+      throw new Error("your own photo needs no approval");
     const output = card?.outputs[0];
     if (card?.status !== "done" || !output) {
       throw new Error("nothing to approve: the slot has no finished output");
@@ -510,15 +630,15 @@ export function moveSlot(
 
 // What keeps a destination from being delivered: the slots switched on that
 // are not ready (an exact frame always is; a scene once its current output is
-// approved), and scenes that carry text on the image (composited at export
-// later; none on a sale destination today).
+// approved; the maker's own photo always is), and scenes that carry text on
+// the image (composited at export later; none on a sale destination today).
 export function deliveryBlockers(
   destination: PlanDestination,
   cardOf: (slotKey: string) => CardLike | undefined,
 ): { notReady: string[]; textOnScenes: string[] } {
   const on = destination.slots.filter((s) => !s.off);
   const ready = (s: PlanSlot) =>
-    ["exact", "approved", "delivered"].includes(
+    ["exact", "kept", "approved", "delivered"].includes(
       slotState(s, cardOf(s.key)).state,
     );
   return {
@@ -549,6 +669,7 @@ export function withDelivered(
               if (!done || s.off) return s;
               if (
                 s.fill !== "exact" &&
+                s.fill !== "photo" &&
                 (!s.approvedOutput || s.approvedOutput !== done.approvedOutput)
               ) {
                 return s;
@@ -631,12 +752,13 @@ function updateSlot(
   return { destinations };
 }
 
-// The deliverable's size: the slots that are on, exact vs scene vs video, and
-// how many the maker switched off.
+// The deliverable's size: the slots that are on, exact vs scene vs video vs
+// the maker's own photos, and how many the maker switched off.
 export function planCounts(plan: ProjectPlan): {
   exact: number;
   scene: number;
   video: number;
+  photo: number;
   off: number;
 } {
   const slots = plan.destinations.flatMap((d) => d.slots);
@@ -647,6 +769,7 @@ export function planCounts(plan: ProjectPlan): {
     exact: count("exact"),
     scene: count("scene"),
     video: count("video"),
+    photo: count("photo"),
     off: slots.length - on.length,
   };
 }

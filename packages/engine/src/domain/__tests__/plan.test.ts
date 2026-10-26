@@ -104,7 +104,13 @@ describe("planProject", () => {
       "colours",
       "personalize",
     ]);
-    expect(planCounts(plan)).toEqual({ exact: 2, scene: 2, video: 0, off: 0 });
+    expect(planCounts(plan)).toEqual({
+      exact: 2,
+      scene: 2,
+      video: 0,
+      photo: 0,
+      off: 0,
+    });
   });
 
   it("skips editor-only presets and offers destinations by project type", () => {
@@ -492,7 +498,13 @@ describe("switching slots off", () => {
     const slot = plan.destinations[0].slots[0];
     expect(slot).toMatchObject({ key: "hero", off: true });
     expect(slotState(slot).state).toBe("off");
-    expect(planCounts(plan)).toEqual({ exact: 2, scene: 1, video: 0, off: 1 });
+    expect(planCounts(plan)).toEqual({
+      exact: 2,
+      scene: 1,
+      video: 0,
+      photo: 0,
+      off: 1,
+    });
     expect(sceneCardIds(plan)).toEqual(["social.hook"]);
   });
 
