@@ -26,8 +26,14 @@ vi.mock("@/server/product-repository", () => ({
 vi.mock("@/server/product-reference", () => ({
   productReference: async () => null,
 }));
+const remembered: Record<string, "sweep" | "place"> = {};
+const rememberHeroSetting = vi.fn(
+  async (_destinationId: string, _family: string, _setting: string) => {},
+);
 vi.mock("@/server/maker-repository", () => ({
   getMakerModels: async () => DEFAULT_MAKER_MODELS,
+  getMakerPreferences: async () => ({ heroSetting: remembered }),
+  rememberHeroSetting,
 }));
 vi.mock("@/server/project-repository", () => ({
   createProject: async (input: { plan: ProjectPlan }) => {
@@ -66,6 +72,7 @@ const stored = (n: number, replaceWith?: string) => ({
 afterEach(() => {
   vi.clearAllMocks();
   created.length = 0;
+  for (const key of Object.keys(remembered)) delete remembered[key];
 });
 
 describe("uploadListingPhotoAction", () => {
@@ -156,5 +163,44 @@ describe("createProjectAction from a live listing", () => {
         },
       }),
     ).toEqual({ error: "Pick a product, a type and a destination." });
+  });
+});
+
+describe("createProjectAction: the hero's setting", () => {
+  const start = (heroSettings?: Record<string, string>) =>
+    createProjectAction({
+      productId: board.id,
+      type: "listing-kit",
+      destinationIds: ["etsy"],
+      ...(heroSettings ? { heroSettings } : {}),
+    });
+  const heroOf = () =>
+    created[0].plan.destinations[0].slots.find((s) => s.key === "hero")?.knobs
+      ?.setting;
+
+  it("takes the maker's choice from the plan step, and remembers it for the family", async () => {
+    await start({ etsy: "place" });
+    expect(heroOf()).toBe("place");
+    expect(rememberHeroSetting).toHaveBeenCalledWith(
+      "etsy",
+      board.family,
+      "place",
+    );
+  });
+
+  it("without a choice, takes Kiln's proposal: the remembered one first", async () => {
+    remembered[`etsy:${board.family.toLowerCase()}`] = "place";
+    await start();
+    expect(heroOf()).toBe("place");
+    created.length = 0;
+    delete remembered[`etsy:${board.family.toLowerCase()}`];
+    await start();
+    expect(heroOf()).toBe("sweep");
+  });
+
+  it("refuses a setting it does not know", async () => {
+    expect(await start({ etsy: "spotlight" })).toEqual({
+      error: "Pick a product, a type and a destination.",
+    });
   });
 });

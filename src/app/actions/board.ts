@@ -22,7 +22,7 @@ import { refreshCards } from "@/lib/project-refresh";
 import { slotCards, videoSlotCard } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { getStorageProvider } from "@/providers/registry";
-import { getMakerModels } from "@/server/maker-repository";
+import { getMakerModels, rememberHeroSetting } from "@/server/maker-repository";
 import { productReference } from "@/server/product-reference";
 import {
   addVideoToPlan,
@@ -90,13 +90,15 @@ export async function setSlotKnobAction(
 ): Promise<{ error: string } | undefined> {
   const { projectId, destinationId, slotKey, choice } = KnobWrite.parse(input);
   const cardId = slotCardId(destinationId, slotKey);
+  const seen: { family?: string } = {};
   try {
     await setSlotTuning(
       projectId,
       { destinationId, slotKey },
       choice,
-      ({ plan, master, product }) =>
-        slotCards(
+      ({ plan, master, product }) => {
+        seen.family = product.family;
+        return slotCards(
           {
             destinations: plan.destinations.filter(
               (d) => d.destinationId === destinationId,
@@ -105,8 +107,18 @@ export async function setSlotKnobAction(
           master,
           productUnderstanding(product),
           product,
-        ).find((card) => card.id === cardId),
+        ).find((card) => card.id === cardId);
+      },
     );
+    // A hero's setting chosen on the board is proposed next time for this
+    // family on this destination.
+    if (
+      choice.knob === "setting" &&
+      (choice.stop === "sweep" || choice.stop === "place") &&
+      seen.family
+    ) {
+      await rememberHeroSetting(destinationId, seen.family, choice.stop);
+    }
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Could not tune it.",

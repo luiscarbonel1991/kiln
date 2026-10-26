@@ -31,6 +31,9 @@ model Maker {
   monthlyCapCents Int              @default(2500)
   brand           Json?
   models          Json?
+  // The maker's remembered choices, read leniently (hero-setting.ts): the
+  // hero's setting per destination and product family.
+  preferences     Json?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   projects        Project[]

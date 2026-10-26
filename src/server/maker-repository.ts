@@ -2,6 +2,12 @@ import type { Prisma } from "@prisma/client";
 import { BrandKit } from "@/domain/brand";
 import { modelPriced } from "@/domain/generation-cost";
 import {
+  type HeroSetting,
+  heroKey,
+  type MakerPreferences,
+  readPreferences,
+} from "@/domain/hero-setting";
+import {
   assertModel,
   DEFAULT_MAKER_MODELS,
   MakerModels,
@@ -70,6 +76,53 @@ export async function getMakerModels(): Promise<MakerModels> {
     select: { models: true },
   });
   return makerModels(row?.models);
+}
+
+// The maker's remembered choices (hero-setting.ts); none without a database.
+export async function getMakerPreferences(): Promise<MakerPreferences> {
+  if (!hasDatabase()) return { heroSetting: {} };
+  const maker = await getCurrentMaker();
+  const row = await db.maker.findUnique({
+    where: { id: maker.id },
+    select: { preferences: true },
+  });
+  return readPreferences(row?.preferences);
+}
+
+// Remember the hero's setting for a destination and a product family, under
+// the maker's row lock, so two projects started at once both land. Other
+// remembered choices are kept as they are.
+export async function rememberHeroSetting(
+  destinationId: string,
+  family: string,
+  setting: HeroSetting,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    await tx.$queryRaw`
+      SELECT "id" FROM "Maker" WHERE "id" = ${maker.id} FOR UPDATE`;
+    const row = await tx.maker.findUniqueOrThrow({
+      where: { id: maker.id },
+      select: { preferences: true },
+    });
+    const key = heroKey(destinationId, family);
+    const kept = readPreferences(row.preferences);
+    if (kept.heroSetting[key] === setting) return;
+    const raw =
+      row.preferences && typeof row.preferences === "object"
+        ? (row.preferences as Record<string, unknown>)
+        : {};
+    await tx.maker.update({
+      where: { id: maker.id },
+      data: {
+        preferences: {
+          ...raw,
+          heroSetting: { ...kept.heroSetting, [key]: setting },
+        } as Prisma.InputJsonValue,
+      },
+    });
+  });
 }
 
 // Save the defaults: each kind must be a model Kiln offers for it, with a

@@ -55,6 +55,15 @@ export {
   GenerationRequest,
 } from "@/domain/generation-request";
 export {
+  HeroSetting,
+  heroKey,
+  heroProposal,
+  heroSettingsOf,
+  MakerPreferences,
+  readPreferences,
+  withHeroSettings,
+} from "@/domain/hero-setting";
+export {
   imageSize,
   type RasterType,
   rasterType,

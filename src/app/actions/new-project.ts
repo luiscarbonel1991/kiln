@@ -2,6 +2,12 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import {
+  HeroSetting,
+  heroProposal,
+  heroSettingsOf,
+  withHeroSettings,
+} from "@/domain/hero-setting";
 import { ListingUrl, LivePhoto, MAX_LIVE_PHOTOS } from "@/domain/live-listing";
 import {
   parseSlotCardId,
@@ -13,7 +19,11 @@ import { ProjectType } from "@/domain/project";
 import { startEditorState } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { isAllowedAssetUrl } from "@/providers/asset-bytes";
-import { getMakerModels } from "@/server/maker-repository";
+import {
+  getMakerModels,
+  getMakerPreferences,
+  rememberHeroSetting,
+} from "@/server/maker-repository";
 import { productReference } from "@/server/product-reference";
 import { getProduct } from "@/server/product-repository";
 import { createProject } from "@/server/project-repository";
@@ -23,7 +33,9 @@ import { createProject } from "@/server/project-repository";
 // maker switched off, each checked against the rebuilt plan. Design projects
 // start in the studio instead. `live` starts a Listing kit from a live
 // listing: its address and its photos (already in Kiln's storage), each kept
-// or replaced by a frame; the plan is rebuilt from them too.
+// or replaced by a frame; the plan is rebuilt from them too. `heroSettings`
+// is each destination's hero setting as the plan step showed it; one left out
+// takes Kiln's proposal.
 const Input = z.object({
   productId: z.string().min(1),
   type: ProjectType.exclude(["design"]),
@@ -35,6 +47,7 @@ const Input = z.object({
       photos: z.array(LivePhoto).min(1).max(MAX_LIVE_PHOTOS),
     })
     .optional(),
+  heroSettings: z.record(z.string().min(1), HeroSetting).default({}),
 });
 
 // Start a project: plan, the product's reference (if Kiln can make one for
@@ -46,7 +59,8 @@ export async function createProjectAction(
   const parsed = Input.safeParse(input);
   if (!parsed.success)
     return { error: "Pick a product, a type and a destination." };
-  const { productId, type, destinationIds, offSlots, live } = parsed.data;
+  const { productId, type, destinationIds, offSlots, live, heroSettings } =
+    parsed.data;
   if (live && (type !== "listing-kit" || destinationIds.length !== 1)) {
     return { error: "A live listing refreshes one sale destination." };
   }
@@ -61,7 +75,7 @@ export async function createProjectAction(
   if (!product) return { error: "That product no longer exists." };
   let id: string;
   try {
-    const plan = offSlots.reduce(
+    const planned = offSlots.reduce(
       (p, id) => {
         const ref = parseSlotCardId(id);
         if (!ref) throw new Error(`"${id}" is not a slot of this plan.`);
@@ -77,6 +91,11 @@ export async function createProjectAction(
           })
         : planProject({ product, type, destinationIds, catalog: CATALOG }),
     );
+    const { heroSetting: remembered } = await getMakerPreferences();
+    const plan = withHeroSettings(
+      planned,
+      (id) => heroSettings[id] ?? heroProposal(product, id, remembered).setting,
+    );
     const master = await productReference(product);
     const editor = startEditorState({
       product,
@@ -86,6 +105,11 @@ export async function createProjectAction(
       models: await getMakerModels(),
     });
     id = await createProject({ type, product, plan, editor });
+    // The setting each hero starts with is the one proposed next time for
+    // this family on that destination.
+    for (const { destinationId, setting } of heroSettingsOf(plan)) {
+      await rememberHeroSetting(destinationId, product.family, setting);
+    }
   } catch (error) {
     return {
       error:

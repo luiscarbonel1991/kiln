@@ -144,3 +144,49 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
     });
   });
 });
+
+describe.skipIf(!enabled)("maker preferences (database)", async () => {
+  const { db } = await import("@/lib/db");
+  const repo = await import("@/server/maker-repository");
+  let before: unknown = null;
+  beforeAll(async () => {
+    const maker = await repo.getCurrentMaker();
+    before = (
+      await db.maker.findUniqueOrThrow({
+        where: { id: maker.id },
+        select: { preferences: true },
+      })
+    ).preferences;
+    await db.maker.update({
+      where: { id: maker.id },
+      data: { preferences: { other: "kept" } },
+    });
+  });
+  afterAll(async () => {
+    const maker = await repo.getCurrentMaker();
+    await db.maker.update({
+      where: { id: maker.id },
+      data: { preferences: before ?? undefined },
+    });
+  });
+
+  it("remembers the hero's setting per destination and family, two at once, keeping what else is there", async () => {
+    await Promise.all([
+      repo.rememberHeroSetting("etsy", "Home", "place"),
+      repo.rememberHeroSetting("etsy", "Kitchen", "sweep"),
+    ]);
+    expect(await repo.getMakerPreferences()).toEqual({
+      heroSetting: { "etsy:home": "place", "etsy:kitchen": "sweep" },
+    });
+    await repo.rememberHeroSetting("etsy", "home ", "sweep");
+    const maker = await repo.getCurrentMaker();
+    const row = await db.maker.findUniqueOrThrow({
+      where: { id: maker.id },
+      select: { preferences: true },
+    });
+    expect(row.preferences).toEqual({
+      other: "kept",
+      heroSetting: { "etsy:home": "sweep", "etsy:kitchen": "sweep" },
+    });
+  });
+});
