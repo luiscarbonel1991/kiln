@@ -2,6 +2,7 @@ import { strToU8, zipSync } from "fflate";
 import type { BrandKit } from "@/domain/brand";
 import type { DestinationProfile } from "@/domain/destination";
 import { exactView } from "@/domain/exact";
+import { imageSize, rasterType } from "@/domain/image-type";
 import type { ListingText } from "@/domain/listing";
 import {
   type CardLike,
@@ -12,6 +13,7 @@ import {
 import type { Product } from "@/domain/product";
 import type { PlateImage } from "@/lib/plate-href";
 import {
+  asJpeg,
   exactFrameSvg,
   renderExactPng,
   targetSize,
@@ -64,7 +66,7 @@ export interface DeliveredFile {
   photo: number | null;
   slot: string;
   label: string;
-  kind: "exact" | "scene" | "video";
+  kind: "exact" | "scene" | "video" | "photo";
   width: number;
   height: number;
   seconds?: number;
@@ -116,7 +118,7 @@ function readme(
     ...files.map((f) =>
       f.kind === "video"
         ? `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.label ?? f.source.model}` : ""}), ${f.width} x ${f.height} px`
-        : `${f.photo}. ${folder}/${f.file} — ${f.label} (${f.kind === "exact" ? "drawn from the product spec" : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}`}), ${f.width} x ${f.height} px`,
+        : `${f.photo}. ${folder}/${f.file} — ${f.label} (${f.kind === "exact" ? "drawn from the product spec" : f.kind === "photo" ? "your photo, as on the listing" : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}`}), ${f.width} x ${f.height} px`,
     ),
     "",
     "manifest.json lists each file with its source (the prompt and model of each",
@@ -193,6 +195,32 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
     photo += 1;
     const size = targetSize(slot.aspect, input.destination);
     const stem = `${String(photo).padStart(2, "0")}-${slot.key}`;
+    if (slot.fill === "photo" && slot.photo) {
+      // The maker's own photo goes as it is: a JPEG or PNG untouched, a WebP
+      // as a JPEG (Etsy takes neither WebP nor a crop of the maker's photo).
+      const bytes = await input.fetchOutput(slot.photo);
+      const type = rasterType(bytes);
+      if (!type) {
+        throw new DeliveryRefusal(
+          `"${slot.label}" (photo ${photo}) is not a PNG, JPEG or WebP image.`,
+        );
+      }
+      const out = type === "image/webp" ? await asJpeg(bytes) : bytes;
+      const file = `${stem}.${type === "image/png" ? "png" : "jpg"}`;
+      const read = imageSize(out);
+      entries[`${folder}/${file}`] = out;
+      files.push({
+        file,
+        photo,
+        slot: slot.key,
+        label: slot.label,
+        kind: "photo",
+        width: read?.width ?? 0,
+        height: read?.height ?? 0,
+        output: slot.photo,
+      });
+      continue;
+    }
     if (slot.fill === "exact" && slot.exact) {
       const view = exactView(
         slot.exact,

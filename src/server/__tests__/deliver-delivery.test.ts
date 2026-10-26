@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { DestinationProfile } from "@/domain/destination";
-import { imageSize } from "@/domain/image-type";
+import { imageSize, rasterType } from "@/domain/image-type";
 import { PlanDestination } from "@/domain/plan";
 import { parseProductPackage } from "@/domain/product-package";
 import { buildDelivery, DeliveryRefusal } from "@/server/deliver/delivery";
@@ -189,6 +189,86 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
       { key: "colours" },
       { key: "scale" },
       { key: "video", approvedOutput: CLIP },
+    ]);
+  });
+
+  it("delivers the maker's own photos as they are, numbered in their place; a WebP as a JPEG", async () => {
+    const LIVE_1 = "https://storage.test/listings/live-1.png";
+    const LIVE_3 = "https://storage.test/listings/live-3.webp";
+    const kept = png("800x600");
+    const webp = new Uint8Array(
+      execFileSync("magick", ["-size", "900x600", "xc:#D9B98C", "webp:-"]),
+    );
+    const live = PlanDestination.parse({
+      destinationId: "etsy",
+      shotListId: "etsy-listing",
+      listingUrl: "https://www.etsy.com/listing/123/coaster",
+      slots: [
+        {
+          key: "live-1",
+          label: "Your photo",
+          purpose: "p",
+          aspect: "4:3",
+          fill: "photo",
+          photo: LIVE_1,
+        },
+        {
+          key: "hero",
+          label: "Hero",
+          purpose: "p",
+          aspect: "1:1",
+          approvedOutput: HERO,
+          before: { url: LIVE_3, aspect: "3:2" },
+        },
+        {
+          key: "live-3",
+          label: "Your photo",
+          purpose: "p",
+          aspect: "3:2",
+          fill: "photo",
+          photo: LIVE_3,
+        },
+      ],
+    });
+    const result = await buildDelivery(
+      input({
+        plan: live,
+        fetchOutput: async (url: string) =>
+          url === LIVE_1 ? kept : url === LIVE_3 ? webp : png("1024x1024"),
+      }),
+    );
+    const files = unzipSync(result.zip);
+    const folder = "botanical-coaster-launch-etsy";
+    expect(Object.keys(files).sort()).toEqual(
+      [
+        "01-live-1.png",
+        "02-hero.jpg",
+        "03-live-3.jpg",
+        "README.txt",
+        "manifest.json",
+      ].map((f) => `${folder}/${f}`),
+    );
+    // As it is: the same bytes.
+    expect(Buffer.from(files[`${folder}/01-live-1.png`]).equals(kept)).toBe(
+      true,
+    );
+    const asJpeg = files[`${folder}/03-live-3.jpg`];
+    expect(rasterType(asJpeg)).toBe("image/jpeg");
+    expect(imageSize(asJpeg)).toEqual({ width: 900, height: 600 });
+    expect(strFromU8(files[`${folder}/README.txt`])).toContain(
+      `1. ${folder}/01-live-1.png — Your photo (your photo, as on the listing), 800 x 600 px`,
+    );
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    expect(manifest.files[2]).toMatchObject({
+      file: "03-live-3.jpg",
+      photo: 3,
+      kind: "photo",
+      output: LIVE_3,
+    });
+    expect(result.delivered).toEqual([
+      { key: "live-1" },
+      { key: "hero", approvedOutput: HERO },
+      { key: "live-3" },
     ]);
   });
 

@@ -122,3 +122,18 @@ export async function upscaleScene(
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+// The maker's own photo as a JPEG, as it is (no crop, no resize; quality 92):
+// for a WebP, which Etsy does not take.
+export async function asJpeg(bytes: Uint8Array): Promise<Uint8Array> {
+  const dir = await mkdtemp(join(tmpdir(), "kiln-deliver-"));
+  try {
+    const src = join(dir, "in");
+    const out = join(dir, "out.jpg");
+    await writeFile(src, bytes);
+    await execFileP("magick", [src, "-quality", "92", out]);
+    return new Uint8Array(await readFile(out));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
