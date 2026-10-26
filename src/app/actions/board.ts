@@ -90,15 +90,13 @@ export async function setSlotKnobAction(
 ): Promise<{ error: string } | undefined> {
   const { projectId, destinationId, slotKey, choice } = KnobWrite.parse(input);
   const cardId = slotCardId(destinationId, slotKey);
-  const seen: { family?: string } = {};
   try {
-    await setSlotTuning(
+    const { product } = await setSlotTuning(
       projectId,
       { destinationId, slotKey },
       choice,
-      ({ plan, master, product }) => {
-        seen.family = product.family;
-        return slotCards(
+      ({ plan, master, product }) =>
+        slotCards(
           {
             destinations: plan.destinations.filter(
               (d) => d.destinationId === destinationId,
@@ -107,17 +105,16 @@ export async function setSlotKnobAction(
           master,
           productUnderstanding(product),
           product,
-        ).find((card) => card.id === cardId);
-      },
+        ).find((card) => card.id === cardId),
     );
     // A hero's setting chosen on the board is proposed next time for this
     // family on this destination.
     if (
       choice.knob === "setting" &&
       (choice.stop === "sweep" || choice.stop === "place") &&
-      seen.family
+      product
     ) {
-      await rememberHeroSetting(destinationId, seen.family, choice.stop);
+      await rememberHeroSetting(destinationId, product.family, choice.stop);
     }
   } catch (error) {
     return {

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ refresh: () => {} }));
@@ -212,6 +213,42 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
       slotCards(plan, master, productUnderstanding(saved), saved),
     );
     expect(await composition(id)).toMatch(/^the camera high above/);
+  });
+
+  it("the hero's setting chosen on the board is remembered for the family, with or without a reference", async () => {
+    const { getMakerPreferences } = await import("@/server/maker-repository");
+    const maker = await getCurrentMaker();
+    const before = (
+      await db.maker.findUniqueOrThrow({
+        where: { id: maker.id },
+        select: { preferences: true },
+      })
+    ).preferences;
+    try {
+      for (const product of [form, photo]) {
+        const { id } = await start(product);
+        for (const stop of ["place", "sweep"] as const) {
+          expect(
+            await setSlotKnobAction({
+              projectId: id,
+              destinationId: "etsy",
+              slotKey: "hero",
+              choice: { knob: "setting", stop },
+            }),
+          ).toBeUndefined();
+          expect((await getMakerPreferences()).heroSetting["etsy:desk"]).toBe(
+            stop,
+          );
+        }
+      }
+    } finally {
+      await db.maker.update({
+        where: { id: maker.id },
+        data: {
+          preferences: before === null ? Prisma.DbNull : (before as object),
+        },
+      });
+    }
   });
 
   it("follows the product version the project has; Update the project keeps the knobs", async () => {

@@ -2,7 +2,11 @@ import { connection } from "next/server";
 import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
-import { getMakerBrand, getMakerModels } from "@/server/maker-repository";
+import {
+  getMakerBrand,
+  getMakerModels,
+  getMakerPreferences,
+} from "@/server/maker-repository";
 import { describeStoredSvg } from "@/server/product-files";
 import { listProducts } from "@/server/product-repository";
 
@@ -23,6 +27,7 @@ export default async function NewProjectPage({
   const products = await listProducts();
   const brand = await getMakerBrand();
   const models = await getMakerModels();
+  const { heroSetting } = await getMakerPreferences();
   const draft = textEstimate(models.text, TEXT_CALL_BUDGETS.productDraft);
   const review = textEstimate(models.text, TEXT_CALL_BUDGETS.productReview);
   return (
@@ -34,6 +39,7 @@ export default async function NewProjectPage({
         makerModels={models}
         draftPrice={draft === null ? null : `≈ $${draft.toFixed(2)}`}
         reviewPrice={review === null ? null : `≈ $${review.toFixed(2)}`}
+        rememberedHero={heroSetting}
         initialDesign={initialDesign}
         initialProductId={
           typeof product === "string" && products.some((p) => p.id === product)

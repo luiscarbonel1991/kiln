@@ -596,10 +596,10 @@ export async function setSlotTuning(
     master: MasterAsset;
     product: Product;
   }) => Card | undefined,
-): Promise<void> {
+): Promise<{ product: Product | null }> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
-  await db.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
       WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
@@ -688,6 +688,7 @@ export async function setSlotTuning(
       where: { id: projectId },
       data: { plan: next as unknown as Prisma.InputJsonValue },
     });
+    return { product };
   });
 }
 

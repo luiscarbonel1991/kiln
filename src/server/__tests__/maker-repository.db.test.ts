@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Integration test against the throwaway Postgres (see
@@ -166,7 +167,9 @@ describe.skipIf(!enabled)("maker preferences (database)", async () => {
     const maker = await repo.getCurrentMaker();
     await db.maker.update({
       where: { id: maker.id },
-      data: { preferences: before ?? undefined },
+      data: {
+        preferences: before === null ? Prisma.DbNull : (before as object),
+      },
     });
   });
 

@@ -8,6 +8,7 @@ import { createProjectAction } from "@/app/actions/new-project";
 import { importProductsAction } from "@/app/actions/products";
 import { BeforeAfter } from "@/components/projects/before-after";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
+import { HeroSettingPicker } from "@/components/projects/hero-setting-picker";
 import {
   ImportCatalogCard,
   type ImportOutcome,
@@ -34,6 +35,12 @@ import {
   textLayerColours,
 } from "@/domain/exact";
 import { estimateScenes } from "@/domain/generation-cost";
+import {
+  type HeroSetting,
+  heroProposal,
+  heroSettingsOf,
+  withHeroSettings,
+} from "@/domain/hero-setting";
 import { defaultImageModel, type MakerModels } from "@/domain/model-defaults";
 import {
   offeredDestinations,
@@ -78,6 +85,7 @@ export function NewProjectFlow({
   makerModels,
   draftPrice,
   reviewPrice,
+  rememberedHero = {},
   initialDesign,
   initialProductId = null,
 }: {
@@ -86,6 +94,8 @@ export function NewProjectFlow({
   makerModels: MakerModels;
   draftPrice: string | null;
   reviewPrice: string | null;
+  // The maker's remembered hero settings, per destination and family.
+  rememberedHero?: Record<string, HeroSetting>;
   // A design handed over from the studio ("Make it a product").
   initialDesign: StoredProductFile | null;
   // A product picked on Home.
@@ -108,6 +118,10 @@ export function NewProjectFlow({
   const [startFrom, setStartFrom] = useState<"product" | "live">("product");
   const [listingUrl, setListingUrl] = useState("");
   const [liveRows, setLiveRows] = useState<LiveRow[]>([]);
+  // The hero setting the maker picked per destination (else the proposal).
+  const [heroChoices, setHeroChoices] = useState<Record<string, HeroSetting>>(
+    {},
+  );
   const [destinationIds, setDestinationIds] = useState<string[]>([]);
   // Slot card ids ("etsy.gift") the maker switched off for this product.
   const [offSlots, setOffSlots] = useState<string[]>([]);
@@ -132,7 +146,7 @@ export function NewProjectFlow({
       : [];
 
   // The plan, or why there is none yet (a live listing's photos to mark).
-  const { plan, planError } = useMemo<{
+  const { plan: planned0, planError } = useMemo<{
     plan: ProjectPlan | null;
     planError: string | null;
   }>(() => {
@@ -164,6 +178,16 @@ export function NewProjectFlow({
       return { plan: null, planError: (error as Error).message };
     }
   }, [product, type, destinationIds, live, liveRows]);
+  // Each hero's setting: the maker's pick, else Kiln's proposal.
+  const proposalFor = (destinationId: string) =>
+    product ? heroProposal(product, destinationId, rememberedHero) : null;
+  const plan =
+    planned0 && product
+      ? withHeroSettings(
+          planned0,
+          (id) => heroChoices[id] ?? proposalFor(id)?.setting,
+        )
+      : planned0;
 
   const planned =
     plan?.destinations.flatMap((d) =>
@@ -262,6 +286,12 @@ export function NewProjectFlow({
         type,
         destinationIds,
         offSlots: off,
+        heroSettings: Object.fromEntries(
+          (plan ? heroSettingsOf(plan) : []).map((h) => [
+            h.destinationId,
+            h.setting,
+          ]),
+        ),
         ...(live
           ? {
               live: {
@@ -593,14 +623,38 @@ export function NewProjectFlow({
                             failed: false,
                           }}
                           actions={
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              onClick={() => toggleSlot(id)}
-                            >
-                              {isOff ? <Eye /> : <EyeOff />}
-                              {isOff ? "Switch on" : "Switch off"}
-                            </Button>
+                            <div className="flex flex-col gap-2">
+                              {slot.knobs?.setting === "sweep" ||
+                              slot.knobs?.setting === "place" ? (
+                                <HeroSettingPicker
+                                  value={slot.knobs.setting}
+                                  proposal={
+                                    proposalFor(d.destinationId) ?? {
+                                      setting: "sweep",
+                                      source: "default",
+                                    }
+                                  }
+                                  family={product.family}
+                                  destination={destination.name}
+                                  testId={`hero-setting-${d.destinationId}`}
+                                  onChange={(setting) =>
+                                    setHeroChoices((all) => ({
+                                      ...all,
+                                      [d.destinationId]: setting,
+                                    }))
+                                  }
+                                />
+                              ) : null}
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                className="self-start"
+                                onClick={() => toggleSlot(id)}
+                              >
+                                {isOff ? <Eye /> : <EyeOff />}
+                                {isOff ? "Switch on" : "Switch off"}
+                              </Button>
+                            </div>
                           }
                         >
                           {withBefore(
