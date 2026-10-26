@@ -106,9 +106,16 @@ export async function importCatalog(
 ): Promise<ImportedProduct[]> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
+  const skus = products.map((p) => p.sku);
   return db.$transaction(async (tx) => {
+    // The rows being replaced are locked first: a material photo set at the
+    // same moment (setSwatchUrl) waits, and is then read by keepSwatches.
+    await tx.$queryRaw`
+      SELECT "id" FROM "Product"
+      WHERE "makerId" = ${maker.id} AND "sku" = ANY(${skus})
+      FOR UPDATE`;
     const existing = await tx.product.findMany({
-      where: { makerId: maker.id, sku: { in: products.map((p) => p.sku) } },
+      where: { makerId: maker.id, sku: { in: skus } },
       select: SELECT,
     });
     const bySku = new Map(existing.map((row) => [row.sku, rowToProduct(row)]));
@@ -189,6 +196,56 @@ export async function updateProduct(
         spec: spec as Prisma.InputJsonValue,
         source: source as Prisma.InputJsonValue,
       },
+      select: SELECT,
+    });
+    const saved = rowToProduct(updated);
+    if (!saved) throw new Error("The product could not be read back.");
+    return {
+      product: saved,
+      status: "updated",
+      changed: productChanges(before, saved),
+    };
+  });
+}
+
+// One colour's material photo set (a stored URL) or removed (null), read and
+// written under the product's row lock, so photos sent at once for two
+// colours both land, and an import waits for it. Unchanged when the colour
+// already reads so; null when the product or the colour is not there.
+export async function setSwatchUrl(
+  id: string,
+  key: string,
+  swatchUrl: string | null,
+): Promise<ImportedProduct | null> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  return db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Product"
+      WHERE "id" = ${id} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) return null;
+    const row = await tx.product.findUniqueOrThrow({
+      where: { id },
+      select: SELECT,
+    });
+    const before = rowToProduct(row);
+    if (!before?.colours.some((c) => c.key === key)) return null;
+    const after: Product = {
+      ...before,
+      colours: before.colours.map((c) => {
+        if (c.key !== key) return c;
+        const { swatchUrl: _previous, ...bare } = c;
+        return swatchUrl ? { ...bare, swatchUrl } : bare;
+      }),
+    };
+    if (productHash(before) === productHash(after)) {
+      return { product: before, status: "unchanged", changed: [] };
+    }
+    const { spec } = productToRow(after);
+    const updated = await tx.product.update({
+      where: { id },
+      data: { spec: spec as Prisma.InputJsonValue },
       select: SELECT,
     });
     const saved = rowToProduct(updated);

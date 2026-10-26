@@ -1,12 +1,11 @@
 import { rasterType } from "@/domain/image-type";
-import type { Product } from "@/domain/product";
 import { colourName } from "@/lib/product-form";
 import { storeAsset } from "@/providers/asset-bytes";
 import { photoColours } from "@/server/product-files";
 import {
   findProduct,
   productProjects,
-  updateProduct,
+  setSwatchUrl,
 } from "@/server/product-repository";
 import { productHash } from "@/server/product-version";
 
@@ -83,14 +82,16 @@ export async function setColourSwatch(
     if (hex) photoColour = { name: colourName(hex), hex };
   }
 
-  const { swatchUrl: _previous, ...bare } = colour;
-  const next: Product = {
-    ...product,
-    colours: product.colours.map((c) =>
-      c.key === key ? { ...bare, ...(swatchUrl ? { swatchUrl } : {}) } : c,
-    ),
-  };
-  const saved = await updateProduct(product.id, next);
+  // Under the product's row lock: another colour's photo sent at the same
+  // moment is kept.
+  const saved = await setSwatchUrl(product.id, key, swatchUrl);
+  if (!saved) {
+    return {
+      ok: false,
+      status: 404,
+      error: `"${product.sku}" or its colour "${key}" was removed meanwhile.`,
+    };
+  }
   const now = productHash(saved.product);
   const behind = (await productProjects(product.id))
     .filter((use) => use.hash !== now)

@@ -171,6 +171,29 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
     expect((await findProduct(sku))?.colours[0].swatchUrl).toBeUndefined();
   });
 
+  it("photos sent at once for two colours both land, and an import at the same moment keeps them", async () => {
+    // Another photo: the same pixels with bytes after the end, so another name.
+    const other = Buffer.concat([PNG, Buffer.from("kiln")]);
+    const [oak, maple, reimport] = await Promise.all([
+      photo("oak", PNG),
+      photo("maple", other),
+      send(JSON.stringify(pkg)),
+    ]);
+    expect([oak.status, maple.status, reimport.status]).toEqual([
+      200, 200, 200,
+    ]);
+    const urls = {
+      oak: (await oak.json()).colour.swatchUrl,
+      maple: (await maple.json()).colour.swatchUrl,
+    };
+    expect(urls.oak).not.toBe(urls.maple);
+    const stored = await findProduct(sku);
+    expect(stored?.colours.map((c) => c.swatchUrl)).toEqual([
+      urls.oak,
+      urls.maple,
+    ]);
+  });
+
   it("a revoked token is refused", async () => {
     const other = await tokens.createAccessToken("Revoked API test");
     await tokens.revokeAccessToken(other.created.id);
