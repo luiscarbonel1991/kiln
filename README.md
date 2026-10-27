@@ -139,6 +139,17 @@ the reference, so each scene can be checked by eye.
 - Up to two `views` (side, top, back, three-quarter) show what the front cannot. An SVG
   view is rendered to PNG at import. Every scene sends them after the reference and the
   material sample, each named by its place ("the top view (the second image)").
+- **The view from above.** The model keeps the reference's point of view, so a part
+  lying flat drawn from the front comes out as a thin strip. For a vector product whose
+  first part stands upright on a part lying flat, Kiln draws the product seen from a
+  little above (30°, `parts[].corner` rounds the base's ends), locally and for free,
+  when the project starts and on "Update the project", and keeps it in the plan
+  (`references.threeQuarter`). Its scenes that offer the camera start a little above
+  ("Kiln's pick" in Tune), and a scene looking down edits that view instead of the
+  front; eye level, the macro and anything without the knob edit the front. Same
+  images sent, same price. A reference the maker uploads replaces both. Checked on
+  10/27: the base in front of the plate went from 6–8 % of the plate's height to
+  21–24 %.
 
 **Listing text.** On a destination with text rules (Etsy), the board shows the
 listing text under the photos: title, description, variations with the maker's
@@ -306,7 +317,8 @@ gift) is tuned with knobs, never with prose: camera (eye level, a little above,
 from above), distance (close, medium, wide), light (window, studio, warm), shadow
 (faint, soft, strong) and props (none, a few, styled); "Any" adds nothing.
 - Under each scene a line says how it is set; Tune opens the knobs, with what each
-  stop does and whether it is the maker's choice or the scene's default. Turning one
+  stop does and whether it is the maker's choice, Kiln's pick or the scene's default,
+  and which image the next take starts from. Turning one
   is free and writes the scene's direction again at once.
 - A take to review offers "What's off?" chips ("Can't see its top", "Product too
   small", "Too busy", "Too dark", "Shadows too strong"), each moving one knob, and
