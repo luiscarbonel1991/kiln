@@ -9,12 +9,14 @@ import { CATALOG } from "@/lib/recipes";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { buildDelivery, DeliveryRefusal } from "@/server/deliver/delivery";
 import { outputSources } from "@/server/generation-repository";
+import { readBeforeAtDelivery } from "@/server/listing-results";
 import { getMakerBrand } from "@/server/maker-repository";
 import { loadProjectBoard, setDelivered } from "@/server/project-repository";
 
 // Deliver one destination of a planned project: a zip of its files (ROADMAP
 // "Deliver"), stored and handed back as a link the board downloads; the slots
-// it exported are stamped delivered. Server Functions are POST-reachable: Zod
+// it exported are stamped delivered, and a sale destination with a connected
+// shop takes its before read. Server Functions are POST-reachable: Zod
 // is the trust boundary; every read and write is scoped to the current maker.
 
 const Input = z.object({
@@ -84,6 +86,7 @@ export async function deliverAction(input: unknown): Promise<DeliverResult> {
       result.delivered,
       now.toISOString(),
     );
+    await readBeforeAtDelivery(projectId, destinationId);
     refresh();
     return { url, filename: result.filename, count: result.files.length };
   } catch (error) {

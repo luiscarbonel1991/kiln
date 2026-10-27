@@ -572,6 +572,35 @@ export async function setBrief(
   });
 }
 
+// Change a planned project's plan under its row lock (a listing's read, its
+// address, the day it went live): the change sees the plan as stored, so an
+// agent's read and the maker's click do not undo each other.
+export async function changePlan(
+  projectId: string,
+  change: (plan: ProjectPlan) => ProjectPlan,
+): Promise<ProjectPlan> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  return db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true },
+    });
+    if (!project.plan) throw new Error("project not found");
+    const next = ProjectPlan.parse(change(ProjectPlan.parse(project.plan)));
+    await tx.project.update({
+      where: { id: projectId },
+      data: { plan: next as unknown as Prisma.InputJsonValue },
+    });
+    return next;
+  });
+}
+
 // The last market brief kept for a product on each destination, with the
 // project it is in: a new project of the product starts from it.
 export async function latestBriefs(
