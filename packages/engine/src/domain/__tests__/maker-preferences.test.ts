@@ -10,6 +10,10 @@ describe("readPreferences", () => {
           EverBee: { term: "Keyword", searches: "Search volume" },
           Broken: { searches: "Searches" },
         },
+        watchedShops: [
+          { shopId: "7", name: "PineGoods" },
+          { shopId: "seven", name: "Broken" },
+        ],
         other: "kept by the repository, not read here",
       }),
     ).toEqual({
@@ -17,14 +21,19 @@ describe("readPreferences", () => {
       searchColumns: {
         EverBee: { term: "Keyword", searches: "Search volume" },
       },
+      watchedShops: [{ shopId: "7", name: "PineGoods" }],
     });
     expect(readPreferences(null)).toEqual({
       heroSetting: {},
       searchColumns: {},
+      watchedShops: [],
     });
-    expect(readPreferences({ heroSetting: "nope" })).toEqual({
+    expect(
+      readPreferences({ heroSetting: "nope", watchedShops: "nope" }),
+    ).toEqual({
       heroSetting: {},
       searchColumns: {},
+      watchedShops: [],
     });
   });
 });

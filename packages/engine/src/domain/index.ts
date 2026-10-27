@@ -333,6 +333,22 @@ export {
   SEED_SHOT_LISTS,
 } from "@/domain/seed";
 export {
+  bestSellers,
+  countsAsSale,
+  etsyText,
+  type FavouredListing,
+  favouredListings,
+  type ListingSales,
+  MAX_WATCHED_SHOPS,
+  moneyLabel,
+  RANK_WINDOWS,
+  RankWindow,
+  rankShops,
+  type ShopStanding,
+  shopStanding,
+  WatchedShop,
+} from "@/domain/shop-ranking";
+export {
   ExactKind,
   exactKindMatchesFill,
   RenderStyle,
