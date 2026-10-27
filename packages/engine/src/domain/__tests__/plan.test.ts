@@ -31,6 +31,7 @@ import {
   withSlotOff,
   withSlotPlace,
   withSlotTuning,
+  withThreeQuarter,
   withVideoChoice,
 } from "@/domain/plan";
 import type { Product } from "@/domain/product";
@@ -928,6 +929,63 @@ describe("withBrief", () => {
     expect(() => withBrief(plan, "nowhere", brief)).toThrow(
       /not a destination/,
     );
+  });
+});
+
+describe("the plan's references", () => {
+  const view = {
+    assetUrl: "https://stub.local/plates/above.png",
+    angleDeg: 30,
+    front: "https://stub.local/plates/front.png",
+  };
+
+  it("are kept by every change to the plan", () => {
+    const plan = withThreeQuarter(
+      planProject({
+        product: CUTTING_BOARD,
+        type: "launch",
+        destinationIds: ["shop", "social"],
+        catalog,
+      }),
+      view,
+    );
+    const hero = { destinationId: "shop", slotKey: "hero" };
+    const changed = [
+      moveSlot(
+        plan,
+        { destinationId: "shop", slotKey: plan.destinations[0].slots[1].key },
+        "first",
+      ),
+      withDelivered(plan, "shop", [], "2026-10-27T00:00:00.000Z"),
+      withListing(plan, "shop", listingDraft(CUTTING_BOARD)),
+      withBrief(plan, "shop", undefined),
+      withSlotOff(plan, hero, true),
+      replan(plan, CUTTING_BOARD, catalog.shotLists).plan,
+    ];
+    for (const next of changed) {
+      expect(next.references).toEqual({ threeQuarter: view });
+      expect(
+        ProjectPlan.parse(JSON.parse(JSON.stringify(next))).references,
+      ).toEqual({
+        threeQuarter: view,
+      });
+    }
+    expect(withThreeQuarter(plan, null)).not.toHaveProperty("references");
+  });
+
+  it("an unreadable reference reads as none, and the plan still parses", () => {
+    const plan = planProject({
+      product: CUTTING_BOARD,
+      type: "launch",
+      destinationIds: ["shop"],
+      catalog,
+    });
+    expect(
+      ProjectPlan.parse({
+        ...plan,
+        references: { threeQuarter: { assetUrl: 3 } },
+      }).references,
+    ).toBeUndefined();
   });
 });
 

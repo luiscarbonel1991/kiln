@@ -72,6 +72,19 @@ describe("effectiveKnobs", () => {
     expect(e.offered).toEqual(["camera"]);
     expect(e.stops).toEqual({ camera: "eye" });
   });
+
+  it("puts Kiln's pick over the default and under the maker's choice", () => {
+    const picked = effectiveKnobs(IN_USE, {}, { camera: "above" });
+    expect(picked.stops.camera).toBe("above");
+    expect(picked.picked).toEqual(["camera"]);
+    expect(picked.chosen).toEqual([]);
+    const mine = effectiveKnobs(IN_USE, { camera: "eye" }, { camera: "above" });
+    expect(mine.stops.camera).toBe("eye");
+    expect(mine.picked).toEqual([]);
+    expect(
+      effectiveKnobs({ distance: "close" }, {}, { camera: "above" }).picked,
+    ).toEqual([]);
+  });
 });
 
 describe("knobText and knobSummary", () => {

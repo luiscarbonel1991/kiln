@@ -47,6 +47,7 @@ export function withHeroSettings(
   settingFor: (destinationId: string) => HeroSetting | undefined,
 ): ProjectPlan {
   return {
+    ...plan,
     destinations: plan.destinations.map((d) => {
       const setting = settingFor(d.destinationId);
       if (!setting) return d;

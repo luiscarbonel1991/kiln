@@ -213,6 +213,7 @@ export {
   withSlotOff,
   withSlotPlace,
   withSlotTuning,
+  withThreeQuarter,
   withVideoChoice,
 } from "@/domain/plan";
 export {
@@ -312,6 +313,14 @@ export {
   ShadowStop,
   type Stop,
 } from "@/domain/scene-knobs";
+export {
+  kilnPick,
+  looksDown,
+  PlanReferences,
+  sceneReference,
+  ThreeQuarterView,
+  threeQuarterFor,
+} from "@/domain/scene-reference";
 export {
   SEED_BRAND,
   SEED_DESTINATIONS,

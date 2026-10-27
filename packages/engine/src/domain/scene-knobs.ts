@@ -20,6 +20,7 @@ export type KnobKey = z.infer<typeof KnobKey>;
 // where it is used. It replaces the slot's scene instead of adding to it.
 export const SettingStop = z.enum(["any", "sweep", "place"]);
 export const CameraStop = z.enum(["any", "eye", "above", "overhead"]);
+export type CameraStop = z.infer<typeof CameraStop>;
 export const DistanceStop = z.enum(["any", "close", "medium", "wide"]);
 export const LightStop = z.enum(["any", "window", "studio", "warm"]);
 export const ShadowStop = z.enum(["any", "faint", "soft", "strong"]);
@@ -257,21 +258,27 @@ export interface EffectiveKnobs {
   stops: SceneKnobs;
   // The knobs the maker set.
   chosen: KnobKey[];
+  // The knobs Kiln set over the slot's default (the maker has not).
+  picked: KnobKey[];
 }
 
-// The slot's defaults, with the maker's own choices over them. (A part lying
-// flat once raised the camera on its own; on 10/20 "a little above" did not
-// show more of a flat base than eye level, so the stop stays the maker's.)
+// The slot's defaults, Kiln's pick over them (a little above, once a view
+// from above exists: scene-reference.ts), and the maker's own choices over
+// both.
 export function effectiveKnobs(
   defaults: SceneKnobs,
   tuned: SceneKnobs = {},
+  pick: SceneKnobs = {},
 ): EffectiveKnobs {
   const offered = KnobKey.options.filter((k) => defaults[k] !== undefined);
   const chosen = offered.filter((k) => tuned[k] !== undefined);
-  const stops: StopMap = Object.fromEntries(
-    offered.map((k) => [k, tuned[k] ?? defaults[k]]),
+  const picked = offered.filter(
+    (k) => tuned[k] === undefined && pick[k] !== undefined,
   );
-  return { offered, stops: stops as SceneKnobs, chosen };
+  const stops: StopMap = Object.fromEntries(
+    offered.map((k) => [k, tuned[k] ?? pick[k] ?? defaults[k]]),
+  );
+  return { offered, stops: stops as SceneKnobs, chosen, picked };
 }
 
 function stopOf(knob: KnobKey, stops: SceneKnobs): Stop | null {

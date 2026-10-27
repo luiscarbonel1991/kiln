@@ -17,6 +17,10 @@ import type { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
 import { type KnobChoice, SavedKnobs } from "@/domain/scene-knobs";
 import {
+  PlanReferences,
+  type ThreeQuarterView,
+} from "@/domain/scene-reference";
+import {
   type ExactKind,
   exactKindMatchesFill,
   type ShotList,
@@ -90,6 +94,9 @@ export type PlanDestination = z.infer<typeof PlanDestination>;
 
 export const ProjectPlan = z.object({
   destinations: z.array(PlanDestination).min(1),
+  // Images Kiln drew for the scenes besides the project's reference: the
+  // product seen from a little above (scene-reference.ts). Read leniently.
+  references: PlanReferences.optional().catch(undefined),
 });
 export type ProjectPlan = z.infer<typeof ProjectPlan>;
 
@@ -474,6 +481,7 @@ export function addVideoSlot(
   return {
     slot,
     plan: {
+      ...plan,
       destinations: plan.destinations.map((d) =>
         d === destination ? { ...d, slots: [...d.slots, slot] } : d,
       ),
@@ -611,6 +619,7 @@ export function moveSlot(
   move: SlotMove,
 ): ProjectPlan {
   return {
+    ...plan,
     destinations: plan.destinations.map((d) => {
       if (d.destinationId !== ref.destinationId) return d;
       const from = d.slots.findIndex((s) => s.key === ref.slotKey);
@@ -674,6 +683,7 @@ export function withDelivered(
 ): ProjectPlan {
   const byKey = new Map(delivered.map((d) => [d.key, d]));
   return {
+    ...plan,
     destinations: plan.destinations.map((d) =>
       d.destinationId !== destinationId
         ? d
@@ -706,6 +716,7 @@ export function withListing(
     throw new Error(`"${destinationId}" is not a destination of this plan`);
   }
   return {
+    ...plan,
     destinations: plan.destinations.map((d) =>
       d.destinationId === destinationId ? { ...d, listing } : d,
     ),
@@ -722,6 +733,7 @@ export function withBrief(
     throw new Error(`"${destinationId}" is not a destination of this plan`);
   }
   return {
+    ...plan,
     destinations: plan.destinations.map((d) => {
       if (d.destinationId !== destinationId) return d;
       const { brief: _old, ...rest } = d;
@@ -739,6 +751,7 @@ function withDestination(
     throw new Error(`"${destinationId}" is not a destination of this plan`);
   }
   return {
+    ...plan,
     destinations: plan.destinations.map((d) =>
       d.destinationId === destinationId ? change(d) : d,
     ),
@@ -803,6 +816,16 @@ export function withFollowing(
   return withResults(plan, destinationId, ({ stopped: _old, ...r }) =>
     following ? r : { ...r, stopped: true },
   );
+}
+
+// The product seen from a little above, drawn beside the project's reference,
+// or none (null).
+export function withThreeQuarter(
+  plan: ProjectPlan,
+  view: ThreeQuarterView | null,
+): ProjectPlan {
+  const { references: _old, ...rest } = plan;
+  return view ? { ...rest, references: { threeQuarter: view } } : rest;
 }
 
 // A scene slot's own place, or back to the product's places (null). A
@@ -878,7 +901,7 @@ function updateSlot(
   if (!found) {
     throw new Error(`no slot "${ref.slotKey}" on "${ref.destinationId}"`);
   }
-  return { destinations };
+  return { ...plan, destinations };
 }
 
 // The deliverable's size: the slots that are on, exact vs scene vs video vs
