@@ -22,16 +22,21 @@ import {
   slotCardId,
   withSlotPlace,
   withSlotTuning,
+  withThreeQuarter,
 } from "@/domain/plan";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { KnobChoice } from "@/domain/scene-knobs";
+import { threeQuarterFor } from "@/domain/scene-reference";
 import { VideoChoice } from "@/domain/video";
 import { refreshCards } from "@/lib/project-refresh";
 import { slotCards, videoSlotCard } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { getStorageProvider } from "@/providers/registry";
 import { getMakerModels, rememberHeroSetting } from "@/server/maker-repository";
-import { productReference } from "@/server/product-reference";
+import {
+  productReference,
+  threeQuarterReference,
+} from "@/server/product-reference";
 import {
   addVideoToPlan,
   loadProjectBoard,
@@ -95,6 +100,7 @@ function retuneSlot(
   return setSlotTuning(projectId, ref, tune, ({ plan, master, product }) =>
     slotCards(
       {
+        ...plan,
         destinations: plan.destinations.filter(
           (d) => d.destinationId === ref.destinationId,
         ),
@@ -209,17 +215,29 @@ export async function addReferenceAction(formData: FormData): Promise<void> {
     assetUrl: url,
     mime,
   };
-  const cards =
-    loaded.board.cards.length === 0
-      ? slotCards(
-          loaded.board.plan,
-          master,
-          productUnderstanding(loaded.product),
-          loaded.product,
-          await getMakerModels(),
-        )
-      : [];
-  await setProjectReference(projectId, master, cards);
+  const { plan } = loaded.board;
+  const { product } = loaded;
+  const write = async () =>
+    slotCards(
+      plan,
+      master,
+      productUnderstanding(product),
+      product,
+      await getMakerModels(),
+    );
+  const first = loaded.board.cards.length === 0;
+  // The view from above was drawn beside Kiln's plate: with the maker's own
+  // reference it no longer applies, so the scenes Kiln started a little above
+  // are written again (the maker's own edits stay).
+  const rewrite =
+    !first &&
+    threeQuarterFor(plan.references, loaded.board.master?.assetUrl) !== null;
+  await setProjectReference(
+    projectId,
+    master,
+    first ? await write() : [],
+    rewrite ? refreshCards(loaded.board.cards, await write(), master.id) : [],
+  );
   refresh();
 }
 
@@ -242,11 +260,18 @@ export async function updateProjectProductAction(
     const understanding = productUnderstanding(product);
     const fresh = await productReference(product);
     const master = fresh ?? board.master;
+    // A fresh plate gets its view from above drawn again beside it; a
+    // maker's own reference keeps the plan's (it no longer applies).
+    const view = fresh
+      ? await threeQuarterReference(product, fresh)
+      : undefined;
+    const viewed = (p: ProjectPlan) =>
+      view === undefined ? p : withThreeQuarter(p, view);
     const cards = master
       ? refreshCards(
           board.cards,
           slotCards(
-            plan,
+            viewed(plan),
             master,
             understanding,
             product,
@@ -261,7 +286,7 @@ export async function updateProjectProductAction(
       master: fresh,
       cards,
       textRules: (id) => CATALOG.destinations.find((d) => d.id === id)?.text,
-      replan: (p) => replan(p, product, CATALOG.shotLists).plan,
+      replan: (p) => viewed(replan(p, product, CATALOG.shotLists).plan),
     });
   } catch (error) {
     return {

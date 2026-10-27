@@ -22,6 +22,7 @@ import {
 } from "@/domain/model-defaults";
 import { parseSlotCardId, slotCardId, videoSettings } from "@/domain/plan";
 import { SEED_BRAND } from "@/domain/seed";
+import { cardReference } from "@/lib/card-reference";
 import { db, hasDatabase } from "@/lib/db";
 import { env } from "@/lib/env";
 import { CATALOG, findRecipe, SEED_RECIPES } from "@/lib/recipes";
@@ -172,9 +173,12 @@ export async function estimateProjectCards(
       throw new Error(`"${id}" is not an image card of this project.`);
     }
     assertRunnable(card.model, "image", card.id);
+    // A scene looking down edits Kiln's view from above, when there is one.
+    board ??= await loadProjectBoard(projectId);
+    const plan = board?.board.plan;
     const request = buildGenerationRequest({
       card,
-      master,
+      master: plan ? cardReference(plan, card.id, master) : master,
       understanding,
       recipe: findRecipe(card.recipeId) ?? SEED_RECIPES[0],
       brand: SEED_BRAND,

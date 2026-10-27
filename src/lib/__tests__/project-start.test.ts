@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MasterAsset } from "@/domain/master-asset";
-import { planProject } from "@/domain/plan";
+import { planProject, withThreeQuarter } from "@/domain/plan";
 import { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import {
@@ -339,5 +339,35 @@ describe("photoReference", () => {
     expect(photo("https://cdn.example.com/board.svg")).toBeNull();
     expect(photo("/files/board.png")).toBeNull();
     expect(photoReference({ ...board, source: { kind: "form" } })).toBeNull();
+  });
+});
+
+describe("slotCards with Kiln's view from above", () => {
+  it("writes the scenes that offer the camera a little above; the macro stays", () => {
+    const viewed = withThreeQuarter(plan, {
+      assetUrl: "https://cdn.example.com/above.png",
+      angleDeg: 30,
+      front: master.assetUrl,
+    });
+    const composition = (p: typeof plan, id: string) =>
+      slotCards(p, master, productUnderstanding(board), board).find(
+        (c) => c.id === id,
+      )?.fields.composition.value ?? "";
+    expect(composition(plan, "etsy.in-use")).toContain("eye level");
+    expect(composition(viewed, "etsy.in-use")).toContain(
+      "the camera a little above",
+    );
+    expect(composition(viewed, "etsy.detail")).not.toContain("a little above");
+    // Drawn beside another reference, it does not apply.
+    expect(
+      composition(
+        withThreeQuarter(plan, {
+          assetUrl: "https://cdn.example.com/above.png",
+          angleDeg: 30,
+          front: "https://cdn.example.com/other.png",
+        }),
+        "etsy.in-use",
+      ),
+    ).toContain("eye level");
   });
 });

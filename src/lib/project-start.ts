@@ -20,6 +20,7 @@ import { productUnderstanding } from "@/domain/product-understanding";
 import type { ProjectType } from "@/domain/project";
 import { productSceneCues, sceneVariants } from "@/domain/scene-direction";
 import { effectiveKnobs } from "@/domain/scene-knobs";
+import { kilnPick, threeQuarterFor } from "@/domain/scene-reference";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { projectTypeLabel } from "@/lib/project-types";
@@ -73,16 +74,26 @@ export function slotCards(
       throw new Error(`no recipe for ${d.shotListId} on ${d.destinationId}`);
     }
     const scenes = d.slots.filter((s) => s.fill === "scene");
+    // A view from above drawn beside this reference: Kiln starts the scenes
+    // that offer the camera a little above (the maker's stop still wins).
+    const view = threeQuarterFor(plan.references, master.assetUrl);
     const planning = buildPlanningContext(understanding, recipe, SEED_BRAND);
     const variants =
       recipe.style === "line-art"
         ? undefined
         : sceneVariants(
-            // Each slot applies its knobs: its defaults, then the maker's
-            // own choices.
+            // Each slot applies its knobs: its defaults, Kiln's pick, then
+            // the maker's own choices.
             scenes.map((s) =>
               s.knobs
-                ? { ...s, knobs: effectiveKnobs(s.knobs, s.tuned).stops }
+                ? {
+                    ...s,
+                    knobs: effectiveKnobs(
+                      s.knobs,
+                      s.tuned,
+                      kilnPick(s.knobs, view),
+                    ).stops,
+                  }
                 : s,
             ),
             recipe.fieldDefaults,

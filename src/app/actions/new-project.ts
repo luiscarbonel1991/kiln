@@ -15,6 +15,7 @@ import {
   planProject,
   withBrief,
   withSlotOff,
+  withThreeQuarter,
 } from "@/domain/plan";
 import { ProjectType } from "@/domain/project";
 import { startEditorState } from "@/lib/project-start";
@@ -25,7 +26,10 @@ import {
   getMakerPreferences,
   rememberHeroSetting,
 } from "@/server/maker-repository";
-import { productReference } from "@/server/product-reference";
+import {
+  productReference,
+  threeQuarterReference,
+} from "@/server/product-reference";
 import { getProduct } from "@/server/product-repository";
 import { createProject, latestBriefs } from "@/server/project-repository";
 
@@ -99,7 +103,7 @@ export async function createProjectAction(
     // Each destination starts from the product's last market brief there,
     // named where it came from.
     const carried = await latestBriefs(product.id);
-    const plan = Object.entries(carried).reduce(
+    const shaped = Object.entries(carried).reduce(
       (p, [destinationId, { brief, projectName }]) =>
         p.destinations.some((d) => d.destinationId === destinationId)
           ? withBrief(p, destinationId, {
@@ -109,7 +113,12 @@ export async function createProjectAction(
           : p,
       withHeroSettings(planned, (id) => heroSettings[id] ?? proposed(id)),
     );
+    // A product with a part lying flat also gets its view from above.
     const master = await productReference(product);
+    const plan = withThreeQuarter(
+      shaped,
+      await threeQuarterReference(product, master),
+    );
     const editor = startEditorState({
       product,
       type,

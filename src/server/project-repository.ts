@@ -1075,12 +1075,15 @@ export async function refreshProjectProduct(
 }
 
 // Set a planned project's reference image (the anchor every scene edits). The
-// first reference also creates the scene slots' draft cards; a later one only
-// re-points the existing cards at it. Locked like approvals.
+// first reference also creates the scene slots' draft cards; a later one
+// re-points the existing cards at it, and rewrites the ones given (`rewritten`:
+// their fields and references, as refreshCards leaves them). Locked like
+// approvals.
 export async function setProjectReference(
   projectId: string,
   master: MasterAsset,
   firstCards: Card[],
+  rewritten: Card[] = [],
 ): Promise<void> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
@@ -1106,6 +1109,16 @@ export async function setProjectReference(
         where: { projectId },
         data: { masterAssetId: master.id },
       });
+      for (const card of rewritten) {
+        await tx.card.update({
+          where: { projectId_cardId: { projectId, cardId: card.id } },
+          data: {
+            fields: card.fields as Prisma.InputJsonValue,
+            references: card.references as Prisma.InputJsonValue,
+            masterAssetId: card.masterAssetId,
+          },
+        });
+      }
     }
     await tx.project.update({
       where: { id: projectId },
