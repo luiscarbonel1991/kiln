@@ -200,6 +200,8 @@ behind your own sign-in (a VPN, a reverse proxy with authentication) and start i
 | `POST /api/import` | the product package (JSON, at most 32 MB) | each product's Kiln `id`, `sku`, `status` (new, updated, unchanged), what `changed` and its colour keys; `rejected` with the page's reasons; `warnings`. 400 not JSON, 413 too large, 422 nothing reads as a package |
 | `POST /api/products/:id/colours/:key/swatch` | a PNG, JPEG or WebP (at most 15 MB), as the body or a multipart `file` | the colour with its stored `swatchUrl`, `status`, `changed`, the projects now `behind`, and `photoColour` (a suggestion: the swatch hex stays yours). 404 unknown product or colour, 409 a catalog connector's product, 415 not a photo |
 | `DELETE /api/products/:id/colours/:key/swatch` | none | the same, with `swatchUrl: null` |
+| `GET /api/results` | none | every followed listing (`projectId`, `destinationId`, `listingUrl`, `liveOn`): the reads `due` today, each with its `window`, the `next` one, the `reads` taken, the `comparison` in words and the frames `changed` |
+| `PUT /api/projects/:id/results/:destinationId/:read` | `{ visits, views, favourites, orders, revenue, searchVisits }` (any of them), optionally `from`, `to`, `source`, `readOn` | the read kept (`:read` is `before`, `day14` or `day30`; its window and today by default, source "API"). 400 not JSON, 404 unknown project, destination or read, 422 a read Kiln cannot keep |
 
 - `:id` is the product's Kiln id or its SKU. A photo is read from its bytes, not its
   name, and stored by them: the same photo sent twice changes nothing.
@@ -209,6 +211,9 @@ behind your own sign-in (a VPN, a reverse proxy with authentication) and start i
   ("kept the material photo of Maple"). Remove one on the product page or with DELETE.
 - There is no import from a URL: the caller sends the bytes (a server that fetches any
   address it is given is an SSRF hole).
+- The results routes are for an agent or a scheduled job that reads the shop's stats
+  where the maker can (their own Shop Manager) and sends the numbers back; Kiln never
+  opens a listing page.
 
 ```bash
 curl -X POST "$KILN_URL/api/import" -H "Authorization: Bearer $KILN_TOKEN" \
@@ -333,6 +338,18 @@ from above), distance (close, medium, wide), light (window, studio, warm), shado
   search) and a price guardrail (the price beside the band that sells, never set
   by Kiln). A new project of the product starts from its last brief, and the
   export's README and manifest carry it.
+- **Results** (each sale destination on the board, and Home): whether the new
+  photos moved anything. A listing is followed from its delivery, or from the
+  day the maker says its photos went up (Kiln never knows when they reach the
+  shop). Three reads: the 30 days before, and the first 14 and 30 after, each
+  with its window, source and the day it was read, due once its days have
+  passed. Typed from the shop's stats page, sent through the API, or read from
+  a connected shop (`src/providers/shop`: a mock shop in mock runs; the Etsy
+  connection comes with its keys), which also takes the before read at
+  delivery once the listing's address is known. Before against the latest
+  after is brought to 30 days, with conversion and a note when too few visits
+  make a change chance. Home lists the reads due first, the family and the
+  frames that changed. Stored in the plan (`PlanDestination.results`).
 
 The worker is a `globalThis` singleton started from `src/instrumentation.ts`.
 It restarts with the current code on the next enqueue after a code reload: it
