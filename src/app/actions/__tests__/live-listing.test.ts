@@ -188,6 +188,12 @@ describe("createProjectAction: the hero's setting", () => {
     );
   });
 
+  it("keeps an accepted proposal a proposal: nothing is remembered", async () => {
+    await start({ etsy: "sweep" });
+    expect(heroOf()).toBe("sweep");
+    expect(rememberHeroSetting).not.toHaveBeenCalled();
+  });
+
   it("without a choice, takes Kiln's proposal: the remembered one first", async () => {
     remembered[`etsy:${board.family.toLowerCase()}`] = "place";
     await start();

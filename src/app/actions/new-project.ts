@@ -92,9 +92,11 @@ export async function createProjectAction(
         : planProject({ product, type, destinationIds, catalog: CATALOG }),
     );
     const { heroSetting: remembered } = await getMakerPreferences();
+    const proposed = (id: string) =>
+      heroProposal(product, id, remembered).setting;
     const plan = withHeroSettings(
       planned,
-      (id) => heroSettings[id] ?? heroProposal(product, id, remembered).setting,
+      (id) => heroSettings[id] ?? proposed(id),
     );
     const master = await productReference(product);
     const editor = startEditorState({
@@ -105,10 +107,12 @@ export async function createProjectAction(
       models: await getMakerModels(),
     });
     id = await createProject({ type, product, plan, editor });
-    // The setting each hero starts with is the one proposed next time for
-    // this family on that destination.
+    // A hero the maker set apart from the proposal is proposed so next time
+    // for this family on that destination; an accepted guess stays a guess.
     for (const { destinationId, setting } of heroSettingsOf(plan)) {
-      await rememberHeroSetting(destinationId, product.family, setting);
+      if (setting !== proposed(destinationId)) {
+        await rememberHeroSetting(destinationId, product.family, setting);
+      }
     }
   } catch (error) {
     return {

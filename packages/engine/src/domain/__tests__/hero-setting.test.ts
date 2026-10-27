@@ -34,15 +34,23 @@ describe("heroProposal", () => {
     ).toBe("sweep");
   });
 
-  it("proposes it in its place when it is mounted where it is used, else a plain backdrop", () => {
+  it("proposes it in its place when it stays where it is used, else a plain backdrop", () => {
     expect(heroProposal(at("beside a front door"), "etsy", {})).toEqual({
       setting: "place",
-      source: "mounted",
+      source: "placed",
       place: "beside a front door",
     });
     expect(heroProposal(at("on an office wall"), "etsy", {}).setting).toBe(
       "place",
     );
+    // On show rather than mounted: a desk, a reception counter, a shelf.
+    for (const place of [
+      "front edge of an office desk, beside a laptop",
+      "a reception counter, facing the visitor",
+      "a bookshelf in a reading nook",
+    ]) {
+      expect(heroProposal(at(place), "etsy", {}).setting).toBe("place");
+    }
     expect(heroProposal(at("a kitchen counter"), "etsy", {})).toEqual({
       setting: "sweep",
       source: "default",

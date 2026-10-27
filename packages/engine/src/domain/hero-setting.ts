@@ -37,16 +37,16 @@ export function readPreferences(raw: unknown): MakerPreferences {
 export const heroKey = (destinationId: string, family: string) =>
   `${destinationId}:${family.trim().toLowerCase()}`;
 
-// Where a product is mounted rather than set down: a page-1 hero shows it in
-// place.
-const MOUNTED =
-  /\b(walls?|doors?|doorways?|gates?|porch(es)?|fences?|entry|entryway|entrance|facade|mailbox(es)?)\b/i;
+// Where a product stays once it is in use, mounted (a wall, a door) or on
+// show (a desk, a shelf): a page-1 hero shows it there (DOGFOOD #63, #75).
+const IN_PLACE =
+  /\b(walls?|doors?|doorways?|gates?|porch(es)?|fences?|entry|entryway|entrance|facade|mailbox(es)?|desks?|reception|shelf|shelves|bookshelf|bookcase|mantel|mantelpiece|nightstand)\b/i;
 
 export interface HeroProposal {
   setting: HeroSetting;
-  // Why: the maker's own choice for the family, the place the product is
-  // mounted in (its first place of use), or Kiln's default.
-  source: "remembered" | "mounted" | "default";
+  // Why: the maker's own choice for the family, the place the product stays
+  // in (its first place of use), or Kiln's default.
+  source: "remembered" | "placed" | "default";
   place?: string;
 }
 
@@ -58,8 +58,8 @@ export function heroProposal(
   const kept = remembered[heroKey(destinationId, product.family)];
   if (kept) return { setting: kept, source: "remembered" };
   const place = product.useContexts[0]?.trim();
-  if (place && MOUNTED.test(place)) {
-    return { setting: "place", source: "mounted", place };
+  if (place && IN_PLACE.test(place)) {
+    return { setting: "place", source: "placed", place };
   }
   return { setting: "sweep", source: "default" };
 }

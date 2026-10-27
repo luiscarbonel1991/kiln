@@ -18,8 +18,8 @@ function why(
   if (proposal.source === "remembered") {
     return `Your last choice for ${family} on ${destination}.`;
   }
-  if (proposal.source === "mounted") {
-    return `It is mounted where it is used (${proposal.place}): page-1 heroes show it there.`;
+  if (proposal.source === "placed") {
+    return `It stays where it is used (${proposal.place}): page-1 heroes show it there.`;
   }
   return "A plain backdrop: Kiln's default for a marketplace hero.";
 }
