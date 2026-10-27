@@ -14,6 +14,11 @@ import {
   reasonMove,
   type Stop,
 } from "@/domain/scene-knobs";
+import {
+  kilnPick,
+  looksDown,
+  type ThreeQuarterView,
+} from "@/domain/scene-reference";
 
 // What the board's Tune shows for one scene slot: its knobs with the stop each
 // applies (the maker's, or the scene's default), whether they can be turned
@@ -28,8 +33,11 @@ export interface TuneKnob {
   key: KnobKey;
   label: string;
   stop: string;
-  // The maker set it (else it is the scene's default).
+  // The maker set it (else it is Kiln's pick or the scene's default).
   chosen: boolean;
+  // Kiln set it over the scene's default (a little above, once the view
+  // from above exists).
+  picked: boolean;
   stops: { key: string; label: string; hint: string }[];
 }
 
@@ -58,6 +66,9 @@ export interface TuneView {
     options: TunePlace[];
     putsInPlace: boolean;
   } | null;
+  // The image the next take edits, when Kiln drew a view from above: that
+  // view for a camera looking down, else the front. Null without one.
+  startsFrom: "above" | "front" | null;
 }
 
 export interface TunePlace {
@@ -77,10 +88,16 @@ export function tuneView(input: {
   view: SlotView;
   job?: JobView;
   places?: TunePlace[];
+  // The project's view from above, when it applies to its reference.
+  above?: ThreeQuarterView | null;
 }): TuneView | null {
-  const { slot, card, view, job, places = [] } = input;
+  const { slot, card, view, job, places = [], above = null } = input;
   if (slot.fill !== "scene" || !slot.knobs) return null;
-  const knobs = effectiveKnobs(slot.knobs, slot.tuned);
+  const knobs = effectiveKnobs(
+    slot.knobs,
+    slot.tuned,
+    kilnPick(slot.knobs, above),
+  );
   const locked =
     view.inBatch || view.state === "generating" || view.state === "retrying"
       ? "In the queue: tune it when it is done."
@@ -105,6 +122,7 @@ export function tuneView(input: {
         label: KNOBS[key].label,
         stop: knobs.stops[key] ?? "any",
         chosen: knobs.chosen.includes(key),
+        picked: knobs.picked.includes(key),
         stops: (knobStops(key) as string[]).map((s) => ({
           key: s,
           label: stops[s].label,
@@ -135,6 +153,11 @@ export function tuneView(input: {
     take: price,
     error:
       view.error ?? (job?.status === "failed" ? (job.error ?? null) : null),
+    startsFrom: above
+      ? looksDown(knobs.stops.camera)
+        ? "above"
+        : "front"
+      : null,
     place: takesPlace(slot)
       ? {
           own: slot.place ?? null,

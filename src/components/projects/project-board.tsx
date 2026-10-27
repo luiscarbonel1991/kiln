@@ -68,6 +68,7 @@ import {
   type Product,
 } from "@/domain/product";
 import type { JobView } from "@/domain/queue";
+import { threeQuarterFor } from "@/domain/scene-reference";
 import { VIDEO_MOTIONS } from "@/domain/video";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { planChangeLines } from "@/lib/plan-changes";
@@ -206,6 +207,9 @@ export function ProjectBoard({
   shop: string | null;
 }) {
   const rows = boardRows(board, jobs);
+  // Kiln's view of the product from a little above, while the reference is
+  // the plate it was drawn beside.
+  const above = threeQuarterFor(board.plan.references, board.master?.assetUrl);
   const waiting = waitingCardIds(rows);
   // The material sample scenes are made with (the default colour's).
   const swatchUrl = defaultSwatch(product);
@@ -380,6 +384,7 @@ export function ProjectBoard({
                             view,
                             job: jobs[cardId],
                             places: placeOptions,
+                            above,
                           })}
                           hasReference={board.master !== null}
                           model={card ? (card.model as ModelValue) : null}
@@ -540,7 +545,9 @@ export function ProjectBoard({
                 )}
               </div>
               <p className="font-sans text-[0.75rem] leading-snug text-on-surface-mid">
-                Every scene edits this image, so the product stays true.
+                {above
+                  ? "Scenes at eye level edit this image, so the product stays true."
+                  : "Every scene edits this image, so the product stays true."}
               </p>
             </div>
           ) : (
@@ -552,6 +559,29 @@ export function ProjectBoard({
               <ReferenceUpload projectId={projectId} />
             </>
           )}
+          {above && isRenderableUrl(above.assetUrl) ? (
+            <div
+              data-testid="reference-above"
+              className="flex items-center gap-3 border-t border-border-soft pt-3"
+            >
+              <div className="size-14 flex-shrink-0 overflow-hidden rounded-thumb bg-surface-soft shadow-render">
+                {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
+                <img
+                  src={above.assetUrl}
+                  alt="The product seen from a little above"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <p className="font-sans text-[0.75rem] leading-snug text-on-surface-mid">
+                <span className="font-semibold text-foreground">
+                  Seen from a little above
+                </span>
+                <br />
+                Kiln drew it from the plate, free. Scenes looking down edit it,
+                so the part lying flat shows.
+              </p>
+            </div>
+          ) : null}
           {sample ? (
             <div className="flex items-center gap-3 border-t border-border-soft pt-3">
               <div className="size-14 flex-shrink-0 overflow-hidden rounded-thumb bg-surface-soft shadow-render">

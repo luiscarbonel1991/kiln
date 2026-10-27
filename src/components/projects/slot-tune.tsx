@@ -135,6 +135,16 @@ export function SlotTune({
                   <span className={cn(NOTE, "text-on-surface-mid")}>
                     {current?.hint}
                   </span>
+                  {knob.key === "camera" && tune.startsFrom ? (
+                    <span
+                      data-testid={`tune-${destinationId}-${slotKey}-starts-from`}
+                      className={cn(NOTE, "text-prov-recipe")}
+                    >
+                      {tune.startsFrom === "above"
+                        ? "Starts from Kiln's view of the product from a little above, so the part lying flat shows."
+                        : "Starts from the front view."}
+                    </span>
+                  ) : null}
                   <span className="flex items-center gap-2 font-mono text-[0.6rem] text-on-surface-dim">
                     {knob.chosen ? (
                       <>
@@ -150,6 +160,8 @@ export function SlotTune({
                           Reset
                         </button>
                       </>
+                    ) : knob.picked ? (
+                      "Kiln's pick, for the view from above"
                     ) : (
                       "the scene's default"
                     )}

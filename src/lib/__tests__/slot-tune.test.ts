@@ -5,6 +5,7 @@ import {
   slotState,
   withSlotPlace,
   withSlotTuning,
+  withThreeQuarter,
 } from "@/domain/plan";
 import { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
@@ -236,5 +237,51 @@ describe("tuneView: the place", () => {
       tuneView({ slot: gift, card, view: slotState(gift, card), places })
         ?.place,
     ).toBeNull();
+  });
+});
+
+describe("tuneView with Kiln's view from above", () => {
+  const above = {
+    assetUrl: "https://cdn.example.com/above.png",
+    angleDeg: 30,
+    front: master.assetUrl,
+  };
+
+  it("names Kiln's pick and the image the next take edits", () => {
+    const { plan, slot, card } = setup();
+    const viewed = withThreeQuarter(plan, above);
+    const view = slotState(slot, card);
+    const picked = tuneView({ slot, card, view, above });
+    const camera = picked?.knobs.find((k) => k.key === "camera");
+    expect(camera).toMatchObject({
+      stop: "above",
+      picked: true,
+      chosen: false,
+    });
+    expect(picked?.startsFrom).toBe("above");
+    expect(picked?.summary).toMatch(/^A little above/);
+    expect(viewed.references?.threeQuarter).toEqual(above);
+    // Without one, nothing changes.
+    const plain = tuneView({ slot, card, view });
+    expect(plain?.knobs.find((k) => k.key === "camera")).toMatchObject({
+      stop: "eye",
+      picked: false,
+    });
+    expect(plain?.startsFrom).toBeNull();
+  });
+
+  it("the maker's eye level starts from the front", () => {
+    const tuned = withSlotTuning(setup().plan, ref, {
+      knob: "camera",
+      stop: "eye",
+    });
+    const { slot, card } = setup(tuned);
+    const tune = tuneView({ slot, card, view: slotState(slot, card), above });
+    expect(tune?.knobs.find((k) => k.key === "camera")).toMatchObject({
+      stop: "eye",
+      chosen: true,
+      picked: false,
+    });
+    expect(tune?.startsFrom).toBe("front");
   });
 });
