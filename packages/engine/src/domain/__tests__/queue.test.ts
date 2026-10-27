@@ -3,6 +3,8 @@ import {
   classifyGenerationError,
   describeProviderError,
   hadResponse,
+  providerWords,
+  readableFailure,
   retryDecision,
 } from "@/domain/queue";
 
@@ -102,6 +104,57 @@ describe("provider errors in plain words", () => {
       "Google is rate-limiting requests — try again in a minute or use OpenAI.",
     );
     expect(classifyGenerationError(withStatus(429))).toBe("transient");
+  });
+
+  // What Google's SDK put in the message for a bad key (10/22): the whole body.
+  const googleBody = JSON.stringify({
+    error: {
+      code: 400,
+      message: "API key not valid. Please pass a valid API key.",
+      status: "INVALID_ARGUMENT",
+      details: [
+        {
+          "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+          reason: "API_KEY_INVALID",
+          domain: "googleapis.com",
+        },
+      ],
+    },
+  });
+
+  it("Google's 400 for a bad key is a rejected key, not its JSON body", () => {
+    expect(
+      describeProviderError(
+        "google",
+        Object.assign(new Error(googleBody), { status: 400 }),
+      ),
+    ).toBe(
+      "Google rejected the API key (400) — check GOOGLE_API_KEY or use OpenAI.",
+    );
+    expect(readableFailure(googleBody, "google")).toBe(
+      "Google rejected the API key — check GOOGLE_API_KEY or use OpenAI.",
+    );
+  });
+
+  it("any other JSON body says what the provider said, even cut short", () => {
+    const body = (message: string) =>
+      JSON.stringify({ error: { code: 400, message, status: "X" } });
+    expect(
+      describeProviderError(
+        "google",
+        Object.assign(
+          new Error(`got status: 400. ${body('The "seed" field is unknown.')}`),
+          { status: 400 },
+        ),
+      ),
+    ).toBe('got status: 400. The "seed" field is unknown.');
+    expect(readableFailure(body("Model is overloaded.").slice(0, 55))).toBe(
+      "Model is overloaded.",
+    );
+    expect(providerWords("No JSON {here")).toBe("No JSON {here");
+    expect(providerWords('{"error":{"code":500}}')).toBe(
+      '{"error":{"code":500}}',
+    );
   });
 
   it("a rejected key names the variable; anything else keeps the provider's words", () => {

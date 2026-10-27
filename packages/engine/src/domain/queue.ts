@@ -105,6 +105,40 @@ export function isOutOfCredit(error: unknown): boolean {
   return /spend|spending cap|quota|billing/i.test(text);
 }
 
+// Google answers a bad key with a 400, not a 401.
+const KEY_REJECTED = /API_KEY_INVALID|API key not valid/i;
+
+// Google's SDK puts the whole JSON response in an error's message; what the
+// provider said is its error.message, read even from a body cut short.
+export function providerWords(text: string): string {
+  const start = text.indexOf("{");
+  if (start < 0) return text;
+  const end = text.lastIndexOf("}");
+  const before = text.slice(0, start);
+  try {
+    const body = JSON.parse(text.slice(start, end + 1)) as {
+      error?: { message?: unknown };
+    } | null;
+    const said = body?.error?.message;
+    if (typeof said !== "string" || said.trim() === "") return text;
+    return `${before}${said.trim()}${text.slice(end + 1)}`.trim();
+  } catch {
+    const quoted = /"message"\s*:\s*("(?:[^"\\]|\\.)+")/.exec(text)?.[1];
+    if (!quoted) return text;
+    try {
+      return `${before}${(JSON.parse(quoted) as string).trim()}`.trim();
+    } catch {
+      return text;
+    }
+  }
+}
+
+function rejectedKey(provider: "google" | "openai", status?: unknown) {
+  const other = PROVIDER_LABEL[provider === "google" ? "openai" : "google"];
+  const code = typeof status === "number" ? ` (${status})` : "";
+  return `${PROVIDER_LABEL[provider]} rejected the API key${code} — check ${PROVIDER_KEY[provider]} or use ${other}.`;
+}
+
 // A provider failure in words the maker can act on, naming the other provider
 // as the way out (never taken on its own).
 export function describeProviderError(
@@ -122,8 +156,21 @@ export function describeProviderError(
   if (status === 429) {
     return `${label} is rate-limiting requests — try again in a minute or use ${other}.`;
   }
-  if (status === 401 || status === 403) {
-    return `${label} rejected the API key (${status}) — check ${PROVIDER_KEY[provider]} or use ${other}.`;
+  const said = providerWords(
+    error instanceof Error ? error.message : String(error),
+  ).slice(0, 500);
+  if (status === 401 || status === 403 || KEY_REJECTED.test(said)) {
+    return rejectedKey(provider, status);
   }
-  return errorMessage(error);
+  return said;
+}
+
+// A failure as stored, for showing: rows written before the provider's words
+// were read out keep the raw JSON body.
+export function readableFailure(
+  text: string,
+  provider?: "google" | "openai",
+): string {
+  if (provider && KEY_REJECTED.test(text)) return rejectedKey(provider);
+  return providerWords(text);
 }

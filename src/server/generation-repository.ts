@@ -10,6 +10,7 @@ import {
   type JobView,
   MAX_ATTEMPTS,
   RETRY_BACKOFF_MS,
+  readableFailure,
 } from "@/domain/queue";
 import { assertDatabaseUrl, db } from "@/lib/db";
 
@@ -621,7 +622,7 @@ export async function projectGenerationState(
         {
           status: j.status,
           attempt: j.attempt,
-          ...(j.error ? { error: j.error } : {}),
+          ...(j.error ? { error: readableFailure(j.error) } : {}),
         },
       ]),
     ),

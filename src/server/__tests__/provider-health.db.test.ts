@@ -74,5 +74,17 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
     expect(g.lastOkAt).not.toBeNull();
     expect(o).toMatchObject({ provider: "openai", lastError: null });
     expect(typeof o.keyPresent).toBe("boolean");
+
+    // A row stored with Google's raw body (before its words were read out).
+    await row(
+      google,
+      "failed",
+      0,
+      '{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}',
+    );
+    const [, raw] = await providerHealth(makerId);
+    expect(raw.lastError?.message).toBe(
+      "Google rejected the API key — check GOOGLE_API_KEY or use OpenAI.",
+    );
   });
 });

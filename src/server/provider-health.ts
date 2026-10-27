@@ -1,4 +1,5 @@
 import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
+import { readableFailure } from "@/domain/queue";
 import { db, hasDatabase } from "@/lib/db";
 import { hasProviderKey } from "@/providers/keys";
 import { CAP_REACHED, NOT_STARTED } from "@/server/generation-worker";
@@ -63,7 +64,10 @@ export async function providerHealth(
       keyPresent: hasProviderKey(provider),
       lastError:
         lastFailed && (!lastOk || lastFailed.at > lastOk)
-          ? { at: lastFailed.at.toISOString(), message: lastFailed.message }
+          ? {
+              at: lastFailed.at.toISOString(),
+              message: readableFailure(lastFailed.message, provider),
+            }
           : null,
       lastOkAt: lastOk?.toISOString() ?? null,
     };

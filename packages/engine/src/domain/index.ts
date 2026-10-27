@@ -243,7 +243,9 @@ export {
   JobStatus,
   type JobView,
   MAX_ATTEMPTS,
+  providerWords,
   RETRY_BACKOFF_MS,
+  readableFailure,
   retryDecision,
 } from "@/domain/queue";
 export {

@@ -74,7 +74,7 @@ export default async function SettingsPage() {
             {health.map((h) => (
               <div
                 key={h.provider}
-                className="flex flex-col gap-2 rounded-render border border-border-soft bg-surface-soft p-4"
+                className="flex min-w-0 flex-col gap-2 rounded-render border border-border-soft bg-surface-soft p-4"
               >
                 <div className="font-sans text-sm font-semibold text-foreground">
                   {h.label}
@@ -88,7 +88,7 @@ export default async function SettingsPage() {
                 {h.lastError ? (
                   <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
                     <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-prov-local" />
-                    <span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">
                       {h.lastError.message}{" "}
                       <span className="font-mono text-[0.65rem] text-on-surface-dim">
                         {when(h.lastError.at)}

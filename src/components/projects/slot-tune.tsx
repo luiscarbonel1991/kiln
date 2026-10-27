@@ -237,7 +237,7 @@ export function SlotTune({
               </div>
             ) : null}
             {tune.error ? (
-              <p className="font-mono text-[0.6rem] text-prov-local">
+              <p className="font-mono text-[0.6rem] text-prov-local [overflow-wrap:anywhere]">
                 Last take failed: {tune.error}
               </p>
             ) : null}
