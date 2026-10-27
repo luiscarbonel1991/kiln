@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { MasterAsset } from "@/domain/master-asset";
-import { planProject, slotState, withSlotTuning } from "@/domain/plan";
+import {
+  planProject,
+  slotState,
+  withSlotPlace,
+  withSlotTuning,
+} from "@/domain/plan";
 import { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { slotCards } from "@/lib/project-start";
@@ -195,5 +200,41 @@ describe("tuneView", () => {
       job,
     });
     expect(t?.error).toBe("provider timed out");
+  });
+});
+
+describe("tuneView: the place", () => {
+  const places = [
+    { place: "a desk beside a laptop", from: "product" as const },
+    { place: "a reception counter", from: "brief" as const },
+  ];
+
+  it("offers the places to a scene that takes one, its own place shown", () => {
+    const { plan, slot, card } = setup();
+    expect(
+      tuneView({ slot, card, view: slotState(slot, card), places })?.place,
+    ).toEqual({ own: null, options: places, putsInPlace: false });
+    const placed = withSlotPlace(plan, ref, "a reception counter");
+    const own = placed.destinations[0].slots.find((s) => s.key === "in-use");
+    if (!own) throw new Error("no in-use");
+    expect(
+      tuneView({ slot: own, card, view: slotState(own, card), places })?.place
+        ?.own,
+    ).toBe("a reception counter");
+  });
+
+  it("a hero takes a place (it then stands in it); a scene that names none does not", () => {
+    const { plan, card } = setup();
+    const hero = plan.destinations[0].slots.find((s) => s.key === "hero");
+    const gift = plan.destinations[0].slots.find((s) => s.key === "gift");
+    if (!hero || !gift) throw new Error("no hero or gift");
+    expect(
+      tuneView({ slot: hero, card, view: slotState(hero, card), places })?.place
+        ?.putsInPlace,
+    ).toBe(true);
+    expect(
+      tuneView({ slot: gift, card, view: slotState(gift, card), places })
+        ?.place,
+    ).toBeNull();
   });
 });
