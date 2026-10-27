@@ -15,7 +15,8 @@ const MAX_READ_BYTES = 16 * 1024;
 // (default "API") and `readOn` (default today). It replaces a read taken
 // before. 200 with the read kept; 400 for a body that is not JSON; 404 for an
 // unknown project, destination or read; 422 for a read Kiln cannot keep (a
-// number that is not a whole count, a destination not delivered yet).
+// number that is not a whole count, a destination neither delivered nor
+// given the day its photos went up).
 export async function PUT(request: Request, { params }: Context) {
   const denied = await authorize(request);
   if (denied) return denied;

@@ -19,7 +19,9 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
   const repo = await import("@/server/project-repository");
   const results = await import("@/server/listing-results");
   const { upsertProducts } = await import("@/server/product-repository");
-  const { planProject, withListingUrl } = await import("@/domain/plan");
+  const { planProject, withListingUrl, withLiveOn } = await import(
+    "@/domain/plan"
+  );
   const { Product } = await import("@/domain/product");
   const { CATALOG } = await import("@/lib/recipes");
   const { localDate } = await import("@/lib/results-view");
@@ -93,7 +95,21 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
         source: "typed",
         today,
       }),
-    ).rejects.toThrow(/Deliver this destination first/);
+    ).rejects.toThrow(/Set the day the photos went up first/);
+    // The maker took the photos out another way and says when they went up.
+    await repo.changePlan(early, (plan) =>
+      withLiveOn(plan, "etsy", "2026-10-20"),
+    );
+    expect(
+      await results.saveRead({
+        projectId: early,
+        destinationId: "etsy",
+        key: "before",
+        read: { visits: 40 },
+        source: "typed",
+        today,
+      }),
+    ).toMatchObject({ from: "2026-09-20", to: "2026-10-19" });
 
     const id = await delivered("2026-10-27T15:00:00.000Z");
     const liveOn = localDate("2026-10-27T15:00:00.000Z");

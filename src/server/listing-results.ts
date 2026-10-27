@@ -93,7 +93,7 @@ export async function saveRead(input: {
     const view = resultsView(destination, today);
     if (!view) {
       throw new ResultsRefusal(
-        "Deliver this destination first: its reads count from the day the photos go up.",
+        "Set the day the photos went up first (or deliver it): the reads count from it.",
       );
     }
     const window = view.reads.find((r) => r.key === input.key)?.window;
@@ -135,7 +135,7 @@ export async function readFromShop(input: {
   const view = destination ? resultsView(destination, today) : null;
   if (!view) {
     throw new ResultsRefusal(
-      "Deliver this destination first: its reads count from the day the photos go up.",
+      "Set the day the photos went up first (or deliver it): the reads count from it.",
     );
   }
   if (!view.listingUrl) {

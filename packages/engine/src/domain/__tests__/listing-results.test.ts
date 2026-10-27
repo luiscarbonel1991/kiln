@@ -131,6 +131,11 @@ describe("before against after", () => {
     expect(comparisonLine({ rows, thin })).toBe(
       "Visits 600 → 450 a month (−25 %)",
     );
+    const big = compareReads(
+      read("2026-09-27", "2026-10-26", { visits: 1200 }),
+      after,
+    );
+    expect(comparisonLine(big)).toBe("Visits 1,200 → 450 a month (−63 %)");
   });
 });
 

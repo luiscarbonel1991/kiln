@@ -206,7 +206,7 @@ export const latestAfter = (results: ListingResults | undefined) =>
   results?.reads.day30 ?? results?.reads.day14 ?? null;
 
 const round = (n: number) =>
-  n >= 100 ? Math.round(n).toString() : n.toFixed(n >= 10 ? 0 : 1);
+  n >= 100 ? Math.round(n).toLocaleString("en-US") : n.toFixed(n >= 10 ? 0 : 1);
 
 export function changeLabel(row: MetricChange): string {
   const pct = (n: number) => `${(n * 100).toFixed(1)} %`;
@@ -239,8 +239,9 @@ export function comparisonLine(comparison: ReadComparison): string | null {
 }
 
 // What the refresh changed: the frames that replaced a live photo, or, in a
-// listing made from the product, every frame delivered (the maker's own
-// photos, kept as they were, changed nothing).
+// listing made from the product, every frame delivered (else every scene
+// approved, when the maker took them out of Kiln another way). The maker's
+// own photos, kept as they were, changed nothing.
 export function changedFrames(destination: {
   slots: {
     key: string;
@@ -248,14 +249,22 @@ export function changedFrames(destination: {
     fill: string;
     off?: boolean;
     deliveredAt?: string;
+    approvedOutput?: string;
     before?: unknown;
     place?: string;
   }[];
 }): { key: string; label: string; place?: string }[] {
   const on = destination.slots.filter((s) => !s.off && s.fill !== "photo");
   const refresh = destination.slots.some((s) => s.fill === "photo");
+  const delivered = on.some((s) => s.deliveredAt);
   return on
-    .filter((s) => (refresh ? s.before !== undefined : !!s.deliveredAt))
+    .filter((s) =>
+      refresh
+        ? s.before !== undefined
+        : delivered
+          ? !!s.deliveredAt
+          : !!s.approvedOutput,
+    )
     .map((s) => ({
       key: s.key,
       label: s.label,

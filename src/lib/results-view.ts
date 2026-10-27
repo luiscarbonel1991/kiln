@@ -25,7 +25,10 @@ export interface ResultsRead {
   key: ReadKey;
   label: string;
   read: ListingRead | null;
+  // The read's own window for the day the photos went up.
   window: { from: string; to: string };
+  // A read taken over other days (the day it counts from moved since).
+  offWindow: boolean;
   dueOn: string;
   // Not taken and its window has passed.
   due: boolean;
@@ -63,14 +66,20 @@ export function resultsView(
   if (!liveOn) return null;
   const following = !results?.stopped;
   const { due, next } = readsDue(results, liveOn, today);
-  const reads = ReadKey.options.map((key) => ({
-    key,
-    label: READ_LABELS[key],
-    read: results?.reads[key] ?? null,
-    window: results?.reads[key] ?? readWindow(key, liveOn),
-    dueOn: dueOn(key, liveOn),
-    due: due.some((d) => d.key === key),
-  }));
+  const reads = ReadKey.options.map((key) => {
+    const read = results?.reads[key] ?? null;
+    const window = readWindow(key, liveOn);
+    return {
+      key,
+      label: READ_LABELS[key],
+      read,
+      window,
+      offWindow:
+        read !== null && (read.from !== window.from || read.to !== window.to),
+      dueOn: dueOn(key, liveOn),
+      due: due.some((d) => d.key === key),
+    };
+  });
   const before = results?.reads.before;
   const against = results?.reads.day30
     ? "day30"
@@ -88,10 +97,7 @@ export function resultsView(
     liveOn,
     liveOnSet: results?.liveOn !== undefined,
     following,
-    reads: reads.map((r) => ({
-      ...r,
-      window: { from: r.window.from, to: r.window.to },
-    })),
+    reads,
     comparison:
       compared && against
         ? { against, ...compared, line: comparisonLine(compared) }
