@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
+import { etsyListingId, ListingUrl } from "@/domain/live-listing";
 import {
   getMakerBrand,
   getMakerModels,
@@ -14,14 +15,20 @@ import { listProducts } from "@/server/product-repository";
 // Start. Rendered per request (it reads the maker's products and defaults).
 // `?design=` hands over a stored design from the studio ("Make it a
 // product"): the new-product form opens with it. `?product=` (Home) picks a
-// product.
+// product. `?listing=` (Shops) starts a Listing kit from that live listing.
 export default async function NewProjectPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   await connection();
-  const { design, product } = await searchParams;
+  const { design, product, listing } = await searchParams;
+  const listingUrl =
+    typeof listing === "string" &&
+    ListingUrl.safeParse(listing).success &&
+    etsyListingId(listing)
+      ? listing
+      : null;
   const initialDesign =
     typeof design === "string" ? await describeStoredSvg(design) : null;
   const products = await listProducts();
@@ -46,6 +53,7 @@ export default async function NewProjectPage({
             ? product
             : null
         }
+        initialListingUrl={listingUrl}
       />
     </div>
   );

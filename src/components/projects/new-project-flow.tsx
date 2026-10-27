@@ -88,6 +88,7 @@ export function NewProjectFlow({
   rememberedHero = {},
   initialDesign,
   initialProductId = null,
+  initialListingUrl = null,
 }: {
   initialProducts: Product[];
   initialBrand: BrandKit | null;
@@ -100,6 +101,8 @@ export function NewProjectFlow({
   initialDesign: StoredProductFile | null;
   // A product picked on Home.
   initialProductId?: string | null;
+  // A live listing to refresh, picked on Shops: a Listing kit started from it.
+  initialListingUrl?: string | null;
 }) {
   const [products, setProducts] = useState(initialProducts);
   // The new-product form: open from the start for a maker with no products
@@ -112,17 +115,26 @@ export function NewProjectFlow({
     initialProductId ??
       (initialProducts.length === 1 ? initialProducts[0].id : null),
   );
-  const [type, setType] = useState<BoardType | null>(null);
+  const [type, setType] = useState<BoardType | null>(
+    initialListingUrl ? "listing-kit" : null,
+  );
   // A Listing kit starts from the product, or from a listing already selling
   // (its address and its photos, some to replace).
-  const [startFrom, setStartFrom] = useState<"product" | "live">("product");
-  const [listingUrl, setListingUrl] = useState("");
+  const [startFrom, setStartFrom] = useState<"product" | "live">(
+    initialListingUrl ? "live" : "product",
+  );
+  const [listingUrl, setListingUrl] = useState(initialListingUrl ?? "");
   const [liveRows, setLiveRows] = useState<LiveRow[]>([]);
   // The hero setting the maker picked per destination (else the proposal).
   const [heroChoices, setHeroChoices] = useState<Record<string, HeroSetting>>(
     {},
   );
-  const [destinationIds, setDestinationIds] = useState<string[]>([]);
+  const [destinationIds, setDestinationIds] = useState<string[]>(() => {
+    if (!initialListingUrl) return [];
+    const offered = offeredDestinations("listing-kit", CATALOG);
+    const etsy = offered.find((d) => d.id === "etsy") ?? offered[0];
+    return etsy ? [etsy.id] : [];
+  });
   // Slot card ids ("etsy.gift") the maker switched off for this product.
   const [offSlots, setOffSlots] = useState<string[]>([]);
   const [importOutcome, setImportOutcome] = useState<ImportOutcome | null>(

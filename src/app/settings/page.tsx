@@ -4,6 +4,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { AccessTokens } from "@/components/settings/access-tokens";
 import { KeyCheck } from "@/components/settings/key-check";
 import { ModelsForm } from "@/components/settings/models-form";
+import { EtsyConnection } from "@/components/shops/etsy-connection";
 import { fromMicros } from "@/domain/generation-cost";
 import { hasDatabase } from "@/lib/db";
 import { providerMode } from "@/providers/mode";
@@ -11,6 +12,7 @@ import { listAccessTokens } from "@/server/access-tokens";
 import { budget } from "@/server/generation-repository";
 import { getCurrentMaker, getMakerModels } from "@/server/maker-repository";
 import { providerHealth } from "@/server/provider-health";
+import { etsySetup, shopConnection } from "@/server/shop-connection";
 
 const money = (usd: number) => `$${usd.toFixed(2)}`;
 
@@ -26,15 +28,17 @@ const when = (iso: string) =>
 // health). Models: the default per kind. Providers: each key and its last
 // calls, read for free, and a free key check on a click (the provider lists
 // its models; no paid call). The month's cap, read only.
-// Access tokens: for the HTTP API (README "HTTP API").
+// Shops: the Etsy connection. Access tokens: for the HTTP API (README "HTTP
+// API").
 export default async function SettingsPage() {
   await connection();
   const maker = hasDatabase() ? await getCurrentMaker() : null;
-  const [models, health, month, tokens] = await Promise.all([
+  const [models, health, month, tokens, shop] = await Promise.all([
     getMakerModels(),
     providerHealth(maker?.id ?? null),
     maker ? budget(maker.id) : Promise.resolve(null),
     maker ? listAccessTokens() : Promise.resolve(null),
+    maker ? shopConnection() : Promise.resolve(null),
   ]);
   const mode = providerMode();
   return (
@@ -126,6 +130,22 @@ export default async function SettingsPage() {
               {money(fromMicros(month.capMicros))}, one cap for both providers
               (calendar month, UTC).
             </p>
+          </section>
+        ) : null}
+
+        {maker ? (
+          <section className="rounded-card bg-card p-6 shadow-card">
+            <h2
+              className="font-serif text-xl italic text-foreground"
+              style={{ fontVariationSettings: "'opsz' 40" }}
+            >
+              Shops
+            </h2>
+            <p className="mt-1 mb-5 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
+              Your Etsy shop, connected through Etsy: Shops ranks your listings
+              by what sold, and the results loop reads orders from it.
+            </p>
+            <EtsyConnection setup={etsySetup()} connection={shop} manage />
           </section>
         ) : null}
 

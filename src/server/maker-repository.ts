@@ -14,6 +14,7 @@ import {
   ModelRefused,
   makerModels,
 } from "@/domain/model-defaults";
+import { MAX_WATCHED_SHOPS, WatchedShop } from "@/domain/shop-ranking";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
 import { env } from "@/lib/env";
 
@@ -80,7 +81,9 @@ export async function getMakerModels(): Promise<MakerModels> {
 
 // The maker's remembered choices (hero-setting.ts); none without a database.
 export async function getMakerPreferences(): Promise<MakerPreferences> {
-  if (!hasDatabase()) return { heroSetting: {}, searchColumns: {} };
+  if (!hasDatabase()) {
+    return { heroSetting: {}, searchColumns: {}, watchedShops: [] };
+  }
   const maker = await getCurrentMaker();
   const row = await db.maker.findUnique({
     where: { id: maker.id },
@@ -147,6 +150,36 @@ export async function rememberSearchColumns(
       ? null
       : { searchColumns: { ...kept.searchColumns, [name]: mapping } },
   );
+}
+
+// Add a shop to the ones the maker compares theirs with (Shops), or take
+// one off; false when it was already there (or not there), or the list is
+// full.
+export async function watchShop(shop: WatchedShop): Promise<boolean> {
+  const wanted = WatchedShop.parse(shop);
+  let added = false;
+  await updatePreferences((kept) => {
+    if (
+      kept.watchedShops.some((s) => s.shopId === wanted.shopId) ||
+      kept.watchedShops.length >= MAX_WATCHED_SHOPS
+    ) {
+      return null;
+    }
+    added = true;
+    return { watchedShops: [...kept.watchedShops, wanted] };
+  });
+  return added;
+}
+
+export async function unwatchShop(shopId: string): Promise<boolean> {
+  let removed = false;
+  await updatePreferences((kept) => {
+    const rest = kept.watchedShops.filter((s) => s.shopId !== shopId);
+    if (rest.length === kept.watchedShops.length) return null;
+    removed = true;
+    return { watchedShops: rest };
+  });
+  return removed;
 }
 
 // Save the defaults: each kind must be a model Kiln offers for it, with a

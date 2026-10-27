@@ -1,8 +1,8 @@
-import { Palette, Plus, Settings2 } from "lucide-react";
+import { Palette, Plus, Settings2, Store } from "lucide-react";
 import Link from "next/link";
 
 // Header for Home and the project pages: the wordmark (Home), the studio,
-// Settings and a "New project" entry. Same chrome as the studio header
+// Shops, Settings and a "New project" entry. Same chrome as the studio header
 // (DESIGN.md).
 export function ProjectsHeader({ children }: { children?: React.ReactNode }) {
   return (
@@ -23,6 +23,12 @@ export function ProjectsHeader({ children }: { children?: React.ReactNode }) {
           className="inline-flex h-7 items-center gap-1 rounded-field px-2.5 font-sans text-[0.8rem] font-semibold text-on-surface-mid transition-colors hover:text-foreground"
         >
           <Palette className="size-3.5" /> Studio
+        </Link>
+        <Link
+          href="/shops"
+          className="inline-flex h-7 items-center gap-1 rounded-field px-2.5 font-sans text-[0.8rem] font-semibold text-on-surface-mid transition-colors hover:text-foreground"
+        >
+          <Store className="size-3.5" /> Shops
         </Link>
         <Link
           href="/settings"
