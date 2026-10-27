@@ -17,30 +17,38 @@ export function ProjectsHeader({ children }: { children?: React.ReactNode }) {
         </Link>
         {children}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
         <Link
           href="/studio"
+          aria-label="Studio"
           className="inline-flex h-7 items-center gap-1 rounded-field px-2.5 font-sans text-[0.8rem] font-semibold text-on-surface-mid transition-colors hover:text-foreground"
         >
-          <Palette className="size-3.5" /> Studio
+          <Palette className="size-3.5" />
+          <span className="hidden sm:inline">Studio</span>
         </Link>
         <Link
           href="/shops"
+          aria-label="Shops"
           className="inline-flex h-7 items-center gap-1 rounded-field px-2.5 font-sans text-[0.8rem] font-semibold text-on-surface-mid transition-colors hover:text-foreground"
         >
-          <Store className="size-3.5" /> Shops
+          <Store className="size-3.5" />
+          <span className="hidden sm:inline">Shops</span>
         </Link>
         <Link
           href="/settings"
+          aria-label="Settings"
           className="inline-flex h-7 items-center gap-1 rounded-field px-2.5 font-sans text-[0.8rem] font-semibold text-on-surface-mid transition-colors hover:text-foreground"
         >
-          <Settings2 className="size-3.5" /> Settings
+          <Settings2 className="size-3.5" />
+          <span className="hidden sm:inline">Settings</span>
         </Link>
         <Link
           href="/projects/new"
+          aria-label="New project"
           className="inline-flex h-7 items-center gap-1 rounded-field bg-primary px-2.5 font-sans text-[0.8rem] font-semibold text-primary-foreground shadow-button transition-colors hover:bg-primary/85"
         >
-          <Plus className="size-3.5" /> New project
+          <Plus className="size-3.5" />
+          <span className="hidden min-[400px]:inline">New project</span>
         </Link>
       </div>
     </header>

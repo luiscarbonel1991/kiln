@@ -39,17 +39,27 @@ const DAY_SEC = 86_400;
 
 const memo = new Map<string, { at: number; value: unknown }>();
 
-async function remembered<T>(
+// A read kept for ten minutes, with when it was read.
+async function rememberedAt<T>(
   key: string,
   fresh: boolean,
   read: () => Promise<T>,
-): Promise<T> {
+): Promise<{ value: T; at: number }> {
   const kept = memo.get(key);
-  if (!fresh && kept && Date.now() - kept.at < FRESH_MS) return kept.value as T;
+  if (!fresh && kept && Date.now() - kept.at < FRESH_MS) {
+    return { value: kept.value as T, at: kept.at };
+  }
   const value = await read();
-  memo.set(key, { at: Date.now(), value });
-  return value;
+  const at = Date.now();
+  memo.set(key, { at, value });
+  return { value, at };
 }
+
+const remembered = async <T>(
+  key: string,
+  fresh: boolean,
+  read: () => Promise<T>,
+): Promise<T> => (await rememberedAt(key, fresh, read)).value;
 
 // For tests.
 export const forgetShopReads = () => memo.clear();
@@ -107,7 +117,7 @@ export async function yourBestSellers(
   const maker = await getCurrentMaker();
   const nowSec = Math.floor(now.getTime() / 1000);
   const minCreated = nowSec - window * DAY_SEC;
-  const read = await remembered(
+  const { value: read, at } = await rememberedAt(
     `${maker.id}|best|${etsy.shopId}|${window}`,
     options.fresh === true,
     async () => {
@@ -137,7 +147,7 @@ export async function yourBestSellers(
     })),
     orders: read.items.length,
     complete: read.complete,
-    readAt: now.toISOString(),
+    readAt: new Date(at).toISOString(),
   };
 }
 
