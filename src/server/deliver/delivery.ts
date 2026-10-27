@@ -5,6 +5,12 @@ import { exactView } from "@/domain/exact";
 import { imageSize, rasterType } from "@/domain/image-type";
 import type { ListingText } from "@/domain/listing";
 import {
+  bandLabel,
+  CONVERSION_LABELS,
+  isEmptyBrief,
+  type MarketBrief,
+} from "@/domain/market-brief";
+import {
   type CardLike,
   deliveryBlockers,
   type PlanDestination,
@@ -72,6 +78,8 @@ export interface DeliveredFile {
   seconds?: number;
   output?: string;
   source?: SceneSource;
+  // A scene's own place (the maker's, often from the market brief).
+  place?: string;
 }
 
 // A clip's pixel size by resolution and orientation (Veo; Sora rendered 720p).
@@ -104,6 +112,34 @@ export function slug(text: string): string {
   );
 }
 
+// The market brief in the README: why these photos, with each number's
+// source and date, so the 30-day read has its "before" reason on file.
+function briefLines(brief: MarketBrief | undefined): string[] {
+  if (!brief || isEmptyBrief(brief)) return [];
+  const search = (s: MarketBrief["searches"][number], i: number) => {
+    const facts = [
+      s.searches !== undefined ? `${s.searches} searches a month` : null,
+      s.results !== undefined ? `${s.results} results` : null,
+      s.conversion
+        ? `${CONVERSION_LABELS[s.conversion].toLowerCase()} conversion`
+        : s.conversionRate !== undefined
+          ? `${s.conversionRate} % conversion`
+          : null,
+      s.price ? `median purchase ${bandLabel(s.price)}` : null,
+    ].filter(Boolean);
+    return `- ${i === 0 ? "Leads with" : "Also"} "${s.term}"${facts.length > 0 ? `: ${facts.join(", ")}` : ""} (${s.source}, read ${s.readOn}).`;
+  };
+  return [
+    "",
+    "Market brief (why these photos):",
+    ...brief.searches.map(search),
+    ...brief.notes.map(
+      (n) =>
+        `- Page 1${n.term ? ` for "${n.term}"` : ""}: ${n.note}${n.place ? ` Place: ${n.place}.` : ""} (read ${n.readOn})`,
+    ),
+  ];
+}
+
 function readme(
   input: DeliveryInput,
   files: DeliveredFile[],
@@ -118,8 +154,9 @@ function readme(
     ...files.map((f) =>
       f.kind === "video"
         ? `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.label ?? f.source.model}` : ""}), ${f.width} x ${f.height} px`
-        : `${f.photo}. ${folder}/${f.file} — ${f.label} (${f.kind === "exact" ? "drawn from the product spec" : f.kind === "photo" ? "your photo, as on the listing" : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}`}), ${f.width} x ${f.height} px`,
+        : `${f.photo}. ${folder}/${f.file} — ${f.label} (${f.kind === "exact" ? "drawn from the product spec" : f.kind === "photo" ? "your photo, as on the listing" : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${f.place ? `, at ${f.place}` : ""}`}), ${f.width} x ${f.height} px`,
     ),
+    ...briefLines(input.plan.brief),
     "",
     "manifest.json lists each file with its source (the prompt and model of each",
     "scene, its measured cost when known).",
@@ -257,6 +294,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       ...size,
       output,
       source: input.sourceOf(output),
+      ...(slot.place ? { place: slot.place } : {}),
     });
   }
   const manifest = {
@@ -265,6 +303,9 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
     destination: input.destination.id,
     exportedAt: input.now.toISOString(),
     files,
+    ...(input.plan.brief && !isEmptyBrief(input.plan.brief)
+      ? { brief: input.plan.brief }
+      : {}),
   };
   entries[`${folder}/README.txt`] = strToU8(readme(input, files, folder));
   if (input.listing && input.destination.text) {

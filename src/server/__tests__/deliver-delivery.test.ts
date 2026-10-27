@@ -328,6 +328,65 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
     expect(plain[`${folder}/listing.txt`]).toBeUndefined();
   });
 
+  it("the README says why: the market brief with its sources and dates, and a scene's own place", async () => {
+    const briefed = PlanDestination.parse({
+      ...plan,
+      slots: plan.slots.map((s) =>
+        s.key === "hero" ? { ...s, place: "a sunny window ledge" } : s,
+      ),
+      brief: {
+        searches: [
+          {
+            term: "cork coaster",
+            searches: 5700,
+            results: 27000,
+            conversion: "high",
+            price: { low: 14.4, high: 17.6 },
+            source: "Etsy Marketplace Insights",
+            readOn: "2026-09-27",
+          },
+          { term: "coaster set", source: "Typed", readOn: "2026-10-01" },
+        ],
+        notes: [
+          {
+            term: "cork coaster",
+            note: "Close crops on a wooden table, a mug beside it.",
+            place: "a sunny window ledge",
+            readOn: "2026-10-01",
+          },
+        ],
+      },
+    });
+    const result = await buildDelivery(input({ plan: briefed }));
+    const files = unzipSync(result.zip);
+    const folder = "botanical-coaster-launch-etsy";
+    const readme = strFromU8(files[`${folder}/README.txt`]);
+    expect(readme).toContain(
+      "Hero (approved scene, gpt-image-2, at a sunny window ledge)",
+    );
+    expect(readme).toContain("Market brief (why these photos):");
+    expect(readme).toContain(
+      '- Leads with "cork coaster": 5700 searches a month, 27000 results, high conversion, median purchase 14.40–17.60 (Etsy Marketplace Insights, read 2026-09-27).',
+    );
+    expect(readme).toContain('- Also "coaster set" (Typed, read 2026-10-01).');
+    expect(readme).toContain(
+      '- Page 1 for "cork coaster": Close crops on a wooden table, a mug beside it. Place: a sunny window ledge. (read 2026-10-01)',
+    );
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    expect(manifest.brief).toEqual(briefed.brief);
+    expect(
+      manifest.files.find((f: { slot: string }) => f.slot === "hero").place,
+    ).toBe("a sunny window ledge");
+    // Without a brief, neither says anything about one.
+    const plain = unzipSync((await buildDelivery(input())).zip);
+    expect(strFromU8(plain[`${folder}/README.txt`])).not.toContain(
+      "Market brief",
+    );
+    expect(
+      JSON.parse(strFromU8(plain[`${folder}/manifest.json`])),
+    ).not.toHaveProperty("brief");
+  });
+
   it("refuses until every scene switched on is approved", async () => {
     await expect(
       buildDelivery(
