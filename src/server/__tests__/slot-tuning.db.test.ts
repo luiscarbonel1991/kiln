@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ refresh: () => {} }));
@@ -218,12 +217,6 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
   it("the hero's setting chosen on the board is remembered for the family, with or without a reference", async () => {
     const { getMakerPreferences } = await import("@/server/maker-repository");
     const maker = await getCurrentMaker();
-    const before = (
-      await db.maker.findUniqueOrThrow({
-        where: { id: maker.id },
-        select: { preferences: true },
-      })
-    ).preferences;
     try {
       for (const product of [form, photo]) {
         const { id } = await start(product);
@@ -242,12 +235,8 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
         }
       }
     } finally {
-      await db.maker.update({
-        where: { id: maker.id },
-        data: {
-          preferences: before === null ? Prisma.DbNull : (before as object),
-        },
-      });
+      // Only this test's key: other files write the same row in parallel.
+      await db.$executeRaw`UPDATE "Maker" SET "preferences" = "preferences" #- '{heroSetting,etsy:desk}' WHERE "id" = ${maker.id}`;
     }
   });
 

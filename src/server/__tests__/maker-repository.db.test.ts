@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Integration test against the throwaway Postgres (see
@@ -146,31 +145,18 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
   });
 });
 
+// The maker's preferences are one row other test files write too, in
+// parallel: each test adds and removes only its own keys, in one statement.
 describe.skipIf(!enabled)("maker preferences (database)", async () => {
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/maker-repository");
-  let before: unknown = null;
   beforeAll(async () => {
     const maker = await repo.getCurrentMaker();
-    before = (
-      await db.maker.findUniqueOrThrow({
-        where: { id: maker.id },
-        select: { preferences: true },
-      })
-    ).preferences;
-    await db.maker.update({
-      where: { id: maker.id },
-      data: { preferences: { other: "kept" } },
-    });
+    await db.$executeRaw`UPDATE "Maker" SET "preferences" = COALESCE("preferences", '{}'::jsonb) || '{"other":"kept"}'::jsonb WHERE "id" = ${maker.id}`;
   });
   afterAll(async () => {
     const maker = await repo.getCurrentMaker();
-    await db.maker.update({
-      where: { id: maker.id },
-      data: {
-        preferences: before === null ? Prisma.DbNull : (before as object),
-      },
-    });
+    await db.$executeRaw`UPDATE "Maker" SET "preferences" = "preferences" - 'other' #- '{heroSetting,etsy:home}' #- '{heroSetting,etsy:kitchen}' WHERE "id" = ${maker.id}`;
   });
 
   it("remembers the hero's setting per destination and family, two at once, keeping what else is there", async () => {
@@ -178,8 +164,9 @@ describe.skipIf(!enabled)("maker preferences (database)", async () => {
       repo.rememberHeroSetting("etsy", "Home", "place"),
       repo.rememberHeroSetting("etsy", "Kitchen", "sweep"),
     ]);
-    expect(await repo.getMakerPreferences()).toEqual({
-      heroSetting: { "etsy:home": "place", "etsy:kitchen": "sweep" },
+    expect((await repo.getMakerPreferences()).heroSetting).toMatchObject({
+      "etsy:home": "place",
+      "etsy:kitchen": "sweep",
     });
     await repo.rememberHeroSetting("etsy", "home ", "sweep");
     const maker = await repo.getCurrentMaker();
@@ -187,7 +174,7 @@ describe.skipIf(!enabled)("maker preferences (database)", async () => {
       where: { id: maker.id },
       select: { preferences: true },
     });
-    expect(row.preferences).toEqual({
+    expect(row.preferences).toMatchObject({
       other: "kept",
       heroSetting: { "etsy:home": "sweep", "etsy:kitchen": "sweep" },
     });
