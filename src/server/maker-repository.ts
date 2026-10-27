@@ -1,12 +1,12 @@
 import type { Prisma } from "@prisma/client";
 import { BrandKit } from "@/domain/brand";
 import { modelPriced } from "@/domain/generation-cost";
+import { type HeroSetting, heroKey } from "@/domain/hero-setting";
 import {
-  type HeroSetting,
-  heroKey,
   type MakerPreferences,
   readPreferences,
-} from "@/domain/hero-setting";
+} from "@/domain/maker-preferences";
+import { SearchColumns } from "@/domain/market-brief";
 import {
   assertModel,
   DEFAULT_MAKER_MODELS,
@@ -80,7 +80,7 @@ export async function getMakerModels(): Promise<MakerModels> {
 
 // The maker's remembered choices (hero-setting.ts); none without a database.
 export async function getMakerPreferences(): Promise<MakerPreferences> {
-  if (!hasDatabase()) return { heroSetting: {} };
+  if (!hasDatabase()) return { heroSetting: {}, searchColumns: {} };
   const maker = await getCurrentMaker();
   const row = await db.maker.findUnique({
     where: { id: maker.id },
@@ -89,13 +89,13 @@ export async function getMakerPreferences(): Promise<MakerPreferences> {
   return readPreferences(row?.preferences);
 }
 
-// Remember the hero's setting for a destination and a product family, under
-// the maker's row lock, so two projects started at once both land. Other
-// remembered choices are kept as they are.
-export async function rememberHeroSetting(
-  destinationId: string,
-  family: string,
-  setting: HeroSetting,
+// Change one kind of remembered choice under the maker's row lock, so two
+// writes at once both land; every other key stays as it is. `update` returns
+// null when nothing changes.
+async function updatePreferences(
+  update: (
+    kept: MakerPreferences,
+  ) => Partial<Record<keyof MakerPreferences, unknown>> | null,
 ): Promise<void> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
@@ -106,23 +106,47 @@ export async function rememberHeroSetting(
       where: { id: maker.id },
       select: { preferences: true },
     });
-    const key = heroKey(destinationId, family);
-    const kept = readPreferences(row.preferences);
-    if (kept.heroSetting[key] === setting) return;
+    const changed = update(readPreferences(row.preferences));
+    if (!changed) return;
     const raw =
       row.preferences && typeof row.preferences === "object"
         ? (row.preferences as Record<string, unknown>)
         : {};
     await tx.maker.update({
       where: { id: maker.id },
-      data: {
-        preferences: {
-          ...raw,
-          heroSetting: { ...kept.heroSetting, [key]: setting },
-        } as Prisma.InputJsonValue,
-      },
+      data: { preferences: { ...raw, ...changed } as Prisma.InputJsonValue },
     });
   });
+}
+
+// Remember the hero's setting for a destination and a product family.
+export async function rememberHeroSetting(
+  destinationId: string,
+  family: string,
+  setting: HeroSetting,
+): Promise<void> {
+  const key = heroKey(destinationId, family);
+  await updatePreferences((kept) =>
+    kept.heroSetting[key] === setting
+      ? null
+      : { heroSetting: { ...kept.heroSetting, [key]: setting } },
+  );
+}
+
+// Remember which header holds each value of a source's search table, so its
+// next export is read without asking.
+export async function rememberSearchColumns(
+  source: string,
+  columns: SearchColumns,
+): Promise<void> {
+  const name = source.trim();
+  const mapping = SearchColumns.parse(columns);
+  if (!name) return;
+  await updatePreferences((kept) =>
+    JSON.stringify(kept.searchColumns[name]) === JSON.stringify(mapping)
+      ? null
+      : { searchColumns: { ...kept.searchColumns, [name]: mapping } },
+  );
 }
 
 // Save the defaults: each kind must be a model Kiln offers for it, with a

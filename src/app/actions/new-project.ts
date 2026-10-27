@@ -13,6 +13,7 @@ import {
   parseSlotCardId,
   planFromListing,
   planProject,
+  withBrief,
   withSlotOff,
 } from "@/domain/plan";
 import { ProjectType } from "@/domain/project";
@@ -26,7 +27,7 @@ import {
 } from "@/server/maker-repository";
 import { productReference } from "@/server/product-reference";
 import { getProduct } from "@/server/product-repository";
-import { createProject } from "@/server/project-repository";
+import { createProject, latestBriefs } from "@/server/project-repository";
 
 // Only ids cross the boundary: the plan is rebuilt here from the catalog, never
 // accepted from the client; `offSlots` are slot card ids ("etsy.gift") the
@@ -50,8 +51,9 @@ const Input = z.object({
   heroSettings: z.record(z.string().min(1), HeroSetting).default({}),
 });
 
-// Start a project: plan, the product's reference (if Kiln can make one for
-// free), draft cards for the scene slots. No model is called. On success it
+// Start a project: plan (with the product's last market brief per
+// destination), the product's reference (if Kiln can make one for free),
+// draft cards for the scene slots. No model is called. On success it
 // redirects to the board; on a refusal it returns the reason.
 export async function createProjectAction(
   input: unknown,
@@ -94,9 +96,18 @@ export async function createProjectAction(
     const { heroSetting: remembered } = await getMakerPreferences();
     const proposed = (id: string) =>
       heroProposal(product, id, remembered).setting;
-    const plan = withHeroSettings(
-      planned,
-      (id) => heroSettings[id] ?? proposed(id),
+    // Each destination starts from the product's last market brief there,
+    // named where it came from.
+    const carried = await latestBriefs(product.id);
+    const plan = Object.entries(carried).reduce(
+      (p, [destinationId, { brief, projectName }]) =>
+        p.destinations.some((d) => d.destinationId === destinationId)
+          ? withBrief(p, destinationId, {
+              ...brief,
+              carriedFrom: projectName.slice(0, 120),
+            })
+          : p,
+      withHeroSettings(planned, (id) => heroSettings[id] ?? proposed(id)),
     );
     const master = await productReference(product);
     const editor = startEditorState({

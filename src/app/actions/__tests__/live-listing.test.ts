@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MarketBrief } from "@/domain/market-brief";
 import { DEFAULT_MAKER_MODELS } from "@/domain/model-defaults";
 import type { ProjectPlan } from "@/domain/plan";
 import { parseProductPackage } from "@/domain/product-package";
@@ -35,11 +36,14 @@ vi.mock("@/server/maker-repository", () => ({
   getMakerPreferences: async () => ({ heroSetting: remembered }),
   rememberHeroSetting,
 }));
+const briefs: Record<string, { brief: MarketBrief; projectName: string }> =
+  {};
 vi.mock("@/server/project-repository", () => ({
   createProject: async (input: { plan: ProjectPlan }) => {
     created.push(input);
     return "project-1";
   },
+  latestBriefs: async () => briefs,
 }));
 
 const { uploadListingPhotoAction } = await import("@/app/actions/live-listing");
@@ -73,6 +77,7 @@ afterEach(() => {
   vi.clearAllMocks();
   created.length = 0;
   for (const key of Object.keys(remembered)) delete remembered[key];
+  for (const key of Object.keys(briefs)) delete briefs[key];
 });
 
 describe("uploadListingPhotoAction", () => {
@@ -208,5 +213,28 @@ describe("createProjectAction: the hero's setting", () => {
     expect(await start({ etsy: "spotlight" })).toEqual({
       error: "Pick a product, a type and a destination.",
     });
+  });
+});
+
+describe("createProjectAction: the market brief", () => {
+  it("each destination starts from the product's last brief there, named where it came from", async () => {
+    const brief = MarketBrief.parse({
+      searches: [
+        { term: "cutting board", source: "typed", readOn: "2026-10-01" },
+      ],
+    });
+    briefs.etsy = { brief, projectName: "Board — Listing kit" };
+    briefs.amazon = { brief, projectName: "Elsewhere" };
+    await createProjectAction({
+      productId: board.id,
+      type: "listing-kit",
+      destinationIds: ["etsy"],
+    });
+    const [etsy, ...rest] = created[0].plan.destinations;
+    expect(etsy.brief).toEqual({
+      ...brief,
+      carriedFrom: "Board — Listing kit",
+    });
+    expect(rest).toEqual([]);
   });
 });

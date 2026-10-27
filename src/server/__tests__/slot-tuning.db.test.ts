@@ -13,9 +13,8 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
   const repo = await import("@/server/project-repository");
   const { upsertProducts } = await import("@/server/product-repository");
   const { getCurrentMaker } = await import("@/server/maker-repository");
-  const { setSlotKnobAction, updateProjectProductAction } = await import(
-    "@/app/actions/board"
-  );
+  const { setSlotKnobAction, setSlotPlaceAction, updateProjectProductAction } =
+    await import("@/app/actions/board");
   const { planProject } = await import("@/domain/plan");
   const { Product } = await import("@/domain/product");
   const { productUnderstanding } = await import(
@@ -236,6 +235,60 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
       }
     } finally {
       // Only this test's key: other files write the same row in parallel.
+      await db.$executeRaw`UPDATE "Maker" SET "preferences" = "preferences" #- '{heroSetting,etsy:desk}' WHERE "id" = ${maker.id}`;
+    }
+  });
+
+  it("a scene given its own place stands there; a hero stands in it, remembered for the family", async () => {
+    const { getMakerPreferences } = await import("@/server/maker-repository");
+    const maker = await getCurrentMaker();
+    const { id } = await start(photo);
+    const scene = async (cardId: string) =>
+      (
+        (
+          await db.card.findUniqueOrThrow({
+            where: { projectId_cardId: { projectId: id, cardId } },
+          })
+        ).fields as { scene: { value: string } }
+      ).scene.value;
+    try {
+      expect(
+        await setSlotPlaceAction({
+          projectId: id,
+          ...inUse,
+          place: "a reception counter, facing the visitor",
+        }),
+      ).toBeUndefined();
+      expect(await scene("etsy.in-use")).toContain(
+        "a reception counter, facing the visitor",
+      );
+      expect(
+        await setSlotPlaceAction({ projectId: id, ...inUse, place: null }),
+      ).toBeUndefined();
+      expect(await scene("etsy.in-use")).toContain("a desk beside a laptop");
+      expect(
+        await setSlotPlaceAction({
+          projectId: id,
+          destinationId: "etsy",
+          slotKey: "hero",
+          place: "an oak bookshelf",
+        }),
+      ).toBeUndefined();
+      expect(await scene("etsy.hero")).toContain(
+        "in its place (an oak bookshelf)",
+      );
+      expect((await getMakerPreferences()).heroSetting["etsy:desk"]).toBe(
+        "place",
+      );
+      expect(
+        await setSlotPlaceAction({
+          projectId: id,
+          destinationId: "etsy",
+          slotKey: "size",
+          place: "a desk",
+        }),
+      ).toEqual({ error: "not a scene slot" });
+    } finally {
       await db.$executeRaw`UPDATE "Maker" SET "preferences" = "preferences" #- '{heroSetting,etsy:desk}' WHERE "id" = ${maker.id}`;
     }
   });

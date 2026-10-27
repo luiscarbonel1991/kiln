@@ -3,6 +3,7 @@ import { Card } from "@/domain/card";
 import type { DestinationText } from "@/domain/destination";
 import { modelPriced } from "@/domain/generation-cost";
 import { type ListingText, refreshListing } from "@/domain/listing";
+import type { MarketBrief } from "@/domain/market-brief";
 import type { MasterAsset } from "@/domain/master-asset";
 import { assertModel, ModelRefused } from "@/domain/model-defaults";
 import type {
@@ -20,16 +21,15 @@ import {
   type SlotRef,
   slotCardId,
   unapproveSlot,
+  withBrief,
   withDelivered,
   withListing,
   withSlotOff,
-  withSlotTuning,
   withVideoChoice,
 } from "@/domain/plan";
 import { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
 import { ACTIVE_JOB_STATUSES } from "@/domain/queue";
-import type { KnobChoice } from "@/domain/scene-knobs";
 import type { ShotList } from "@/domain/shot-list";
 import { BaseUnderstanding } from "@/domain/understanding";
 import type { VideoChoice } from "@/domain/video";
@@ -540,6 +540,64 @@ export async function setListing(
   });
 }
 
+// Save one destination's market brief (none: the brief is cleared).
+export async function setBrief(
+  projectId: string,
+  destinationId: string,
+  brief: MarketBrief | undefined,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { plan: true },
+    });
+    const plan = ProjectPlan.parse(project.plan);
+    await tx.project.update({
+      where: { id: projectId },
+      data: {
+        plan: withBrief(
+          plan,
+          destinationId,
+          brief,
+        ) as unknown as Prisma.InputJsonValue,
+      },
+    });
+  });
+}
+
+// The last market brief kept for a product on each destination, with the
+// project it is in: a new project of the product starts from it.
+export async function latestBriefs(
+  productId: string,
+): Promise<Record<string, { brief: MarketBrief; projectName: string }>> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  const rows = await db.project.findMany({
+    where: { makerId: maker.id, products: { some: { productId } } },
+    select: { name: true, plan: true },
+    orderBy: { updatedAt: "desc" },
+    take: 25,
+  });
+  const found: Record<string, { brief: MarketBrief; projectName: string }> = {};
+  for (const row of rows) {
+    const plan = ProjectPlan.safeParse(row.plan);
+    if (!plan.success) continue;
+    for (const d of plan.data.destinations) {
+      if (found[d.destinationId] || !d.brief) continue;
+      if (d.brief.searches.length === 0 && d.brief.notes.length === 0) continue;
+      found[d.destinationId] = { brief: d.brief, projectName: row.name };
+    }
+  }
+  return found;
+}
+
 export async function setSlotOff(
   projectId: string,
   ref: SlotRef,
@@ -581,8 +639,8 @@ export async function setSlotOff(
   });
 }
 
-// Set one of a scene slot's knobs, and write the direction it makes into the
-// slot's card: `derive` builds the card from the locked plan and the product
+// Tune a scene slot (one of its knobs, its own place), and write the
+// direction it makes into the slot's card: `derive` builds the card from the locked plan and the product
 // version the project follows (an unreviewed product change waits for Update
 // the project). Refused while the scene is in the queue, and while it is
 // approved: its words must keep describing the approved picture, which the
@@ -590,13 +648,13 @@ export async function setSlotOff(
 export async function setSlotTuning(
   projectId: string,
   ref: SlotRef,
-  choice: KnobChoice,
+  tune: (plan: ProjectPlan) => ProjectPlan,
   derive: (input: {
     plan: ProjectPlan;
     master: MasterAsset;
     product: Product;
   }) => Card | undefined,
-): Promise<{ product: Product | null }> {
+): Promise<{ product: Product | null; plan: ProjectPlan }> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
   return db.$transaction(async (tx) => {
@@ -651,7 +709,7 @@ export async function setSlotTuning(
     ) {
       throw new Error("Undo the approval to tune this scene.");
     }
-    const next = withSlotTuning(plan, ref, choice);
+    const next = tune(plan);
     const link = project.products[0];
     const snapshot = Product.safeParse(link?.productSnapshot);
     const product = snapshot.success
@@ -688,7 +746,7 @@ export async function setSlotTuning(
       where: { id: projectId },
       data: { plan: next as unknown as Prisma.InputJsonValue },
     });
-    return { product };
+    return { product, plan: next };
   });
 }
 

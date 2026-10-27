@@ -14,7 +14,15 @@ import {
   ProviderId,
   VideoResolution,
 } from "@/domain/model-defaults";
-import { replan, SlotMove, slotCardId } from "@/domain/plan";
+import {
+  type ProjectPlan,
+  replan,
+  SlotMove,
+  type SlotRef,
+  slotCardId,
+  withSlotPlace,
+  withSlotTuning,
+} from "@/domain/plan";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { KnobChoice } from "@/domain/scene-knobs";
 import { VideoChoice } from "@/domain/video";
@@ -76,6 +84,28 @@ export async function setSlotOffAction(
   refresh();
 }
 
+// Tune one scene slot (free): the plan keeps the change and the slot's card
+// is written again from it, on its own destination only.
+function retuneSlot(
+  projectId: string,
+  ref: SlotRef,
+  tune: (plan: ProjectPlan) => ProjectPlan,
+) {
+  const cardId = slotCardId(ref.destinationId, ref.slotKey);
+  return setSlotTuning(projectId, ref, tune, ({ plan, master, product }) =>
+    slotCards(
+      {
+        destinations: plan.destinations.filter(
+          (d) => d.destinationId === ref.destinationId,
+        ),
+      },
+      master,
+      productUnderstanding(product),
+      product,
+    ).find((card) => card.id === cardId),
+  );
+}
+
 const KnobWrite = z.object({
   projectId: z.string().min(1),
   destinationId: z.string().min(1),
@@ -83,29 +113,15 @@ const KnobWrite = z.object({
   choice: KnobChoice,
 });
 
-// Turn one of a scene's knobs (free): the plan keeps the stop and the slot's
-// card is written again from it, on its own destination only.
+// Turn one of a scene's knobs.
 export async function setSlotKnobAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
   const { projectId, destinationId, slotKey, choice } = KnobWrite.parse(input);
-  const cardId = slotCardId(destinationId, slotKey);
+  const ref = { destinationId, slotKey };
   try {
-    const { product } = await setSlotTuning(
-      projectId,
-      { destinationId, slotKey },
-      choice,
-      ({ plan, master, product }) =>
-        slotCards(
-          {
-            destinations: plan.destinations.filter(
-              (d) => d.destinationId === destinationId,
-            ),
-          },
-          master,
-          productUnderstanding(product),
-          product,
-        ).find((card) => card.id === cardId),
+    const { product } = await retuneSlot(projectId, ref, (plan) =>
+      withSlotTuning(plan, ref, choice),
     );
     // A hero's setting chosen on the board is proposed next time for this
     // family on this destination.
@@ -119,6 +135,42 @@ export async function setSlotKnobAction(
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Could not tune it.",
+    };
+  }
+  refresh();
+}
+
+const PlaceWrite = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  slotKey: z.string().min(1),
+  place: z.string().trim().max(160).nullable(),
+});
+
+// Give a scene its own place (from Tune or the market brief), or back to the
+// product's places (null or blank). A hero given a place stands in it, and
+// that setting is remembered for the family like one chosen in Tune.
+export async function setSlotPlaceAction(
+  input: unknown,
+): Promise<{ error: string } | undefined> {
+  const parsed = PlaceWrite.safeParse(input);
+  if (!parsed.success) return { error: "A place is at most 160 characters." };
+  const { projectId, destinationId, slotKey, place } = parsed.data;
+  const ref = { destinationId, slotKey };
+  try {
+    const { product, plan } = await retuneSlot(projectId, ref, (p) =>
+      withSlotPlace(p, ref, place || null),
+    );
+    const slot = plan.destinations
+      .find((d) => d.destinationId === destinationId)
+      ?.slots.find((s) => s.key === slotKey);
+    if (place && slot?.knobs?.setting !== undefined && product) {
+      await rememberHeroSetting(destinationId, product.family, "place");
+    }
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Could not set the place.",
     };
   }
   refresh();
