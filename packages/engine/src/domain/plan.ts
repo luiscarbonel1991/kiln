@@ -2,6 +2,11 @@ import { z } from "zod";
 import type { DestinationKind, DestinationProfile } from "@/domain/destination";
 import { ListingText } from "@/domain/listing";
 import {
+  type ListingRead,
+  ListingResults,
+  type ReadKey,
+} from "@/domain/listing-results";
+import {
   ListingUrl,
   type LivePhoto,
   MAX_LIVE_PHOTOS,
@@ -78,6 +83,8 @@ export const PlanDestination = z.object({
   // Why this listing looks as it does: the searches it aims at and what
   // page 1 shows for them (Phase 20).
   brief: MarketBrief.optional(),
+  // Its numbers before and after the new photos went up (Phase 20).
+  results: ListingResults.optional(),
 });
 export type PlanDestination = z.infer<typeof PlanDestination>;
 
@@ -721,6 +728,81 @@ export function withBrief(
       return brief ? { ...rest, brief } : rest;
     }),
   };
+}
+
+function withDestination(
+  plan: ProjectPlan,
+  destinationId: string,
+  change: (d: PlanDestination) => PlanDestination,
+): ProjectPlan {
+  if (!plan.destinations.some((d) => d.destinationId === destinationId)) {
+    throw new Error(`"${destinationId}" is not a destination of this plan`);
+  }
+  return {
+    destinations: plan.destinations.map((d) =>
+      d.destinationId === destinationId ? change(d) : d,
+    ),
+  };
+}
+
+// The live listing a destination's photos went to, or none (null). Kiln
+// keeps the address and never opens it.
+export function withListingUrl(
+  plan: ProjectPlan,
+  destinationId: string,
+  url: string | null,
+): ProjectPlan {
+  return withDestination(plan, destinationId, (d) => {
+    const { listingUrl: _old, ...rest } = d;
+    return url ? { ...rest, listingUrl: ListingUrl.parse(url) } : rest;
+  });
+}
+
+function withResults(
+  plan: ProjectPlan,
+  destinationId: string,
+  change: (results: ListingResults) => ListingResults,
+): ProjectPlan {
+  return withDestination(plan, destinationId, (d) => ({
+    ...d,
+    results: ListingResults.parse(change(d.results ?? { reads: {} })),
+  }));
+}
+
+// One read of the listing's numbers, or none (null).
+export function withRead(
+  plan: ProjectPlan,
+  destinationId: string,
+  key: ReadKey,
+  read: ListingRead | null,
+): ProjectPlan {
+  return withResults(plan, destinationId, (r) => {
+    const { [key]: _old, ...reads } = r.reads;
+    return { ...r, reads: read ? { ...reads, [key]: read } : reads };
+  });
+}
+
+// The day the new photos went up, or back to the day of the last delivery
+// (null).
+export function withLiveOn(
+  plan: ProjectPlan,
+  destinationId: string,
+  liveOn: string | null,
+): ProjectPlan {
+  return withResults(plan, destinationId, ({ liveOn: _old, ...r }) =>
+    liveOn ? { ...r, liveOn } : r,
+  );
+}
+
+// Follow the listing's numbers, or stop (no read is due).
+export function withFollowing(
+  plan: ProjectPlan,
+  destinationId: string,
+  following: boolean,
+): ProjectPlan {
+  return withResults(plan, destinationId, ({ stopped: _old, ...r }) =>
+    following ? r : { ...r, stopped: true },
+  );
 }
 
 // A scene slot's own place, or back to the product's places (null). A

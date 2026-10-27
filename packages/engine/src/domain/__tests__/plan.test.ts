@@ -23,7 +23,11 @@ import {
   videoSettings,
   withBrief,
   withDelivered,
+  withFollowing,
   withListing,
+  withListingUrl,
+  withLiveOn,
+  withRead,
   withSlotOff,
   withSlotPlace,
   withSlotTuning,
@@ -922,6 +926,77 @@ describe("withBrief", () => {
       withBrief(next, "shop", undefined).destinations[0],
     ).not.toHaveProperty("brief");
     expect(() => withBrief(plan, "nowhere", brief)).toThrow(
+      /not a destination/,
+    );
+  });
+});
+
+describe("a destination's results", () => {
+  const plan = planProject({
+    product: CUTTING_BOARD,
+    type: "launch",
+    destinationIds: ["shop", "social"],
+    catalog,
+  });
+  const before = {
+    from: "2026-09-27",
+    to: "2026-10-26",
+    visits: 40,
+    orders: 2,
+    source: "Etsy Stats",
+    readOn: "2026-10-27",
+  };
+
+  it("keeps the listing's address, its reads and the day it went live, through a replan", () => {
+    let next = withListingUrl(
+      plan,
+      "shop",
+      "https://www.etsy.com/listing/4413933723/board",
+    );
+    next = withRead(next, "shop", "before", before);
+    next = withLiveOn(next, "shop", "2026-10-27");
+    expect(next.destinations[0]).toMatchObject({
+      listingUrl: "https://www.etsy.com/listing/4413933723/board",
+      results: { liveOn: "2026-10-27", reads: { before } },
+    });
+    expect(next.destinations[1]).not.toHaveProperty("results");
+    expect(ProjectPlan.parse(JSON.parse(JSON.stringify(next)))).toEqual(next);
+    expect(
+      replan(next, CUTTING_BOARD, catalog.shotLists).plan.destinations[0]
+        .results,
+    ).toEqual(next.destinations[0].results);
+  });
+
+  it("takes a read back, the day back to the delivery, and stops following", () => {
+    let next = withRead(plan, "shop", "before", before);
+    next = withLiveOn(next, "shop", "2026-10-27");
+    next = withRead(next, "shop", "before", null);
+    next = withLiveOn(next, "shop", null);
+    expect(next.destinations[0].results).toEqual({ reads: {} });
+    expect(
+      withFollowing(next, "shop", false).destinations[0].results?.stopped,
+    ).toBe(true);
+    expect(
+      withFollowing(withFollowing(next, "shop", false), "shop", true)
+        .destinations[0].results,
+    ).toEqual({ reads: {} });
+    expect(
+      withListingUrl(
+        withListingUrl(plan, "shop", "https://example.com/l/1"),
+        "shop",
+        null,
+      ).destinations[0],
+    ).not.toHaveProperty("listingUrl");
+  });
+
+  it("refuses a read that does not parse, a plain-http address and an unknown destination", () => {
+    expect(() =>
+      withRead(plan, "shop", "day14", { ...before, visits: -1 }),
+    ).toThrow();
+    expect(() =>
+      withListingUrl(plan, "shop", "http://www.etsy.com/listing/1"),
+    ).toThrow(/https/);
+    expect(() => withRead(plan, "nowhere", "before", before)).toThrow(
       /not a destination/,
     );
   });
