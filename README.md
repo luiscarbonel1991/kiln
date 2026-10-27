@@ -258,6 +258,54 @@ pnpm kiln schema                         # the package's JSON Schema
   package.json` (paths are the caller's, under `pnpm kiln` too). The package is meant
   for npm later, so an exporter in any repository can add it as a dev dependency.
 
+## Shops (Etsy)
+
+Shops (header) reads Etsy through its official API, never its pages:
+
+- **Your best sellers:** the connected shop's listings by units sold over the
+  last 30, 90 or 365 days, from its own orders (paid, shipped or partly
+  refunded), with orders, revenue and the last sale. Each sits beside the Kiln
+  project that keeps its address, or "Refresh its photos", which starts a
+  Listing kit from that live listing.
+- **Other shops:** found by name, ranked by lifetime sales, with a month's
+  average since the shop opened, the past year's reviews and favourites. A
+  shop's listings rank by favourites: Etsy gives another shop's sales only as
+  a total, never per listing. These need only Kiln's app keys, no shop
+  connected.
+
+Reads are made per request and kept in memory for ten minutes; nothing read
+from Etsy is stored, beyond the list of shops the maker compares.
+
+**Connecting.** The maker approves Kiln on Etsy's own page (OAuth 2.0 with
+PKCE, read-only scopes `shops_r listings_r transactions_r`): no key to paste.
+Kiln itself is an app Etsy knows, registered once:
+
+1. Register a seller app (for your own shop) at
+   <https://www.etsy.com/developers/register>.
+2. Give it the address Etsy sends you back to, exactly:
+   `https://localhost:3009/api/shops/etsy/callback`.
+3. In `.env`: `ETSY_API_KEY` (the keystring), `ETSY_SHARED_SECRET`,
+   `ETSY_REDIRECT_URI` (the address above) and `KILN_SECRET_KEY`
+   (`openssl rand -base64 32`), which seals the shop's tokens (AES-256-GCM).
+4. Etsy only sends you back to https, so connect with Kiln on a local
+   certificate, then Settings → Shops → Connect:
+
+```bash
+pnpm dev:https --port 3009
+```
+
+The first run fetches `mkcert` and asks for your password to trust its local
+certificate. Once connected, plain `pnpm dev` keeps the connection: Kiln
+refreshes the hour-long access token itself, under the row's lock. If Etsy
+refuses the refresh (access revoked, or 90 days unused), Shops asks to connect
+again. Disconnect in Settings drops the tokens; remove Kiln from your Etsy
+account's apps to revoke it there too.
+
+A seller app serves only your own shop. Serving other sellers needs Etsy's
+commercial access (a review: terms, privacy policy, the "not endorsed by
+Etsy" notice). In a mock run (`pnpm dev:mock`), Connect links a mock shop with
+a year of orders, and Other shops finds a few mock shops by name.
+
 ## Models and providers
 
 Kiln generates with several models from two providers, OpenAI and Google:
@@ -359,8 +407,9 @@ from above), distance (close, medium, wide), light (window, studio, warm), shado
   shop). Three reads: the 30 days before, and the first 14 and 30 after, each
   with its window, source and the day it was read, due once its days have
   passed. Typed from the shop's stats page, sent through the API, or read from
-  a connected shop (`src/providers/shop`: a mock shop in mock runs; the Etsy
-  connection comes with its keys), which also takes the before read at
+  a connected shop (`src/server/shop-connector.ts`: a mock shop in mock runs;
+  a connected Etsy shop gives a listing's orders and revenue, and the visits
+  typed for the same window stay), which also takes the before read at
   delivery once the listing's address is known. Before against the latest
   after is brought to 30 days, with conversion and a note when too few visits
   make a change chance. Home lists the reads due first, the family and the
