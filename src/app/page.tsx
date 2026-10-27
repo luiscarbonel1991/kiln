@@ -2,12 +2,14 @@ import { PenLine, Plus } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { HomeProjects } from "@/components/home/home-projects";
+import { HomeResults } from "@/components/home/home-results";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { fromMicros } from "@/domain/generation-cost";
 import { buyerSizeLabel } from "@/domain/product";
 import { providerMode } from "@/providers/mode";
 import { budget } from "@/server/generation-repository";
 import { homeStats, type ProjectStats } from "@/server/home-repository";
+import { followedListings } from "@/server/listing-results";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { listProducts } from "@/server/product-repository";
 import { listProjects } from "@/server/project-repository";
@@ -35,12 +37,14 @@ function projectDetail(stats: ProjectStats): string {
 export default async function HomePage() {
   await connection();
   const maker = await getCurrentMaker();
-  const [projects, products, stats, spend] = await Promise.all([
+  const [projects, products, stats, spend, listings] = await Promise.all([
     listProjects(),
     listProducts(),
     homeStats(maker.id),
     budget(maker.id),
+    followedListings(),
   ]);
+  const followed = listings.filter((l) => l.view.following);
   const mock = providerMode() === "mock";
   const details = Object.fromEntries(
     projects.flatMap((p) => {
@@ -106,6 +110,21 @@ export default async function HomePage() {
             </div>
           ))}
         </section>
+
+        {followed.length > 0 ? (
+          <section className="flex flex-col gap-4" data-testid="home-results">
+            <div className="flex flex-col gap-1">
+              <h2 className="font-serif text-xl italic text-foreground">
+                Results
+              </h2>
+              <p className="font-sans text-[0.8125rem] text-on-surface-mid">
+                Each delivered listing, read from your shop's stats before the
+                new photos and 14 and 30 days after.
+              </p>
+            </div>
+            <HomeResults listings={followed} />
+          </section>
+        ) : null}
 
         <section className="flex flex-col gap-4">
           <h2 className="font-serif text-xl italic text-foreground">
