@@ -312,12 +312,14 @@ from above), distance (close, medium, wide), light (window, studio, warm), shado
   planned before knobs keep their prose.
 - **The hero's setting** (Etsy's marketplace hero): Plain backdrop (a seamless
   sweep) or In its place (the product at its first place of use, true to size, as
-  page-1 heroes show what is mounted where it is used). New project's plan proposes
+  page-1 heroes show what stays where it is used). New project's plan proposes
   it and says why: the maker's last choice for that product family on that
-  destination, else In its place when the product is mounted where it is used (its
-  first place names a wall, a door, a gate, a porch…), else Plain backdrop. The
-  setting a project starts with, or one changed in Tune, is remembered for the
-  family (`Maker.preferences`). A product's family is a field of the product form.
+  destination, else In its place when the product stays where it is used (its
+  first place names a wall, a door, a gate, a porch, a desk, a reception counter,
+  a shelf…), else Plain backdrop. A setting the maker picks apart from the
+  proposal, at the start or in Tune, is remembered for the family
+  (`Maker.preferences`); an accepted proposal is not, so a guess never passes for
+  a choice. A product's family is a field of the product form.
 
 The worker is a `globalThis` singleton started from `src/instrumentation.ts`.
 It restarts with the current code on the next enqueue after a code reload: it
