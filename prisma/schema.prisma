@@ -31,8 +31,9 @@ model Maker {
   monthlyCapCents Int              @default(2500)
   brand           Json?
   models          Json?
-  // The maker's remembered choices, read leniently (hero-setting.ts): the
-  // hero's setting per destination and product family.
+  // The maker's remembered choices, read leniently (maker-preferences.ts):
+  // the hero's setting per destination and product family, a search table's
+  // columns per source, the other shops the maker compares theirs with.
   preferences     Json?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -40,6 +41,7 @@ model Maker {
   products        Product[]
   moduleSettings  ModuleSettings[]
   accessTokens    AccessToken[]
+  shopConnections ShopConnection[]
 }
 
 // A personal access token for Kiln's HTTP API (/api/import, a colour's
@@ -58,6 +60,33 @@ model AccessToken {
   lastUsedAt DateTime?
 
   @@index([makerId])
+}
+
+// A shop the maker connected to Kiln through its platform's OAuth (Etsy,
+// read-only scopes): one per maker and platform. The tokens are sealed with
+// KILN_SECRET_KEY (AES-256-GCM, src/server/secret-box.ts), never stored in
+// the clear; the access token is refreshed before it expires, under this
+// row's lock. `needsReconnect` is set when the platform refuses the refresh
+// (revoked, or 90 days unused): the maker connects again. Disconnecting
+// deletes the row.
+model ShopConnection {
+  id             String    @id @default(cuid())
+  makerId        String
+  maker          Maker     @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  platform       String
+  shopId         String
+  shopName       String
+  shopUrl        String
+  userId         String
+  scopes         String
+  accessToken    String
+  refreshToken   String
+  expiresAt      DateTime  @db.Timestamptz(3)
+  needsReconnect Boolean   @default(false)
+  connectedAt    DateTime  @default(now()) @db.Timestamptz(3)
+  refreshedAt    DateTime? @db.Timestamptz(3)
+
+  @@unique([makerId, platform])
 }
 
 // An optional module's saved settings for a maker (src/modules; an instance

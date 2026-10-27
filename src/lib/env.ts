@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { MODULE_IDS } from "@/modules/ids";
 
+// An empty value in .env (`KEY=`) means "not set".
+const unsetIfBlank = (v: unknown) => (v === "" ? undefined : v);
+
 const EnvSchema = z.object({
   GOOGLE_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
@@ -28,6 +31,16 @@ const EnvSchema = z.object({
         : [],
     z.array(z.enum(MODULE_IDS)),
   ),
+
+  // Kiln's own key for what it keeps sealed (a connected shop's tokens): 32
+  // random bytes in base64, made once with `openssl rand -base64 32`.
+  KILN_SECRET_KEY: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
+  // The Etsy app Kiln acts as (etsy.com/developers/your-apps): its keystring
+  // and shared secret, and the https address Etsy sends the maker back to
+  // after they approve Kiln (registered on the app exactly as written here).
+  ETSY_API_KEY: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
+  ETSY_SHARED_SECRET: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
+  ETSY_REDIRECT_URI: z.preprocess(unsetIfBlank, z.string().url().optional()),
 
   // Object storage — selectable provider (LocalStack S3 for local dev). Optional
   // with local defaults; the storage adapter asserts what it needs at runtime.
