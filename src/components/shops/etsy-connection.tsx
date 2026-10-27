@@ -58,10 +58,12 @@ export function EtsyConnection({
             <code>ETSY_REDIRECT_URI</code>:{" "}
             <code>https://localhost:3009/api/shops/etsy/callback</code>.
           </li>
-          <li>
-            <code>KILN_SECRET_KEY</code> seals the shop&apos;s access:{" "}
-            <code>openssl rand -base64 32</code>.
-          </li>
+          {setup.missing.includes("KILN_SECRET_KEY") ? (
+            <li>
+              <code>KILN_SECRET_KEY</code> seals the shop&apos;s access:{" "}
+              <code>openssl rand -base64 32</code>.
+            </li>
+          ) : null}
         </ol>
       </div>
     );
