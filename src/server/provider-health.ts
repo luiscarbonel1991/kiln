@@ -1,8 +1,11 @@
 import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import { readableFailure } from "@/domain/queue";
 import { db, hasDatabase } from "@/lib/db";
+import { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 import { hasProviderKey } from "@/providers/keys";
+import { recordKeyCheck } from "@/server/generation-repository";
 import { CAP_REACHED, NOT_STARTED } from "@/server/generation-worker";
+import { getCurrentMaker } from "@/server/maker-repository";
 
 // Each provider's health, free to read (no ping, no paid call): whether its
 // key is set, and what its last live calls did — the queue's jobs and the
@@ -72,4 +75,20 @@ export async function providerHealth(
       lastOkAt: lastOk?.toISOString() ?? null,
     };
   });
+}
+
+// Check a provider's key now, for free, and keep the answer as the provider's
+// latest call: a key replaced in .env clears the error it left, and a key the
+// provider rejects says so before any paid call.
+export async function checkKey(provider: ProviderId): Promise<KeyCheck> {
+  const result = await checkProviderKey(provider);
+  if (result.called && hasDatabase()) {
+    const maker = await getCurrentMaker();
+    await recordKeyCheck({
+      makerId: maker.id,
+      provider,
+      error: result.ok ? null : result.message,
+    });
+  }
+  return result;
 }

@@ -512,6 +512,37 @@ export async function reserveDirectCall(input: {
   });
 }
 
+// A key checked from Settings (free: the provider lists its models), kept as
+// a finished call of no cost so provider health reads it like any other.
+export async function recordKeyCheck(input: {
+  makerId: string;
+  provider: string;
+  error: string | null;
+}): Promise<void> {
+  assertDatabaseUrl();
+  const now = new Date();
+  await db.generationJob.create({
+    data: {
+      makerId: input.makerId,
+      cardId: "key-check",
+      mode: "live",
+      status: input.error === null ? "done" : "failed",
+      attempt: 1,
+      maxAttempts: 1,
+      estimateMicros: 0,
+      actualMicros: 0,
+      request: {
+        kind: "key-check",
+        provider: input.provider,
+        model: "models list",
+      },
+      error: input.error,
+      startedAt: now,
+      finishedAt: now,
+    },
+  });
+}
+
 // The direct call's request is going out.
 export async function markDirectCall(id: string): Promise<void> {
   await db.$executeRaw`

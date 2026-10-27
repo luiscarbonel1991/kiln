@@ -287,7 +287,10 @@ Kiln never switches provider on its own:
 
 Settings → Providers shows each key and the provider's last calls (the last
 error, the last call that worked). It reads them from the job ledger, so it
-costs nothing.
+costs nothing. "Check the key" asks the provider for the list of models the
+key reaches: free, nothing is generated, and the answer is kept as the
+provider's latest call, so a key replaced in `.env` (then a restart) clears
+the error the old one left.
 
 Keys: `OPENAI_API_KEY` and `GOOGLE_API_KEY` (`.env`). Tests drop both before
 any test runs (`vitest.setup.ts`), so a test never makes a paid call.

@@ -9,6 +9,9 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
   const { db } = await import("@/lib/db");
   const { providerHealth } = await import("@/server/provider-health");
   const { CAP_REACHED } = await import("@/server/generation-worker");
+  const { recordKeyCheck, budget } = await import(
+    "@/server/generation-repository"
+  );
   const slug = `health-${Date.now()}`;
   let makerId = "";
 
@@ -85,6 +88,27 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
     const [, raw] = await providerHealth(makerId);
     expect(raw.lastError?.message).toBe(
       "Google rejected the API key — check GOOGLE_API_KEY or use OpenAI.",
+    );
+
+    // The key replaced and checked from Settings: the error clears, and the
+    // check costs nothing.
+    const before = (await budget(makerId)).spentMicros;
+    await new Promise((r) => setTimeout(r, 5));
+    await recordKeyCheck({ makerId, provider: "google", error: null });
+    const [, checked] = await providerHealth(makerId);
+    expect(checked.lastError).toBeNull();
+    expect((await budget(makerId)).spentMicros).toBe(before);
+    // A check the provider refuses shows as its error.
+    await new Promise((r) => setTimeout(r, 5));
+    await recordKeyCheck({
+      makerId,
+      provider: "google",
+      error:
+        "Google rejected the API key (400) — check GOOGLE_API_KEY or use OpenAI.",
+    });
+    const [, refused] = await providerHealth(makerId);
+    expect(refused.lastError?.message).toBe(
+      "Google rejected the API key (400) — check GOOGLE_API_KEY or use OpenAI.",
     );
   });
 });

@@ -2,6 +2,7 @@ import { CircleAlert, CircleCheck, KeyRound } from "lucide-react";
 import { connection } from "next/server";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { AccessTokens } from "@/components/settings/access-tokens";
+import { KeyCheck } from "@/components/settings/key-check";
 import { ModelsForm } from "@/components/settings/models-form";
 import { fromMicros } from "@/domain/generation-cost";
 import { hasDatabase } from "@/lib/db";
@@ -23,7 +24,8 @@ const when = (iso: string) =>
 
 // Settings (per request: it reads the maker's defaults and the providers'
 // health). Models: the default per kind. Providers: each key and its last
-// calls, read for free — no ping, no paid call. The month's cap, read only.
+// calls, read for free, and a free key check on a click (the provider lists
+// its models; no paid call). The month's cap, read only.
 // Access tokens: for the HTTP API (README "HTTP API").
 export default async function SettingsPage() {
   await connection();
@@ -68,7 +70,7 @@ export default async function SettingsPage() {
           <p className="mt-1 mb-5 font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
             {mode === "mock"
               ? "Mock mode: nothing is called or paid."
-              : "Read from the last calls Kiln made; checking costs nothing."}
+              : "Read from the last calls Kiln made. Checking a key is free: the provider lists its models, nothing is generated."}
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {health.map((h) => (
@@ -102,6 +104,9 @@ export default async function SettingsPage() {
                     ? `Last call that worked: ${when(h.lastOkAt)}`
                     : "No call that worked yet"}
                 </div>
+                {h.keyPresent && mode !== "mock" ? (
+                  <KeyCheck provider={h.provider} label={h.label} />
+                ) : null}
               </div>
             ))}
           </div>
