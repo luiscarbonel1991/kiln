@@ -50,7 +50,7 @@ export function HeroSettingPicker({
         onValueChange={(next) => {
           if (next) onChange(next as HeroSetting);
         }}
-        className="flex gap-1 self-start rounded-field bg-secondary p-1"
+        className="flex flex-wrap gap-1 self-start rounded-field bg-secondary p-1"
       >
         {OPTIONS.map(([setting, label]) => (
           <ToggleGroup.Item
@@ -58,7 +58,7 @@ export function HeroSettingPicker({
             value={setting}
             data-testid={`${testId}-${setting}`}
             className={cn(
-              "h-7 rounded-[9px] px-2 font-sans text-[0.72rem] transition-colors",
+              "h-7 whitespace-nowrap rounded-[9px] px-2 font-sans text-[0.72rem] transition-colors",
               value === setting
                 ? "bg-primary text-primary-foreground"
                 : "text-on-surface-mid hover:bg-surface-soft",
