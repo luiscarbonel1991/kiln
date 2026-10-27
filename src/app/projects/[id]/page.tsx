@@ -12,6 +12,7 @@ import { defaultTextModel, modelLabel } from "@/domain/model-defaults";
 import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerMode } from "@/providers/mode";
+import { shopConnector } from "@/providers/shop";
 import { estimateProjectCards } from "@/server/generation-queue";
 import {
   outputVersions,
@@ -160,6 +161,7 @@ export default async function ProjectBoardPage({
           listingPrice={listingPrice}
           searchSources={searchColumns}
           today={new Date().toLocaleDateString("en-CA")}
+          shop={shopConnector()?.label ?? null}
         />
       ) : (
         <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">

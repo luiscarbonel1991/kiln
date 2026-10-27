@@ -19,6 +19,7 @@ import {
 } from "@/components/projects/generation-panel";
 import { GenerationPoller } from "@/components/projects/generation-poller";
 import { ListingPanel } from "@/components/projects/listing-panel";
+import { ListingResultsPanel } from "@/components/projects/listing-results-panel";
 import { MarketBriefPanel } from "@/components/projects/market-brief-panel";
 import { PhotoArt } from "@/components/projects/photo-art";
 import { ProductChangedBanner } from "@/components/projects/product-changed";
@@ -74,6 +75,7 @@ import { plateHref } from "@/lib/plate-href";
 import { plural } from "@/lib/plural";
 import { projectTypeLabel } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
+import { dayLabel, resultsView } from "@/lib/results-view";
 import {
   type TunePlace,
   type TuneView,
@@ -175,6 +177,7 @@ export function ProjectBoard({
   listingPrice,
   searchSources,
   today,
+  shop,
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -199,6 +202,8 @@ export function ProjectBoard({
   searchSources: Record<string, SearchColumns>;
   // The server's date (YYYY-MM-DD).
   today: string;
+  // The connected shop that reads a listing's numbers, or null (typed).
+  shop: string | null;
 }) {
   const rows = boardRows(board, jobs);
   const waiting = waitingCardIds(rows);
@@ -285,6 +290,8 @@ export function ProjectBoard({
               .filter(Boolean)
               .map((place) => ({ place, from: "brief" as const })),
           ];
+          const results =
+            destination.kind === "sale" ? resultsView(plan, today) : null;
           const budgetLine =
             mode === "mock"
               ? "mock mode, not counted"
@@ -496,6 +503,18 @@ export function ProjectBoard({
                   brief={plan.brief}
                 />
               ) : null}
+              {destination.kind === "sale" ? (
+                <ListingResultsPanel
+                  key={`results-${JSON.stringify(results)}-${plan.listingUrl ?? ""}`}
+                  projectId={projectId}
+                  destinationId={plan.destinationId}
+                  destinationName={destination.name}
+                  listingUrl={plan.listingUrl ?? null}
+                  view={results}
+                  today={today}
+                  shop={shop}
+                />
+              ) : null}
             </section>
           );
         })}
@@ -587,6 +606,8 @@ export function ProjectBoard({
                 destination.text,
               ).filter((i) => i.severity === "error").length
             : null;
+          const results =
+            destination.kind === "sale" ? resultsView(plan, today) : null;
           const approvedEarlier = on.filter(
             (s) => s.slot.approvedOutput && earlier.includes(s.cardId),
           ).length;
@@ -640,6 +661,30 @@ export function ProjectBoard({
                     Listing text:{" "}
                     {listingErrors > 0 ? `${listingErrors} to fix` : "ready"}
                     {plan.listing ? "" : " (draft, not saved)"}
+                  </li>
+                ) : null}
+                {results?.following ? (
+                  <li
+                    className={
+                      results.reads.some((r) => r.due)
+                        ? "text-prov-local"
+                        : undefined
+                    }
+                  >
+                    <a
+                      href={`#results-${plan.destinationId}`}
+                      className="hover:underline"
+                    >
+                      Results:{" "}
+                      {results.reads.some((r) => r.due)
+                        ? `${results.reads
+                            .filter((r) => r.due)
+                            .map((r) => r.label.toLowerCase())
+                            .join(", ")} read due`
+                        : results.next
+                          ? `next read ${dayLabel(results.next.dueOn)}`
+                          : "all three read"}
+                    </a>
                   </li>
                 ) : null}
                 {approvedEarlier > 0 ? (
