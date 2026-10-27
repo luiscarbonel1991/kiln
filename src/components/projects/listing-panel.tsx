@@ -16,6 +16,14 @@ import {
   type PersonalizationField,
   type TextSource,
 } from "@/domain/listing";
+import {
+  briefIssues,
+  CONVERSION_LABELS,
+  type MarketBrief,
+  searchFor,
+  type TargetSearch,
+  tagSuggestions,
+} from "@/domain/market-brief";
 import type { Product } from "@/domain/product";
 import { cn } from "@/lib/utils";
 import type { Degraded } from "@/server/text-calls";
@@ -37,6 +45,24 @@ const SOURCE: Record<TextSource, { label: string; className: string }> = {
 };
 
 const money = (n: number) => n.toFixed(2);
+const thousands = (n: number) =>
+  n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : `${n}`;
+
+// "27.9k a month · Very low": a search's demand as the brief has it.
+function demand(search: TargetSearch): string {
+  return [
+    search.searches !== undefined
+      ? `${thousands(search.searches)} a month`
+      : null,
+    search.conversion
+      ? CONVERSION_LABELS[search.conversion]
+      : search.conversionRate !== undefined
+        ? `${search.conversionRate} %`
+        : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 function SourceBadge({ source }: { source: TextSource }) {
   return (
@@ -129,7 +155,10 @@ function FieldHead({
 // with its count against the limit, what the channel would refuse (red) or
 // advises (amber), where its words came from, and Copy. Drafted from the
 // spec for free; what the maker edits becomes theirs. Variations, prices
-// and attributes come from the product and are edited there.
+// and attributes come from the product and are edited there. With a market
+// brief, each tag shows the demand the brief has for it, the brief's
+// searches that fit are offered as tags, and the title and the price are
+// read against it (warnings only).
 export function ListingPanel({
   projectId,
   destinationId,
@@ -139,6 +168,7 @@ export function ListingPanel({
   product,
   rules,
   writePrice,
+  brief,
 }: {
   projectId: string;
   destinationId: string;
@@ -150,6 +180,7 @@ export function ListingPanel({
   rules: DestinationText;
   // "≈ $0.03" on the maker's text model; null when it has no price.
   writePrice: string | null;
+  brief?: MarketBrief;
 }) {
   const [listing, setListing] = useState(initial);
   // The materials as typed (commas and spaces kept while typing).
@@ -162,8 +193,11 @@ export function ListingPanel({
   const [writing, startWriting] = useTransition();
   const [degraded, setDegraded] = useState<Degraded | null>(null);
   const issues = useMemo(
-    () => checkListing(listing, product, rules),
-    [listing, product, rules],
+    () => [
+      ...checkListing(listing, product, rules),
+      ...briefIssues(listing, product, brief),
+    ],
+    [listing, product, rules, brief],
   );
   const of = (field: ListingIssue["field"], index?: number) =>
     issues.filter(
@@ -238,6 +272,10 @@ export function ListingPanel({
       "",
     ),
   ];
+  const suggested =
+    listing.tags.value.length < rules.tags.count
+      ? tagSuggestions(brief, listing.tags.value, rules)
+      : [];
 
   return (
     <div className="flex flex-col gap-5 rounded-card bg-card p-6 shadow-card">
@@ -434,6 +472,29 @@ export function ListingPanel({
           source={listing.tags.source}
           copy={listing.tags.value.join(", ")}
         />
+        {suggested.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-sans text-[0.72rem] text-on-surface-mid">
+              From your brief:
+            </span>
+            {suggested.map((s) => (
+              <button
+                key={s.term}
+                type="button"
+                data-testid={`tag-suggestion-${destinationId}`}
+                onClick={() => edit("tags", [...listing.tags.value, s.term])}
+                className="rounded-pill border border-border-soft bg-secondary px-2.5 py-0.5 font-sans text-[0.72rem] text-foreground transition-colors hover:border-primary"
+              >
+                + {s.term}
+                {demand(s) ? (
+                  <span className="ml-1 font-mono text-[0.6rem] text-on-surface-dim">
+                    {demand(s)}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {tags.map((tag, i) => (
             <div
@@ -458,6 +519,14 @@ export function ListingPanel({
                 />
                 <Count n={tag.length} max={rules.tags.maxChars} />
               </div>
+              {(() => {
+                const known = tag ? searchFor(brief, tag) : undefined;
+                return known && demand(known) ? (
+                  <span className="font-mono text-[0.6rem] text-prov-recipe">
+                    {demand(known)}
+                  </span>
+                ) : null;
+              })()}
               <Issues issues={of("tags", i)} />
             </div>
           ))}

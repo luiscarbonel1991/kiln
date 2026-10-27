@@ -19,6 +19,7 @@ import {
 } from "@/components/projects/generation-panel";
 import { GenerationPoller } from "@/components/projects/generation-poller";
 import { ListingPanel } from "@/components/projects/listing-panel";
+import { MarketBriefPanel } from "@/components/projects/market-brief-panel";
 import { PhotoArt } from "@/components/projects/photo-art";
 import { ProductChangedBanner } from "@/components/projects/product-changed";
 import { ProjectTitle } from "@/components/projects/project-title";
@@ -46,6 +47,7 @@ import {
 import { fromMicros } from "@/domain/generation-cost";
 import { checkListing, listingDraft } from "@/domain/listing";
 import { etsyListingId } from "@/domain/live-listing";
+import type { SearchColumns } from "@/domain/market-brief";
 import {
   addVideoSlot,
   deliveryBlockers,
@@ -72,7 +74,12 @@ import { plateHref } from "@/lib/plate-href";
 import { plural } from "@/lib/plural";
 import { projectTypeLabel } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
-import { type TuneView, tuneView } from "@/lib/slot-tune";
+import {
+  type TunePlace,
+  type TuneView,
+  takesPlace,
+  tuneView,
+} from "@/lib/slot-tune";
 import type { BatchProgress, Budget } from "@/server/generation-repository";
 import type { ProductDrift } from "@/server/product-version";
 import type { ProjectBoard as Board } from "@/server/project-mapper";
@@ -166,6 +173,8 @@ export function ProjectBoard({
   earlier,
   ownPrompts,
   listingPrice,
+  searchSources,
+  today,
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -186,6 +195,10 @@ export function ProjectBoard({
   ownPrompts: string[];
   // "≈ $0.03": the maker's text model writing a listing; null unpriced.
   listingPrice: string | null;
+  // The market brief's column mappings saved per source.
+  searchSources: Record<string, SearchColumns>;
+  // The server's date (YYYY-MM-DD).
+  today: string;
 }) {
   const rows = boardRows(board, jobs);
   const waiting = waitingCardIds(rows);
@@ -260,6 +273,18 @@ export function ProjectBoard({
             board.master !== null &&
             addVideoSlot(board.plan, plan.destinationId, CATALOG.shotLists) !==
               null;
+          // The places a scene can stand in: the product's, then the ones
+          // this destination's market brief suggests.
+          const placeOptions: TunePlace[] = [
+            ...product.useContexts
+              .map((p) => p.trim())
+              .filter(Boolean)
+              .map((place) => ({ place, from: "product" as const })),
+            ...(plan.brief?.notes ?? [])
+              .map((n) => n.place.trim())
+              .filter(Boolean)
+              .map((place) => ({ place, from: "brief" as const })),
+          ];
           const budgetLine =
             mode === "mock"
               ? "mock mode, not counted"
@@ -347,6 +372,7 @@ export function ProjectBoard({
                             card,
                             view,
                             job: jobs[cardId],
+                            places: placeOptions,
                           })}
                           hasReference={board.master !== null}
                           model={card ? (card.model as ModelValue) : null}
@@ -434,6 +460,26 @@ export function ProjectBoard({
                   );
                 })}
               </SlotGrid>
+              {destination.kind === "sale" ? (
+                <MarketBriefPanel
+                  key={`brief-${JSON.stringify(plan.brief ?? null)}`}
+                  projectId={projectId}
+                  destinationId={plan.destinationId}
+                  destinationName={destination.name}
+                  initial={plan.brief}
+                  product={product}
+                  sources={searchSources}
+                  frames={slots
+                    .filter(
+                      (s) =>
+                        s.slot.fill === "scene" &&
+                        !s.slot.off &&
+                        takesPlace(s.slot),
+                    )
+                    .map((s) => ({ key: s.slot.key, label: s.slot.label }))}
+                  today={today}
+                />
+              ) : null}
               {destination.text ? (
                 <ListingPanel
                   key={JSON.stringify(plan.listing ?? null)}
@@ -447,6 +493,7 @@ export function ProjectBoard({
                   product={product}
                   rules={destination.text}
                   writePrice={listingPrice}
+                  brief={plan.brief}
                 />
               ) : null}
             </section>

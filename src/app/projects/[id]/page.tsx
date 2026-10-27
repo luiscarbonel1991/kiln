@@ -22,6 +22,7 @@ import {
   getCurrentMaker,
   getMakerBrand,
   getMakerModels,
+  getMakerPreferences,
 } from "@/server/maker-repository";
 import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
@@ -123,6 +124,7 @@ export default async function ProjectBoardPage({
   const listingPrice = writeUsd === null ? null : `≈ $${writeUsd.toFixed(2)}`;
   const generation = await projectGenerationState(maker.id, board.id);
   const brand = await getMakerBrand();
+  const { searchColumns } = await getMakerPreferences();
   const health = await providerHealth(maker.id);
   const plan = board.plan;
   const estimate =
@@ -156,6 +158,8 @@ export default async function ProjectBoardPage({
           earlier={earlier}
           ownPrompts={cardsWithOwnPrompt(board.cards)}
           listingPrice={listingPrice}
+          searchSources={searchColumns}
+          today={new Date().toISOString().slice(0, 10)}
         />
       ) : (
         <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
