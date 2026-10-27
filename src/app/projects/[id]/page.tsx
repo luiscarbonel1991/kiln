@@ -12,7 +12,6 @@ import { defaultTextModel, modelLabel } from "@/domain/model-defaults";
 import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerMode } from "@/providers/mode";
-import { shopConnector } from "@/providers/shop";
 import { estimateProjectCards } from "@/server/generation-queue";
 import {
   outputVersions,
@@ -28,6 +27,7 @@ import {
 import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
 import { type ProviderHealth, providerHealth } from "@/server/provider-health";
+import { resultsConnector } from "@/server/shop-connector";
 
 // The estimate of a batch of every waiting scene, built exactly as the queue
 // would build it: each card's model and price, and a line for each provider
@@ -161,7 +161,7 @@ export default async function ProjectBoardPage({
           listingPrice={listingPrice}
           searchSources={searchColumns}
           today={new Date().toLocaleDateString("en-CA")}
-          shop={shopConnector()?.label ?? null}
+          shop={(await resultsConnector())?.label ?? null}
         />
       ) : (
         <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">

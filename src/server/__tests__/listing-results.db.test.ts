@@ -1,10 +1,20 @@
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ refresh: () => {} }));
-// A connected shop: the mock one, whatever mode the tests run in.
-vi.mock("@/providers/shop", async (original) => {
-  const shop = await original<typeof import("@/providers/shop")>();
-  return { ...shop, shopConnector: () => shop.mockShop };
+// A connected shop: the mock one, whatever mode the tests run in; or one that,
+// like Etsy's API, gives orders and revenue but no visits.
+const connector = vi.hoisted(() => ({ ordersOnly: false }));
+vi.mock("@/server/shop-connector", async () => {
+  const { mockShop } = await import("@/providers/shop");
+  return {
+    resultsConnector: async () =>
+      connector.ordersOnly
+        ? {
+            label: "Etsy",
+            readListing: async () => ({ orders: 4, revenue: 96 }),
+          }
+        : mockShop,
+  };
 });
 
 // A delivered listing's reads kept, refused before delivery, read from the
@@ -197,6 +207,38 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
     expect(listed?.view.reads.filter((r) => r.due).map((r) => r.key)).toEqual([
       "day14",
     ]);
+  });
+
+  it("a shop that gives only orders keeps the visits typed for the same window", async () => {
+    const id = await delivered("2026-10-01T15:00:00.000Z");
+    await repo.changePlan(id, (plan) =>
+      withListingUrl(plan, "etsy", "https://www.etsy.com/listing/4413933723/x"),
+    );
+    await results.saveRead({
+      projectId: id,
+      destinationId: "etsy",
+      key: "before",
+      read: { visits: 120, orders: 1 },
+      source: "Etsy stats",
+      today,
+    });
+    connector.ordersOnly = true;
+    try {
+      const read = await results.readFromShop({
+        projectId: id,
+        destinationId: "etsy",
+        key: "before",
+        today,
+      });
+      expect(read).toMatchObject({
+        visits: 120,
+        orders: 4,
+        revenue: 96,
+        source: "Etsy and typed",
+      });
+    } finally {
+      connector.ordersOnly = false;
+    }
   });
 
   it("takes the before read at delivery when a shop is connected", async () => {

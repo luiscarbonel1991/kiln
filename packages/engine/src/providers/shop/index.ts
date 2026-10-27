@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { daysIn, type Metric } from "@/domain/listing-results";
 import { etsyListingId } from "@/domain/live-listing";
-import { mockDelay, providerMode } from "@/providers/mode";
+import { mockDelay } from "@/providers/mode";
 
 // A shop connector (ROADMAP Phase 20, "The Etsy connection"): a sale
 // destination's own numbers for one of the maker's listings, read through the
 // shop's API, never its pages. Beside the typed and API paths, so nothing
-// waits on keys: a mock run reads a mock shop, and the Etsy connector comes
-// with its OAuth keys.
+// waits on keys: a mock run reads a mock shop, a connected Etsy shop its
+// orders (src/server/shop-connector.ts).
 
 export type ShopNumbers = Partial<Record<Metric, number>>;
 
@@ -48,9 +48,3 @@ export const mockShop: ShopConnector = {
     };
   },
 };
-
-// The connector for a sale destination, or null: typed numbers and the API
-// still work without one.
-export function shopConnector(): ShopConnector | null {
-  return providerMode() === "mock" ? mockShop : null;
-}

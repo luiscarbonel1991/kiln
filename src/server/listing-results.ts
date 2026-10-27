@@ -5,9 +5,9 @@ import { ProjectPlan, withRead } from "@/domain/plan";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { CATALOG } from "@/lib/recipes";
 import { localDate, type ResultsView, resultsView } from "@/lib/results-view";
-import { shopConnector } from "@/providers/shop";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { changePlan, loadProjectBoard } from "@/server/project-repository";
+import { resultsConnector } from "@/server/shop-connector";
 
 // The results loop's server side (ROADMAP Phase 20): a read saved (typed on
 // the board, sent by an agent through the API, or read from the shop
@@ -113,7 +113,8 @@ export async function saveRead(input: {
 }
 
 // Read one window from the shop connector and keep it. Refused without a
-// connector or a listing address; nothing is paid.
+// connector or a listing address; nothing is paid. Numbers the shop does not
+// give (Etsy's API has no visits) stay as typed for the same window.
 export async function readFromShop(input: {
   projectId: string;
   destinationId: string;
@@ -121,7 +122,7 @@ export async function readFromShop(input: {
   today?: string;
 }): Promise<ListingRead> {
   saleDestination(input.destinationId);
-  const shop = shopConnector();
+  const shop = await resultsConnector();
   if (!shop) {
     throw new ResultsRefusal(
       "No shop is connected: type the numbers from your shop's stats.",
@@ -148,12 +149,37 @@ export async function readFromShop(input: {
     );
   }
   const numbers = await shop.readListing(view.listingUrl, read.window);
+  const typed =
+    read.read &&
+    read.read.from === read.window.from &&
+    read.read.to === read.window.to
+      ? read.read
+      : null;
+  const kept = typed
+    ? Object.fromEntries(
+        (
+          [
+            "visits",
+            "views",
+            "favourites",
+            "orders",
+            "revenue",
+            "searchVisits",
+          ] as const
+        ).flatMap((m) =>
+          typed[m] !== undefined && numbers[m] === undefined
+            ? [[m, typed[m]]]
+            : [],
+        ),
+      )
+    : {};
+  const merged = Object.keys(kept).length > 0;
   return saveRead({
     projectId: input.projectId,
     destinationId: input.destinationId,
     key: input.key,
-    read: { ...read.window, ...numbers },
-    source: shop.label,
+    read: { ...read.window, ...kept, ...numbers },
+    source: merged ? `${shop.label} and typed` : shop.label,
     today,
   });
 }
@@ -225,7 +251,7 @@ export async function readBeforeAtDelivery(
   destinationId: string,
 ): Promise<void> {
   const destination = CATALOG.destinations.find((d) => d.id === destinationId);
-  if (destination?.kind !== "sale" || !shopConnector()) return;
+  if (destination?.kind !== "sale" || !(await resultsConnector())) return;
   try {
     const loaded = await loadProjectBoard(projectId);
     const plan = loaded?.board.plan?.destinations.find(

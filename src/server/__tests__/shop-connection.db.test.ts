@@ -39,6 +39,7 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
   );
   const { mockEtsy, MOCK_SHOP_ID } = await import("@/providers/shop/etsy-mock");
   const { unseal } = await import("@/server/secret-box");
+  const { resultsConnector } = await import("@/server/shop-connector");
 
   const NOW = new Date("2026-10-27T12:00:00Z");
   const tokenAnswer = (n: number) => ({
@@ -254,6 +255,33 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
     // A year sells at least what 90 days do.
     const year = await ranking.yourBestSellers(365, { now: NOW });
     expect(year?.orders).toBeGreaterThan(view?.orders ?? 0);
+  });
+
+  it("the results loop reads a listing's orders and revenue in a window from the connected shop", async () => {
+    expect(await resultsConnector()).toBeNull();
+    await connect();
+    // Read at the real time, past the token's hour: it is refreshed first.
+    vi.stubGlobal(
+      "fetch",
+      etsyFetch(
+        mockEtsy(() => NOW),
+        [tokenAnswer(5)],
+      ).fetch,
+    );
+    const view = await ranking.yourBestSellers(30, { now: NOW });
+    const top = view?.rows[0];
+    const shop = await resultsConnector();
+    expect(shop?.label).toBe("Etsy");
+    const window = { from: view?.from ?? "", to: "2026-10-27" };
+    const numbers = await shop?.readListing(
+      `https://www.etsy.com/listing/${top?.listingId}/x`,
+      window,
+    );
+    expect(numbers).toEqual({ orders: top?.orders, revenue: top?.revenue });
+    expect(numbers).not.toHaveProperty("visits");
+    await expect(
+      shop?.readListing("https://example.com/item/1", window),
+    ).rejects.toThrow("Not an Etsy listing address");
   });
 
   it("no shop connected, no best sellers", async () => {
