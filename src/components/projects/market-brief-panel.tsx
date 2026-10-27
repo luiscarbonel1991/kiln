@@ -86,11 +86,31 @@ function ReadInput({
       list={list}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => {
-        const next = read(text);
-        setText(next ?? value);
+        if (text.trim() === value) {
+          setText(value);
+          return;
+        }
+        setText(read(text) ?? value);
       }}
       className={FIELD}
     />
+  );
+}
+
+// A value with its own label on a narrow card; the header row names the
+// columns on a wide one.
+function Cell({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className={cn(LABEL, "truncate @2xl:hidden")}>{label}</span>
+      {children}
+    </div>
   );
 }
 
@@ -202,13 +222,13 @@ export function MarketBriefPanel({
   return (
     <div
       data-testid={testId}
-      className="flex flex-col gap-4 rounded-card bg-card p-6 shadow-card"
+      className="@container flex flex-col gap-4 rounded-card bg-card p-6 shadow-card"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex max-w-[620px] flex-col gap-1">
           <h3 className="font-serif text-lg italic text-foreground">
-            Market brief
-            <span className="ml-2 font-sans text-[0.7rem] not-italic text-on-surface-dim">
+            Market brief{" "}
+            <span className="ml-1 font-sans text-[0.7rem] not-italic text-on-surface-dim">
               optional
             </span>
           </h3>
@@ -239,16 +259,18 @@ export function MarketBriefPanel({
             </p>
           ) : null}
         </div>
-        <Button
-          size="sm"
-          data-testid={`${testId}-save`}
-          disabled={pending || !dirty}
-          onClick={save}
-          className="font-semibold shadow-button"
-        >
-          {pending ? <Loader2 className="animate-spin" /> : <Save />}
-          {dirty ? "Save" : "Saved"}
-        </Button>
+        {initial !== undefined || dirty ? (
+          <Button
+            size="sm"
+            data-testid={`${testId}-save`}
+            disabled={pending || !dirty}
+            onClick={save}
+            className="font-semibold shadow-button"
+          >
+            {pending ? <Loader2 className="animate-spin" /> : <Save />}
+            {dirty ? "Save" : "Saved"}
+          </Button>
+        ) : null}
       </div>
       {error ? (
         <p className="font-mono text-[0.7rem] text-prov-local">{error}</p>
@@ -258,7 +280,7 @@ export function MarketBriefPanel({
         <span className={LABEL}>Target searches</span>
         {brief.searches.length > 0 ? (
           <>
-            <div className="hidden grid-cols-[minmax(0,2.4fr)_repeat(4,minmax(0,1fr))_3.5rem] gap-2 sm:grid">
+            <div className="hidden grid-cols-[minmax(0,2.4fr)_repeat(4,minmax(0,1fr))_3.5rem] gap-2 @2xl:grid">
               {[
                 "Term",
                 "Searches / mo",
@@ -286,7 +308,7 @@ export function MarketBriefPanel({
                     data-testid={`${testId}-search-${i + 1}`}
                     className="flex flex-col gap-1"
                   >
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,2.4fr)_repeat(4,minmax(0,1fr))_3.5rem]">
+                    <div className="grid grid-cols-[repeat(4,minmax(0,1fr))_auto] items-end gap-2 @2xl:grid-cols-[minmax(0,2.4fr)_repeat(4,minmax(0,1fr))_3.5rem]">
                       <input
                         aria-label={`Search ${i + 1} term`}
                         data-testid={`${testId}-search-${i + 1}-term`}
@@ -295,61 +317,69 @@ export function MarketBriefPanel({
                         onChange={(e) =>
                           editSearch(i, { term: e.target.value })
                         }
-                        className={cn(FIELD, "col-span-2 sm:col-span-1")}
+                        className={cn(FIELD, "col-span-5 @2xl:col-span-1")}
                       />
-                      <ReadInput
-                        label={`Search ${i + 1} searches a month`}
-                        testId={`${testId}-search-${i + 1}-searches`}
-                        value={countText(s.searches)}
-                        placeholder="27.9k"
-                        read={(text) => {
-                          const n = readCount(text);
-                          editSearch(i, { searches: n });
-                          return countText(n);
-                        }}
-                      />
-                      <ReadInput
-                        label={`Search ${i + 1} results`}
-                        testId={`${testId}-search-${i + 1}-results`}
-                        value={countText(s.results)}
-                        placeholder="33.1k"
-                        read={(text) => {
-                          const n = readCount(text);
-                          editSearch(i, { results: n });
-                          return countText(n);
-                        }}
-                      />
-                      <ReadInput
-                        label={`Search ${i + 1} conversion`}
-                        testId={`${testId}-search-${i + 1}-conversion`}
-                        value={conversionText(s)}
-                        placeholder="High, or 0.49 %"
-                        list={`${testId}-conversion`}
-                        read={(text) => {
-                          const read = readConversion(text);
-                          const next = {
-                            ...s,
-                            conversion: read.conversion,
-                            conversionRate: read.conversionRate,
-                          };
-                          editSearch(i, {
-                            conversion: read.conversion,
-                            conversionRate: read.conversionRate,
-                          });
-                          return conversionText(next);
-                        }}
-                      />
-                      <ReadInput
-                        label={`Search ${i + 1} median price`}
-                        testId={`${testId}-search-${i + 1}-price`}
-                        value={priceText(s.price)}
-                        placeholder="14.40–17.60"
-                        read={(text) => {
-                          const band = readPriceBand(text);
-                          editSearch(i, { price: band });
-                          return priceText(band);
-                        }}
-                      />
+                      <Cell label="Searches / mo">
+                        <ReadInput
+                          label={`Search ${i + 1} searches a month`}
+                          testId={`${testId}-search-${i + 1}-searches`}
+                          value={countText(s.searches)}
+                          placeholder="27.9k"
+                          read={(text) => {
+                            const n = readCount(text);
+                            editSearch(i, { searches: n });
+                            return countText(n);
+                          }}
+                        />
+                      </Cell>
+                      <Cell label="Results">
+                        <ReadInput
+                          label={`Search ${i + 1} results`}
+                          testId={`${testId}-search-${i + 1}-results`}
+                          value={countText(s.results)}
+                          placeholder="33.1k"
+                          read={(text) => {
+                            const n = readCount(text);
+                            editSearch(i, { results: n });
+                            return countText(n);
+                          }}
+                        />
+                      </Cell>
+                      <Cell label="Conversion">
+                        <ReadInput
+                          label={`Search ${i + 1} conversion`}
+                          testId={`${testId}-search-${i + 1}-conversion`}
+                          value={conversionText(s)}
+                          placeholder="High, or 0.49 %"
+                          list={`${testId}-conversion`}
+                          read={(text) => {
+                            const read = readConversion(text);
+                            const next = {
+                              ...s,
+                              conversion: read.conversion,
+                              conversionRate: read.conversionRate,
+                            };
+                            editSearch(i, {
+                              conversion: read.conversion,
+                              conversionRate: read.conversionRate,
+                            });
+                            return conversionText(next);
+                          }}
+                        />
+                      </Cell>
+                      <Cell label="Median price">
+                        <ReadInput
+                          label={`Search ${i + 1} median price`}
+                          testId={`${testId}-search-${i + 1}-price`}
+                          value={priceText(s.price)}
+                          placeholder="14.40–17.60"
+                          read={(text) => {
+                            const band = readPriceBand(text);
+                            editSearch(i, { price: band });
+                            return priceText(band);
+                          }}
+                        />
+                      </Cell>
                       <div className="flex items-center justify-end gap-0.5">
                         {i > 0 ? (
                           <Button

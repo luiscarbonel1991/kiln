@@ -36,8 +36,7 @@ vi.mock("@/server/maker-repository", () => ({
   getMakerPreferences: async () => ({ heroSetting: remembered }),
   rememberHeroSetting,
 }));
-const briefs: Record<string, { brief: MarketBrief; projectName: string }> =
-  {};
+const briefs: Record<string, { brief: MarketBrief; projectName: string }> = {};
 vi.mock("@/server/project-repository", () => ({
   createProject: async (input: { plan: ProjectPlan }) => {
     created.push(input);

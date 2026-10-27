@@ -21,8 +21,8 @@ const FIELD =
 const NOTE = "font-sans text-[0.75rem] leading-snug text-on-surface-mid";
 
 const COLUMN_LABEL: Record<SearchColumn, string> = {
-  term: "Search term",
-  searches: "Searches a month",
+  term: "Term",
+  searches: "Searches / mo",
   results: "Results",
   conversion: "Conversion",
   price: "Median price",
@@ -172,7 +172,9 @@ export function SearchTableImport({
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {SearchColumn.options.map((column) => (
               <label key={column} className="flex min-w-0 flex-col gap-1">
-                <span className={LABEL}>{COLUMN_LABEL[column]}</span>
+                <span className={`${LABEL} truncate`}>
+                  {COLUMN_LABEL[column]}
+                </span>
                 <select
                   aria-label={`${COLUMN_LABEL[column]} column`}
                   data-testid={`${testId}-column-${column}`}

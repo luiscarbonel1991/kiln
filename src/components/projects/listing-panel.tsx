@@ -485,7 +485,7 @@ export function ListingPanel({
                 onClick={() => edit("tags", [...listing.tags.value, s.term])}
                 className="rounded-pill border border-border-soft bg-secondary px-2.5 py-0.5 font-sans text-[0.72rem] text-foreground transition-colors hover:border-primary"
               >
-                + {s.term}
+                + {s.term}{" "}
                 {demand(s) ? (
                   <span className="ml-1 font-mono text-[0.6rem] text-on-surface-dim">
                     {demand(s)}

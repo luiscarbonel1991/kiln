@@ -159,7 +159,7 @@ export default async function ProjectBoardPage({
           ownPrompts={cardsWithOwnPrompt(board.cards)}
           listingPrice={listingPrice}
           searchSources={searchColumns}
-          today={new Date().toISOString().slice(0, 10)}
+          today={new Date().toLocaleDateString("en-CA")}
         />
       ) : (
         <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
