@@ -320,6 +320,19 @@ from above), distance (close, medium, wide), light (window, studio, warm), shado
   proposal, at the start or in Tune, is remembered for the family
   (`Maker.preferences`); an accepted proposal is not, so a guess never passes for
   a choice. A product's family is a field of the product form.
+- **The market brief** (each sale destination on the board, optional): the
+  searches the listing aims at (the first leads), each with its monthly searches,
+  results, conversion, median purchase price, source and date, and what page 1
+  shows for them, in words. Paste a table (a CSV or TSV export, cells from a
+  spreadsheet, or a Markdown table from your notes) or open a CSV: it is read in
+  the browser, the columns guessed or mapped as that source was last time
+  (`Maker.preferences.searchColumns`). Kiln never reads a marketplace page. The
+  brief feeds the scenes (a note's place goes to a frame with "Use it for…"; Tune
+  has a Place for any scene), the tags (each tag's demand, and the searches that
+  fit offered as tags), the title (a warning when it does not name the lead
+  search) and a price guardrail (the price beside the band that sells, never set
+  by Kiln). A new project of the product starts from its last brief, and the
+  export's README and manifest carry it.
 
 The worker is a `globalThis` singleton started from `src/instrumentation.ts`.
 It restarts with the current code on the next enqueue after a code reload: it
