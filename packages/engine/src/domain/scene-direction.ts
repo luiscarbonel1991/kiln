@@ -27,6 +27,8 @@ export interface SceneSlot {
   lighting?: string;
   // The stops the slot applies (its defaults, the product's pick, the maker's).
   knobs?: SceneKnobs;
+  // Its own place of use (the maker's), instead of the product's next one.
+  place?: string;
 }
 
 export interface SceneDefaults {
@@ -211,14 +213,16 @@ export function sceneVariants(
     const knob = knobText(slot.knobs ?? {});
     // A setting (the hero's backdrop or its place) replaces the slot's scene.
     // In its place it stands at the first place of use, which it does not take
-    // from the slots that follow: in-use keeps the most typical place too.
+    // from the slots that follow: in-use keeps the most typical place too. A
+    // slot's own place takes none of the product's places either.
     const setting = knob.setting;
+    const own = slot.place?.trim() || null;
     const where = setting
       ? setting.includes(USE)
-        ? (places[0] ?? GENERIC_USE)
+        ? (own ?? places[0] ?? GENERIC_USE)
         : null
       : slot.scene?.includes(USE)
-        ? place()
+        ? (own ?? place())
         : null;
     const scene = setting
       ? setting.replaceAll(USE, where ?? GENERIC_USE)

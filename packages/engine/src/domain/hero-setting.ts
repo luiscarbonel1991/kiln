@@ -9,30 +9,6 @@ import type { Product } from "@/domain/product";
 export const HeroSetting = z.enum(["sweep", "place"]);
 export type HeroSetting = z.infer<typeof HeroSetting>;
 
-// What a maker's choices are kept as, read leniently: a value a later version
-// drops reads as unset.
-export const MakerPreferences = z.object({
-  heroSetting: z
-    .record(z.string(), z.string())
-    .catch({})
-    .default({})
-    .transform(
-      (all) =>
-        Object.fromEntries(
-          Object.entries(all).flatMap(([key, value]) => {
-            const setting = HeroSetting.safeParse(value);
-            return setting.success ? [[key, setting.data]] : [];
-          }),
-        ) as Record<string, HeroSetting>,
-    ),
-});
-export type MakerPreferences = z.infer<typeof MakerPreferences>;
-
-export function readPreferences(raw: unknown): MakerPreferences {
-  const parsed = MakerPreferences.safeParse(raw ?? {});
-  return parsed.success ? parsed.data : { heroSetting: {} };
-}
-
 // "etsy:home": a choice is kept per destination and family, whatever its case.
 export const heroKey = (destinationId: string, family: string) =>
   `${destinationId}:${family.trim().toLowerCase()}`;

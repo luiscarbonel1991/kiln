@@ -226,6 +226,27 @@ describe("the hero's setting", () => {
     expect(u.scene).toBe("in use at beside a front door");
   });
 
+  it("a slot's own place wins and takes none of the product's places", () => {
+    const [h, u] = sceneVariants(
+      [{ ...hero("place"), place: "a reception counter" }, inUse],
+      {},
+      understanding,
+      places,
+      cues,
+    );
+    expect(h.scene).toContain("in its place (a reception counter)");
+    expect(h.composition).toContain("the product true to its real size");
+    expect(u.scene).toBe("in use at beside a front door");
+    const [a, b] = sceneVariants(
+      [{ ...inUse, place: "a picnic blanket" }, inUse],
+      {},
+      understanding,
+      places,
+    );
+    expect(a.scene).toBe("in use at a picnic blanket");
+    expect(b.scene).toBe("in use at beside a front door");
+  });
+
   it("'any' leaves the scene to the defaults and the purpose; without places, a generic place", () => {
     const [v] = sceneVariants(
       [hero("any")],

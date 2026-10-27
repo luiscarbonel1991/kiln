@@ -6,6 +6,7 @@ import {
   type LivePhoto,
   MAX_LIVE_PHOTOS,
 } from "@/domain/live-listing";
+import { MarketBrief } from "@/domain/market-brief";
 import type { VideoResolution } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
 import type { ProjectType } from "@/domain/project";
@@ -44,6 +45,10 @@ export const PlanSlot = ShotSlotFields.extend({
   // as unset instead of breaking the plan.
   knobs: SavedKnobs.optional(),
   tuned: SavedKnobs.optional(),
+  // A scene slot's own place of use, chosen by the maker (from the product's
+  // places, the market brief, or typed): it stands there instead of taking
+  // the product's next place.
+  place: z.string().trim().min(1).max(160).optional(),
   // A photo slot's photo: the maker's own image, in Kiln's storage, delivered
   // as it is.
   photo: z.string().min(1).optional(),
@@ -70,6 +75,9 @@ export const PlanDestination = z.object({
   listing: ListingText.optional(),
   // The live listing this destination refreshes (never fetched).
   listingUrl: ListingUrl.optional(),
+  // Why this listing looks as it does: the searches it aims at and what
+  // page 1 shows for them (Phase 20).
+  brief: MarketBrief.optional(),
 });
 export type PlanDestination = z.infer<typeof PlanDestination>;
 
@@ -695,6 +703,45 @@ export function withListing(
       d.destinationId === destinationId ? { ...d, listing } : d,
     ),
   };
+}
+
+// The market brief of one destination, or none.
+export function withBrief(
+  plan: ProjectPlan,
+  destinationId: string,
+  brief: MarketBrief | undefined,
+): ProjectPlan {
+  if (!plan.destinations.some((d) => d.destinationId === destinationId)) {
+    throw new Error(`"${destinationId}" is not a destination of this plan`);
+  }
+  return {
+    destinations: plan.destinations.map((d) => {
+      if (d.destinationId !== destinationId) return d;
+      const { brief: _old, ...rest } = d;
+      return brief ? { ...rest, brief } : rest;
+    }),
+  };
+}
+
+// A scene slot's own place, or back to the product's places (null). A
+// hero that offers a setting stands in its place once it has one.
+export function withSlotPlace(
+  plan: ProjectPlan,
+  ref: SlotRef,
+  place: string | null,
+): ProjectPlan {
+  return updateSlot(plan, ref, ({ place: _old, ...slot }) => {
+    if (slot.fill !== "scene") throw new Error("not a scene slot");
+    const own = place?.trim();
+    if (!own) return slot;
+    if (own.length > 160) throw new Error("a place is at most 160 characters");
+    if (slot.knobs?.setting === undefined) return { ...slot, place: own };
+    return {
+      ...slot,
+      place: own,
+      tuned: { ...slot.tuned, setting: "place" },
+    };
+  });
 }
 
 // Switch a slot off or back on. An approval survives the round trip.

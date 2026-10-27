@@ -3,7 +3,6 @@ import {
   heroKey,
   heroProposal,
   heroSettingsOf,
-  readPreferences,
   withHeroSettings,
 } from "@/domain/hero-setting";
 import { planProject } from "@/domain/plan";
@@ -85,19 +84,5 @@ describe("withHeroSettings", () => {
     expect(hero?.knobs).toMatchObject({ setting: "place", distance: "close" });
     expect(next.destinations[1]).toEqual(plan.destinations[1]);
     expect(withHeroSettings(plan, () => undefined)).toEqual(plan);
-  });
-});
-
-describe("readPreferences", () => {
-  it("keeps the choices it can read and drops the rest", () => {
-    expect(
-      readPreferences({
-        heroSetting: { "etsy:home": "place", "etsy:old": "spotlight" },
-      }),
-    ).toEqual({ heroSetting: { "etsy:home": "place" } });
-    expect(readPreferences(null)).toEqual({ heroSetting: {} });
-    expect(readPreferences({ heroSetting: "nope" })).toEqual({
-      heroSetting: {},
-    });
   });
 });

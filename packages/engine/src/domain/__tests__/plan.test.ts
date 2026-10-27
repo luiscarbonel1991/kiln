@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DestinationProfile } from "@/domain/destination";
 import { listingDraft } from "@/domain/listing";
+import { MarketBrief } from "@/domain/market-brief";
 import {
   addVideoSlot,
   approveSlot,
@@ -20,13 +21,16 @@ import {
   slotState,
   unapproveSlot,
   videoSettings,
+  withBrief,
   withDelivered,
   withListing,
   withSlotOff,
+  withSlotPlace,
   withSlotTuning,
   withVideoChoice,
 } from "@/domain/plan";
 import type { Product } from "@/domain/product";
+import { SEED_DESTINATIONS, SEED_SHOT_LISTS } from "@/domain/seed";
 import { ShotList } from "@/domain/shot-list";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
 
@@ -884,6 +888,85 @@ describe("withListing", () => {
     expect(ProjectPlan.parse(JSON.parse(JSON.stringify(next)))).toEqual(next);
     expect(() => withListing(plan, "nowhere", listing)).toThrow(
       /not a destination/,
+    );
+  });
+});
+
+describe("withBrief", () => {
+  const brief = MarketBrief.parse({
+    searches: [
+      {
+        term: "cutting board",
+        searches: 27900,
+        source: "typed",
+        readOn: "2026-10-26",
+      },
+    ],
+  });
+
+  it("keeps a destination's market brief, reads back from JSON, and survives a replan", () => {
+    const plan = planProject({
+      product: CUTTING_BOARD,
+      type: "launch",
+      destinationIds: ["shop", "social"],
+      catalog,
+    });
+    const next = withBrief(plan, "shop", brief);
+    expect(next.destinations[0].brief).toEqual(brief);
+    expect(next.destinations[1]).not.toHaveProperty("brief");
+    expect(ProjectPlan.parse(JSON.parse(JSON.stringify(next)))).toEqual(next);
+    expect(
+      replan(next, CUTTING_BOARD, catalog.shotLists).plan.destinations[0].brief,
+    ).toEqual(brief);
+    expect(
+      withBrief(next, "shop", undefined).destinations[0],
+    ).not.toHaveProperty("brief");
+    expect(() => withBrief(plan, "nowhere", brief)).toThrow(
+      /not a destination/,
+    );
+  });
+});
+
+describe("withSlotPlace", () => {
+  const plan = planProject({
+    product: CUTTING_BOARD,
+    type: "listing-kit",
+    destinationIds: ["etsy"],
+    catalog: { destinations: SEED_DESTINATIONS, shotLists: SEED_SHOT_LISTS },
+  });
+  const slot = (p: ProjectPlan, key: string) =>
+    p.destinations[0].slots.find((s) => s.key === key);
+
+  it("gives a scene its own place; a hero with a setting stands there, in its place", () => {
+    const inUse = withSlotPlace(
+      plan,
+      { destinationId: "etsy", slotKey: "in-use" },
+      "  a farmhouse table set for brunch ",
+    );
+    expect(slot(inUse, "in-use")?.place).toBe(
+      "a farmhouse table set for brunch",
+    );
+    expect(slot(inUse, "in-use")?.tuned).toBeUndefined();
+    const hero = withSlotPlace(
+      plan,
+      { destinationId: "etsy", slotKey: "hero" },
+      "an open shelf in a bright kitchen",
+    );
+    expect(slot(hero, "hero")).toMatchObject({
+      place: "an open shelf in a bright kitchen",
+      tuned: { setting: "place" },
+    });
+  });
+
+  it("null gives the scene back the product's places; an exact frame has none", () => {
+    const ref = { destinationId: "etsy", slotKey: "in-use" };
+    const back = withSlotPlace(withSlotPlace(plan, ref, "a table"), ref, null);
+    expect(slot(back, "in-use")).not.toHaveProperty("place");
+    expect(() =>
+      withSlotPlace(plan, { destinationId: "etsy", slotKey: "size" }, "a desk"),
+    ).toThrow("not a scene slot");
+    expect(() => withSlotPlace(plan, ref, "x".repeat(161))).toThrow(
+      /at most 160/,
     );
   });
 });

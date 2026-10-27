@@ -59,8 +59,6 @@ export {
   heroKey,
   heroProposal,
   heroSettingsOf,
-  MakerPreferences,
-  readPreferences,
   withHeroSettings,
 } from "@/domain/hero-setting";
 export {
@@ -90,6 +88,40 @@ export {
   MAX_LIVE_PHOTOS,
 } from "@/domain/live-listing";
 export { lockByDefault } from "@/domain/locks";
+export {
+  MakerPreferences,
+  readPreferences,
+} from "@/domain/maker-preferences";
+export {
+  bandLabel,
+  briefIssues,
+  CONVERSION_LABELS,
+  Conversion,
+  columnsFit,
+  guessColumns,
+  isEmptyBrief,
+  MAX_NOTES,
+  MAX_SEARCHES,
+  MAX_TABLE_ROWS,
+  MarketBrief,
+  mergeSearches,
+  PageOneNote,
+  PriceBand,
+  type PriceCheck,
+  parseTable,
+  priceCheck,
+  readConversion,
+  readCount,
+  readPriceBand,
+  SearchColumn,
+  SearchColumns,
+  type SearchTable,
+  searchesFromTable,
+  searchFor,
+  TargetSearch,
+  tagSuggestions,
+  termKey,
+} from "@/domain/market-brief";
 export { MasterAsset } from "@/domain/master-asset";
 export { ModelConfig } from "@/domain/model-config";
 export {
@@ -149,8 +181,10 @@ export {
   unapproveSlot,
   type VideoSettings,
   videoSettings,
+  withBrief,
   withListing,
   withSlotOff,
+  withSlotPlace,
   withSlotTuning,
   withVideoChoice,
 } from "@/domain/plan";
