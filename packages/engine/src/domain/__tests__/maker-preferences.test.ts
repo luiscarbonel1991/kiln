@@ -14,6 +14,7 @@ describe("readPreferences", () => {
           { shopId: "7", name: "PineGoods" },
           { shopId: "seven", name: "Broken" },
         ],
+        leftOutListings: ["4143619041", "not-an-id"],
         other: "kept by the repository, not read here",
       }),
     ).toEqual({
@@ -22,11 +23,13 @@ describe("readPreferences", () => {
         EverBee: { term: "Keyword", searches: "Search volume" },
       },
       watchedShops: [{ shopId: "7", name: "PineGoods" }],
+      leftOutListings: ["4143619041"],
     });
     expect(readPreferences(null)).toEqual({
       heroSetting: {},
       searchColumns: {},
       watchedShops: [],
+      leftOutListings: [],
     });
     expect(
       readPreferences({ heroSetting: "nope", watchedShops: "nope" }),
@@ -34,6 +37,7 @@ describe("readPreferences", () => {
       heroSetting: {},
       searchColumns: {},
       watchedShops: [],
+      leftOutListings: [],
     });
   });
 });

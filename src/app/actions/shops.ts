@@ -4,6 +4,8 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import {
   type FavouredListing,
+  ListingId,
+  MAX_LEFT_OUT,
   MAX_WATCHED_SHOPS,
   type ShopStanding,
   WatchedShop,
@@ -11,6 +13,7 @@ import {
 import { EtsyError } from "@/providers/shop/etsy";
 import {
   getMakerPreferences,
+  leaveOutListing,
   unwatchShop,
   watchShop,
 } from "@/server/maker-repository";
@@ -88,4 +91,22 @@ export async function shopFavouritesAction(
   } catch (error) {
     return { error: said(error) };
   }
+}
+
+// Leave one of the maker's listings out of their best sellers (an add-on, a
+// sample), or put it back.
+export async function leaveOutListingAction(
+  input: unknown,
+): Promise<{ error?: string }> {
+  const parsed = z
+    .object({ listingId: ListingId, out: z.boolean() })
+    .safeParse(input);
+  if (!parsed.success) return { error: "Which listing?" };
+  const { leftOutListings } = await getMakerPreferences();
+  if (parsed.data.out && leftOutListings.length >= MAX_LEFT_OUT) {
+    return { error: `At most ${MAX_LEFT_OUT} listings can be left out.` };
+  }
+  await leaveOutListing(parsed.data.listingId, parsed.data.out);
+  refresh();
+  return {};
 }

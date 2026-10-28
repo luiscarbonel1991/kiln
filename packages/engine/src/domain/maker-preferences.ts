@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { HeroSetting } from "@/domain/hero-setting";
 import { SearchColumns } from "@/domain/market-brief";
-import { MAX_WATCHED_SHOPS, WatchedShop } from "@/domain/shop-ranking";
+import {
+  ListingId,
+  MAX_LEFT_OUT,
+  MAX_WATCHED_SHOPS,
+  WatchedShop,
+} from "@/domain/shop-ranking";
 
 // What a maker's choices are kept as (`Maker.preferences`), read leniently: a
 // value a later version drops reads as unset, and the rest still reads.
@@ -43,6 +48,9 @@ export const MakerPreferences = z.object({
   searchColumns: lenientRecord(SearchColumns),
   // Other shops the maker compares theirs with (Shops), in the order added.
   watchedShops: lenientList(WatchedShop, MAX_WATCHED_SHOPS),
+  // Listings of the maker's shop left out of their best sellers (add-ons,
+  // samples: anything that is not a product to refresh).
+  leftOutListings: lenientList(ListingId, MAX_LEFT_OUT),
 });
 export type MakerPreferences = z.infer<typeof MakerPreferences>;
 
@@ -50,5 +58,10 @@ export function readPreferences(raw: unknown): MakerPreferences {
   const parsed = MakerPreferences.safeParse(raw ?? {});
   return parsed.success
     ? parsed.data
-    : { heroSetting: {}, searchColumns: {}, watchedShops: [] };
+    : {
+        heroSetting: {},
+        searchColumns: {},
+        watchedShops: [],
+        leftOutListings: [],
+      };
 }

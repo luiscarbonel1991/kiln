@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const kept = vi.hoisted(() => ({
   watched: [] as { shopId: string; name: string }[],
   added: [] as unknown[],
+  leftOut: [] as string[],
+  changes: [] as [string, boolean][],
 }));
 vi.mock("next/cache", () => ({ refresh: () => {} }));
 vi.mock("@/server/maker-repository", () => ({
@@ -12,7 +14,12 @@ vi.mock("@/server/maker-repository", () => ({
     heroSetting: {},
     searchColumns: {},
     watchedShops: kept.watched,
+    leftOutListings: kept.leftOut,
   }),
+  leaveOutListing: async (listingId: string, out: boolean) => {
+    kept.changes.push([listingId, out]);
+    return true;
+  },
   watchShop: async (shop: unknown) => {
     kept.added.push(shop);
     return true;
@@ -40,6 +47,8 @@ const actions = await import("@/app/actions/shops");
 beforeEach(() => {
   kept.watched = [];
   kept.added = [];
+  kept.leftOut = [];
+  kept.changes = [];
 });
 
 describe("Shops actions", () => {
@@ -84,5 +93,31 @@ describe("Shops actions", () => {
     expect(await actions.disconnectShopAction()).toEqual({
       error: "No shop was connected.",
     });
+  });
+
+  it("leaves a listing out of the ranking or puts it back, by its id only", async () => {
+    expect(
+      await actions.leaveOutListingAction({ listingId: "abc", out: true }),
+    ).toEqual({ error: "Which listing?" });
+    expect(
+      await actions.leaveOutListingAction({
+        listingId: "4143619041",
+        out: true,
+      }),
+    ).toEqual({});
+    expect(
+      await actions.leaveOutListingAction({
+        listingId: "4143619041",
+        out: false,
+      }),
+    ).toEqual({});
+    expect(kept.changes).toEqual([
+      ["4143619041", true],
+      ["4143619041", false],
+    ]);
+    kept.leftOut = Array.from({ length: 500 }, (_, i) => String(i + 1));
+    expect(
+      await actions.leaveOutListingAction({ listingId: "9999", out: true }),
+    ).toEqual({ error: "At most 500 listings can be left out." });
   });
 });

@@ -14,7 +14,12 @@ import {
   ModelRefused,
   makerModels,
 } from "@/domain/model-defaults";
-import { MAX_WATCHED_SHOPS, WatchedShop } from "@/domain/shop-ranking";
+import {
+  ListingId,
+  MAX_LEFT_OUT,
+  MAX_WATCHED_SHOPS,
+  WatchedShop,
+} from "@/domain/shop-ranking";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
 import { env } from "@/lib/env";
 
@@ -82,7 +87,12 @@ export async function getMakerModels(): Promise<MakerModels> {
 // The maker's remembered choices (hero-setting.ts); none without a database.
 export async function getMakerPreferences(): Promise<MakerPreferences> {
   if (!hasDatabase()) {
-    return { heroSetting: {}, searchColumns: {}, watchedShops: [] };
+    return {
+      heroSetting: {},
+      searchColumns: {},
+      watchedShops: [],
+      leftOutListings: [],
+    };
   }
   const maker = await getCurrentMaker();
   const row = await db.maker.findUnique({
@@ -180,6 +190,29 @@ export async function unwatchShop(shopId: string): Promise<boolean> {
     return { watchedShops: rest };
   });
   return removed;
+}
+
+// Leave a listing of the maker's shop out of their best sellers, or put it
+// back; false when nothing changed.
+export async function leaveOutListing(
+  listingId: string,
+  out: boolean,
+): Promise<boolean> {
+  const id = ListingId.parse(listingId);
+  let changed = false;
+  await updatePreferences((kept) => {
+    const has = kept.leftOutListings.includes(id);
+    if (has === out || (out && kept.leftOutListings.length >= MAX_LEFT_OUT)) {
+      return null;
+    }
+    changed = true;
+    return {
+      leftOutListings: out
+        ? [...kept.leftOutListings, id]
+        : kept.leftOutListings.filter((l) => l !== id),
+    };
+  });
+  return changed;
 }
 
 // Save the defaults: each kind must be a model Kiln offers for it, with a

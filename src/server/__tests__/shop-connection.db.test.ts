@@ -34,9 +34,8 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
   const { db } = await import("@/lib/db");
   const shops = await import("@/server/shop-connection");
   const ranking = await import("@/server/shop-ranking");
-  const { getCurrentMaker, watchShop, unwatchShop } = await import(
-    "@/server/maker-repository"
-  );
+  const { getCurrentMaker, watchShop, unwatchShop, leaveOutListing } =
+    await import("@/server/maker-repository");
   const { mockEtsy, MOCK_SHOP_ID } = await import("@/providers/shop/etsy-mock");
   const { unseal } = await import("@/server/secret-box");
   const { resultsConnector } = await import("@/server/shop-connector");
@@ -200,26 +199,49 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
     });
   });
 
-  it("best sellers: the shop's listings by units sold in the window, each with its Kiln project", async () => {
+  it("best sellers: the shop's listings by orders in the window, each with its photo and Kiln project; one-offs set aside", async () => {
     await connect();
     vi.stubGlobal("fetch", etsyFetch(mockEtsy(() => NOW)).fetch);
     const view = await ranking.yourBestSellers(90, { now: NOW });
     expect(view).toMatchObject({
       shopName: "MockMakerStudio",
       window: 90,
+      by: "orders",
       from: "2026-07-29",
       complete: true,
+      detailsProblem: null,
     });
-    expect(view?.orders).toBeGreaterThan(50);
+    expect(view?.totals.orders).toBeGreaterThan(50);
+    expect(view?.totals.units).toBeGreaterThanOrEqual(view?.totals.orders ?? 0);
     const rows = view?.rows ?? [];
     expect(rows.length).toBeGreaterThan(3);
     for (let i = 1; i < rows.length; i++) {
-      expect(rows[i - 1].units).toBeGreaterThanOrEqual(rows[i].units);
+      expect(rows[i - 1].orders).toBeGreaterThanOrEqual(rows[i].orders);
     }
     expect(rows[0].url).toBe(
       `https://www.etsy.com/listing/${rows[0].listingId}`,
     );
     expect(rows[0].title).not.toContain("&amp;");
+    expect(rows[0].photo).toMatch(/^data:image\/svg\+xml/);
+    expect(rows.every((r) => r.now === "live" || r.now === "sold-out")).toBe(
+      true,
+    );
+    // Listings made for one buyer, and the deleted one, are set aside; their
+    // orders still count in the totals.
+    const aside = view?.setAside ?? [];
+    expect(aside.map((r) => r.now)).toContain("one-off");
+    expect(aside.every((r) => r.now === "one-off" || r.now === "gone")).toBe(
+      true,
+    );
+    const ranked = [...rows, ...aside].reduce((n, r) => n + r.units, 0);
+    expect(ranked).toBe(view?.totals.units);
+    // Ranked by units on request.
+    const byUnits = await ranking.yourBestSellers(90, {
+      by: "units",
+      now: NOW,
+    });
+    const units = byUnits?.rows.map((r) => r.units) ?? [];
+    expect(units).toEqual([...units].sort((a, b) => b - a));
     // A listing a Kiln project refreshes names that project.
     const maker = await getCurrentMaker();
     const project = await db.project.create({
@@ -254,7 +276,30 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
     }
     // A year sells at least what 90 days do.
     const year = await ranking.yourBestSellers(365, { now: NOW });
-    expect(year?.orders).toBeGreaterThan(view?.orders ?? 0);
+    expect(year?.totals.orders).toBeGreaterThan(view?.totals.orders ?? 0);
+  });
+
+  it("a listing the maker leaves out moves to the set-aside ones, and back", async () => {
+    await connect();
+    vi.stubGlobal("fetch", etsyFetch(mockEtsy(() => NOW)).fetch);
+    const before = await ranking.yourBestSellers(30, { now: NOW });
+    const first = before?.rows[0];
+    if (!first) throw new Error("no best seller");
+    try {
+      expect(await leaveOutListing(first.listingId, true)).toBe(true);
+      expect(await leaveOutListing(first.listingId, true)).toBe(false);
+      const after = await ranking.yourBestSellers(30, { now: NOW });
+      expect(after?.rows.map((r) => r.listingId)).not.toContain(
+        first.listingId,
+      );
+      expect(
+        after?.setAside.find((r) => r.listingId === first.listingId),
+      ).toMatchObject({ leftOut: true, now: "live" });
+    } finally {
+      await leaveOutListing(first.listingId, false);
+    }
+    const back = await ranking.yourBestSellers(30, { now: NOW });
+    expect(back?.rows[0].listingId).toBe(first.listingId);
   });
 
   it("the results loop reads a listing's orders and revenue in a window from the connected shop", async () => {
@@ -290,7 +335,7 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
 
   it("other shops: found by name, ranked by lifetime sales, their listings by favourites", async () => {
     vi.stubGlobal("fetch", etsyFetch(mockEtsy(() => NOW)).fetch);
-    const found = await ranking.findShops("pine", NOW);
+    const found = await ranking.findShops("pine");
     expect(found.map((s) => s.name)).toEqual([
       "NorthPineGoods",
       "PineAndPaperStudio",
@@ -300,19 +345,32 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
     expect(await watchShop({ shopId: "60011", name: "NorthPineGoods" })).toBe(
       false,
     );
-    const watched = await ranking.watchedShops({ now: NOW });
+    const watched = await ranking.watchedShops();
     expect(watched?.failed).toEqual([]);
-    const sold = watched?.standings.map((s) => s.sold) ?? [];
-    expect(sold).toEqual([...sold].sort((x, y) => y - x));
+    expect(watched?.yourShopId).toBeNull();
+    const reviews = watched?.standings.map((s) => s.reviews?.count ?? 0) ?? [];
+    expect(reviews).toEqual([...reviews].sort((x, y) => y - x));
     expect(watched?.standings.map((s) => s.shopId).sort()).toEqual([
       "60011",
       "60013",
     ]);
+    const lifetime = await ranking.watchedShops({ by: "lifetime" });
+    const sold = lifetime?.standings.map((s) => s.sold) ?? [];
+    expect(sold).toEqual([...sold].sort((x, y) => y - x));
     const top = await ranking.shopFavourites("60011");
     expect(top.read).toBe(24);
     expect(top.listings).toHaveLength(20);
     expect(top.listings[0].favourites).toBeGreaterThanOrEqual(
       top.listings[1].favourites,
+    );
+    expect(top.listings.every((l) => l.photo !== null)).toBe(true);
+    // With a shop connected, the maker's own stands among the others.
+    await connect();
+    vi.stubGlobal("fetch", etsyFetch(mockEtsy(() => NOW)).fetch);
+    const withYours = await ranking.watchedShops();
+    expect(withYours?.yourShopId).toBe(String(MOCK_SHOP_ID));
+    expect(withYours?.standings.map((s) => s.shopId)).toContain(
+      String(MOCK_SHOP_ID),
     );
   });
 });

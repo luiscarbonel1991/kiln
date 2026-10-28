@@ -15,6 +15,9 @@ export const RankWindow = z.coerce
 export type RankWindow = (typeof RANK_WINDOWS)[number];
 
 export const MAX_WATCHED_SHOPS = 12;
+// Listings of the maker's shop they left out of their best sellers.
+export const MAX_LEFT_OUT = 500;
+export const ListingId = z.string().regex(/^\d+$/).max(20);
 
 // A shop the maker compares against, by Etsy's id and the name it had.
 export const WatchedShop = z.object({
@@ -125,6 +128,122 @@ export function bestSellers(receipts: ReceiptLike[]): ListingSales[] {
     );
 }
 
+// How the maker's best sellers are ranked. Orders count buyers, so one bulk
+// order does not lift a listing over one many people buy (the default);
+// units and revenue are a click away.
+export const RANK_BY = ["orders", "units", "revenue"] as const;
+export const RankBy = z.enum(RANK_BY).catch("orders");
+export type RankBy = (typeof RANK_BY)[number];
+
+export function rankBestSellers<T extends ListingSales>(
+  rows: T[],
+  by: RankBy,
+): T[] {
+  const key: Record<RankBy, (keyof ListingSales)[]> = {
+    orders: ["orders", "units", "revenue"],
+    units: ["units", "orders", "revenue"],
+    revenue: ["revenue", "orders", "units"],
+  };
+  return [...rows].sort((a, b) => {
+    for (const k of key[by]) {
+      const d = (b[k] as number) - (a[k] as number);
+      if (d !== 0) return d;
+    }
+    return a.title.localeCompare(b.title);
+  });
+}
+
+export interface SalesTotals {
+  orders: number;
+  units: number;
+  revenue: number;
+  currency: string | null;
+  listings: number;
+}
+
+// A window's sales in all: the orders that count as sales, their units and
+// revenue, and how many listings sold.
+export function salesTotals(receipts: ReceiptLike[]): SalesTotals {
+  const totals: SalesTotals = {
+    orders: 0,
+    units: 0,
+    revenue: 0,
+    currency: null,
+    listings: 0,
+  };
+  const listings = new Set<number>();
+  let currency: string | null | undefined;
+  for (const receipt of receipts) {
+    if (!countsAsSale(receipt.status)) continue;
+    totals.orders += 1;
+    for (const line of receipt.transactions) {
+      if (line.quantity <= 0) continue;
+      totals.units += line.quantity;
+      totals.revenue += amountOf(line.price) * line.quantity;
+      if (line.listing_id !== null) listings.add(line.listing_id);
+      const code = line.price.currency_code || null;
+      currency = currency === undefined || currency === code ? code : null;
+    }
+  }
+  totals.revenue = Math.round(totals.revenue * 100) / 100;
+  totals.currency = currency ?? null;
+  totals.listings = listings.size;
+  return totals;
+}
+
+// What a sold listing is on Etsy now. A private listing was made for one
+// buyer (a custom order, an upgrade); one Etsy no longer answers for was
+// deleted. "unknown" when the listings could not be read.
+export type ListingNow =
+  | "live"
+  | "sold-out"
+  | "inactive"
+  | "one-off"
+  | "gone"
+  | "unknown";
+
+export interface ListingDetailLike {
+  listing_id: number;
+  state: string;
+  is_private?: boolean;
+  images?:
+    | {
+        rank?: number;
+        url_75x75?: string;
+        url_170x135?: string;
+        url_570xN?: string;
+      }[]
+    | null;
+}
+
+export function listingNow(
+  detail: ListingDetailLike | undefined,
+  read: boolean,
+): ListingNow {
+  if (!read) return "unknown";
+  if (!detail) return "gone";
+  if (detail.is_private) return "one-off";
+  const state = detail.state.trim().toLowerCase();
+  if (state === "active") return "live";
+  if (state === "sold_out") return "sold-out";
+  return "inactive";
+}
+
+// One-offs and deleted listings are not products to refresh: set aside from
+// the ranking, with the listings the maker left out.
+export const setAside = (now: ListingNow, leftOut: boolean) =>
+  leftOut || now === "one-off" || now === "gone";
+
+// A listing's first photo, small enough for a list.
+export function listingPhoto(
+  detail: ListingDetailLike | undefined,
+): string | null {
+  const first = [...(detail?.images ?? [])].sort(
+    (a, b) => (a.rank ?? 99) - (b.rank ?? 99),
+  )[0];
+  return first?.url_170x135 ?? first?.url_570xN ?? first?.url_75x75 ?? null;
+}
+
 // --- Other shops ----------------------------------------------------------
 
 export interface ShopLike {
@@ -138,38 +257,34 @@ export interface ShopLike {
   review_average?: number | null;
   listing_active_count: number;
   is_vacation?: boolean;
+  icon_url_fullxfull?: string | null;
 }
 
 export interface ShopStanding {
   shopId: string;
   name: string;
   url: string;
-  // Lifetime sales, and their average per month since the shop opened.
+  icon: string | null;
+  // Lifetime sales, and when the shop opened (a lifetime average would hide
+  // its pace now, so none is made).
   sold: number;
-  perMonth: number | null;
   openedOn: string | null;
   favourites: number;
-  // Reviews of the past year.
+  // Reviews of the past year (Etsy's definition): the one recent number
+  // Etsy gives about another shop.
   reviews: { count: number; average: number | null } | null;
   activeListings: number;
   onVacation: boolean;
 }
 
-const MONTH_SEC = (365.25 / 12) * 86_400;
-
-export function shopStanding(shop: ShopLike, nowSec: number): ShopStanding {
+export function shopStanding(shop: ShopLike): ShopStanding {
   const opened = shop.create_date;
-  const months =
-    opened && opened < nowSec
-      ? Math.max(1, (nowSec - opened) / MONTH_SEC)
-      : null;
   return {
     shopId: String(shop.shop_id),
     name: shop.shop_name,
     url: shop.url,
+    icon: shop.icon_url_fullxfull ?? null,
     sold: shop.transaction_sold_count,
-    perMonth:
-      months === null ? null : Math.round(shop.transaction_sold_count / months),
     openedOn: opened
       ? new Date(opened * 1000).toISOString().slice(0, 10)
       : null,
@@ -183,9 +298,21 @@ export function shopStanding(shop: ShopLike, nowSec: number): ShopStanding {
   };
 }
 
-// Shops by lifetime sales, the most first.
-export const rankShops = (shops: ShopStanding[]) =>
-  [...shops].sort((a, b) => b.sold - a.sold || a.name.localeCompare(b.name));
+// Shops by the past year (reviews, the most first; a shop without any
+// last) or by lifetime sales.
+export const SHOP_RANK_BY = ["recent", "lifetime"] as const;
+export const ShopRankBy = z.enum(SHOP_RANK_BY).catch("recent");
+export type ShopRankBy = (typeof SHOP_RANK_BY)[number];
+
+export const rankShops = (shops: ShopStanding[], by: ShopRankBy = "recent") =>
+  [...shops].sort(
+    (a, b) =>
+      (by === "recent"
+        ? (b.reviews?.count ?? -1) - (a.reviews?.count ?? -1)
+        : 0) ||
+      b.sold - a.sold ||
+      a.name.localeCompare(b.name),
+  );
 
 export interface ListingLike {
   listing_id: number;
@@ -202,6 +329,7 @@ export interface FavouredListing {
   favourites: number;
   price: number;
   currency: string;
+  photo: string | null;
 }
 
 // A shop's listings by favourites, the most first: what Etsy gives in place
@@ -218,6 +346,7 @@ export function favouredListings(
       favourites: l.num_favorers,
       price: Math.round(amountOf(l.price) * 100) / 100,
       currency: l.price.currency_code,
+      photo: null,
     }))
     .sort(
       (a, b) => b.favourites - a.favourites || a.title.localeCompare(b.title),
