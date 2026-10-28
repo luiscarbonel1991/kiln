@@ -135,6 +135,42 @@ describe("etsyApi", () => {
       offset: "200",
     });
   });
+
+  it("reads listings by id in one batch, with their photos, at most 100", async () => {
+    const fetch = vi.fn(async (_url: URL | RequestInfo, _init?: RequestInit) =>
+      json(200, {
+        count: 1,
+        results: [
+          {
+            listing_id: 5,
+            shop_id: 7,
+            title: "Oak board",
+            url: "https://www.etsy.com/listing/5",
+            state: "active",
+            is_private: false,
+            num_favorers: 3,
+            price: { amount: 2500, divisor: 100, currency_code: "USD" },
+            images: [
+              { rank: 1, url_170x135: "https://i.etsystatic.com/5.jpg" },
+            ],
+            description: "dropped",
+          },
+        ],
+      }),
+    );
+    const etsy = etsyApi(app, { fetch });
+    expect(await etsy.listings([])).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+    const [one] = await etsy.listings(
+      Array.from({ length: 120 }, (_, i) => i + 1),
+    );
+    const url = new URL(String(fetch.mock.calls[0][0]));
+    expect(url.pathname).toBe("/v3/application/listings/batch");
+    expect(url.searchParams.get("includes")).toBe("Images");
+    expect(url.searchParams.get("listing_ids")?.split(",")).toHaveLength(100);
+    expect(one).toMatchObject({ listing_id: 5, is_private: false });
+    expect(one).not.toHaveProperty("description");
+  });
 });
 
 describe("allPages", () => {
@@ -297,5 +333,28 @@ describe("the mock Etsy", () => {
     await expect(
       etsy.receipts(60011, { minCreated: 0, limit: 1, offset: 0 }),
     ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("sold listings made for one buyer, and one since deleted, like a real shop", async () => {
+    const etsy = mockEtsy(() => new Date("2026-10-27T12:00:00Z"));
+    const now = Date.UTC(2026, 9, 27, 12) / 1000;
+    const { results } = await etsy.receipts(MOCK_SHOP_ID, {
+      minCreated: now - 365 * 86_400,
+      limit: 2000,
+      offset: 0,
+    });
+    const sold = [
+      ...new Set(
+        results.flatMap((r) => r.transactions.map((t) => t.listing_id ?? 0)),
+      ),
+    ];
+    const details = await etsy.listings(sold);
+    const byId = new Map(details.map((d) => [d.listing_id, d]));
+    expect(details.some((d) => d.is_private)).toBe(true);
+    expect(sold.some((id) => !byId.has(id))).toBe(true);
+    expect(details.some((d) => d.state === "sold_out" && !d.is_private)).toBe(
+      true,
+    );
+    expect(details.every((d) => (d.images ?? []).length > 0)).toBe(true);
   });
 });

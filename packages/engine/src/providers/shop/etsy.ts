@@ -44,6 +44,7 @@ export const EtsyShop = z.object({
   review_average: z.number().nullable().optional(),
   listing_active_count: z.number().int().min(0).default(0),
   is_vacation: z.boolean().optional(),
+  icon_url_fullxfull: z.string().nullable().optional(),
 });
 export type EtsyShop = z.infer<typeof EtsyShop>;
 
@@ -60,6 +61,21 @@ export const EtsyListing = z.object({
   views: z.number().int().min(0).optional(),
 });
 export type EtsyListing = z.infer<typeof EtsyListing>;
+
+export const EtsyListingImage = z.object({
+  rank: z.number().int().optional(),
+  url_75x75: z.string().optional(),
+  url_170x135: z.string().optional(),
+  url_570xN: z.string().optional(),
+});
+
+// A listing read by id (the batch read), with its photos: whether it is still
+// on Etsy, live, or private (made for one buyer).
+export const EtsyListingDetail = EtsyListing.extend({
+  is_private: z.boolean().optional(),
+  images: z.array(EtsyListingImage).nullable().optional(),
+});
+export type EtsyListingDetail = z.infer<typeof EtsyListingDetail>;
 
 export const EtsyTransaction = z.object({
   transaction_id: Id,
@@ -87,8 +103,11 @@ export const EtsyListings = page(EtsyListing);
 export type EtsyListings = z.infer<typeof EtsyListings>;
 export const EtsyReceipts = page(EtsyReceipt);
 export type EtsyReceipts = z.infer<typeof EtsyReceipts>;
+const EtsyListingDetails = page(EtsyListingDetail);
 
 export const PAGE_LIMIT = 100;
+// Etsy's batch read takes at most 100 ids.
+export const BATCH_LIMIT = 100;
 
 // What Kiln reads from Etsy: the live API, or the mock shop of a mock run.
 export interface EtsyReader {
@@ -100,6 +119,9 @@ export interface EtsyReader {
     shopId: number,
     page: { limit: number; offset: number },
   ): Promise<EtsyListings>;
+  // Listings by id, with their photos, up to BATCH_LIMIT at once. A listing
+  // Etsy no longer has (or will not show) is missing from the answer.
+  listings(listingIds: number[]): Promise<EtsyListingDetail[]>;
   // A shop's receipts created in a window, newest first (needs the shop's
   // token, scope transactions_r). Epoch seconds.
   receipts(
@@ -221,6 +243,19 @@ export function etsyApi(
       (await get("/shops", { shop_name: name, limit: 10 }, EtsyShops)).results,
     activeListings: (shopId, { limit, offset }) =>
       get(`/shops/${shopId}/listings/active`, { limit, offset }, EtsyListings),
+    listings: async (listingIds) =>
+      listingIds.length === 0
+        ? []
+        : (
+            await get(
+              "/listings/batch",
+              {
+                listing_ids: listingIds.slice(0, BATCH_LIMIT).join(","),
+                includes: "Images",
+              },
+              EtsyListingDetails,
+            )
+          ).results,
     receipts: (shopId, { minCreated, maxCreated, limit, offset }) =>
       get(
         `/shops/${shopId}/receipts`,

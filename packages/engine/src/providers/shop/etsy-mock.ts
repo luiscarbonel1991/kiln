@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import {
+  BATCH_LIMIT,
   EtsyError,
   type EtsyListing,
+  type EtsyListingDetail,
   type EtsyReader,
   type EtsyReceipt,
   type EtsyShop,
@@ -9,7 +11,9 @@ import {
 
 // The Etsy a mock run reads (KILN_PROVIDERS=mock): a connected shop with a
 // year of orders, and a few other shops to look up by name. Deterministic per
-// day, so a ranking reads the same twice; nothing is called.
+// day, so a ranking reads the same twice; nothing is called. Like a real
+// shop's, its orders include one-off listings made for one buyer (private),
+// one listing since deleted, and one sold out.
 
 export const MOCK_USER_ID = 90001;
 export const MOCK_SHOP_ID = 50001;
@@ -62,7 +66,15 @@ function mockShop(id: number, nowSec: number): EtsyShop {
     review_average: Math.round((4.5 + unit(`${id}|rev`) * 0.5) * 100) / 100,
     listing_active_count: 24,
     is_vacation: false,
+    icon_url_fullxfull: null,
   };
+}
+
+// A photo for a mock listing: a warm tile with its initial, drawn inline.
+function mockPhoto(listingId: number, title: string): string {
+  const hue = Math.round(unit(`${listingId}|hue`) * 40) + 15;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 135"><rect width="170" height="135" fill="hsl(${hue} 45% 78%)"/><text x="85" y="84" font-family="Georgia" font-size="56" text-anchor="middle" fill="hsl(${hue} 40% 34%)">${title.charAt(0)}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 function mockListings(shopId: number): EtsyListing[] {
@@ -75,7 +87,7 @@ function mockListings(shopId: number): EtsyListing[] {
       shop_id: shopId,
       title: `${style} ${thing} &amp; Gift Box`,
       url: `https://www.etsy.com/listing/${listingId}/${style.toLowerCase()}-${thing.toLowerCase().replace(/\s+/g, "-")}`,
-      state: "active",
+      state: shopId === MOCK_SHOP_ID && i === 7 ? "sold_out" : "active",
       num_favorers: Math.round(unit(`${shopId}|${i}|f`) ** 2 * 2400),
       price: {
         amount: 1200 + Math.round(unit(`${shopId}|${i}|p`) * 60) * 100,
@@ -87,8 +99,52 @@ function mockListings(shopId: number): EtsyListing[] {
   });
 }
 
+// Listings of the connected shop that are not on its shop page: made for one
+// buyer (private), and one since deleted (Etsy no longer answers for it).
+const ONE_OFFS = [
+  "Custom Order for Dana - Engraved Walnut Board",
+  "Design Upgrade - Second Line of Text",
+  "Custom Order for Priya - Set of 6 Coasters",
+].map((title, k) => ({ listingId: MOCK_SHOP_ID * 1000 + 900 + k, title }));
+const DELETED = {
+  listingId: MOCK_SHOP_ID * 1000 + 990,
+  title: "Retired Cedar Sachet Trio",
+};
+
+function mockDetail(
+  listing: EtsyListing,
+  isPrivate = false,
+): EtsyListingDetail {
+  return {
+    ...listing,
+    is_private: isPrivate,
+    images: [
+      {
+        rank: 1,
+        url_75x75: mockPhoto(listing.listing_id, listing.title),
+        url_170x135: mockPhoto(listing.listing_id, listing.title),
+      },
+    ],
+  };
+}
+
+function oneOffListing(listingId: number, title: string): EtsyListing {
+  return {
+    listing_id: listingId,
+    shop_id: MOCK_SHOP_ID,
+    title,
+    url: `https://www.etsy.com/listing/${listingId}`,
+    state: "sold_out",
+    num_favorers: 0,
+    price: { amount: 4500, divisor: 100, currency_code: "USD" },
+    quantity: 0,
+  };
+}
+
 // The connected shop's orders: a day has up to three, each one or two
-// listings, the popular ones more often; one order in twenty is canceled.
+// listings, the popular ones more often; one order in twenty is canceled,
+// one in fifteen is a one-off made for its buyer, and the deleted listing
+// sold a few times.
 function mockReceipts(nowSec: number): EtsyReceipt[] {
   const listings = mockListings(MOCK_SHOP_ID);
   const today = Math.floor(nowSec / DAY) * DAY;
@@ -110,9 +166,18 @@ function mockReceipts(nowSec: number): EtsyReceipt[] {
               : "Completed",
         created_timestamp: at,
         transactions: Array.from({ length: lines }, (_, l) => {
-          const pick = listings[
-            Math.floor(unit(`${day}|${o}|${l}|p`) ** 2 * listings.length)
-          ] as EtsyListing;
+          const odd = unit(`${day}|${o}|${l}|odd`);
+          const one = ONE_OFFS[Math.floor(odd * 45) % ONE_OFFS.length];
+          const pick =
+            odd < 1 / 15 && one
+              ? oneOffListing(one.listingId, one.title)
+              : odd > 0.985
+                ? oneOffListing(DELETED.listingId, DELETED.title)
+                : (listings[
+                    Math.floor(
+                      unit(`${day}|${o}|${l}|p`) ** 2 * listings.length,
+                    )
+                  ] as EtsyListing);
           return {
             transaction_id: (day / 10 + o + 1) * 10 + l,
             listing_id: pick.listing_id,
@@ -144,6 +209,22 @@ export function mockEtsy(now: () => Date = () => new Date()): EtsyReader {
       mockShop(shopId, nowSec());
       const all = mockListings(shopId);
       return { count: all.length, results: all.slice(offset, offset + limit) };
+    },
+    listings: async (listingIds) => {
+      const known = new Map<number, EtsyListingDetail>();
+      for (const shop of SHOPS) {
+        for (const l of mockListings(shop.id))
+          known.set(l.listing_id, mockDetail(l));
+      }
+      for (const one of ONE_OFFS) {
+        known.set(
+          one.listingId,
+          mockDetail(oneOffListing(one.listingId, one.title), true),
+        );
+      }
+      return listingIds
+        .slice(0, BATCH_LIMIT)
+        .flatMap((id) => known.get(id) ?? []);
     },
     receipts: async (shopId, { minCreated, maxCreated, limit, offset }) => {
       if (shopId !== MOCK_SHOP_ID) {

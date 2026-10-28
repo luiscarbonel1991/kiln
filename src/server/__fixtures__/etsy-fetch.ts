@@ -44,6 +44,14 @@ export function etsyFetch(
           }),
         );
       }
+      if (path === "/listings/batch") {
+        const ids = (q.get("listing_ids") ?? "")
+          .split(",")
+          .filter(Boolean)
+          .map(Number);
+        const results = await reader.listings(ids);
+        return answer(200, { count: results.length, results });
+      }
       const listings = path.match(/^\/shops\/(\d+)\/listings\/active$/);
       if (listings) {
         return answer(
