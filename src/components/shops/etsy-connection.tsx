@@ -41,22 +41,23 @@ export function EtsyConnection({
         </ul>
         <ol className={`${NOTE} list-decimal pl-5`}>
           <li>
-            Register Kiln once as an app at{" "}
+            Whoever runs Kiln registers it once as an app at{" "}
             <a
-              href="https://www.etsy.com/developers/register"
+              href="https://www.etsy.com/developers"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
               etsy.com/developers
-            </a>{" "}
-            (a seller app, for your own shop). Its keystring and shared secret
-            are <code>ETSY_API_KEY</code> and <code>ETSY_SHARED_SECRET</code>.
+            </a>
+            ; makers connect through it and never make a key of their own. Its
+            keystring and shared secret are <code>ETSY_API_KEY</code> and{" "}
+            <code>ETSY_SHARED_SECRET</code>.
           </li>
           <li>
-            Give the app the address Etsy sends you back to, and the same in{" "}
-            <code>ETSY_REDIRECT_URI</code>:{" "}
-            <code>https://localhost:3009/api/shops/etsy/callback</code>.
+            Add the address Etsy sends you back to as one of the app&apos;s
+            callback URLs, and the same in <code>ETSY_REDIRECT_URI</code>:{" "}
+            <code>http://localhost:3009/api/shops/etsy/callback</code>.
           </li>
           {setup.missing.includes("KILN_SECRET_KEY") ? (
             <li>
@@ -134,10 +135,8 @@ export function EtsyConnection({
         </a>
       </Button>
       {setup.mode === "live" && setup.redirectUri ? (
-        <p className="font-mono text-[0.65rem] leading-relaxed text-on-surface-dim">
-          Etsy sends you back to {setup.redirectUri}. Kiln answers there over
-          https: start it with pnpm dev:https --port 3009 to connect; after
-          that, plain pnpm dev keeps the connection.
+        <p className="font-mono text-[0.65rem] leading-relaxed text-on-surface-dim [overflow-wrap:anywhere]">
+          Etsy sends you back to {setup.redirectUri}.
         </p>
       ) : null}
     </div>

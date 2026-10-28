@@ -8,6 +8,7 @@ import {
 } from "@/providers/shop/etsy";
 import { MOCK_SHOP_ID, mockEtsy } from "@/providers/shop/etsy-mock";
 import {
+  callbackUrlProblem,
   connectUrl,
   exchangeCode,
   pkceChallenge,
@@ -187,6 +188,19 @@ describe("Etsy OAuth", () => {
       code_challenge: "ch",
       code_challenge_method: "S256",
     });
+  });
+
+  it("a callback URL is http or https on a host name, as Etsy's portal takes it", () => {
+    expect(
+      callbackUrlProblem("http://localhost:3009/api/shops/etsy/callback"),
+    ).toBeNull();
+    expect(callbackUrlProblem("https://kiln.example.com/cb")).toBeNull();
+    expect(callbackUrlProblem("http://127.0.0.1:3009/cb")).toMatch(
+      "IP address",
+    );
+    expect(callbackUrlProblem("http://[::1]:3009/cb")).toMatch("IP address");
+    expect(callbackUrlProblem("ftp://localhost/cb")).toMatch("http or https");
+    expect(callbackUrlProblem("localhost:3009")).not.toBeNull();
   });
 
   it("trades the code for tokens, the user read from the token", async () => {

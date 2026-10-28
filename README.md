@@ -278,33 +278,29 @@ from Etsy is stored, beyond the list of shops the maker compares.
 
 **Connecting.** The maker approves Kiln on Etsy's own page (OAuth 2.0 with
 PKCE, read-only scopes `shops_r listings_r transactions_r`): no key to paste.
-Kiln itself is an app Etsy knows, registered once:
+Kiln itself is an app Etsy knows, registered once by whoever runs Kiln (Etsy's
+terms forbid asking users to make keys of their own):
 
-1. Register a seller app (for your own shop) at
-   <https://www.etsy.com/developers/register>.
-2. Give it the address Etsy sends you back to, exactly:
-   `https://localhost:3009/api/shops/etsy/callback`.
+1. Register an app at <https://www.etsy.com/developers>, or use one you
+   already have.
+2. Add to its callback URLs the address Etsy sends you back to, exactly:
+   `http://localhost:3009/api/shops/etsy/callback` (Etsy takes http on a host
+   name; an IP address such as 127.0.0.1 is refused).
 3. In `.env`: `ETSY_API_KEY` (the keystring), `ETSY_SHARED_SECRET`,
    `ETSY_REDIRECT_URI` (the address above) and `KILN_SECRET_KEY`
    (`openssl rand -base64 32`), which seals the shop's tokens (AES-256-GCM).
-4. Etsy only sends you back to https, so connect with Kiln on a local
-   certificate, then Settings → Shops → Connect:
+4. Restart Kiln, then Settings → Shops → Connect.
 
-```bash
-pnpm dev:https --port 3009
-```
-
-The first run fetches `mkcert` and asks for your password to trust its local
-certificate. Once connected, plain `pnpm dev` keeps the connection: Kiln
-refreshes the hour-long access token itself, under the row's lock. If Etsy
+Kiln refreshes the hour-long access token itself, under the row's lock. If Etsy
 refuses the refresh (access revoked, or 90 days unused), Shops asks to connect
 again. Disconnect in Settings drops the tokens; remove Kiln from your Etsy
 account's apps to revoke it there too.
 
-A seller app serves only your own shop. Serving other sellers needs Etsy's
-commercial access (a review: terms, privacy policy, the "not endorsed by
-Etsy" notice). In a mock run (`pnpm dev:mock`), Connect links a mock shop with
-a year of orders, and Other shops finds a few mock shops by name.
+A personal app serves your own shop and a few others at limited scale.
+Serving sellers at large needs Etsy's commercial access (a review: terms,
+privacy policy, the "not endorsed by Etsy" notice). In a mock run
+(`pnpm dev:mock`), Connect links a mock shop with a year of orders, and Other
+shops finds a few mock shops by name.
 
 ## Models and providers
 

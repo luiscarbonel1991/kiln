@@ -11,6 +11,7 @@ import {
 } from "@/providers/shop/etsy";
 import { MOCK_USER_ID, mockEtsy } from "@/providers/shop/etsy-mock";
 import {
+  callbackUrlProblem,
   connectUrl,
   ETSY_SCOPES,
   type EtsyTokens,
@@ -92,10 +93,11 @@ export function etsySetup(): EtsySetup {
   if (mode === "live") {
     if (!env.ETSY_API_KEY) missing.push("ETSY_API_KEY");
     if (!env.ETSY_SHARED_SECRET) missing.push("ETSY_SHARED_SECRET");
+    const problem = env.ETSY_REDIRECT_URI
+      ? callbackUrlProblem(env.ETSY_REDIRECT_URI)
+      : null;
     if (!env.ETSY_REDIRECT_URI) missing.push("ETSY_REDIRECT_URI");
-    else if (!env.ETSY_REDIRECT_URI.startsWith("https://")) {
-      missing.push("ETSY_REDIRECT_URI (Etsy needs an https address)");
-    }
+    else if (problem) missing.push(`ETSY_REDIRECT_URI (${problem})`);
   }
   if (!env.KILN_SECRET_KEY) missing.push("KILN_SECRET_KEY");
   return {

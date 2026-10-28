@@ -7,12 +7,30 @@ import { type EtsyApp, EtsyError, etsyApiKey } from "@/providers/shop/etsy";
 // code, and Kiln trades it for the shop's tokens. Read-only scopes: Kiln
 // never writes to a shop. Checked against developers.etsy.com on 2026-10-27:
 // the access token lasts an hour and starts with the user's id; the refresh
-// token lasts 90 days; the redirect address is https and matches the one
-// registered on the app exactly.
+// token lasts 90 days; the redirect address matches one of the app's callback
+// URLs exactly.
 
 export const ETSY_CONNECT_URL = "https://www.etsy.com/oauth/connect";
 export const ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token";
 export const ETSY_SCOPES = ["shops_r", "listings_r", "transactions_r"] as const;
+
+// What Etsy's app portal refuses in a callback URL (2026-10-27): anything but
+// http or https, and an IP address for its host (localhost is fine).
+export function callbackUrlProblem(address: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(address);
+  } catch {
+    return "not an address";
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return "Etsy takes only http or https";
+  }
+  if (/^[\d.]+$/.test(url.hostname) || url.hostname.startsWith("[")) {
+    return "Etsy refuses an IP address: use a host name such as localhost";
+  }
+  return null;
+}
 
 // RFC 7636: a verifier of 43 characters from 32 random bytes, and its S256
 // challenge.

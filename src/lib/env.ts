@@ -36,8 +36,8 @@ const EnvSchema = z.object({
   // random bytes in base64, made once with `openssl rand -base64 32`.
   KILN_SECRET_KEY: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
   // The Etsy app Kiln acts as (etsy.com/developers/your-apps): its keystring
-  // and shared secret, and the https address Etsy sends the maker back to
-  // after they approve Kiln (registered on the app exactly as written here).
+  // and shared secret, and the address Etsy sends the maker back to after
+  // they approve Kiln (one of the app's callback URLs, exactly as written here).
   ETSY_API_KEY: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
   ETSY_SHARED_SECRET: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
   ETSY_REDIRECT_URI: z.preprocess(unsetIfBlank, z.string().url().optional()),
