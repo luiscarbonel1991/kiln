@@ -262,19 +262,26 @@ pnpm kiln schema                         # the package's JSON Schema
 
 Shops (header) reads Etsy through its official API, never its pages:
 
-- **Your best sellers:** the connected shop's listings by units sold over the
-  last 30, 90 or 365 days, from its own orders (paid, shipped or partly
-  refunded), with orders, revenue and the last sale. Each sits beside the Kiln
-  project that keeps its address, or "Refresh its photos", which starts a
-  Listing kit from that live listing.
-- **Other shops:** found by name, ranked by lifetime sales, with a month's
-  average since the shop opened, the past year's reviews and favourites. A
-  shop's listings rank by favourites: Etsy gives another shop's sales only as
-  a total, never per listing. These need only Kiln's app keys, no shop
-  connected.
+- **Your best sellers:** the connected shop's listings over the last 30, 90
+  or 365 days, from its own orders (paid, shipped or partly refunded), ranked
+  by orders (so one bulk order does not lead), units or revenue, with the
+  window's totals above. Each row shows the listing's photo, its numbers and
+  its state, beside the Kiln project that keeps its address or "Refresh
+  photos", which starts a Listing kit from that live listing.
+- **Set aside:** listings Etsy marks private (made for one buyer: a custom
+  order, an upgrade) and deleted ones are not ranked; their orders still count
+  in the totals. The maker can leave any other listing out (an add-on, a
+  sample) and put it back.
+- **Other shops:** found by name and set beside the maker's own, ranked by
+  their reviews in the past year (Etsy's one recent number about another shop)
+  or by lifetime sales. A shop's listings rank by favourites, with their
+  photos: Etsy gives another shop's sales only as a total, never per listing.
+  These need only Kiln's app keys, no shop connected.
 
-Reads are made per request and kept in memory for ten minutes; nothing read
-from Etsy is stored, beyond the list of shops the maker compares.
+Reads are made per request and kept in memory for ten minutes (Etsy's API
+terms allow showing listings at most six hours old); nothing read from Etsy is
+stored, beyond the shops the maker compares and the listings they left out,
+by id. Shops carries Etsy's notice in the words its terms ask for.
 
 **Connecting.** The maker approves Kiln on Etsy's own page (OAuth 2.0 with
 PKCE, read-only scopes `shops_r listings_r transactions_r`): no key to paste.
