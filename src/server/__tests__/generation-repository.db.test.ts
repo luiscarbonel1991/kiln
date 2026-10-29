@@ -31,7 +31,10 @@ describe.skipIf(!enabled)(
       },
     };
     // Every queued card is a scene slot of the project's plan ("q.<key>").
-    const KEYS = ["a", "b", "c", "d", "e", "f", "dup", "cx", "cy", "sx", "sy"];
+    const KEYS = [
+      ...["a", "b", "c", "d", "e", "f", "dup", "cx", "cy", "sx", "sy"],
+      ...["ra", "rb", "rc"],
+    ];
     const plan = {
       destinations: [
         {
@@ -480,6 +483,119 @@ describe.skipIf(!enabled)(
         where: { batchId },
       });
       expect(orphan.status).toBe("canceled");
+    });
+
+    it("a job moves down its route, and its batch's queued jobs on the same model with it", async () => {
+      const flash = {
+        provider: "google" as const,
+        model: "gemini-3.1-flash-image",
+      };
+      const later = new Date(Date.now() + 3_600_000);
+      const batch = await db.generationBatch.create({
+        data: {
+          makerId,
+          projectId,
+          mode: "live",
+          count: 3,
+          estimateMicros: 300_000,
+          model: "gpt-image-2",
+        },
+      });
+      const row = (
+        key: string,
+        data: { status: string } & Record<string, unknown>,
+      ) => ({
+        batchId: batch.id,
+        makerId,
+        projectId,
+        cardId: `q.${key}`,
+        mode: "live",
+        maxAttempts: 2,
+        request,
+        estimateMicros: 100_000,
+        // Never claimable by the other tests of this file.
+        availableAt: later,
+        ...data,
+      });
+      await db.generationJob.createMany({
+        data: [
+          row("ra", {
+            status: "running",
+            attempt: 1,
+            leaseToken: "lease-ra",
+            callStartedAt: new Date(),
+            route: { next: [flash], switched: [] },
+          }),
+          row("rb", {
+            status: "queued",
+            route: { next: [flash], switched: [] },
+          }),
+          row("rc", { status: "queued" }),
+        ],
+      });
+      const byKey = async (key: string) =>
+        db.generationJob.findFirstOrThrow({
+          where: { batchId: batch.id, cardId: `q.${key}` },
+        });
+      const ra = await byKey("ra");
+      const move = { to: flash, rest: [], reason: "OpenAI answered 503" };
+      expect(
+        await repo.fallBackJob(
+          { id: ra.id, leaseToken: "stale" },
+          move,
+          () => true,
+        ),
+      ).toBe(false);
+      expect(
+        await repo.fallBackJob(
+          { id: ra.id, leaseToken: "lease-ra" },
+          move,
+          () => true,
+        ),
+      ).toBe(true);
+
+      const moved = await byKey("ra");
+      expect(moved).toMatchObject({
+        status: "queued",
+        leaseToken: null,
+        callStartedAt: null,
+        // A fresh retry allowance on the new model.
+        maxAttempts: 3,
+      });
+      expect(moved.request).toMatchObject({
+        prompt: "a scene",
+        model: {
+          provider: "google",
+          model: "gemini-3.1-flash-image",
+          aspect: "1:1",
+        },
+      });
+      expect(moved.route).toMatchObject({
+        next: [],
+        switched: [
+          {
+            from: { provider: "openai", model: "gpt-image-2" },
+            to: flash,
+            reason: "OpenAI answered 503",
+          },
+        ],
+      });
+      const rb = await byKey("rb");
+      expect(rb.request).toMatchObject({ model: flash });
+      expect(rb.route).toMatchObject({
+        next: [],
+        switched: [
+          { reason: "OpenAI answered 503 (on another frame of the batch)" },
+        ],
+      });
+      // A job with no route stays on its model.
+      expect((await byKey("rc")).request).toMatchObject({
+        model: { provider: "openai", model: "gpt-image-2" },
+      });
+      await db.generationJob.updateMany({
+        where: { batchId: batch.id },
+        data: { status: "canceled", finishedAt: new Date() },
+      });
     });
 
     it("deleting the project keeps the month's spend", async () => {

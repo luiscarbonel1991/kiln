@@ -3,7 +3,13 @@ import { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import { GenerationRequest } from "@/domain/generation-request";
 import { modelLabel } from "@/domain/model-defaults";
-import type { JobRoute } from "@/domain/model-routing";
+import {
+  type JobRoute,
+  type RouteEntry,
+  readJobRoute,
+  routedRequest,
+  sameModel,
+} from "@/domain/model-routing";
 import { generableCardIds, ProjectPlan } from "@/domain/plan";
 import type { CardSpend } from "@/domain/project-cost";
 import {
@@ -48,6 +54,8 @@ export interface NewJob {
   cardId: string;
   request: GenerationRequest;
   estimateMicros: number;
+  // The models it may move to, in order (empty: it runs its one model).
+  next?: RouteEntry[];
 }
 
 export interface ClaimedJob {
@@ -59,6 +67,7 @@ export interface ClaimedJob {
   projectId: string | null;
   cardId: string;
   request: unknown;
+  route: unknown;
   estimateMicros: number;
 }
 
@@ -229,6 +238,14 @@ export async function enqueueBatch(input: {
         status: "queued",
         maxAttempts: MAX_ATTEMPTS,
         request: j.request as unknown as Prisma.InputJsonValue,
+        ...(j.next?.length
+          ? {
+              route: {
+                next: j.next,
+                switched: [],
+              } satisfies JobRoute as unknown as Prisma.InputJsonValue,
+            }
+          : {}),
         estimateMicros: j.estimateMicros,
         productHash: link?.productHash ?? null,
       })),
@@ -285,6 +302,7 @@ export async function claimJobs(
     projectId: j.projectId,
     cardId: j.cardId,
     request: j.request,
+    route: j.route,
     estimateMicros: j.estimateMicros,
   }));
 }
@@ -403,6 +421,102 @@ export async function failJob(
     WHERE j."id" = ${id} AND j."leaseToken" = ${token} AND j."status" = 'running'`;
   return count === 1;
 }
+
+// A job moves to the next model of its route after a failure another model
+// may fix (domain fallbackAfter; nothing was charged): its request is the
+// same on the new model, its route records the move, and it goes back to the
+// queue at once with a fresh retry allowance for the new model. Its batch's
+// jobs still queued on the same model move with it, so a batch stays on one
+// model (another model changes the look); each records why. false = the lease
+// was lost or the batch canceled: the caller fails the job as usual.
+export async function fallBackJob(
+  job: { id: string; leaseToken: string },
+  move: { to: RouteEntry; rest: RouteEntry[]; reason: string },
+  runnable: (entry: RouteEntry, request: GenerationRequest) => boolean,
+): Promise<boolean> {
+  return db.$transaction(async (tx) => {
+    const [row] = await tx.$queryRaw<
+      {
+        batchId: string | null;
+        attempt: number;
+        request: unknown;
+        route: unknown;
+      }[]
+    >`
+      SELECT j."batchId", j."attempt", j."request", j."route"
+      FROM "GenerationJob" j
+      WHERE j."id" = ${job.id} AND j."leaseToken" = ${job.leaseToken}
+        AND j."status" = 'running' AND NOT ${STOPPED}
+      FOR UPDATE`;
+    if (!row) return false;
+    const request = GenerationRequest.parse(row.request);
+    const at = new Date().toISOString();
+    const from = modelOf(request);
+    const moved = (
+      current: GenerationRequest,
+      route: JobRoute,
+      rest: RouteEntry[],
+      reason: string,
+    ) => ({
+      request: routedRequest(
+        current,
+        move.to,
+      ) as unknown as Prisma.InputJsonValue,
+      route: {
+        next: rest,
+        switched: [
+          ...route.switched,
+          { from: modelOf(current), to: move.to, reason, at },
+        ],
+      } satisfies JobRoute as unknown as Prisma.InputJsonValue,
+    });
+    await tx.generationJob.update({
+      where: { id: job.id },
+      data: {
+        ...moved(request, readJobRoute(row.route), move.rest, move.reason),
+        status: "queued",
+        maxAttempts: row.attempt + MAX_ATTEMPTS,
+        error: null,
+        callStartedAt: null,
+        availableAt: new Date(),
+        leaseToken: null,
+        leaseUntil: null,
+      },
+    });
+    if (!row.batchId) return true;
+    const queued = await tx.$queryRaw<
+      { id: string; request: unknown; route: unknown }[]
+    >`
+      SELECT "id", "request", "route" FROM "GenerationJob"
+      WHERE "batchId" = ${row.batchId} AND "status" = 'queued'
+        AND "id" <> ${job.id}
+      FOR UPDATE`;
+    for (const other of queued) {
+      const parsed = GenerationRequest.safeParse(other.request);
+      if (!parsed.success || !sameModel(parsed.data.model, from)) continue;
+      const route = readJobRoute(other.route);
+      const index = route.next.findIndex((m) => sameModel(m, move.to));
+      if (index < 0 || !runnable(move.to, parsed.data)) continue;
+      await tx.generationJob.update({
+        where: { id: other.id },
+        data: moved(
+          parsed.data,
+          route,
+          route.next.slice(index + 1),
+          `${move.reason} (on another frame of the batch)`,
+        ),
+      });
+    }
+    return true;
+  });
+}
+
+const modelOf = (request: GenerationRequest): RouteEntry => ({
+  provider: request.model.provider,
+  model: request.model.model,
+  ...(request.model.quality ? { quality: request.model.quality } : {}),
+  ...(request.model.resolution ? { resolution: request.model.resolution } : {}),
+});
 
 // Jobs whose worker died (lease expired). One that died before its paid call
 // goes back to the queue under the retry rule, so a job that kills its process

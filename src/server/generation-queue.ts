@@ -22,6 +22,13 @@ import {
   type ProviderId,
 } from "@/domain/model-defaults";
 import {
+  canRunRequest,
+  type RouteEntry,
+  roleRoute,
+  routeCandidates,
+  worstCase,
+} from "@/domain/model-routing";
+import {
   parseSlotCardId,
   slotCardId,
   versionSource,
@@ -42,6 +49,7 @@ import {
   completeJob,
   enqueueBatch,
   failJob,
+  fallBackJob,
   markCallStarted,
   QueueRefusal,
   recordCost,
@@ -49,7 +57,7 @@ import {
   requeueExpired,
 } from "@/server/generation-repository";
 import { createWorker, type Worker } from "@/server/generation-worker";
-import { getCurrentMaker } from "@/server/maker-repository";
+import { getCurrentMaker, getMakerRoutes } from "@/server/maker-repository";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
 
 // The queue's entry points for the app: estimate and enqueue a planned
@@ -70,7 +78,53 @@ export interface CardEstimate {
   cardId: string;
   request: GenerationRequest;
   typicalMicros: number;
+  // The worst case along its route: one charged call at most, so the dearest
+  // model's max (its own when it does not fall back).
   maxMicros: number;
+  // The models it may move to, in order (Settings → Models).
+  next: RouteEntry[];
+}
+
+// A model some of the batch's cards may move to, and how many.
+export interface BatchFallback {
+  label: string;
+  count: number;
+}
+
+// Whether a model of a route may run this request now: one Kiln offers for the
+// request's kind, priced for it and able to take it, its provider keyed in a
+// live run (and, for a video, able to render).
+export function runnableEntry(
+  entry: RouteEntry,
+  request: GenerationRequest,
+): boolean {
+  return (
+    checkModel(entry, request.kind).ok &&
+    canRunRequest(entry, request) &&
+    (providerMode() === "mock" || hasProviderKey(entry.provider)) &&
+    (request.kind === "image" || getVideoProvider(entry.provider) !== undefined)
+  );
+}
+
+// The card's own model first, then the models after it in its role's route
+// (final for a scene, video for a video) that may run its request.
+export function cardRoute(
+  request: GenerationRequest,
+  routes: Awaited<ReturnType<typeof getMakerRoutes>>,
+): { next: RouteEntry[]; maxMicros: number | null } {
+  const { provider, model, quality, resolution } = request.model;
+  const start: RouteEntry = {
+    provider,
+    model,
+    ...(quality ? { quality } : {}),
+    ...(resolution ? { resolution } : {}),
+  };
+  const role = request.kind === "video" ? "video" : "final";
+  const next = routeCandidates(roleRoute(routes, role), start)
+    .slice(1)
+    .filter((entry) => runnableEntry(entry, request));
+  const worst = worstCase(request, [start, ...next]);
+  return { next, maxMicros: worst === null ? null : toMicros(worst) };
 }
 
 // "openai gpt-image-2 medium", "google veo-3.1-fast-generate-preview 720p".
@@ -109,8 +163,11 @@ export async function estimateProjectCards(
   // label for them.
   models: BatchModel[];
   model: string;
+  // The models cards may move to along their routes.
+  fallbacks: BatchFallback[];
 }> {
   const project = await loadProject(projectId);
+  const routes = await getMakerRoutes();
   if (!project?.master || !project.understanding) {
     throw new Error("The project needs a reference image first.");
   }
@@ -161,11 +218,13 @@ export async function estimateProjectCards(
         `No pinned price for ${modelLabel(request.model)} at ${request.durationSec} s.`,
       );
     }
+    const route = cardRoute(request, routes);
     return {
       cardId: card.id,
       request,
       typicalMicros: toMicros(usd),
-      maxMicros: toMicros(usd),
+      maxMicros: route.maxMicros ?? toMicros(usd),
+      next: route.next,
     };
   };
   const cards: CardEstimate[] = [];
@@ -222,11 +281,13 @@ export async function estimateProjectCards(
         `No pinned price for ${modelLabel(request.model)}.`,
       );
     }
+    const route = cardRoute(request, routes);
     cards.push({
       cardId: id,
       request,
       typicalMicros: toMicros(estimate.typical),
-      maxMicros: toMicros(estimate.max),
+      maxMicros: route.maxMicros ?? toMicros(estimate.max),
+      next: route.next,
     });
   }
   const models = new Map<string, BatchModel>();
@@ -249,10 +310,20 @@ export async function estimateProjectCards(
     else models.set(key, entry);
   }
   const list = [...models.values()];
+  const fallbacks = new Map<string, BatchFallback>();
+  for (const { next } of cards) {
+    for (const entry of next) {
+      const label = modelLabel(entry);
+      const seen = fallbacks.get(label);
+      if (seen) seen.count++;
+      else fallbacks.set(label, { label, count: 1 });
+    }
+  }
   return {
     cards,
     models: list,
     model: list.map((m) => `${batchLabel(m)} ×${m.count}`).join(", "),
+    fallbacks: [...fallbacks.values()],
   };
 }
 
@@ -283,6 +354,7 @@ export async function enqueueProjectCards(input: {
       cardId: c.cardId,
       request: c.request,
       estimateMicros: c.maxMicros,
+      next: c.next,
     })),
     shownMaxMicros: input.shownMaxMicros,
   });
@@ -330,6 +402,8 @@ export function ensureGenerationWorker(): Worker | null {
       completeJob,
       failJob,
       requeueExpired,
+      fallBack: fallBackJob,
+      runnable: runnableEntry,
       overCap: async (makerId) => {
         const b = await budget(makerId);
         return b.spentMicros >= b.capMicros;

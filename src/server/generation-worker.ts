@@ -5,6 +5,12 @@ import {
   type VideoGenerationRequest,
 } from "@/domain/generation-request";
 import {
+  fallbackAfter,
+  pickNext,
+  type RouteEntry,
+  readJobRoute,
+} from "@/domain/model-routing";
+import {
   describeProviderError,
   errorMessage,
   hadResponse,
@@ -25,9 +31,11 @@ import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 // - its cost is recorded as soon as the call returns, before anything else
 //   (a failure to record it never loses the image);
 // - storing the image is retried in-process — never the paid call;
-// - a failure the provider answered (an HTTP error: nothing generated) is
-//   retried once if it may pass (domain retryDecision); a call with no answer
-//   (timeout, dropped connection) or one that was paid is final.
+// - a failure the provider answered (an HTTP error: nothing generated) moves
+//   to the next model of the job's route when another model may pass (domain
+//   fallbackAfter; the route was fixed when the maker approved the estimate),
+//   else is retried once if it may pass (domain retryDecision); a call with no
+//   answer (timeout, dropped connection) or one that was paid is final.
 
 export interface WorkerDeps {
   mode: ProviderMode;
@@ -56,6 +64,15 @@ export interface WorkerDeps {
     outcome: { retry: boolean; mayBeCharged: boolean },
   ): Promise<boolean>;
   requeueExpired(mode: ProviderMode): Promise<number>;
+  // Move a job to the next model of its route; false when it could not.
+  fallBack(
+    job: ClaimedJob,
+    move: { to: RouteEntry; rest: RouteEntry[]; reason: string },
+    runnable: (entry: RouteEntry, request: GenerationRequest) => boolean,
+  ): Promise<boolean>;
+  // Whether a model of the route may run this request now (key, price,
+  // capability).
+  runnable(entry: RouteEntry, request: GenerationRequest): boolean;
   overCap(makerId: string): Promise<boolean>;
   provider(id: "google" | "openai"): ImageProvider;
   videoProvider(id: "google" | "openai"): VideoProvider | undefined;
@@ -205,10 +222,42 @@ async function callVideo(
   return clip;
 }
 
+// Move the job down its route when the failure allows and a model may run it;
+// true when it moved (it is queued again on that model).
+async function moveDown(
+  deps: WorkerDeps,
+  job: ClaimedJob,
+  provider: "google" | "openai",
+  request: GenerationRequest,
+  error: unknown,
+  callStarted: boolean,
+): Promise<boolean> {
+  const route = readJobRoute(job.route);
+  if (route.next.length === 0) return false;
+  const failure = fallbackAfter(provider, error, { callStarted });
+  const runnable = (entry: RouteEntry) => deps.runnable(entry, request);
+  const picked = pickNext(route.next, { provider }, failure, runnable);
+  if (!picked) return false;
+  deps.log(
+    `generation job ${job.id} moves from ${request.model.model} to ${picked.entry.model}: ${failure.reason}`,
+  );
+  return deps
+    .fallBack(
+      job,
+      { to: picked.entry, rest: picked.rest, reason: failure.reason },
+      deps.runnable,
+    )
+    .catch((e) => {
+      deps.log(`could not move ${job.id} down its route`, e);
+      return false;
+    });
+}
+
 export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
   let callStarted = false;
   let paid = false;
   let provider: "google" | "openai" | undefined;
+  let request: GenerationRequest | undefined;
   const renew = setInterval(() => {
     void deps.renewLease(job.id, job.leaseToken, deps.leaseSec).catch(() => {});
   }, deps.renewMs);
@@ -220,8 +269,9 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
       });
       return;
     }
-    const request = GenerationRequest.parse(job.request);
-    provider = request.model.provider;
+    const parsed = GenerationRequest.parse(job.request);
+    request = parsed;
+    provider = parsed.model.provider;
     const beforeCall = async () => {
       if (!(await deps.markCallStarted(job.id, job.leaseToken))) {
         throw new CallNotStarted();
@@ -232,9 +282,9 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
       paid = true;
     };
     const result =
-      request.kind === "video"
-        ? await callVideo(deps, job, request, beforeCall, onPaid)
-        : await callImage(deps, job, request, beforeCall, onPaid);
+      parsed.kind === "video"
+        ? await callVideo(deps, job, parsed, beforeCall, onPaid)
+        : await callImage(deps, job, parsed, beforeCall, onPaid);
     if (!result.bytes) {
       throw new Error(
         result.refusal
@@ -247,6 +297,15 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
   } catch (error) {
     const unanswered = callStarted && !paid && !hadResponse(error);
     const mayBeCharged = paid || unanswered;
+    if (
+      provider &&
+      request &&
+      !mayBeCharged &&
+      !(error instanceof CallNotStarted) &&
+      (await moveDown(deps, job, provider, request, error, callStarted))
+    ) {
+      return;
+    }
     const retry =
       !mayBeCharged &&
       !(error instanceof CallNotStarted) &&

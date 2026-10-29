@@ -339,6 +339,8 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       completeJob: queueRepo.completeJob,
       failJob: queueRepo.failJob,
       requeueExpired: queueRepo.requeueExpired,
+      fallBack: queueRepo.fallBackJob,
+      runnable: () => true,
       overCap: async () => false,
       videoProvider: () => undefined,
       provider: () =>

@@ -27,7 +27,11 @@ const request = {
   },
 };
 
-const claimed = (id: string, attempt = 1): ClaimedJob => ({
+const claimed = (
+  id: string,
+  attempt = 1,
+  route: unknown = null,
+): ClaimedJob => ({
   id,
   leaseToken: `t-${id}`,
   attempt,
@@ -36,6 +40,7 @@ const claimed = (id: string, attempt = 1): ClaimedJob => ({
   projectId: "p",
   cardId: id,
   request,
+  route,
   estimateMicros: 231_000,
 });
 
@@ -82,6 +87,8 @@ function deps(overrides: Partial<WorkerDeps> = {}) {
     }),
     failJob: vi.fn(async () => true),
     requeueExpired: vi.fn(async () => 0),
+    fallBack: vi.fn(async () => true),
+    runnable: () => true,
     overCap: vi.fn(async () => false),
     provider: () => provider,
     videoProvider: () => undefined,
@@ -100,6 +107,13 @@ afterEach(() => {
   for (const w of workers) w.stop();
   workers = [];
 });
+
+// A provider that answers with an HTTP error after the call went out.
+const answering = (error: Error) =>
+  vi.fn(async (_input: unknown, options: EditOptions) => {
+    await options.beforeCall?.();
+    throw error;
+  });
 
 describe("runJob", () => {
   it("records the cost before storing, then completes", async () => {
@@ -142,13 +156,6 @@ describe("runJob", () => {
       mayBeCharged: true,
     });
   });
-
-  // A provider that answers with an HTTP error after the call went out.
-  const answering = (error: Error) =>
-    vi.fn(async (_input: unknown, options: EditOptions) => {
-      await options.beforeCall?.();
-      throw error;
-    });
 
   it("a failure the provider answered is retried once; a permanent one is not", async () => {
     const busy = Object.assign(new Error("busy"), { status: 503 });
@@ -326,6 +333,117 @@ describe("runJob", () => {
       "This month's spending cap was reached.",
       { retry: false, mayBeCharged: false },
     );
+  });
+});
+
+describe("runJob along a route", () => {
+  const flash = {
+    provider: "google" as const,
+    model: "gemini-3.1-flash-image",
+  };
+  const older = {
+    provider: "openai" as const,
+    model: "gpt-image-1.5",
+    quality: "medium" as const,
+  };
+  const routed = (id: string, next: unknown[]) =>
+    claimed(id, 1, { next, switched: [] });
+
+  it("an answered failure moves to the next model instead of failing", async () => {
+    const { d, editBytes } = deps();
+    editBytes.mockImplementationOnce(
+      answering(Object.assign(new Error("busy"), { status: 503 })),
+    );
+    await runJob(d, routed("a", [flash]));
+    expect(d.fallBack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "a" }),
+      { to: flash, rest: [], reason: "OpenAI answered 503" },
+      d.runnable,
+    );
+    expect(d.failJob).not.toHaveBeenCalled();
+  });
+
+  it("a rejected key skips the rest of that provider", async () => {
+    const { d, editBytes } = deps();
+    editBytes.mockImplementationOnce(
+      answering(Object.assign(new Error("bad key"), { status: 401 })),
+    );
+    await runJob(d, routed("a", [older, flash]));
+    expect(d.fallBack).toHaveBeenCalledWith(
+      expect.anything(),
+      { to: flash, rest: [], reason: "OpenAI rejected the API key" },
+      d.runnable,
+    );
+  });
+
+  it("a call with no answer stays final: it may have been charged", async () => {
+    const { d, editBytes } = deps();
+    editBytes.mockImplementationOnce(
+      answering(new Error("Request timed out.")),
+    );
+    await runJob(d, routed("a", [flash]));
+    expect(d.fallBack).not.toHaveBeenCalled();
+    expect(d.failJob).toHaveBeenCalledWith(
+      "a",
+      "t-a",
+      expect.stringContaining("may have been charged"),
+      { retry: false, mayBeCharged: true },
+    );
+  });
+
+  it("a paid answer without an image never moves: one charged call per frame", async () => {
+    const { d, editBytes } = deps();
+    editBytes.mockImplementationOnce(async (_input, options) => {
+      await options.beforeCall?.();
+      return { ...bytes, bytes: null };
+    });
+    await runJob(d, routed("a", [flash]));
+    expect(d.fallBack).not.toHaveBeenCalled();
+    expect(d.failJob).toHaveBeenCalledWith(
+      "a",
+      "t-a",
+      "The provider returned no image.",
+      { retry: false, mayBeCharged: true },
+    );
+  });
+
+  it("a bad request stops; so does a route with nothing that may run", async () => {
+    const bad = deps();
+    bad.editBytes.mockImplementationOnce(
+      answering(Object.assign(new Error("rejected"), { status: 400 })),
+    );
+    await runJob(bad.d, routed("a", [flash]));
+    expect(bad.d.fallBack).not.toHaveBeenCalled();
+
+    const none = deps({ runnable: () => false });
+    none.editBytes.mockImplementationOnce(
+      answering(Object.assign(new Error("busy"), { status: 503 })),
+    );
+    await runJob(none.d, routed("a", [flash]));
+    expect(none.d.fallBack).not.toHaveBeenCalled();
+    expect(none.d.failJob).toHaveBeenCalledWith("a", "t-a", "busy", {
+      retry: true,
+      mayBeCharged: false,
+    });
+  });
+
+  it("a move that could not be written fails the job as usual", async () => {
+    const { d, editBytes } = deps({ fallBack: vi.fn(async () => false) });
+    editBytes.mockImplementationOnce(
+      answering(Object.assign(new Error("busy"), { status: 503 })),
+    );
+    await runJob(d, routed("a", [flash]));
+    expect(d.failJob).toHaveBeenCalledWith("a", "t-a", "busy", {
+      retry: true,
+      mayBeCharged: false,
+    });
+  });
+
+  it("over the monthly cap, nothing runs and nothing moves", async () => {
+    const { d, calls } = deps({ overCap: vi.fn(async () => true) });
+    await runJob(d, routed("a", [flash]));
+    expect(calls).not.toContain("edit");
+    expect(d.fallBack).not.toHaveBeenCalled();
   });
 });
 

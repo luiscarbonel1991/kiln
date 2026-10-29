@@ -10,8 +10,9 @@ import { getCurrentMaker } from "@/server/maker-repository";
 // Each provider's health, free to read (no ping, no paid call): whether its
 // key is set, and what its last live calls did — the queue's jobs and the
 // direct calls (vision, art direction, the studio) all leave a row. The last
-// error shows until a later call succeeds. Kiln's own refusals (the month's
-// cap, a canceled job) are not the provider's and are skipped.
+// error shows until a later call succeeds. A move down a route counts as a
+// failure of the provider it left. Kiln's own refusals (the month's cap, a
+// canceled job) are not the provider's and are skipped.
 
 export interface ProviderHealth {
   provider: ProviderId;
@@ -49,6 +50,13 @@ export async function providerHealth(
           AND ("status" = 'done'
                OR ("status" = 'failed' AND "error" IS NOT NULL
                    AND "error" NOT IN (${CAP_REACHED}, ${NOT_STARTED})))
+        UNION ALL
+        SELECT s #>> '{from,provider}', 'failed', (s ->> 'at')::timestamptz,
+               s ->> 'reason'
+        FROM "GenerationJob", jsonb_array_elements("route" -> 'switched') AS s
+        WHERE "makerId" = ${makerId}
+          AND "mode" = 'live'
+          AND jsonb_typeof("route" -> 'switched') = 'array'
       ) AS j
       WHERE "provider" IS NOT NULL
       ORDER BY "provider", "status", "at" DESC`;

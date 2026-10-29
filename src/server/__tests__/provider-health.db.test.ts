@@ -111,4 +111,38 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
       "Google rejected the API key (400) — check GOOGLE_API_KEY or use OpenAI.",
     );
   });
+
+  it("a move down a route counts as a failure of the provider it left", async () => {
+    const at = new Date().toISOString();
+    await db.generationJob.create({
+      data: {
+        makerId,
+        cardId: "q.moved",
+        mode: "live",
+        status: "done",
+        attempt: 1,
+        maxAttempts: 3,
+        estimateMicros: 1,
+        request: {
+          kind: "image",
+          model: { provider: "google", model: "gemini-3.1-flash-image" },
+        },
+        route: {
+          next: [],
+          switched: [
+            {
+              from: { provider: "openai", model: "gpt-image-2" },
+              to: { provider: "google", model: "gemini-3.1-flash-image" },
+              reason: "OpenAI answered 503",
+              at,
+            },
+          ],
+        },
+        finishedAt: new Date(),
+      },
+    });
+    const [o, g] = await providerHealth(makerId);
+    expect(o.lastError?.message).toBe("OpenAI answered 503");
+    expect(g.lastError).toBeNull();
+  });
 });
