@@ -594,6 +594,8 @@ export interface JobLike {
   status: "queued" | "running" | "done" | "failed" | "canceled";
   attempt: number;
   error?: string;
+  // After a move down its route: the model it ran on, from which, and why.
+  ranOn?: { label: string; from: string; reason: string };
 }
 
 // The state the board shows for a slot, from its card and its latest job. A

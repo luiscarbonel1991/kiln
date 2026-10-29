@@ -6,6 +6,7 @@ import { modelLabel } from "@/domain/model-defaults";
 import {
   type JobRoute,
   type RouteEntry,
+  ranOn,
   readJobRoute,
   routedRequest,
   sameModel,
@@ -725,6 +726,11 @@ export interface GenerationState {
 // What the board and the slot editor poll: each card's latest job, the cards'
 // generation state, the running batch's progress and the month's budget, plus
 // a version that changes whenever any of it does.
+const withRanOn = (route: unknown) => {
+  const ran = ranOn(readJobRoute(route));
+  return ran ? { ranOn: ran } : {};
+};
+
 export async function projectGenerationState(
   makerId: string,
   projectId: string,
@@ -736,9 +742,10 @@ export async function projectGenerationState(
       status: JobStatus;
       attempt: number;
       error: string | null;
+      route: unknown;
     }[]
   >`
-    SELECT DISTINCT ON ("cardId") "cardId", "status", "attempt", "error"
+    SELECT DISTINCT ON ("cardId") "cardId", "status", "attempt", "error", "route"
     FROM "GenerationJob"
     WHERE "projectId" = ${projectId} AND "makerId" = ${makerId}
       AND "batchId" IS NOT NULL
@@ -778,6 +785,7 @@ export async function projectGenerationState(
           status: j.status,
           attempt: j.attempt,
           ...(j.error ? { error: readableFailure(j.error) } : {}),
+          ...withRanOn(j.route),
         },
       ]),
     ),

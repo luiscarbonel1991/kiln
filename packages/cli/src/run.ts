@@ -208,6 +208,7 @@ interface FrameAnswer {
   output: string | null;
   approvedOutput: string | null;
   approvable: boolean;
+  ranOn?: { label: string; from: string; reason: string };
 }
 
 interface FramesAnswer {
@@ -471,8 +472,11 @@ async function frames(
   for (const f of all) {
     const failed = f.failed ? ` · failed${f.error ? `: ${f.error}` : ""}` : "";
     const take = f.output ? ` · ${f.output}` : "";
+    const ran = f.ranOn
+      ? ` · on ${f.ranOn.label} (from ${f.ranOn.from}: ${f.ranOn.reason})`
+      : "";
     io.out(
-      `${f.frame.padEnd(width)}  ${f.state.padEnd(10)} ${f.label}${take}${failed}`,
+      `${f.frame.padEnd(width)}  ${f.state.padEnd(10)} ${f.label}${take}${ran}${failed}`,
     );
   }
   const waiting = all.filter((f) => f.approvable);

@@ -42,7 +42,10 @@ async function batchEstimate(
 ): Promise<BatchEstimate | { refusal: string } | null> {
   if (cardIds.length === 0) return null;
   try {
-    const { cards, models } = await estimateProjectCards(projectId, cardIds);
+    const { cards, models, fallbacks } = await estimateProjectCards(
+      projectId,
+      cardIds,
+    );
     const labelOf = (cardId: string) => {
       const ref = parseSlotCardId(cardId);
       return (
@@ -68,6 +71,7 @@ async function batchEstimate(
       typicalMicros: cards.reduce((t, c) => t + c.typicalMicros, 0),
       maxMicros: cards.reduce((t, c) => t + c.maxMicros, 0),
       models,
+      fallbacks,
       cards: cards.map((c) => ({
         cardId: c.cardId,
         label: labelOf(c.cardId),
@@ -80,6 +84,7 @@ async function batchEstimate(
         ]
           .filter(Boolean)
           .join(" "),
+        fallbacks: c.next.map(modelLabel),
         typicalMicros: c.typicalMicros,
         maxMicros: c.maxMicros,
       })),

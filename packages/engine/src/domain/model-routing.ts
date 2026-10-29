@@ -23,7 +23,10 @@ import {
   hadResponse,
   isKeyRejected,
   isOutOfCredit,
+  type RanOn,
 } from "@/domain/queue";
+
+export type { RanOn };
 
 // Model routing (ROADMAP "Agents and model routing", Luis 2026-10-29): a task
 // names a role, never a model; each role has a route the maker saved, an
@@ -463,12 +466,6 @@ export function readJobRoute(raw: unknown): JobRoute {
 
 // What a take shows of its route: the model it ran on and, after a move, the
 // first model it left and why.
-export interface RanOn {
-  label: string;
-  from: string;
-  reason: string;
-}
-
 export function ranOn(route: JobRoute): RanOn | undefined {
   const first = route.switched[0];
   const last = route.switched.at(-1);

@@ -289,6 +289,11 @@ describe("kiln projects, frames, approve", () => {
         output: "https://storage/hero-2.png",
         approvedOutput: null,
         approvable: true,
+        ranOn: {
+          label: "Gemini 3.1 Flash Image",
+          from: "GPT Image 2",
+          reason: "OpenAI answered 503",
+        },
       },
       {
         frame: "etsy.size",
@@ -339,7 +344,7 @@ describe("kiln projects, frames, approve", () => {
       headers: { Authorization: "Bearer kiln_pat_test" },
     });
     expect(c.out.slice(1)).toEqual([
-      "etsy.hero    to-review  Marketplace hero · https://storage/hero-2.png",
+      "etsy.hero    to-review  Marketplace hero · https://storage/hero-2.png · on Gemini 3.1 Flash Image (from GPT Image 2: OpenAI answered 503)",
       "etsy.size    exact      Size & spec",
       "etsy.in-use  queued     In-use mockup · failed: the provider timed out",
       "1 to review. After your check: kiln approve p1 <frame> <take>",

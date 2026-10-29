@@ -34,6 +34,9 @@ export interface FrameView {
   approvable: boolean;
   // The frame this one re-frames (a version) or repeats (a shared frame).
   versionOf?: string;
+  // After a move down its route (Settings → Models): the model its latest
+  // take ran on, the first model it left and why.
+  ranOn?: { label: string; from: string; reason: string };
 }
 
 function outputOf(
@@ -70,6 +73,7 @@ export function frameViews(
         approvedOutput: slot.approvedOutput ?? null,
         approvable: view.state === "to-review",
         ...(slot.versionOf ? { versionOf: slot.versionOf } : {}),
+        ...(jobs[frame]?.ranOn ? { ranOn: jobs[frame].ranOn } : {}),
       };
     }),
   );

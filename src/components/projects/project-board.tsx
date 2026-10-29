@@ -447,6 +447,7 @@ export function ProjectBoard({
                           : versionMark(board.plan, slot)
                       }
                       cost={frameCostLine(frameCosts.get(cardId), mode)}
+                      ranOn={jobs[cardId]?.ranOn}
                       actions={
                         <SlotActions
                           projectId={projectId}

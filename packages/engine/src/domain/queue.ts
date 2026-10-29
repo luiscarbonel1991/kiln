@@ -20,10 +20,19 @@ export const MAX_ATTEMPTS = 2;
 // A retried job waits before it is claimed again, so a rate limit can clear.
 export const RETRY_BACKOFF_MS = 30_000;
 
+// What a take shows of its route (domain model-routing): the model it ran on
+// and, after a move, the first model it left and why.
+export interface RanOn {
+  label: string;
+  from: string;
+  reason: string;
+}
+
 export interface JobView {
   status: JobStatus;
   attempt: number;
   error?: string;
+  ranOn?: RanOn;
 }
 
 export function isActiveJob(job: { status: JobStatus } | undefined): boolean {

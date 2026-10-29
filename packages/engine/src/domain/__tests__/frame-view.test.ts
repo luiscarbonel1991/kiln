@@ -77,4 +77,21 @@ describe("frameViews", () => {
       ),
     );
   });
+
+  it("names the model a take ran on after a move down its route", () => {
+    const ranOn = {
+      label: "Gemini 3.1 Flash Image",
+      from: "GPT Image 2",
+      reason: "OpenAI answered 503",
+    };
+    const frames = frameViews(
+      launch(),
+      { "etsy.hero": take("https://x/hero.png") },
+      { "etsy.hero": { status: "done", attempt: 1, ranOn } },
+    );
+    expect(frames.find((f) => f.frame === "etsy.hero")?.ranOn).toEqual(ranOn);
+    expect(frames.find((f) => f.frame === "etsy.size")).not.toHaveProperty(
+      "ranOn",
+    );
+  });
 });

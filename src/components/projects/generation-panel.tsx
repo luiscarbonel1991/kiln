@@ -25,14 +25,19 @@ export interface BatchEstimate {
     resolution: string | null;
     count: number;
   }[];
-  // Each card with its model and price, as the confirmation lists them.
+  // Each card with its model and price, as the confirmation lists them; its
+  // max counts the dearest model it may move to.
   cards: {
     cardId: string;
     label: string;
     model: string;
+    // The models it may move to, in order ("Gemini 3.1 Flash Image").
+    fallbacks: string[];
     typicalMicros: number;
     maxMicros: number;
   }[];
+  // The models cards may move to along their routes, and how many.
+  fallbacks: { label: string; count: number }[];
   // A provider the batch uses that may not answer (no key, a failed last
   // call), in a line each. Nothing is switched on its own.
   warnings: string[];
@@ -204,7 +209,10 @@ export function GenerationPanel({
               >
                 <span className="min-w-0 truncate text-foreground">
                   {c.label}
-                  <span className="text-on-surface-mid"> — {c.model}</span>
+                  <span className="text-on-surface-mid">
+                    {" "}
+                    — {[c.model, ...c.fallbacks].join(" → ")}
+                  </span>
                 </span>
                 <span className="flex-shrink-0 font-mono text-[0.72rem] text-on-surface-mid">
                   {range(c.typicalMicros, c.maxMicros)}
@@ -230,10 +238,30 @@ export function GenerationPanel({
                 )
                 .join("; ")}
             </dd>
+            {estimate.fallbacks.length > 0 ? (
+              <>
+                <dt className="text-on-surface-mid">Fallback</dt>
+                <dd
+                  className="text-foreground"
+                  data-testid="generate-fallbacks"
+                >
+                  {estimate.fallbacks
+                    .map(
+                      (f) =>
+                        `${f.label} for ${f.count} scene${f.count === 1 ? "" : "s"}`,
+                    )
+                    .join("; ")}
+                  , only if the first model fails
+                </dd>
+              </>
+            ) : null}
             <dt className="text-on-surface-mid">Estimated</dt>
             <dd className="text-foreground">
               {money(estimate.typicalMicros)} typical, at most{" "}
               {money(estimate.maxMicros)}
+              {estimate.fallbacks.length > 0
+                ? " (the dearest model each scene may run on)"
+                : ""}
             </dd>
             <dt className="text-on-surface-mid">This month</dt>
             <dd className="text-foreground">
@@ -244,10 +272,11 @@ export function GenerationPanel({
           </dl>
           <p className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
             Kiln runs them in the background; you can leave this page. A call
-            the provider refuses is not paid. One that times out may have been
-            charged: Kiln counts it at its estimate and tries once more, so that
-            scene can cost up to twice its price. The cost is measured from what
-            each provider reports.
+            the provider refuses is not paid; it is tried once more, or moves to
+            the next model of its route when fallback is on. One that times out
+            may have been charged: Kiln counts it at its estimate and never
+            tries it again, so a scene is paid for once at most. The cost is
+            measured from what each provider reports.
           </p>
           {staleProduct ? (
             <div className="flex flex-col gap-2 rounded-field bg-prov-brand/10 px-3 py-2.5">

@@ -31,6 +31,7 @@ export function SlotFrame({
   actions,
   mark,
   cost,
+  ranOn,
   testId,
 }: {
   position: string;
@@ -44,6 +45,9 @@ export function SlotFrame({
   mark?: string;
   // What the frame has cost so far, its takes included ("$0.12 · 2 takes").
   cost?: string;
+  // Its latest take moved down its route: the model it ran on, from which,
+  // and why (never switched unseen).
+  ranOn?: { label: string; from: string; reason: string };
   // The frame's own id, so its controls can be found inside it; its state is
   // data-state.
   testId?: string;
@@ -90,6 +94,14 @@ export function SlotFrame({
             data-testid="frame-cost"
           >
             {cost}
+          </span>
+        ) : null}
+        {ranOn ? (
+          <span
+            className="font-mono text-[0.59rem] leading-snug text-prov-image"
+            data-testid="frame-ran-on"
+          >
+            {ranOn.label} · from {ranOn.from}: {ranOn.reason}
           </span>
         ) : null}
         {actions ? <div className="pt-1">{actions}</div> : null}
