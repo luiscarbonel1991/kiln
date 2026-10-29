@@ -4,6 +4,7 @@ import { ClipboardPaste, Download, FileUp, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ImportResult } from "@/app/actions/products";
 import { Button } from "@/components/ui/button";
+import { FilePick } from "@/components/ui/file-pick";
 import { productLabel } from "@/domain/product-package";
 import { plural } from "@/lib/plural";
 
@@ -24,33 +25,23 @@ export function ImportCatalogCard({
   importing: boolean;
   onImport: (text: string, from: string) => void;
 }) {
-  const fileInput = useRef<HTMLInputElement>(null);
   const [pasting, setPasting] = useState(false);
   const [pasted, setPasted] = useState("");
 
   return (
     <div className="flex flex-col justify-center gap-2 rounded-card border border-dashed border-border bg-card/60 p-5">
-      <input
-        ref={fileInput}
-        type="file"
-        accept="application/json,.json"
-        className="hidden"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (file) onImport(await file.text(), file.name);
-          e.target.value = "";
-        }}
-      />
       <div className="flex flex-wrap gap-2">
-        <Button
+        <FilePick
           variant="secondary"
           size="sm"
           disabled={importing}
-          onClick={() => fileInput.current?.click()}
+          accept="application/json,.json"
+          testId="catalog-file"
+          onFiles={async ([file]) => onImport(await file.text(), file.name)}
         >
           {importing ? <Loader2 className="animate-spin" /> : <FileUp />}
           Import a catalog (.json)
-        </Button>
+        </FilePick>
         <Button
           variant="ghost"
           size="sm"

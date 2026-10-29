@@ -9,9 +9,10 @@ import {
   X,
 } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { uploadListingPhotoAction } from "@/app/actions/live-listing";
 import { Button } from "@/components/ui/button";
+import { FilePick } from "@/components/ui/file-pick";
 import { etsyListingId, MAX_LIVE_PHOTOS } from "@/domain/live-listing";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +48,6 @@ export function LiveListingStep({
 }) {
   const [uploading, startUpload] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const input = useRef<HTMLInputElement>(null);
   const listingId = etsyListingId(url.trim());
   const room = MAX_LIVE_PHOTOS - rows.length;
 
@@ -120,18 +120,6 @@ export function LiveListingStep({
 
       <div className="flex flex-col gap-2">
         <span className={LABEL}>Its photos now, in order</span>
-        <input
-          ref={input}
-          type="file"
-          multiple
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const chosen = [...(e.target.files ?? [])];
-            if (chosen.length > 0) add(chosen);
-            e.target.value = "";
-          }}
-        />
         {rows.length > 0 ? (
           <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {rows.map((row, i) => (
@@ -241,18 +229,20 @@ export function LiveListingStep({
         ) : null}
         <div className="flex flex-wrap items-center gap-3">
           {room > 0 ? (
-            <Button
+            <FilePick
               variant="secondary"
               size="sm"
-              data-testid="live-photos-add"
+              multiple
+              accept="image/png,image/jpeg,image/webp"
+              testId="live-photos-add"
               disabled={uploading}
-              onClick={() => input.current?.click()}
+              onFiles={add}
             >
               {uploading ? <Loader2 className="animate-spin" /> : <ImagePlus />}
               {rows.length === 0
                 ? "Add the listing's photos"
                 : "Add more photos"}
-            </Button>
+            </FilePick>
           ) : null}
           <span className={NOTE}>
             {rows.length === 0

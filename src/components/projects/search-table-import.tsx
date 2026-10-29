@@ -1,9 +1,10 @@
 "use client";
 
 import { FileUp } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { MaterialCombobox } from "@/components/projects/material-combobox";
 import { Button } from "@/components/ui/button";
+import { FilePick } from "@/components/ui/file-pick";
 import {
   columnsFit,
   guessColumns,
@@ -58,7 +59,6 @@ export function SearchTableImport({
   const [readOn, setReadOn] = useState(today);
   const [chosen, setChosen] = useState<Partial<SearchColumns> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const file = useRef<HTMLInputElement>(null);
   const table = useMemo(() => parseTable(text), [text]);
   // The maker's own mapping wins; else the one saved for the source, when
   // this table has its headers; else Kiln's guess.
@@ -90,15 +90,12 @@ export function SearchTableImport({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className={LABEL}>Paste a table, or open a CSV</span>
-        <input
-          ref={file}
-          type="file"
+        <FilePick
+          variant="ghost"
+          size="xs"
           accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values"
-          className="hidden"
-          onChange={async (e) => {
-            const chosenFile = e.target.files?.[0];
-            e.target.value = "";
-            if (!chosenFile) return;
+          testId={`${testId}-file`}
+          onFiles={async ([chosenFile]) => {
             if (chosenFile.size > MAX_FILE_BYTES) {
               setError("That file is over 1 MB; a search table is smaller.");
               return;
@@ -107,15 +104,9 @@ export function SearchTableImport({
             setChosen(null);
             setText(await chosenFile.text());
           }}
-        />
-        <Button
-          variant="ghost"
-          size="xs"
-          data-testid={`${testId}-file`}
-          onClick={() => file.current?.click()}
         >
           <FileUp /> Open a CSV
-        </Button>
+        </FilePick>
       </div>
       <textarea
         aria-label="Search table"

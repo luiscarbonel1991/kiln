@@ -12,7 +12,7 @@ import {
   Star,
   Undo2,
 } from "lucide-react";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import {
   addReferenceAction,
   moveSlotAction,
@@ -21,6 +21,7 @@ import {
 } from "@/app/actions/board";
 import { deliverAction } from "@/app/actions/deliver";
 import { Button } from "@/components/ui/button";
+import { FilePick } from "@/components/ui/file-pick";
 import { downloadAsset } from "@/lib/download";
 import { plural } from "@/lib/plural";
 import { cn } from "@/lib/utils";
@@ -126,19 +127,17 @@ export function SlotSwitch({
 // One upload makes the product's reference the anchor of every scene: a photo
 // of the product, or the plate the maker's own renderer produced.
 export function ReferenceUpload({ projectId }: { projectId: string }) {
-  const input = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   return (
     <div className="flex flex-col gap-2">
-      <input
-        ref={input}
-        type="file"
+      <FilePick
+        size="sm"
+        disabled={pending}
         accept="image/png,image/jpeg,image/webp"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
+        testId="reference-upload"
+        className="self-start"
+        onFiles={([file]) => {
           const form = new FormData();
           form.set("projectId", projectId);
           form.set("file", file);
@@ -151,16 +150,10 @@ export function ReferenceUpload({ projectId }: { projectId: string }) {
             }
           });
         }}
-      />
-      <Button
-        size="sm"
-        disabled={pending}
-        onClick={() => input.current?.click()}
-        className="self-start"
       >
         {pending ? <Loader2 className="animate-spin" /> : <ImagePlus />}
         Add reference image
-      </Button>
+      </FilePick>
       {error ? (
         <p className="font-mono text-[0.65rem] text-prov-local">{error}</p>
       ) : null}

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu, ToggleGroup } from "radix-ui";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import {
   createProductAction,
   draftProductAction,
@@ -34,6 +34,7 @@ import {
 } from "@/components/projects/wording-rows";
 import { DegradedNotice } from "@/components/studio/degraded-notice";
 import { Button } from "@/components/ui/button";
+import { FilePick } from "@/components/ui/file-pick";
 import {
   type Product,
   Treatment,
@@ -105,6 +106,8 @@ const VIEW_LABELS: { value: ViewLabel; label: string }[] = [
 ];
 const viewName = (label: ViewLabel) =>
   VIEW_LABELS.find((v) => v.value === label)?.label ?? label;
+
+const PRODUCT_FILE_TYPES = "image/png,image/jpeg,image/webp,image/svg+xml,.svg";
 
 interface Colour {
   // The stored colour this row edits (absent for a new one).
@@ -242,7 +245,6 @@ export function ProductEditor({
   const [views, setViews] = useState<{ label: ViewLabel; url: string }[]>(
     start?.views ?? [],
   );
-  const viewInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   // After the first Save, each field shows its problem as it is fixed.
   const [attempted, setAttempted] = useState(false);
@@ -250,10 +252,6 @@ export function ProductEditor({
   const [uploading, startUpload] = useTransition();
   const [drafting, startDraft] = useTransition();
   const [saving, startSave] = useTransition();
-  const input = useRef<HTMLInputElement>(null);
-  const sampleInput = useRef<HTMLInputElement>(null);
-  // The colour row a material photo is being chosen for.
-  const sampleRow = useRef<number | null>(null);
 
   const ratio = file?.kind === "vector" ? file.ratio : null;
   // "Review with AI": what the text model suggests and asks to check, under
@@ -623,17 +621,6 @@ export function ProductEditor({
 
       {/* The file: optional. */}
       <div className="flex flex-wrap items-center gap-4">
-        <input
-          ref={input}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg"
-          className="hidden"
-          onChange={(e) => {
-            const chosen = e.target.files?.[0];
-            if (chosen) upload(chosen);
-            e.target.value = "";
-          }}
-        />
         {file ? (
           <div className="flex items-center gap-3">
             <div className="size-16 flex-shrink-0 overflow-hidden rounded-thumb bg-surface-soft shadow-render">
@@ -651,14 +638,17 @@ export function ProductEditor({
                   : "Photo: the reference for every scene"}
               </span>
               <div className="flex gap-2">
-                <Button
+                <FilePick
                   variant="ghost"
                   size="xs"
                   disabled={busy}
-                  onClick={() => input.current?.click()}
+                  accept={PRODUCT_FILE_TYPES}
+                  testId="product-file-replace"
+                  label="Replace the photo or design file"
+                  onFiles={([chosen]) => upload(chosen)}
                 >
                   Replace
-                </Button>
+                </FilePick>
                 <Button
                   variant="ghost"
                   size="xs"
@@ -671,11 +661,13 @@ export function ProductEditor({
             </div>
           </div>
         ) : (
-          <button
-            type="button"
+          <FilePick
+            unstyled
             disabled={busy}
-            onClick={() => input.current?.click()}
-            className="flex items-center gap-3 rounded-render border border-dashed border-border bg-surface-soft px-4 py-3 text-left transition-colors hover:border-primary disabled:opacity-60"
+            accept={PRODUCT_FILE_TYPES}
+            testId="product-file"
+            onFiles={([chosen]) => upload(chosen)}
+            className="flex items-center gap-3 rounded-render border border-dashed border-border bg-surface-soft px-4 py-3 text-left transition-colors hover:border-primary"
           >
             {uploading ? (
               <Loader2 className="size-5 animate-spin text-on-surface-mid" />
@@ -690,7 +682,7 @@ export function ProductEditor({
                 Optional · PNG, JPEG, WebP or SVG, up to 15 MB
               </span>
             </span>
-          </button>
+          </FilePick>
         )}
         {file?.kind === "photo" ? (
           <Button
@@ -933,18 +925,18 @@ export function ProductEditor({
                     </button>
                   </span>
                 ) : (
-                  <Button
+                  <FilePick
                     variant="ghost"
                     size="xs"
                     disabled={busy}
+                    accept="image/png,image/jpeg,image/webp"
+                    testId={`material-photo-${i + 1}`}
+                    label={`Material photo for ${c.name || `colour ${i + 1}`}`}
                     title="A close photo of the material in this colour, even light, no text: scenes copy its look"
-                    onClick={() => {
-                      sampleRow.current = i;
-                      sampleInput.current?.click();
-                    }}
+                    onFiles={([chosen]) => uploadSample(i, chosen)}
                   >
                     <ImagePlus /> Material photo
-                  </Button>
+                  </FilePick>
                 )}
                 {i === defaultColour ? (
                   <span className="font-mono text-[0.625rem] text-on-surface-dim">
@@ -979,18 +971,6 @@ export function ProductEditor({
               {note(`colours.${i}.name`)}
             </div>
           ))}
-          <input
-            ref={sampleInput}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              const chosen = e.target.files?.[0];
-              const row = sampleRow.current;
-              if (chosen && row !== null) uploadSample(row, chosen);
-              e.target.value = "";
-            }}
-          />
           {colours.map((_, i) =>
             problems[`colours.${i}.name`] ? (
               <span
@@ -1127,27 +1107,18 @@ export function ProductEditor({
               </span>
             ))}
             {views.length < 2 ? (
-              <Button
+              <FilePick
                 variant="ghost"
                 size="xs"
                 disabled={busy}
-                onClick={() => viewInput.current?.click()}
+                accept={PRODUCT_FILE_TYPES}
+                testId="product-view-add"
+                onFiles={([chosen]) => uploadView(chosen)}
               >
                 <ImagePlus /> Add a view
-              </Button>
+              </FilePick>
             ) : null}
           </div>
-          <input
-            ref={viewInput}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg"
-            className="hidden"
-            onChange={(e) => {
-              const chosen = e.target.files?.[0];
-              if (chosen) uploadView(chosen);
-              e.target.value = "";
-            }}
-          />
           <span className="font-sans text-[0.75rem] text-on-surface-mid">
             {treatment === "raised" && !views.some((v) => v.label === "side")
               ? "A side view shows how far the marks stand out; scenes read it beside the front."
