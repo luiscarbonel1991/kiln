@@ -682,12 +682,12 @@ export function moveSlot(
 
 // What keeps a destination from being delivered: the slots switched on that
 // are not ready (an exact frame always is; a scene once its current output is
-// approved; the maker's own photo always is), and scenes that carry text on
-// the image (composited at export later; none on a sale destination today).
+// approved; the maker's own photo always is). A scene's text layer is drawn
+// over it at export, so it holds nothing up.
 export function deliveryBlockers(
   destination: PlanDestination,
   cardOf: (slotKey: string) => CardLike | undefined,
-): { notReady: string[]; textOnScenes: string[] } {
+): { notReady: string[] } {
   const on = destination.slots.filter((s) => !s.off);
   const ready = (s: PlanSlot) =>
     ["exact", "kept", "approved", "delivered"].includes(
@@ -695,9 +695,6 @@ export function deliveryBlockers(
     );
   return {
     notReady: on.filter((s) => !ready(s)).map((s) => s.label),
-    textOnScenes: on
-      .filter((s) => s.fill === "scene" && s.textTemplate)
-      .map((s) => s.label),
   };
 }
 

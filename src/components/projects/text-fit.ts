@@ -3,15 +3,18 @@
 // wrapped by words into the lines a width allows.
 
 const GLYPH = 0.58;
+// Fraunces italic runs narrower: ~0.39 em measured, 0.45 kept conservative.
+export const SERIF_ITALIC_GLYPH = 0.45;
 
 // A conservative width estimate for sans text (no DOM to measure): average
-// glyph ~0.58 em, plus any letter spacing.
+// glyph ~0.58 em, plus any letter spacing. `glyph` for another face.
 export function textWidth(
   text: string,
   fontSize: number,
   letterSpacing = 0,
+  glyph = GLYPH,
 ): number {
-  return text.length * (fontSize * GLYPH + letterSpacing);
+  return text.length * (fontSize * glyph + letterSpacing);
 }
 
 // Cut `text` to fit `maxWidth`, ending it with "…".
@@ -20,11 +23,12 @@ function ellipsize(
   maxWidth: number,
   fontSize: number,
   letterSpacing: number,
+  glyph: number,
 ): string {
   let cut = text;
   while (
     cut.length > 1 &&
-    textWidth(`${cut}…`, fontSize, letterSpacing) > maxWidth
+    textWidth(`${cut}…`, fontSize, letterSpacing, glyph) > maxWidth
   ) {
     cut = cut.slice(0, -1);
   }
@@ -40,8 +44,9 @@ export function wrapText(
   fontSize: number,
   maxLines: number,
   letterSpacing = 0,
+  glyph = GLYPH,
 ): { lines: string[]; fits: boolean } {
-  const width = (t: string) => textWidth(t, fontSize, letterSpacing);
+  const width = (t: string) => textWidth(t, fontSize, letterSpacing, glyph);
   const lines: string[] = [];
   let line = "";
   for (const word of text.trim().split(/\s+/)) {
@@ -63,6 +68,12 @@ export function wrapText(
   if (lines.length <= maxLines) return { lines, fits: true };
   const kept = lines.slice(0, maxLines);
   const rest = lines.slice(maxLines - 1).join(" ");
-  kept[maxLines - 1] = ellipsize(rest, maxWidth, fontSize, letterSpacing);
+  kept[maxLines - 1] = ellipsize(
+    rest,
+    maxWidth,
+    fontSize,
+    letterSpacing,
+    glyph,
+  );
   return { lines: kept, fits: false };
 }

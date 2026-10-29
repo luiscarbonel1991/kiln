@@ -731,6 +731,7 @@ export function NewProjectFlow({
                                     : undefined
                                 }
                                 band={textLayerColours(brand)}
+                                aspect={slot.aspect}
                                 badge="scene"
                               />
                             ),

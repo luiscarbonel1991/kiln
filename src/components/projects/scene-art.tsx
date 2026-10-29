@@ -1,22 +1,25 @@
+import { SceneTextLayer } from "@/components/projects/scene-text-layer";
 import { isRenderableUrl } from "@/lib/asset-url";
 import { gradientForPrompt } from "@/lib/gradient";
 
 // What a scene slot shows: its candidate image, or a placeholder until one
 // exists, with the slot's text layer on top when it has a text template (the
 // text is drawn by the template, never by the image model) on a band in the
-// maker's brand colours. Shared by the board and the New project plan so both
-// read the same.
+// maker's brand colours: the same layer Deliver composites onto the file.
+// Shared by the board and the New project plan so both read the same.
 export function SceneArt({
   seed,
   output,
   text,
   band,
+  aspect,
   badge,
 }: {
   seed: string;
   output?: string;
   text?: string;
-  band?: { background: string; ink: string };
+  band: { background: string; ink: string };
+  aspect?: string;
   badge?: string;
 }) {
   const image = isRenderableUrl(output) ? output : null;
@@ -30,17 +33,13 @@ export function SceneArt({
         <img src={image} alt="" className="h-full w-full object-cover" />
       ) : null}
       {text ? (
-        <span
-          className="absolute inset-x-3 top-3 rounded-field px-2.5 py-1.5 font-serif text-[0.95rem] italic leading-tight"
-          style={
-            band
-              ? { backgroundColor: band.background, color: band.ink }
-              : undefined
-          }
+        <div
+          className="pointer-events-none absolute inset-0"
           title="Text layer drawn by a template, never by the image model"
+          data-testid="scene-text-layer"
         >
-          {text}
-        </span>
+          <SceneTextLayer text={text} band={band} aspect={aspect} />
+        </div>
       ) : null}
       {badge ? (
         <span className="absolute bottom-3 left-3 rounded-pill bg-card/85 px-2 py-0.5 font-mono text-[0.59rem] text-on-surface-mid">

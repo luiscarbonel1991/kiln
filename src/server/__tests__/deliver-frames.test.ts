@@ -9,6 +9,7 @@ import {
   EXPORT_FONT_OPTIONS,
   exactFrameSvg,
   renderExactPng,
+  sceneTextSvg,
   targetSize,
   upscaleScene,
 } from "@/server/deliver/frames";
@@ -133,6 +134,40 @@ describe("Size & spec with the real fonts", () => {
         392,
       );
     }
+  });
+});
+
+describe("a scene's text layer with the real fonts", () => {
+  const band = { background: "#c0461f", ink: "#ffffff" };
+  const headline =
+    "A little forest for every mug, carved to last a lifetime of mornings";
+
+  it("wraps the headline so every line fits its band in Fraunces italic", () => {
+    const svg = sceneTextSvg(headline, band, "4:5");
+    expect(svg).toContain("font-family:Fraunces");
+    const lines = [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(
+      (m) => m[1],
+    );
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.join(" ")).toBe(headline);
+    const width = (line: string) =>
+      new Resvg(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 60"><text x="0" y="40" style="font-family:Fraunces;font-size:22px;font-style:italic">${line}</text></svg>`,
+        { font: { ...EXPORT_FONT_OPTIONS, loadSystemFonts: false } },
+      ).getBBox()?.width ?? 0;
+    // The band runs from x 16 to 384, the text from x 30 with 14 of padding.
+    for (const line of lines) expect(30 + width(line)).toBeLessThanOrEqual(370);
+  });
+
+  it("sits below a story's top bar, in its safe zone", () => {
+    const top = (svg: string) => Number(/<rect[^>]* y="(\d+)"/.exec(svg)?.[1]);
+    expect(top(sceneTextSvg(headline, band, "4:5"))).toBe(16);
+    expect(top(sceneTextSvg(headline, band, "9:16"))).toBeGreaterThan(80);
+  });
+
+  it("lays over the image on a transparent ground", () => {
+    const png = renderExactPng(sceneTextSvg("Hello", band, "4:5"), 400);
+    expect(pngSize(png)).toEqual({ width: 400, height: 500 });
   });
 });
 

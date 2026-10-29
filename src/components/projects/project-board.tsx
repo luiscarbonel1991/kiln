@@ -143,12 +143,7 @@ function deliveryBlocker(
   slots: BoardSlot[],
 ): string | null {
   const cards = new Map(slots.map((s) => [s.slot.key, s.card]));
-  const { notReady, textOnScenes } = deliveryBlockers(plan, (key) =>
-    cards.get(key),
-  );
-  if (textOnScenes.length > 0) {
-    return "Scenes with text on the image are not exported yet.";
-  }
+  const { notReady } = deliveryBlockers(plan, (key) => cards.get(key));
   if (notReady.length > 0) {
     return `Approve ${notReady.length === 1 ? "1 scene" : `${notReady.length} scenes`} to export: ${notReady.join(", ")}.`;
   }
@@ -466,6 +461,7 @@ export function ProjectBoard({
                               : undefined
                           }
                           band={textLayerColours(brand)}
+                          aspect={slot.aspect}
                         />
                       )}
                     </SlotFrame>
@@ -791,6 +787,7 @@ function SlotArt({
           : undefined
       }
       band={textLayerColours(brand)}
+      aspect={slot.aspect}
     />
   );
 }

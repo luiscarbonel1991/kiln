@@ -1,7 +1,11 @@
 import { strToU8, zipSync } from "fflate";
 import type { BrandKit } from "@/domain/brand";
 import type { DestinationProfile } from "@/domain/destination";
-import { exactView } from "@/domain/exact";
+import {
+  exactView,
+  renderTextTemplate,
+  textLayerColours,
+} from "@/domain/exact";
 import { imageSize, rasterType } from "@/domain/image-type";
 import type { ListingText } from "@/domain/listing";
 import {
@@ -20,8 +24,10 @@ import type { Product } from "@/domain/product";
 import type { PlateImage } from "@/lib/plate-href";
 import {
   asJpeg,
+  compositeText,
   exactFrameSvg,
   renderExactPng,
+  sceneTextSvg,
   targetSize,
   upscaleScene,
 } from "@/server/deliver/frames";
@@ -80,6 +86,8 @@ export interface DeliveredFile {
   source?: SceneSource;
   // A scene's own place (the maker's, often from the market brief).
   place?: string;
+  // The text layer drawn over a scene by its template.
+  text?: string;
 }
 
 // A clip's pixel size by resolution and orientation (Veo; Sora rendered 720p).
@@ -148,13 +156,20 @@ function readme(
   const lines = [
     `${input.projectName} — ${input.destination.name}`,
     `${input.product.name} (${input.product.sku})`,
-    `Exported by Kiln on ${input.now.toISOString()}. Post the photos in this order;`,
-    "photo 1 is the listing's thumbnail. A human publishes.",
+    ...(input.destination.kind === "content"
+      ? [
+          `Exported by Kiln on ${input.now.toISOString()}. Post the slides in this order;`,
+          "slide 1 is the cover. A human publishes.",
+        ]
+      : [
+          `Exported by Kiln on ${input.now.toISOString()}. Post the photos in this order;`,
+          "photo 1 is the listing's thumbnail. A human publishes.",
+        ]),
     "",
     ...files.map((f) =>
       f.kind === "video"
         ? `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.label ?? f.source.model}` : ""}), ${f.width} x ${f.height} px`
-        : `${f.photo}. ${folder}/${f.file} — ${f.label} (${f.kind === "exact" ? "drawn from the product spec" : f.kind === "photo" ? "your photo, as on the listing" : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${f.place ? `, at ${f.place}` : ""}`}), ${f.width} x ${f.height} px`,
+        : `${f.photo}. ${folder}/${f.file} — ${f.label} (${f.kind === "exact" ? "drawn from the product spec" : f.kind === "photo" ? "your photo, as on the listing" : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}`}), ${f.width} x ${f.height} px`,
     ),
     ...briefLines(input.plan.brief),
     "",
@@ -178,11 +193,6 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
   delivered: { key: string; approvedOutput?: string }[];
 }> {
   const blockers = deliveryBlockers(input.plan, input.cardOf);
-  if (blockers.textOnScenes.length > 0) {
-    throw new DeliveryRefusal(
-      `Scenes with text on the image are not exported yet (${blockers.textOnScenes.join(", ")}).`,
-    );
-  }
   if (blockers.notReady.length > 0) {
     throw new DeliveryRefusal(
       `Approve every scene first: ${blockers.notReady.join(", ")}.`,
@@ -281,10 +291,21 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
     const output = slot.approvedOutput;
     if (!output) throw new DeliveryRefusal(`"${slot.label}" is not approved.`);
     const file = `${stem}.jpg`;
-    entries[`${folder}/${file}`] = await upscaleScene(
-      await input.fetchOutput(output),
-      size,
-    );
+    const scene = await upscaleScene(await input.fetchOutput(output), size);
+    // A slot's text layer is drawn by its template over the approved image,
+    // as the board shows it; the image model never draws it.
+    const text = slot.textTemplate
+      ? renderTextTemplate(slot.textTemplate, input.product)
+      : undefined;
+    entries[`${folder}/${file}`] = text
+      ? await compositeText(
+          scene,
+          renderExactPng(
+            sceneTextSvg(text, textLayerColours(input.brand), slot.aspect),
+            size.width,
+          ),
+        )
+      : scene;
     files.push({
       file,
       photo,
@@ -295,6 +316,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       output,
       source: input.sourceOf(output),
       ...(slot.place ? { place: slot.place } : {}),
+      ...(text ? { text } : {}),
     });
   }
   const manifest = {

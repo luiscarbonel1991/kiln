@@ -567,7 +567,6 @@ describe("delivery", () => {
     const shopPlan = () => plan.destinations[0];
     expect(deliveryBlockers(shopPlan(), () => card)).toEqual({
       notReady: ["Hero"],
-      textOnScenes: [],
     });
     const approved = approveSlot(plan, hero, card);
     expect(
@@ -577,7 +576,6 @@ describe("delivery", () => {
     const off = withSlotOff(plan, hero, true);
     expect(deliveryBlockers(off.destinations[0], () => undefined)).toEqual({
       notReady: [],
-      textOnScenes: [],
     });
     // A re-rolled card is not approved any more.
     expect(
@@ -588,17 +586,15 @@ describe("delivery", () => {
     ).toEqual(["Hero"]);
   });
 
-  it("scenes with text on the image are not exported yet", () => {
-    const plan = launch();
+  it("a scene with text on the image is ready once approved: the text is drawn at export", () => {
+    const plan = approveSlot(launch(), hero, card);
     const withText = {
       ...plan.destinations[0],
       slots: plan.destinations[0].slots.map((s) =>
         s.key === "hero" ? { ...s, textTemplate: "{product.hook}" } : s,
       ),
     };
-    expect(deliveryBlockers(withText, () => card).textOnScenes).toEqual([
-      "Hero",
-    ]);
+    expect(deliveryBlockers(withText, () => card)).toEqual({ notReady: [] });
   });
 
   it("stamps what was exported; a scene only if its approval did not change", () => {

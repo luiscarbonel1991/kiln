@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { Resvg } from "@resvg/resvg-js";
 import { createElement } from "react";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
+import { SceneTextLayer } from "@/components/projects/scene-text-layer";
 import type { DestinationProfile } from "@/domain/destination";
 import type { ExactView } from "@/domain/exact";
 import type { PlateImage } from "@/lib/plate-href";
@@ -65,6 +66,18 @@ export function exactFrameSvg(
   });
 }
 
+// A scene's text layer as the board draws it, with real font names: rendered
+// on a transparent ground, to lay over the approved image.
+export function sceneTextSvg(
+  text: string,
+  band: { background: string; ink: string },
+  aspect: string | undefined,
+): string {
+  return toSvgMarkup(createElement(SceneTextLayer, { text, band, aspect }), {
+    fonts: EXPORT_FONTS,
+  });
+}
+
 export const EXPORT_FONT_OPTIONS = {
   fontFiles: FONT_FILES,
   loadSystemFonts: true,
@@ -117,6 +130,35 @@ export async function upscaleScene(
       }
       throw error;
     }
+    return new Uint8Array(await readFile(out));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+// A delivered scene with its text layer laid over it (both at the delivery
+// size), as a JPEG at quality 92.
+export async function compositeText(
+  scene: Uint8Array,
+  layer: Uint8Array,
+): Promise<Uint8Array> {
+  const dir = await mkdtemp(join(tmpdir(), "kiln-deliver-"));
+  try {
+    const base = join(dir, "scene.jpg");
+    const over = join(dir, "layer.png");
+    const out = join(dir, "out.jpg");
+    await writeFile(base, scene);
+    await writeFile(over, layer);
+    await execFileP("magick", [
+      base,
+      over,
+      "-gravity",
+      "northwest",
+      "-composite",
+      "-quality",
+      "92",
+      out,
+    ]);
     return new Uint8Array(await readFile(out));
   } finally {
     await rm(dir, { recursive: true, force: true });

@@ -19,7 +19,7 @@ import type { PlateImage } from "@/lib/plate-href";
 // the app's theme), so the same markup renders in the board and, through
 // src/lib/svg-markup.ts and resvg, as an exported file. The viewBox follows the
 // slot's aspect.
-const WIDTH = 400;
+export const WIDTH = 400;
 
 // DESIGN.md's light tokens: on-surface, on-surface-mid, on-surface-dim,
 // surface, surface-soft, line.
@@ -32,7 +32,7 @@ const INK = {
   border: "#ebe2d2",
 } as const;
 
-function heightFor(aspect: string | undefined): number {
+export function heightFor(aspect: string | undefined): number {
   const [w, h] = (aspect ?? "1:1").split(":").map(Number);
   return w && h ? Math.round((WIDTH * h) / w) : WIDTH;
 }

@@ -1,4 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { DestinationProfile } from "@/domain/destination";
@@ -326,6 +329,70 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
     // Without text rules, no sheet.
     const plain = unzipSync((await buildDelivery(input({ listing }))).zip);
     expect(plain[`${folder}/listing.txt`]).toBeUndefined();
+  });
+
+  it("draws a scene's headline over the approved image, as the board shows it", async () => {
+    const instagram = DestinationProfile.parse({
+      id: "instagram",
+      name: "Instagram",
+      kind: "content",
+      formats: [{ key: "feed", label: "Feed", aspect: "4:5", minPx: 1080 }],
+      rules: { textOnImage: "allowed", negative: [] },
+      delivery: { mode: "export" },
+    });
+    const carousel = PlanDestination.parse({
+      destinationId: "instagram",
+      shotListId: "instagram-carousel",
+      slots: [
+        {
+          key: "hook",
+          label: "Hook",
+          purpose: "p",
+          aspect: "4:5",
+          textTemplate: "{product.hook}",
+          approvedOutput: HERO,
+        },
+      ],
+    });
+    const result = await buildDelivery(
+      input({
+        destination: instagram,
+        plan: carousel,
+        cardOf: () => ({ status: "done" as const, outputs: [HERO] }),
+        brand: { palette: ["#c0461f"] },
+      }),
+    );
+    const files = unzipSync(result.zip);
+    const folder = "botanical-coaster-launch-instagram";
+    const slide = files[`${folder}/01-hook.jpg`];
+    expect(imageSize(slide)).toEqual({ width: 1080, height: 1350 });
+    // The band in the brand's first colour sits over the top-left of the
+    // image (the gradient there is a light tan).
+    const dir = mkdtempSync(join(tmpdir(), "kiln-test-"));
+    const file = join(dir, "slide.jpg");
+    writeFileSync(file, slide);
+    const [r, g, b] = execFileSync("magick", [
+      file,
+      "-format",
+      "%[fx:int(255*p{60,60}.r)] %[fx:int(255*p{60,60}.g)] %[fx:int(255*p{60,60}.b)]",
+      "info:",
+    ])
+      .toString()
+      .split(" ")
+      .map(Number);
+    rmSync(dir, { recursive: true, force: true });
+    expect(Math.abs(r - 0xc0)).toBeLessThan(24);
+    expect(Math.abs(g - 0x46)).toBeLessThan(24);
+    expect(Math.abs(b - 0x1f)).toBeLessThan(24);
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    expect(manifest.files[0]).toMatchObject({
+      file: "01-hook.jpg",
+      kind: "scene",
+      text: coaster.hook,
+    });
+    const readme = strFromU8(files[`${folder}/README.txt`]);
+    expect(readme).toContain("slide 1 is the cover");
+    expect(readme).toContain(`with "${coaster.hook}" drawn by Kiln`);
   });
 
   it("the README says why: the market brief with its sources and dates, and a scene's own place", async () => {
