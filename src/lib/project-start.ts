@@ -73,7 +73,9 @@ export function slotCards(
     if (!recipe) {
       throw new Error(`no recipe for ${d.shotListId} on ${d.destinationId}`);
     }
-    const scenes = d.slots.filter((s) => s.fill === "scene");
+    // A version re-frames another scene: it takes no direction and no place
+    // of use from the scenes, only a card of its own (below).
+    const scenes = d.slots.filter((s) => s.fill === "scene" && !s.versionOf);
     // A view from above drawn beside this reference: Kiln starts the scenes
     // that offer the camera a little above (the maker's stop still wins).
     const view = threeQuarterFor(plan.references, master.assetUrl);
@@ -139,7 +141,52 @@ export function slotCards(
           models,
         ),
       );
-    return [...sceneCards, ...videoCards];
+    const versionCards = d.slots
+      .filter((s) => s.fill === "scene" && s.versionOf)
+      .map((s) =>
+        versionSlotCard(
+          d.destinationId,
+          d.shotListId,
+          s,
+          master,
+          understanding,
+          models,
+        ),
+      );
+    return [...sceneCards, ...versionCards, ...videoCards];
+  });
+}
+
+// A version slot's card: it holds the re-framed image the queue makes from
+// the source's approved scene (built at queue time, not from these fields),
+// on the maker's image model at the slot's aspect.
+export function versionSlotCard(
+  destinationId: string,
+  shotListId: string,
+  slot: PlanSlot,
+  master: MasterAsset,
+  understanding: BaseUnderstanding,
+  models: MakerModels = DEFAULT_MAKER_MODELS,
+): Card {
+  const recipe = findRecipe(slotRecipeId(shotListId, destinationId));
+  if (!recipe)
+    throw new Error(`no recipe for ${shotListId} on ${destinationId}`);
+  const planning = buildPlanningContext(understanding, recipe, SEED_BRAND);
+  const [base] = buildCards({
+    master,
+    recipe: {
+      ...recipe,
+      directions: [{ label: slot.label, purpose: slot.purpose }],
+    },
+    planning,
+    imageModel: defaultImageModel(models),
+  });
+  return Card.parse({
+    ...base,
+    id: slotCardId(destinationId, slot.key),
+    model: { ...base.model, aspect: slot.aspect ?? base.model.aspect },
+    status: "draft",
+    references: [],
   });
 }
 

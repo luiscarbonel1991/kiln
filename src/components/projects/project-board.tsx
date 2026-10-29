@@ -26,10 +26,12 @@ import { ProductChangedBanner } from "@/components/projects/product-changed";
 import { ProjectTitle } from "@/components/projects/project-title";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
+  framePosition,
   onIndexes,
   SlotFrame,
   SlotGrid,
   slotPosition,
+  unnumbered,
 } from "@/components/projects/slot-frame";
 import { SlotModel } from "@/components/projects/slot-model";
 import { SlotTune } from "@/components/projects/slot-tune";
@@ -83,6 +85,7 @@ import {
   takesPlace,
   tuneView,
 } from "@/lib/slot-tune";
+import { versionMark } from "@/lib/version-mark";
 import type { BatchProgress, Budget } from "@/server/generation-repository";
 import type { ProductDrift } from "@/server/product-version";
 import type { ProjectBoard as Board } from "@/server/project-mapper";
@@ -123,14 +126,18 @@ export function boardRows(
 // running for it, and it has no output yet (a failed one counts). A video is
 // generated from its own slot, never in the scene batch.
 export function waitingCardIds(rows: ReturnType<typeof boardRows>): string[] {
-  return rows
-    .flatMap((r) => r.slots)
+  const all = rows.flatMap((r) => r.slots);
+  const byId = new Map(all.map((s) => [s.cardId, s.slot]));
+  return all
     .filter(
       (s) =>
         s.slot.fill === "scene" &&
         s.card &&
         s.view.state === "queued" &&
-        !s.view.inBatch,
+        !s.view.inBatch &&
+        // A version waits until the scene it re-frames is approved.
+        (!s.slot.versionOf ||
+          Boolean(byId.get(s.slot.versionOf)?.approvedOutput)),
     )
     .map((s) => s.cardId);
 }
@@ -262,9 +269,10 @@ export function ProjectBoard({
               </p>
             );
           }
-          // A video is not a photo: it takes no photo number and never moves.
+          // A video is not a photo: it takes no photo number and never moves;
+          // a frame posted on its own takes none either.
           const places = onIndexes(
-            slots.map((s) => s.slot.off === true || s.slot.fill === "video"),
+            slots.map((s) => s.slot.off === true || unnumbered(s.slot)),
           );
           const last = places.filter((p) => p !== null).length - 1;
           const approvedScenes = slots
@@ -345,11 +353,12 @@ export function ProjectBoard({
                   return (
                     <SlotFrame
                       key={slot.key}
-                      position={
-                        video
-                          ? `${destination.name} video`
-                          : slotPosition(destination, places[i])
-                      }
+                      position={framePosition(
+                        destination,
+                        slot,
+                        places[i],
+                        slot.off === true,
+                      )}
                       label={slot.label}
                       purpose={slot.purpose}
                       aspect={
@@ -363,7 +372,7 @@ export function ProjectBoard({
                       mark={
                         earlier.includes(cardId)
                           ? "earlier version of the product"
-                          : undefined
+                          : versionMark(board.plan, slot)
                       }
                       actions={
                         <SlotActions
@@ -395,9 +404,10 @@ export function ProjectBoard({
                               : null
                           }
                           order={
-                            // A video never moves; a slot switched off keeps
-                            // the order buttons' room (hidden).
-                            video
+                            // A video never moves, nor a frame posted on its
+                            // own; a slot switched off keeps the order
+                            // buttons' room (hidden).
+                            video || slot.standalone
                               ? null
                               : {
                                   place: places[i] ?? 1,
@@ -454,7 +464,11 @@ export function ProjectBoard({
                       ) : (
                         <SceneArt
                           seed={cardId}
-                          output={card?.outputs[0]}
+                          output={
+                            slot.fill === "shared"
+                              ? slot.approvedOutput
+                              : card?.outputs[0]
+                          }
                           text={
                             slot.textTemplate
                               ? renderTextTemplate(slot.textTemplate, product)
@@ -626,6 +640,7 @@ export function ProjectBoard({
           const approved = generated.filter(
             (s) => s.view.state === "approved" || s.view.state === "delivered",
           ).length;
+          const sharedCount = on.filter((s) => s.slot.fill === "shared").length;
           const exact = on.filter(
             (s) =>
               s.slot.fill === "exact" &&
@@ -686,6 +701,12 @@ export function ProjectBoard({
                 <li>
                   {approved} of {plural(scenes, "scene")} approved
                 </li>
+                {sharedCount > 0 ? (
+                  <li>
+                    {plural(sharedCount, "frame")} shared from another
+                    destination, free
+                  </li>
+                ) : null}
                 <li>{count("to-review")} to review</li>
                 <li>
                   {count("queued") + count("generating") + count("retrying")}{" "}
@@ -896,7 +917,12 @@ function SlotActions({
       </div>
     );
   }
-  if (slot.fill === "exact" || slot.fill === "photo") {
+  // A shared frame follows its scene: nothing to make or approve here.
+  if (
+    slot.fill === "exact" ||
+    slot.fill === "photo" ||
+    slot.fill === "shared"
+  ) {
     return (
       <div className="flex flex-wrap items-center gap-2">
         {toggle}

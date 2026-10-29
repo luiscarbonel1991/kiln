@@ -95,6 +95,30 @@ export function slotPosition(
     : `Slide ${index + 1}`;
 }
 
+// A frame's position on the board and the plan: a video and a standalone
+// frame (a story, a single post) are named by what they are and take no
+// number; every other frame by its place among those switched on.
+export function framePosition(
+  destination: { name: string; kind: "sale" | "content" },
+  slot: { fill: string; standalone?: boolean; label: string },
+  index: number | null,
+  off: boolean,
+): string {
+  if (slot.fill === "video") return `${destination.name} video`;
+  if (slot.standalone) {
+    return `${destination.name} ${slot.label.toLowerCase()}${off ? " · off" : ""}`;
+  }
+  return slotPosition(destination, index);
+}
+
+// The slots that take no number: off, a video, a frame posted on its own.
+export function unnumbered(slot: {
+  fill: string;
+  standalone?: boolean;
+}): boolean {
+  return slot.fill === "video" || slot.standalone === true;
+}
+
 // Each slot's place among the slots switched on (null when off).
 export function onIndexes(off: boolean[]): (number | null)[] {
   let next = 0;

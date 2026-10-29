@@ -68,6 +68,8 @@ describe("slotCards", () => {
     cards.find((c) => c.id === id)?.fields.scene.value ?? "";
 
   it("one draft card per scene slot, ids unique across destinations", () => {
+    // In a Launch the carousel's "in place" and "detail" are Etsy's scenes
+    // shared (no card of their own); the story and the post re-frame scenes.
     expect(cards.map((c) => c.id)).toEqual([
       "etsy.hero",
       "etsy.in-use",
@@ -76,11 +78,22 @@ describe("slotCards", () => {
       "etsy.gift",
       "etsy.video",
       "instagram.hook",
-      "instagram.in-place",
-      "instagram.detail",
+      "instagram.story",
+      "instagram.post",
     ]);
     expect(new Set(cards.map((c) => c.id)).size).toBe(cards.length);
     expect(cards.every((c) => c.status === "draft")).toBe(true);
+  });
+
+  it("a version's card is drafted at its own aspect on the default image model", () => {
+    expect(cards.find((c) => c.id === "instagram.story")?.model).toMatchObject({
+      provider: "openai",
+      model: "gpt-image-2",
+      aspect: "9:16",
+    });
+    expect(cards.find((c) => c.id === "instagram.post")?.model.aspect).toBe(
+      "1:1",
+    );
   });
 
   it("the video slot gets a video card, drafted on the default video model at 9:16", () => {
@@ -188,7 +201,16 @@ describe("slotCards", () => {
       productUnderstanding(sampled),
       sampled,
     );
-    const scenes = withSample.filter((c) => c.type === "image");
+    // A version re-frames an approved scene: it reads nothing else.
+    const versions = ["instagram.story", "instagram.post"];
+    const scenes = withSample.filter(
+      (c) => c.type === "image" && !versions.includes(c.id),
+    );
+    expect(
+      withSample
+        .filter((c) => versions.includes(c.id))
+        .map((c) => c.references),
+    ).toEqual([[], []]);
     expect(scenes.length).toBeGreaterThan(0);
     expect(
       scenes.every((c) => c.references[0] === "https://stub.local/sample.jpg"),

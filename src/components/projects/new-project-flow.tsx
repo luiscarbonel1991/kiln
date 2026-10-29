@@ -22,10 +22,12 @@ import { PhotoArt } from "@/components/projects/photo-art";
 import { ProductEditor } from "@/components/projects/product-editor";
 import { SceneArt } from "@/components/projects/scene-art";
 import {
+  framePosition,
   onIndexes,
   SlotFrame,
   SlotGrid,
   slotPosition,
+  unnumbered,
 } from "@/components/projects/slot-frame";
 import { Button } from "@/components/ui/button";
 import type { BrandKit } from "@/domain/brand";
@@ -63,6 +65,7 @@ import { plural } from "@/lib/plural";
 import { PROJECT_TYPES } from "@/lib/project-types";
 import { CATALOG } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
+import { versionMark } from "@/lib/version-mark";
 import type { StoredProductFile } from "@/server/product-files";
 
 type BoardType = Exclude<ProjectType, "design">;
@@ -223,6 +226,7 @@ export function NewProjectFlow({
   const off = planned.filter((p) => offSlots.includes(p.id)).map((p) => p.id);
   const slots = planned.filter((p) => !off.includes(p.id)).map((p) => p.slot);
   const scenes = slots.filter((s) => s.fill === "scene");
+  const shared = slots.filter((s) => s.fill === "shared").length;
   const kept = slots.filter((s) => s.fill === "photo").length;
   const exact = slots.filter((s) => s.fill === "exact").length;
   const model = defaultImageModel(makerModels);
@@ -636,25 +640,27 @@ export function NewProjectFlow({
                     {d.slots.map((slot, i) => {
                       const id = slotCardId(d.destinationId, slot.key);
                       const isOff = off.includes(id);
-                      // A video takes no photo number.
+                      // A video and a frame posted on its own take no number.
                       const place = onIndexes(
                         d.slots.map(
                           (s) =>
-                            s.fill === "video" ||
+                            unnumbered(s) ||
                             off.includes(slotCardId(d.destinationId, s.key)),
                         ),
                       )[i];
                       return (
                         <SlotFrame
                           key={slot.key}
-                          position={
-                            slot.fill === "video"
-                              ? `${destination.name} video`
-                              : slotPosition(destination, place)
-                          }
+                          position={framePosition(
+                            destination,
+                            slot,
+                            place,
+                            isOff,
+                          )}
                           label={slot.label}
                           purpose={slot.purpose}
                           aspect={slot.aspect}
+                          mark={versionMark(plan, slot, { waits: false })}
                           view={{
                             state: isOff
                               ? "off"
@@ -732,7 +738,13 @@ export function NewProjectFlow({
                                 }
                                 band={textLayerColours(brand)}
                                 aspect={slot.aspect}
-                                badge="scene"
+                                badge={
+                                  slot.fill === "shared"
+                                    ? "shared"
+                                    : slot.versionOf
+                                      ? "version"
+                                      : "scene"
+                                }
                               />
                             ),
                           )}
@@ -769,6 +781,9 @@ export function NewProjectFlow({
                   {scenes.length === 1 ? "needs" : "need"} the image model.
                   {videos.count > 0
                     ? ` ${plural(videos.count, "video")} ${videos.count === 1 ? "needs" : "need"} the video model.`
+                    : ""}
+                  {shared > 0
+                    ? ` ${plural(shared, "frame")} ${shared === 1 ? "repeats a scene" : "repeat scenes"} another destination makes, free.`
                     : ""}
                   {off.length > 0
                     ? ` ${off.length} switched off, not part of the deliverable.`

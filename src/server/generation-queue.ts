@@ -9,6 +9,7 @@ import {
 } from "@/domain/generation-cost";
 import {
   buildGenerationRequest,
+  buildVersionRequest,
   buildVideoRequest,
   type GenerationRequest,
   VideoNeedsScene,
@@ -20,7 +21,12 @@ import {
   PROVIDER_LABELS,
   type ProviderId,
 } from "@/domain/model-defaults";
-import { parseSlotCardId, slotCardId, videoSettings } from "@/domain/plan";
+import {
+  parseSlotCardId,
+  slotCardId,
+  versionSource,
+  videoSettings,
+} from "@/domain/plan";
 import { SEED_BRAND } from "@/domain/seed";
 import { cardReference } from "@/lib/card-reference";
 import { db, hasDatabase } from "@/lib/db";
@@ -176,13 +182,35 @@ export async function estimateProjectCards(
     // A scene looking down edits Kiln's view from above, when there is one.
     board ??= await loadProjectBoard(projectId);
     const plan = board?.board.plan;
-    const request = buildGenerationRequest({
-      card,
-      master: plan ? cardReference(plan, card.id, master) : master,
-      understanding,
-      recipe: findRecipe(card.recipeId) ?? SEED_RECIPES[0],
-      brand: SEED_BRAND,
-    });
+    const ref = parseSlotCardId(card.id);
+    const slot = plan?.destinations
+      .find((d) => d.destinationId === ref?.destinationId)
+      ?.slots.find((s) => s.key === ref?.slotKey);
+    // A version re-frames its source's approved scene, so it waits for it.
+    const source =
+      plan && slot?.versionOf ? versionSource(plan, slot) : undefined;
+    if (slot?.versionOf && !source?.slot.approvedOutput) {
+      throw new QueueRefusal(
+        "needs-scene",
+        `Approve "${source?.slot.label ?? slot.versionOf}" first: "${slot.label}" re-frames it.`,
+      );
+    }
+    const request =
+      slot?.versionOf && source?.slot.approvedOutput && board?.product
+        ? buildVersionRequest({
+            product: board.product,
+            sourceOutput: source.slot.approvedOutput,
+            aspect: slot.aspect ?? card.model.aspect,
+            text: Boolean(slot.textTemplate),
+            model: card.model,
+          })
+        : buildGenerationRequest({
+            card,
+            master: plan ? cardReference(plan, card.id, master) : master,
+            understanding,
+            recipe: findRecipe(card.recipeId) ?? SEED_RECIPES[0],
+            brand: SEED_BRAND,
+          });
     const estimate = estimateGeneration(
       request.model,
       request.model.aspect,
