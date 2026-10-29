@@ -254,6 +254,14 @@ export {
 export { productUnderstanding } from "@/domain/product-understanding";
 export { ProjectType } from "@/domain/project";
 export {
+  type CardSpend,
+  type CostSummary,
+  type DestinationCost,
+  type FrameCost,
+  type ProjectCost,
+  projectCost,
+} from "@/domain/project-cost";
+export {
   checkExpectedText,
   type ExpectedText,
   lenientKey,
