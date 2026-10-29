@@ -30,6 +30,7 @@ export function SlotFrame({
   children,
   actions,
   mark,
+  cost,
 }: {
   position: string;
   label: string;
@@ -40,6 +41,8 @@ export function SlotFrame({
   actions?: ReactNode;
   // A note on what the render shows ("earlier version"), under its state.
   mark?: string;
+  // What the frame has cost so far, its takes included ("$0.12 · 2 takes").
+  cost?: string;
 }) {
   return (
     <figure className="row-span-2 grid min-w-0 grid-rows-subgrid gap-y-2">
@@ -73,6 +76,14 @@ export function SlotFrame({
         <span className="font-sans text-[0.72rem] leading-snug text-on-surface-mid">
           {purpose}
         </span>
+        {cost ? (
+          <span
+            className="font-mono text-[0.59rem] text-on-surface-dim"
+            data-testid="frame-cost"
+          >
+            {cost}
+          </span>
+        ) : null}
         {actions ? <div className="pt-1">{actions}</div> : null}
       </figcaption>
     </figure>

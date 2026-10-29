@@ -69,6 +69,7 @@ import {
   defaultSwatch,
   type Product,
 } from "@/domain/product";
+import type { FrameCost, ProjectCost } from "@/domain/project-cost";
 import type { JobView } from "@/domain/queue";
 import { threeQuarterFor } from "@/domain/scene-reference";
 import { VIDEO_MOTIONS } from "@/domain/video";
@@ -142,7 +143,67 @@ export function waitingCardIds(rows: ReturnType<typeof boardRows>): string[] {
     .map((s) => s.cardId);
 }
 
-const money = (micros: number) => `$${fromMicros(micros).toFixed(2)}`;
+// Cents, or a tenth of a cent for less than one (a text call is $0.004, not
+// "$0.00").
+const money = (micros: number) =>
+  `$${fromMicros(micros).toFixed(micros > 0 && micros < 10_000 ? 3 : 2)}`;
+
+// "$0.12 · 2 takes": what a frame has cost, its re-rolls included; nothing
+// before its first take, nor in mock mode (nothing is paid there).
+function frameCostLine(
+  frame: FrameCost | undefined,
+  mode: "live" | "mock",
+): string | undefined {
+  if (mode !== "live" || !frame || frame.takes === 0) return undefined;
+  return `${money(frame.spentMicros)} · ${plural(frame.takes, "take")}`;
+}
+
+// The project's photo work so far: what it spent (every take, the rejected
+// ones too) and what each approved frame cost on average — the number a
+// business prices into the product.
+function ProjectCostCard({
+  cost,
+  mode,
+}: {
+  cost: ProjectCost | null;
+  mode: "live" | "mock";
+}) {
+  return (
+    <div
+      className="flex flex-col gap-1.5 rounded-card bg-card p-5 shadow-card"
+      data-testid="project-cost"
+    >
+      <span className="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
+        Cost
+      </span>
+      {mode === "mock" || !cost ? (
+        <p className="font-mono text-[0.65rem] text-on-surface-mid">
+          Mock mode: nothing is paid or counted.
+        </p>
+      ) : (
+        <>
+          <p className="font-serif text-2xl italic text-foreground">
+            {money(cost.spentMicros)}
+          </p>
+          <p className="font-mono text-[0.65rem] text-on-surface-mid">
+            spent on this project · {plural(cost.takes, "take")}
+          </p>
+          <p className="font-mono text-[0.65rem] text-foreground">
+            {cost.perApprovedMicros === null
+              ? "no frame approved yet"
+              : `${money(cost.perApprovedMicros)} per approved frame · ${cost.approved} approved`}
+          </p>
+          {cost.otherMicros > 0 ? (
+            <p className="font-sans text-[0.72rem] leading-snug text-on-surface-mid">
+              {money(cost.otherMicros)} of it went to the listing text and
+              frames no longer in the deliverable.
+            </p>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
 
 // Why a destination cannot be exported yet, in a line; null when it can.
 function deliveryBlocker(
@@ -181,6 +242,7 @@ export function ProjectBoard({
   searchSources,
   today,
   shop,
+  cost,
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -207,8 +269,15 @@ export function ProjectBoard({
   today: string;
   // The connected shop that reads a listing's numbers, or null (typed).
   shop: string | null;
+  // What the project's photo work has cost (live spend only).
+  cost: ProjectCost | null;
 }) {
   const rows = boardRows(board, jobs);
+  const frameCosts = new Map(
+    (cost?.destinations ?? []).flatMap((d) =>
+      d.frames.map((f) => [slotCardId(d.destinationId, f.slotKey), f] as const),
+    ),
+  );
   // Kiln's view of the product from a little above, while the reference is
   // the plate it was drawn beside.
   const above = threeQuarterFor(board.plan.references, board.master?.assetUrl);
@@ -374,6 +443,7 @@ export function ProjectBoard({
                           ? "earlier version of the product"
                           : versionMark(board.plan, slot)
                       }
+                      cost={frameCostLine(frameCosts.get(cardId), mode)}
                       actions={
                         <SlotActions
                           projectId={projectId}
@@ -626,6 +696,8 @@ export function ProjectBoard({
           />
         ) : null}
 
+        <ProjectCostCard cost={cost} mode={mode} />
+
         {rows.map(({ plan, destination, slots }) => {
           if (!destination) return null;
           const count = (state: SlotView["state"]) =>
@@ -641,6 +713,9 @@ export function ProjectBoard({
             (s) => s.view.state === "approved" || s.view.state === "delivered",
           ).length;
           const sharedCount = on.filter((s) => s.slot.fill === "shared").length;
+          const destinationCost = cost?.destinations.find(
+            (d) => d.destinationId === plan.destinationId,
+          );
           const exact = on.filter(
             (s) =>
               s.slot.fill === "exact" &&
@@ -701,6 +776,16 @@ export function ProjectBoard({
                 <li>
                   {approved} of {plural(scenes, "scene")} approved
                 </li>
+                {mode === "live" &&
+                destinationCost &&
+                destinationCost.takes > 0 ? (
+                  <li data-testid={`destination-cost-${plan.destinationId}`}>
+                    {money(destinationCost.spentMicros)} spent
+                    {destinationCost.perApprovedMicros !== null
+                      ? ` · ${money(destinationCost.perApprovedMicros)} per approved frame`
+                      : ""}
+                  </li>
+                ) : null}
                 {sharedCount > 0 ? (
                   <li>
                     {plural(sharedCount, "frame")} shared from another

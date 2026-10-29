@@ -10,12 +10,14 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
 import { defaultTextModel, modelLabel } from "@/domain/model-defaults";
 import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
+import { projectCost } from "@/domain/project-cost";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerMode } from "@/providers/mode";
 import { estimateProjectCards } from "@/server/generation-queue";
 import {
   outputVersions,
   projectGenerationState,
+  projectSpend,
   QueueRefusal,
 } from "@/server/generation-repository";
 import {
@@ -128,6 +130,9 @@ export default async function ProjectBoardPage({
   const { searchColumns } = await getMakerPreferences();
   const health = await providerHealth(maker.id);
   const plan = board.plan;
+  const spend = plan ? await projectSpend(board.id) : null;
+  const cost =
+    plan && spend ? projectCost(plan, spend.byCard, spend.directMicros) : null;
   const estimate =
     plan && board.master
       ? await batchEstimate(
@@ -162,6 +167,7 @@ export default async function ProjectBoardPage({
           searchSources={searchColumns}
           today={new Date().toLocaleDateString("en-CA")}
           shop={(await resultsConnector())?.label ?? null}
+          cost={cost}
         />
       ) : (
         <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
