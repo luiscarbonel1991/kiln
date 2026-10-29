@@ -191,6 +191,7 @@ export {
   planCounts,
   planFromListing,
   planProject,
+  planVideos,
   replacementFrames,
   replan,
   type SlotRef,

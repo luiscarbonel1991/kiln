@@ -14,6 +14,7 @@ import {
   parseSlotRecipeId,
   planCounts,
   planProject,
+  planVideos,
   replan,
   sceneCardIds,
   slotCardId,
@@ -763,6 +764,36 @@ describe("video slots", () => {
       generableCardIds(withSlotOff(withVideo(), video, true)),
     ).not.toContain("shop.video");
     expect(planCounts(withVideo())).toMatchObject({ scene: 2, video: 1 });
+  });
+
+  it("prices the plan's videos beside its scenes, at each video's length", () => {
+    const veoFast = {
+      provider: "google",
+      model: "veo-3.1-fast-generate-preview",
+    };
+    const shopWithVideo = { ...shop, video: { minSec: 5, maxSec: 15 } };
+    // 8 s at $0.10/s on Veo 3.1 Fast 720p.
+    expect(planVideos(withVideo(), [shopWithVideo, social], veoFast)).toEqual({
+      count: 1,
+      seconds: [8],
+      usd: 0.8,
+    });
+    expect(
+      planVideos(withVideo(), [shopWithVideo, social], veoFast, ["shop.video"]),
+    ).toEqual({ count: 0, seconds: [], usd: 0 });
+    expect(
+      planVideos(
+        withSlotOff(withVideo(), video, true),
+        [shopWithVideo],
+        veoFast,
+      ).count,
+    ).toBe(0);
+    expect(
+      planVideos(withVideo(), [shopWithVideo], {
+        provider: "google",
+        model: "veo-unpriced",
+      }).usd,
+    ).toBeNull();
   });
 
   it("starts from the first approved scene, a still camera with a light change, 8 s, vertical", () => {

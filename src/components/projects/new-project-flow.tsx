@@ -41,12 +41,18 @@ import {
   heroSettingsOf,
   withHeroSettings,
 } from "@/domain/hero-setting";
-import { defaultImageModel, type MakerModels } from "@/domain/model-defaults";
+import {
+  defaultImageModel,
+  defaultVideoModel,
+  type MakerModels,
+  modelLabel,
+} from "@/domain/model-defaults";
 import {
   offeredDestinations,
   type ProjectPlan,
   planFromListing,
   planProject,
+  planVideos,
   replacementFrames,
   slotCardId,
 } from "@/domain/plan";
@@ -220,6 +226,11 @@ export function NewProjectFlow({
     model,
     product ? productImages(product).length : 0,
   );
+  // A video is paid like a scene, so the plan prices it too.
+  const videoModel = defaultVideoModel(makerModels);
+  const videos = plan
+    ? planVideos(plan, CATALOG.destinations, videoModel, off)
+    : { count: 0, seconds: [], usd: 0 };
 
   function toggleSlot(id: string) {
     setOffSlots((ids) =>
@@ -735,6 +746,9 @@ export function NewProjectFlow({
                   {live ? "and " : ""}
                   {plural(scenes.length, "scene")}{" "}
                   {scenes.length === 1 ? "needs" : "need"} the image model.
+                  {videos.count > 0
+                    ? ` ${plural(videos.count, "video")} ${videos.count === 1 ? "needs" : "need"} the video model.`
+                    : ""}
                   {off.length > 0
                     ? ` ${off.length} switched off, not part of the deliverable.`
                     : ""}
@@ -744,6 +758,16 @@ export function NewProjectFlow({
                     ? `≈ ${money(estimate.typical)}–${money(estimate.max)} if each scene is generated once · ${model.model}${estimate.quality ? `, quality ${estimate.quality}` : ""}${estimate.confidence === "derived" ? " (derived price)" : ""}`
                     : `no pinned price for ${model.model}`}
                 </p>
+                {videos.count > 0 ? (
+                  <p
+                    className="font-mono text-[0.7rem] text-on-surface-mid"
+                    data-testid="plan-video-estimate"
+                  >
+                    {videos.usd === null
+                      ? `no pinned price for ${videoModel.model} at ${videos.seconds.join(", ")} s`
+                      : `+ ${money(videos.usd)} for ${videos.count === 1 ? "the video" : `${videos.count} videos`} (${videos.seconds.join(", ")} s, ${modelLabel(videoModel)})${estimate ? ` · ≈ ${money(estimate.typical + videos.usd)}–${money(estimate.max + videos.usd)} in all` : ""}`}
+                  </p>
+                ) : null}
                 <p className="font-sans text-[0.75rem] text-on-surface-mid">
                   Nothing is generated when you start: each scene waits for your
                   Generate. {REFERENCE_NOTE[product.source.kind]}

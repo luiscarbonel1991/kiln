@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { DestinationKind, DestinationProfile } from "@/domain/destination";
+import { estimateVideo } from "@/domain/generation-cost";
 import { ListingText } from "@/domain/listing";
 import {
   type ListingRead,
@@ -446,6 +447,33 @@ export function videoSettings(
     orientation: choice.orientation ?? "portrait",
     allowed,
   };
+}
+
+// The videos a plan renders, each at its slot's length, priced on `model`:
+// what the plan's estimate adds to its scenes. `usd` is null when the model
+// has no pinned price for a length it would render.
+export function planVideos(
+  plan: ProjectPlan,
+  destinations: DestinationProfile[],
+  model: { provider: string; model: string; resolution?: VideoResolution },
+  off: string[] = [],
+): { count: number; seconds: number[]; usd: number | null } {
+  const seconds = plan.destinations.flatMap((d) => {
+    const profile = destinations.find((p) => p.id === d.destinationId);
+    return d.slots
+      .filter(
+        (s) =>
+          s.fill === "video" &&
+          !s.off &&
+          !off.includes(slotCardId(d.destinationId, s.key)),
+      )
+      .map((s) => videoSettings(d, s, profile?.video, model).seconds);
+  });
+  const prices = seconds.map((s) => estimateVideo(model, s));
+  const usd = prices.some((p) => p === null)
+    ? null
+    : Math.round(prices.reduce<number>((t, p) => t + (p ?? 0), 0) * 100) / 100;
+  return { count: seconds.length, seconds, usd };
 }
 
 // Change a video slot's choices (only the fields given).
