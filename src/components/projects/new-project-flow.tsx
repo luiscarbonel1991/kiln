@@ -95,6 +95,7 @@ export function NewProjectFlow({
   initialDesign,
   initialProductId = null,
   initialListingUrl = null,
+  initialListingTitle = null,
 }: {
   initialProducts: Product[];
   initialBrand: BrandKit | null;
@@ -109,6 +110,7 @@ export function NewProjectFlow({
   initialProductId?: string | null;
   // A live listing to refresh, picked on Shops: a Listing kit started from it.
   initialListingUrl?: string | null;
+  initialListingTitle?: string | null;
 }) {
   const [products, setProducts] = useState(initialProducts);
   // The new-product form: open from the start for a maker with no products
@@ -117,9 +119,13 @@ export function NewProjectFlow({
     initialProducts.length === 0 || initialDesign !== null,
   );
   const [brand, setBrand] = useState(initialBrand);
+  // A single product is picked for the maker, except for a listing from
+  // Shops: it may be a product Kiln does not have yet, so the maker says.
   const [productId, setProductId] = useState<string | null>(
     initialProductId ??
-      (initialProducts.length === 1 ? initialProducts[0].id : null),
+      (initialProducts.length === 1 && !initialListingUrl
+        ? initialProducts[0].id
+        : null),
   );
   const [type, setType] = useState<BoardType | null>(
     initialListingUrl ? "listing-kit" : null,
@@ -349,7 +355,21 @@ export function NewProjectFlow({
       {/* 1 · Product */}
       <Step n={1} title="Product">
         <p className="-mt-2 font-sans text-[0.8125rem] text-on-surface-mid">
-          Pick a product, add a new one, or import your catalog.
+          {initialListingUrl && !productId ? (
+            <span data-testid="listing-product-ask">
+              Which product is{" "}
+              {initialListingTitle ? (
+                <strong className="text-foreground">
+                  “{initialListingTitle}”
+                </strong>
+              ) : (
+                "this listing"
+              )}
+              ? Pick it, or add it if Kiln does not have it yet.
+            </span>
+          ) : (
+            "Pick a product, add a new one, or import your catalog."
+          )}
         </p>
         {importOutcome ? (
           <ImportResultPanel

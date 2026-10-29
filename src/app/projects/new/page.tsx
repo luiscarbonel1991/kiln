@@ -15,19 +15,25 @@ import { listProducts } from "@/server/product-repository";
 // Start. Rendered per request (it reads the maker's products and defaults).
 // `?design=` hands over a stored design from the studio ("Make it a
 // product"): the new-product form opens with it. `?product=` (Home) picks a
-// product. `?listing=` (Shops) starts a Listing kit from that live listing.
+// product. `?listing=` (Shops) starts a Listing kit from that live listing,
+// with `?title=` its title, to ask which product it is.
 export default async function NewProjectPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   await connection();
-  const { design, product, listing } = await searchParams;
+  const { design, product, listing, title } = await searchParams;
   const listingUrl =
     typeof listing === "string" &&
     ListingUrl.safeParse(listing).success &&
     etsyListingId(listing)
       ? listing
+      : null;
+  // The listing's title from Shops, only to ask which product it is.
+  const listingTitle =
+    listingUrl && typeof title === "string" && title.trim() !== ""
+      ? title.trim().slice(0, 140)
       : null;
   const initialDesign =
     typeof design === "string" ? await describeStoredSvg(design) : null;
@@ -54,6 +60,7 @@ export default async function NewProjectPage({
             : null
         }
         initialListingUrl={listingUrl}
+        initialListingTitle={listingTitle}
       />
     </div>
   );

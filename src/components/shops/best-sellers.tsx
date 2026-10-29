@@ -271,7 +271,7 @@ function Row({ row, rank, by }: { row: BestSeller; rank: number; by: RankBy }) {
         ) : (
           <Button asChild size="sm" variant="outline">
             <Link
-              href={`/projects/new?listing=${encodeURIComponent(row.url)}`}
+              href={`/projects/new?listing=${encodeURIComponent(row.url)}&title=${encodeURIComponent(row.title)}`}
               data-testid={`best-seller-${row.listingId}-refresh`}
             >
               <ImagePlus /> Refresh photos
