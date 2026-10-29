@@ -108,6 +108,13 @@ export function isOutOfCredit(error: unknown): boolean {
 // Google answers a bad key with a 400, not a 401.
 const KEY_REJECTED = /API_KEY_INVALID|API key not valid/i;
 
+export function isKeyRejected(error: unknown): boolean {
+  const status = (error as { status?: unknown } | null)?.status;
+  return (
+    status === 401 || status === 403 || KEY_REJECTED.test(errorMessage(error))
+  );
+}
+
 // Google's SDK puts the whole JSON response in an error's message; what the
 // provider said is its error.message, read even from a body cut short.
 export function providerWords(text: string): string {
