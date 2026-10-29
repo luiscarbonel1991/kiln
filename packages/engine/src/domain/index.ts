@@ -52,6 +52,7 @@ export {
 } from "@/domain/generation-cost";
 export {
   buildGenerationRequest,
+  buildVersionRequest,
   GenerationRequest,
 } from "@/domain/generation-request";
 export {
@@ -204,6 +205,7 @@ export {
   slotState,
   unapproveSlot,
   type VideoSettings,
+  versionSource,
   videoSettings,
   withBrief,
   withFollowing,

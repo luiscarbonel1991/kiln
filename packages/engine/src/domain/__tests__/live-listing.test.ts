@@ -170,6 +170,7 @@ describe("the maker's own photo across the plan", () => {
       scene: 1,
       video: 0,
       photo: 3,
+      shared: 0,
       off: 0,
     });
     const delivered = withDelivered(

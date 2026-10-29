@@ -73,6 +73,53 @@ export function buildGenerationRequest(input: {
 
 export class VideoNeedsScene extends Error {}
 
+// A version of an approved scene at another aspect (ROADMAP "Scene vs
+// version"): the approved image is the reference, re-framed and never
+// cropped, so the product, the place and the light stay what the maker
+// approved; the scene is extended where the new frame needs room. A slot with
+// a text layer keeps calm space for it (a story's below the app's top bar).
+export function buildVersionRequest(input: {
+  product: Product;
+  // The approved scene this version re-frames.
+  sourceOutput: string;
+  aspect: string;
+  text: boolean;
+  model: ModelConfig;
+}): ImageGenerationRequest {
+  const u = productUnderstanding(input.product, { images: false });
+  const subject = u.subject.replaceAll("the master image", "the photograph");
+  const [w, h] = input.aspect.split(":").map(Number);
+  const shape =
+    w && h ? (w === h ? "square" : w < h ? "taller" : "wider") : "new";
+  const prompt = [
+    `Re-frame this photograph for a ${shape} ${input.aspect} frame: the same photograph, recomposed.`,
+    `The product: ${subject}; ${u.materials}.`,
+    "Keep the product exactly as it is in the photograph: its shape, proportions, every letter of its wording, its colours and finish, and keep it whole in the frame.",
+    "Keep the same place, light, props and styling; extend the scene naturally where the new frame needs more room. Never crop into the product.",
+    input.text
+      ? w && h && h / w >= 1.7
+        ? "Leave calm, clean space across the upper third, below the top edge, for a short headline."
+        : "Leave calm, clean space across the top for a short headline."
+      : "",
+    `Add no text, captions, logos, people or new objects.${u.avoid ? ` Never: ${u.avoid}.` : ""}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    kind: "image",
+    masterAssetUrl: input.sourceOutput,
+    prompt,
+    imageInputs: [],
+    negative: [
+      u.avoid,
+      "text, captions, logos, watermarks, people, cropped product",
+    ]
+      .filter(Boolean)
+      .join(", "),
+    model: { ...input.model, aspect: input.aspect },
+  };
+}
+
 // A video of the product from its spec, starting from an approved scene: the
 // product as the spec says it is (material, treatment with its relief, the
 // colour of its marks), the scene the frame shows, and locks the model must

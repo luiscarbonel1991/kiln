@@ -26,6 +26,7 @@ import {
   exactKindMatchesFill,
   type ShotList,
   ShotSlotFields,
+  versionMatchesFill,
 } from "@/domain/shot-list";
 import {
   snapSeconds,
@@ -73,7 +74,8 @@ export const PlanSlot = ShotSlotFields.extend({
   })
   .refine((s) => (s.fill === "photo") === (s.photo !== undefined), {
     message: "a photo slot carries its photo; no other slot does",
-  });
+  })
+  .refine(versionMatchesFill.check, { message: versionMatchesFill.message });
 export type PlanSlot = z.infer<typeof PlanSlot>;
 
 export const PlanDestination = z.object({
@@ -264,6 +266,10 @@ export function planProject(input: {
   const ids = [...new Set(input.destinationIds)];
   if (ids.length === 0) throw new Error("pick at least one destination");
   const allowed = destinationsFor(type, catalog.destinations);
+  // A Launch makes each scene once (ROADMAP "Scene vs version"): a later
+  // destination's scene with a role an earlier one already shows is that
+  // scene again — shared as it is at the same aspect, else re-framed.
+  const shown = new Map<string, { id: string; aspect?: string }>();
   return ProjectPlan.parse({
     destinations: ids.map((id) => {
       if (!allowed.some((d) => d.id === id)) {
@@ -271,10 +277,52 @@ export function planProject(input: {
       }
       const list = shotListFor(id, type, catalog.shotLists);
       if (!list) throw new Error(`no shot list for ${type} on "${id}"`);
+      // In the plan a version names its source's card, not a list key.
+      const listed = list.slots
+        .filter((s) => exactApplies(s, product))
+        .map((s) =>
+          s.versionOf ? { ...s, versionOf: slotCardId(id, s.versionOf) } : s,
+        );
+      const made = new Map<string, string>();
+      const slots = listed.map((s) => {
+        const from =
+          type === "launch" && s.role && !s.versionOf && s.fill === "scene"
+            ? shown.get(s.role)
+            : undefined;
+        if (!from) return s;
+        made.set(slotCardId(id, s.key), from.id);
+        const {
+          knobs: _k,
+          scene: _s,
+          composition: _c,
+          lighting: _l,
+          ...rest
+        } = s;
+        return {
+          ...rest,
+          versionOf: from.id,
+          ...(from.aspect === s.aspect ? { fill: "shared" as const } : {}),
+        };
+      });
+      for (const s of listed) {
+        if (
+          s.role &&
+          s.fill === "scene" &&
+          !s.versionOf &&
+          !shown.has(s.role)
+        ) {
+          shown.set(s.role, { id: slotCardId(id, s.key), aspect: s.aspect });
+        }
+      }
       return {
         destinationId: id,
         shotListId: list.id,
-        slots: list.slots.filter((s) => exactApplies(s, product)),
+        // A version of a slot that is now another's re-frames that one.
+        slots: slots.map((s) =>
+          s.versionOf && made.has(s.versionOf)
+            ? { ...s, versionOf: made.get(s.versionOf) }
+            : s,
+        ),
       };
     }),
   });
@@ -565,6 +613,14 @@ export function slotState(
   if (slot.fill === "photo") {
     return { state: slot.deliveredAt ? "delivered" : "kept", failed: false };
   }
+  // A shared frame follows its source: ready once that scene is approved.
+  if (slot.fill === "shared") {
+    if (!slot.approvedOutput) return { state: "queued", failed: false };
+    return {
+      state: slot.deliveredAt ? "delivered" : "approved",
+      failed: false,
+    };
+  }
   if (job?.status === "running") {
     return {
       state: job.attempt >= 2 ? "retrying" : "generating",
@@ -610,25 +666,67 @@ export function approveSlot(
   ref: SlotRef,
   card: CardLike | undefined,
 ): ProjectPlan {
-  return updateSlot(plan, ref, (slot) => {
+  const output = card?.outputs[0];
+  const approved = updateSlot(plan, ref, (slot) => {
     if (slot.fill === "exact") throw new Error("exact slots need no approval");
     if (slot.fill === "photo")
       throw new Error("your own photo needs no approval");
-    const output = card?.outputs[0];
+    if (slot.fill === "shared") {
+      throw new Error("a shared frame follows the scene it repeats");
+    }
     if (card?.status !== "done" || !output) {
       throw new Error("nothing to approve: the slot has no finished output");
     }
     const { deliveredAt: _d, ...rest } = slot;
     return { ...rest, approvedOutput: output };
   });
+  return withShared(approved, ref, output);
 }
 
 export function unapproveSlot(plan: ProjectPlan, ref: SlotRef): ProjectPlan {
-  return updateSlot(
-    plan,
+  return withShared(
+    updateSlot(
+      plan,
+      ref,
+      ({ approvedOutput: _a, deliveredAt: _d, ...slot }) => slot,
+    ),
     ref,
-    ({ approvedOutput: _a, deliveredAt: _d, ...slot }) => slot,
+    undefined,
   );
+}
+
+// The shared frames of a scene carry its approval: the same output, or none
+// once it is withdrawn (either way not delivered yet).
+function withShared(
+  plan: ProjectPlan,
+  ref: SlotRef,
+  output: string | undefined,
+): ProjectPlan {
+  const source = slotCardId(ref.destinationId, ref.slotKey);
+  return {
+    ...plan,
+    destinations: plan.destinations.map((d) => ({
+      ...d,
+      slots: d.slots.map((s) => {
+        if (s.fill !== "shared" || s.versionOf !== source) return s;
+        const { approvedOutput: _a, deliveredAt: _d, ...rest } = s;
+        return output ? { ...rest, approvedOutput: output } : rest;
+      }),
+    })),
+  };
+}
+
+// The slot a version re-frames or a shared frame repeats, with where it is.
+export function versionSource(
+  plan: ProjectPlan,
+  slot: Pick<PlanSlot, "versionOf">,
+): { destinationId: string; slot: PlanSlot } | null {
+  const ref = slot.versionOf ? parseSlotCardId(slot.versionOf) : null;
+  if (!ref) return null;
+  const source = plan.destinations
+    .find((d) => d.destinationId === ref.destinationId)
+    ?.slots.find((s) => s.key === ref.slotKey);
+  return source ? { destinationId: ref.destinationId, slot: source } : null;
 }
 
 export const SlotMove = z.enum(["first", "earlier", "later"]);
@@ -936,6 +1034,7 @@ export function planCounts(plan: ProjectPlan): {
   scene: number;
   video: number;
   photo: number;
+  shared: number;
   off: number;
 } {
   const slots = plan.destinations.flatMap((d) => d.slots);
@@ -947,6 +1046,7 @@ export function planCounts(plan: ProjectPlan): {
     scene: count("scene"),
     video: count("video"),
     photo: count("photo"),
+    shared: count("shared"),
     off: slots.length - on.length,
   };
 }

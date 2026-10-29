@@ -126,6 +126,7 @@ export const SEED_SHOT_LISTS: ShotList[] = [
       },
       {
         key: "in-use",
+        role: "in-use",
         label: "In-use mockup",
         purpose:
           "Show it where the customer actually uses it, product still the hero.",
@@ -195,6 +196,7 @@ export const SEED_SHOT_LISTS: ShotList[] = [
       },
       {
         key: "detail",
+        role: "detail",
         label: "Material detail",
         purpose:
           "Macro on texture and finish to prove craft and justify the price.",
@@ -342,6 +344,7 @@ export const SEED_SHOT_LISTS: ShotList[] = [
       },
       {
         key: "in-place",
+        role: "in-use",
         label: "Product in place",
         purpose: "Show it where it lives, product still the hero.",
         aspect: "4:5",
@@ -351,6 +354,7 @@ export const SEED_SHOT_LISTS: ShotList[] = [
       },
       {
         key: "detail",
+        role: "detail",
         label: "Detail",
         purpose: "A close look at the finish that proves the craft.",
         aspect: "4:5",
@@ -383,6 +387,26 @@ export const SEED_SHOT_LISTS: ShotList[] = [
         fill: "exact",
         exact: "text-card",
         textTemplate: "{product.cta}",
+      },
+      // The same campaign in the other sizes Instagram shows: each one the
+      // approved scene re-framed (never cropped), posted on its own.
+      {
+        key: "story",
+        label: "Story",
+        purpose:
+          "The hook as a full-screen story, its headline below the top bar.",
+        aspect: "9:16",
+        versionOf: "hook",
+        textTemplate: "{product.hook}",
+        standalone: true,
+      },
+      {
+        key: "post",
+        label: "Square post",
+        purpose: "The product in place as a single square post for the feed.",
+        aspect: "1:1",
+        versionOf: "in-place",
+        standalone: true,
       },
     ],
   },

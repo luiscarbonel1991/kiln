@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { buildCards } from "@/domain/cards";
 import { assemblePrompt, buildPlanningContext } from "@/domain/cascade";
-import { buildGenerationRequest } from "@/domain/generation-request";
+import {
+  buildGenerationRequest,
+  buildVersionRequest,
+} from "@/domain/generation-request";
 import type { MasterAsset } from "@/domain/master-asset";
 import { SEED_BRAND, SEED_RECIPE } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
+import { CUTTING_BOARD } from "./fixtures/cutting-board";
 
 const master: MasterAsset = {
   id: "m",
@@ -77,5 +81,47 @@ describe("buildGenerationRequest", () => {
       provider: "google",
       model: "gemini-3.1-flash-image",
     });
+  });
+});
+
+describe("buildVersionRequest", () => {
+  const model = {
+    provider: "openai" as const,
+    model: "gpt-image-2",
+    aspect: "4:5",
+    guidance: 7.5,
+    strength: 0.65,
+  };
+
+  it("re-frames the approved scene at the version's aspect, never cropping the product", () => {
+    const request = buildVersionRequest({
+      product: CUTTING_BOARD,
+      sourceOutput: "https://storage.test/cards/hook.png",
+      aspect: "9:16",
+      text: true,
+      model,
+    });
+    expect(request.masterAssetUrl).toBe("https://storage.test/cards/hook.png");
+    expect(request.model).toMatchObject({
+      model: "gpt-image-2",
+      aspect: "9:16",
+    });
+    expect(request.imageInputs).toEqual([]);
+    expect(request.prompt).toContain("taller 9:16 frame");
+    expect(request.prompt).toContain("Never crop into the product");
+    expect(request.prompt).toContain("upper third");
+    expect(request.negative).toContain("cropped product");
+  });
+
+  it("asks for headline space only when the slot has a text layer", () => {
+    const square = buildVersionRequest({
+      product: CUTTING_BOARD,
+      sourceOutput: "https://storage.test/cards/in-use.png",
+      aspect: "1:1",
+      text: false,
+      model,
+    });
+    expect(square.prompt).toContain("square 1:1 frame");
+    expect(square.prompt).not.toContain("headline");
   });
 });

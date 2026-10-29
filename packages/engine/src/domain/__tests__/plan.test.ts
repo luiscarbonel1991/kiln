@@ -21,6 +21,7 @@ import {
   slotRecipeId,
   slotState,
   unapproveSlot,
+  versionSource,
   videoSettings,
   withBrief,
   withDelivered,
@@ -119,6 +120,7 @@ describe("planProject", () => {
       scene: 2,
       video: 0,
       photo: 0,
+      shared: 0,
       off: 0,
     });
   });
@@ -513,6 +515,7 @@ describe("switching slots off", () => {
       scene: 1,
       video: 0,
       photo: 0,
+      shared: 0,
       off: 1,
     });
     expect(sceneCardIds(plan)).toEqual(["social.hook"]);
@@ -706,6 +709,85 @@ describe("photo order", () => {
     expect(() => moveSlot(launch(), ref("nope"), "first")).toThrow(
       'no slot "nope"',
     );
+  });
+});
+
+describe("versions and shared frames", () => {
+  const seeds = {
+    destinations: SEED_DESTINATIONS,
+    shotLists: SEED_SHOT_LISTS,
+  };
+  const plan = (type: "content" | "launch", ids: string[]) =>
+    planProject({
+      product: CUTTING_BOARD,
+      type,
+      destinationIds: ids,
+      catalog: seeds,
+    });
+  const slotOf = (p: ReturnType<typeof plan>, id: string, key: string) =>
+    p.destinations
+      .find((d) => d.destinationId === id)
+      ?.slots.find((s) => s.key === key);
+  const take = { status: "done" as const, outputs: ["https://x/in-use.png"] };
+
+  it("a content plan re-frames its own slides for the story and the post", () => {
+    const content = plan("content", ["instagram"]);
+    expect(slotOf(content, "instagram", "story")).toMatchObject({
+      fill: "scene",
+      aspect: "9:16",
+      versionOf: "instagram.hook",
+      standalone: true,
+    });
+    expect(slotOf(content, "instagram", "post")).toMatchObject({
+      fill: "scene",
+      versionOf: "instagram.in-place",
+    });
+    // The versions are generated (they cost), but direct nothing of their own.
+    expect(generableCardIds(content)).toContain("instagram.story");
+  });
+
+  it("a Launch makes each scene once: the same shot is shared, another size re-frames it", () => {
+    const launch = plan("launch", ["etsy", "instagram"]);
+    // Etsy's in-use and detail are 4:5 like the slides: shared, free.
+    for (const [key, source] of [
+      ["in-place", "etsy.in-use"],
+      ["detail", "etsy.detail"],
+    ]) {
+      const slot = slotOf(launch, "instagram", key);
+      expect(slot).toMatchObject({ fill: "shared", versionOf: source });
+      expect(slot?.knobs).toBeUndefined();
+      expect(slot?.scene).toBeUndefined();
+    }
+    // The square post re-frames Etsy's in-use, not the shared slide.
+    expect(slotOf(launch, "instagram", "post")).toMatchObject({
+      fill: "scene",
+      versionOf: "etsy.in-use",
+    });
+    // The hook has no twin on Etsy: its own scene.
+    expect(slotOf(launch, "instagram", "hook")?.versionOf).toBeUndefined();
+    expect(generableCardIds(launch)).not.toContain("instagram.in-place");
+    expect(planCounts(launch).shared).toBe(2);
+  });
+
+  it("a shared frame carries its scene's approval, and is never approved alone", () => {
+    const launch = plan("launch", ["etsy", "instagram"]);
+    const inUse = { destinationId: "etsy", slotKey: "in-use" };
+    const approved = approveSlot(launch, inUse, take);
+    const shared = slotOf(approved, "instagram", "in-place");
+    expect(shared?.approvedOutput).toBe("https://x/in-use.png");
+    expect(shared && slotState(shared).state).toBe("approved");
+    expect(versionSource(approved, shared ?? {})?.slot.key).toBe("in-use");
+    expect(() =>
+      approveSlot(
+        approved,
+        { destinationId: "instagram", slotKey: "in-place" },
+        take,
+      ),
+    ).toThrow("follows the scene it repeats");
+    const withdrawn = unapproveSlot(approved, inUse);
+    const after = slotOf(withdrawn, "instagram", "in-place");
+    expect(after?.approvedOutput).toBeUndefined();
+    expect(after && slotState(after).state).toBe("queued");
   });
 });
 

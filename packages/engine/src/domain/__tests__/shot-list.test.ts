@@ -137,9 +137,10 @@ describe("board seeds", () => {
     ]);
   });
 
-  it("the Instagram carousel is a fixed six-slide sequence at 4:5", () => {
+  it("the Instagram carousel is a fixed six-slide sequence at 4:5, with a story and a post apart", () => {
     const carousel = SEED_SHOT_LISTS.find((l) => l.id === "instagram-carousel");
-    expect(carousel?.slots.map((s) => s.key)).toEqual([
+    const slides = carousel?.slots.filter((s) => !s.standalone) ?? [];
+    expect(slides.map((s) => s.key)).toEqual([
       "hook",
       "in-place",
       "detail",
@@ -147,6 +148,39 @@ describe("board seeds", () => {
       "personalize",
       "cta",
     ]);
-    expect(carousel?.slots.every((s) => s.aspect === "4:5")).toBe(true);
+    expect(slides.every((s) => s.aspect === "4:5")).toBe(true);
+    // The other sizes re-frame an approved slide, posted on their own.
+    expect(
+      carousel?.slots
+        .filter((s) => s.standalone)
+        .map((s) => [s.key, s.aspect, s.versionOf]),
+    ).toEqual([
+      ["story", "9:16", "hook"],
+      ["post", "1:1", "in-place"],
+    ]);
+  });
+
+  it("a version re-frames a scene of its list at another aspect, with no knobs", () => {
+    const list = (slots: unknown[]) =>
+      ShotList.safeParse({
+        id: "l",
+        name: "L",
+        destinationId: "d",
+        slots: [
+          { key: "hook", label: "Hook", purpose: "p", aspect: "4:5" },
+          ...slots,
+        ],
+      }).success;
+    const story = { key: "story", label: "S", purpose: "p", aspect: "9:16" };
+    expect(list([{ ...story, versionOf: "hook" }])).toBe(true);
+    expect(list([{ ...story, versionOf: "nope" }])).toBe(false);
+    expect(list([{ ...story, aspect: "4:5", versionOf: "hook" }])).toBe(false);
+    expect(list([{ ...story, fill: "shared", versionOf: "hook" }])).toBe(false);
+    expect(
+      list([
+        { ...story, versionOf: "hook" },
+        { ...story, key: "chain", aspect: "1:1", versionOf: "story" },
+      ]),
+    ).toBe(false);
   });
 });
