@@ -1,9 +1,9 @@
 "use server";
 
 import { z } from "zod";
-import { defaultTextModel, ProviderId } from "@/domain/model-defaults";
+import { ProviderId } from "@/domain/model-defaults";
+import type { RanOn } from "@/domain/model-routing";
 import type { BaseUnderstanding } from "@/domain/understanding";
-import { getMakerModels } from "@/server/maker-repository";
 import { type Degraded, readProduct } from "@/server/text-calls";
 
 const AnalyzeInput = z.object({
@@ -16,15 +16,16 @@ const AnalyzeInput = z.object({
 
 // Server Function: the only client path into @/providers for vision. The Zod
 // guard is the trust boundary (Server Functions are POST-reachable). Runs on
-// the maker's text model unless another is named; a failure comes back as the
-// neutral understanding with why it degraded and the other provider to offer.
+// the deep route unless a model is named; a failure comes back as the neutral
+// understanding with why it degraded and the other provider to offer.
 export async function analyzeMaster(input: {
   assetUrl: string;
   model?: { provider: ProviderId; model: string };
-}): Promise<{ understanding: BaseUnderstanding; degraded?: Degraded }> {
+}): Promise<{
+  understanding: BaseUnderstanding;
+  degraded?: Degraded;
+  ranOn?: RanOn;
+}> {
   const safe = AnalyzeInput.parse(input);
-  return readProduct(
-    safe.assetUrl,
-    safe.model ?? defaultTextModel(await getMakerModels()),
-  );
+  return readProduct(safe.assetUrl, safe.model);
 }

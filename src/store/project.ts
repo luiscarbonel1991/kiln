@@ -16,6 +16,7 @@ import {
   defaultVideoModel,
   type MakerModels,
 } from "@/domain/model-defaults";
+import type { RanOn } from "@/domain/model-routing";
 import type {
   PersistedProject,
   PersistedProjectRecord,
@@ -71,7 +72,9 @@ interface ProjectState {
   goToPlanning: () => void;
   selectRecipe: (recipeId: string) => void;
   editPlanningField: (key: FieldKey, value: string) => void;
-  generateVariants: (variants?: VariantDirection[]) => void;
+  // Set when the scenes were directed by a model further down the text route.
+  directedBy: RanOn | null;
+  generateVariants: (variants?: VariantDirection[], directedBy?: RanOn) => void;
   applyCardResult: (id: string, url: string) => void;
   applyVector: (id: string, url: string) => void;
   markCardError: (id: string) => void;
@@ -98,6 +101,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   recipeId: null,
   planning: null,
   cards: null,
+  directedBy: null,
   projectId: null,
   jobs: {},
   lastEnqueueAt: 0,
@@ -113,6 +117,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       recipeId: null,
       planning: null,
       cards: null,
+      directedBy: null,
     }),
   setUnderstanding: (understanding) => set({ understanding }),
   editUnderstandingField: (key, value) =>
@@ -130,6 +135,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       recipeId: recipe.id,
       planning: buildPlanningContext(understanding, recipe, SEED_BRAND),
       cards: null,
+      directedBy: null,
     });
   },
   selectRecipe: (recipeId) => {
@@ -140,6 +146,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       recipeId,
       planning: buildPlanningContext(understanding, recipe, SEED_BRAND),
       cards: null,
+      directedBy: null,
     });
   },
   editPlanningField: (key, value) => {
@@ -155,7 +162,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   // Build the variant cards from the planning context + recipe directions. Cards
   // start in "draft" — generation is manual (a per-card Generate button), so
   // nothing hits the providers until the user asks for it (cost control).
-  generateVariants: (variants) => {
+  generateVariants: (variants, directedBy) => {
     const { understanding, master, recipeId, planning, makerModels } = get();
     if (!understanding || !master || !recipeId || !planning) return;
     const recipe = findRecipe(recipeId);
@@ -173,7 +180,7 @@ export const useProject = create<ProjectState>((set, get) => ({
         status: "draft",
       }),
     );
-    set({ phase: "generation", cards });
+    set({ phase: "generation", cards, directedBy: directedBy ?? null });
   },
   applyCardResult: (id, url) => {
     const cards = get().cards;
@@ -383,6 +390,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       projectId: record.id,
       jobs: {},
       lastEnqueueAt: 0,
+      directedBy: null,
       phase: record.phase,
       master: record.master,
       understanding: record.understanding,
@@ -412,6 +420,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       recipeId: null,
       planning: null,
       cards: null,
+      directedBy: null,
       projectId: null,
       jobs: {},
       lastEnqueueAt: 0,

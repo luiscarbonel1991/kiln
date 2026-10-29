@@ -119,7 +119,7 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
         return;
       }
       setDegraded(null);
-      generateVariants(result.variants);
+      generateVariants(result.variants, result.ranOn);
     } catch {
       generateVariants();
     } finally {

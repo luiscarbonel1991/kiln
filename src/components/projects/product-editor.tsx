@@ -32,10 +32,14 @@ import {
   type WordingRow,
   WordingRows,
 } from "@/components/projects/wording-rows";
-import { DegradedNotice } from "@/components/studio/degraded-notice";
+import {
+  DegradedNotice,
+  RanOnNotice,
+} from "@/components/studio/degraded-notice";
 import { Button } from "@/components/ui/button";
 import { FilePick } from "@/components/ui/file-pick";
 import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
+import type { RanOn } from "@/domain/model-routing";
 import {
   type Product,
   Treatment,
@@ -250,6 +254,7 @@ export function ProductEditor({
   // After the first Save, each field shows its problem as it is fixed.
   const [attempted, setAttempted] = useState(false);
   const [degraded, setDegraded] = useState<Degraded | null>(null);
+  const [ranOn, setRanOn] = useState<RanOn | null>(null);
   const [uploading, startUpload] = useTransition();
   const [drafting, startDraft] = useTransition();
   const [saving, startSave] = useTransition();
@@ -261,6 +266,7 @@ export function ProductEditor({
     (CleanReview & { model: string }) | null
   >(null);
   const [reviewDegraded, setReviewDegraded] = useState<Degraded | null>(null);
+  const [reviewRanOn, setReviewRanOn] = useState<RanOn | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewing, startReview] = useTransition();
   const busy = uploading || drafting || saving || reviewing;
@@ -349,6 +355,7 @@ export function ProductEditor({
       const result = await draftProductAction({ assetUrl: file.url, model });
       if (result.error) setError(result.error);
       setDegraded(result.degraded ?? null);
+      setRanOn(result.ranOn ?? null);
       const draft = result.draft;
       if (!draft) return;
       setName(draft.name);
@@ -449,6 +456,7 @@ export function ProductEditor({
       });
       if (result.error) setReviewError(result.error);
       setReviewDegraded(result.degraded ?? null);
+      setReviewRanOn(result.ranOn ?? null);
       if (!result.review) return;
       setReview(result.review);
       requestAnimationFrame(() =>
@@ -701,6 +709,9 @@ export function ProductEditor({
         ) : null}
       </div>
 
+      {ranOn && !degraded ? (
+        <RanOnNotice ranOn={ranOn} testId="product-fill-ran-on" />
+      ) : null}
       {degraded ? (
         <DegradedNotice
           degraded={degraded}
@@ -1162,6 +1173,9 @@ export function ProductEditor({
         }
       />
 
+      {reviewRanOn && !reviewDegraded ? (
+        <RanOnNotice ranOn={reviewRanOn} testId="product-review-ran-on" />
+      ) : null}
       {reviewDegraded ? (
         <DegradedNotice
           degraded={reviewDegraded}

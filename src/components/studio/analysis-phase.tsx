@@ -3,11 +3,15 @@
 import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { analyzeMaster } from "@/app/actions/analyze";
-import { DegradedNotice } from "@/components/studio/degraded-notice";
+import {
+  DegradedNotice,
+  RanOnNotice,
+} from "@/components/studio/degraded-notice";
 import { MasterPreview } from "@/components/studio/master-preview";
 import { PaletteSwatches } from "@/components/studio/palette-swatches";
 import { ProvenanceBadge } from "@/components/studio/provenance-badge";
 import type { MasterAsset } from "@/domain/master-asset";
+import type { RanOn } from "@/domain/model-routing";
 import type { BaseUnderstanding } from "@/domain/understanding";
 import { cn } from "@/lib/utils";
 import type { Degraded } from "@/server/text-calls";
@@ -37,6 +41,8 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
   // Set when no model could read the photo: the neutral understanding is shown
   // and the other provider offered.
   const [degraded, setDegraded] = useState<Degraded | null>(null);
+  // Set when the read moved down its route: which model answered.
+  const [ranOn, setRanOn] = useState<RanOn | null>(null);
   const [asking, setAsking] = useState(false);
 
   const askOther = (model: {
@@ -48,6 +54,7 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
       .then((result) => {
         setUnderstanding(result.understanding);
         setDegraded(result.degraded ?? null);
+        setRanOn(result.ranOn ?? null);
       })
       .catch(() => setError(true))
       .finally(() => setAsking(false));
@@ -65,6 +72,7 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
         if (!active) return;
         setUnderstanding(result.understanding);
         setDegraded(result.degraded ?? null);
+        setRanOn(result.ranOn ?? null);
       })
       .catch(() => {
         if (active) setError(true);
@@ -106,6 +114,10 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
           <span className="font-semibold text-prov-image">image-sourced</span>{" "}
           context and travels through the rest of the flow.
         </p>
+
+        {ranOn && !degraded && !error ? (
+          <RanOnNotice ranOn={ranOn} testId="vision-ran-on" />
+        ) : null}
 
         {degraded && !error ? (
           <DegradedNotice

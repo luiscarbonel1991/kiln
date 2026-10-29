@@ -9,9 +9,19 @@ import type { ListingText } from "@/domain/listing";
 import {
   assertModel,
   catalogFor,
+  DEFAULT_MAKER_MODELS,
   modelLabel,
   type ProviderId,
 } from "@/domain/model-defaults";
+import {
+  fallbackAfter,
+  pickNext,
+  type RanOn,
+  type RouteEntry,
+  roleRoute,
+  routeCandidates,
+  TEXT_CALL_ROLES,
+} from "@/domain/model-routing";
 import type { Product } from "@/domain/product";
 import { describeProviderError, errorMessage } from "@/domain/queue";
 import type { Recipe } from "@/domain/recipe";
@@ -21,7 +31,10 @@ import {
   neutralUnderstanding,
 } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
+import type { TextResult } from "@/providers/interfaces";
+import { hasProviderKey } from "@/providers/keys";
 import { fallbackVariants } from "@/providers/mock/art-director";
+import { providerMode } from "@/providers/mode";
 import { getArtDirector, getVisionProvider } from "@/providers/registry";
 import type {
   ListingCopy,
@@ -30,12 +43,16 @@ import type {
   ReviewField,
 } from "@/providers/text-prompts";
 import { textCall, withDirectSpend } from "@/server/direct-spend";
+import { getMakerModelSetup } from "@/server/maker-repository";
 
-// Vision and the art director on the maker's text model, under the monthly cap
-// like every paid call. When a call fails the flow is never blocked and never
-// silently switched: the answer says it degraded (the neutral understanding,
-// the recipe's own directions), why, and which other provider the maker may
-// ask instead, with its price.
+// Vision, the art director and the product and listing text, on their role's
+// route (TEXT_CALL_ROLES), under the monthly cap like every paid call. A
+// failure another model can fix moves down the route the maker saved, each
+// attempt reserved and recorded on its own; the answer then says which model
+// answered and why (`ranOn`). When the route fails, the flow is never blocked:
+// the answer says it degraded (the neutral understanding, the recipe's own
+// directions), why, and which other provider the maker may ask instead, with
+// its price — only on a click. A model the maker asks for by name runs alone.
 
 export interface TextModel {
   provider: ProviderId;
@@ -48,7 +65,7 @@ export interface Degraded {
   label: string;
   message: string;
   // The other provider's text model, to offer (never run on its own); null
-  // when switching would not help (the month's cap).
+  // when switching would not help (the month's cap) or it was tried.
   alternative: (TextModel & { label: string; usd: number | null }) | null;
 }
 
@@ -56,9 +73,12 @@ function degraded(
   model: TextModel,
   kind: TextCallKind,
   error: unknown,
+  tried: readonly TextModel[],
 ): Degraded {
   const cap = (error as { reason?: unknown } | null)?.reason === "cap";
-  const other = catalogFor("text").find((m) => m.provider !== model.provider);
+  const other = catalogFor("text").find(
+    (m) => !tried.some((t) => t.provider === m.provider),
+  );
   return {
     ...model,
     label: modelLabel(model),
@@ -78,26 +98,147 @@ function degraded(
   };
 }
 
+class RouteFailed extends Error {
+  constructor(
+    readonly last: TextModel,
+    readonly tried: TextModel[],
+    readonly cause: unknown,
+  ) {
+    super(errorMessage(cause));
+    this.name = "RouteFailed";
+  }
+}
+
+// The models a call may run on: the one asked for by name alone, else its
+// role's route (the default text model alone until the maker saves routes).
+async function textCandidates(
+  kind: TextCallKind,
+  asked?: TextModel,
+): Promise<RouteEntry[]> {
+  if (asked) return [{ provider: asked.provider, model: asked.model }];
+  const { models, routes } = await getMakerModelSetup();
+  const route = roleRoute(routes, TEXT_CALL_ROLES[kind]);
+  return routeCandidates(route, route?.models[0] ?? models.text);
+}
+
+const runnable = (kind: TextCallKind) => (entry: RouteEntry) =>
+  textEstimate(entry, TEXT_CALL_BUDGETS[kind]) !== null &&
+  (providerMode() === "mock" || hasProviderKey(entry.provider));
+
+// Run one text call along its candidates. Each attempt is its own direct call
+// against the cap (reserved first, its row naming its model and the move that
+// led to it); a failure moves on only as fallbackAfter allows.
+async function runText<T>(
+  kind: TextCallKind,
+  asked: TextModel | undefined,
+  call: (
+    model: TextModel,
+    beforeCall: () => Promise<void>,
+  ) => Promise<TextResult<T>>,
+  projectId?: string,
+): Promise<{ value: T; label: string; ranOn?: RanOn }> {
+  const candidates = await textCandidates(kind, asked);
+  let [current] = candidates;
+  let rest = candidates.slice(1);
+  const tried: TextModel[] = [];
+  let first: { from: TextModel; reason: string } | undefined;
+  let move: { from: RouteEntry; reason: string } | undefined;
+  for (;;) {
+    tried.push(current);
+    let callStarted = false;
+    const model = current;
+    try {
+      assertModel(model, "text");
+      const result = await withDirectSpend(
+        {
+          ...textCall<T>(model, kind),
+          ...(projectId ? { projectId } : {}),
+          ...(move
+            ? {
+                route: {
+                  next: [],
+                  switched: [
+                    {
+                      from: move.from,
+                      to: model,
+                      reason: move.reason,
+                      at: new Date().toISOString(),
+                    },
+                  ],
+                },
+              }
+            : {}),
+        },
+        (beforeCall) =>
+          call(model, async () => {
+            await beforeCall();
+            callStarted = true;
+          }),
+      );
+      return {
+        value: result.value,
+        label: modelLabel(model),
+        ...(first
+          ? {
+              ranOn: {
+                label: modelLabel(model),
+                from: modelLabel(first.from),
+                reason: first.reason,
+              },
+            }
+          : {}),
+      };
+    } catch (error) {
+      const failure = fallbackAfter(model.provider, error, { callStarted });
+      const picked = pickNext(rest, model, failure, runnable(kind));
+      if (!picked) throw new RouteFailed(model, tried, error);
+      console.warn(
+        `[kiln] ${kind} moved from ${model.model} to ${picked.entry.model}: ${failure.reason}`,
+      );
+      first ??= { from: model, reason: failure.reason };
+      move = { from: model, reason: failure.reason };
+      current = picked.entry;
+      rest = picked.rest;
+    }
+  }
+}
+
+function routeDegraded(
+  error: unknown,
+  kind: TextCallKind,
+  asked: TextModel | undefined,
+): Degraded {
+  if (error instanceof RouteFailed) {
+    return degraded(error.last, kind, error.cause, error.tried);
+  }
+  const model = asked ?? DEFAULT_MAKER_MODELS.text;
+  return degraded(model, kind, error, [model]);
+}
+
 export async function readProduct(
   assetUrl: string,
-  model: TextModel,
-): Promise<{ understanding: BaseUnderstanding; degraded?: Degraded }> {
+  model?: TextModel,
+): Promise<{
+  understanding: BaseUnderstanding;
+  degraded?: Degraded;
+  ranOn?: RanOn;
+}> {
   try {
-    assertModel(model, "text");
-    const result = await withDirectSpend(
-      textCall<BaseUnderstanding>(model, "vision"),
-      (beforeCall) =>
-        getVisionProvider(model.provider).analyze(
+    const { value, ranOn } = await runText<BaseUnderstanding>(
+      "vision",
+      model,
+      (m, beforeCall) =>
+        getVisionProvider(m.provider).analyze(
           { assetUrl },
-          { model: model.model, beforeCall },
+          { model: m.model, beforeCall },
         ),
     );
-    return { understanding: result.value };
+    return { understanding: value, ...(ranOn ? { ranOn } : {}) };
   } catch (error) {
     console.warn("[kiln] vision degraded:", errorMessage(error));
     return {
       understanding: neutralUnderstanding(SEED_BRAND.palette),
-      degraded: degraded(model, "vision", error),
+      degraded: routeDegraded(error, "vision", model),
     };
   }
 }
@@ -109,24 +250,28 @@ export async function directScenes(
     brand: BrandProfile;
     n: number;
   },
-  model: TextModel,
-): Promise<{ variants: VariantDirection[]; degraded?: Degraded }> {
+  model?: TextModel,
+): Promise<{
+  variants: VariantDirection[];
+  degraded?: Degraded;
+  ranOn?: RanOn;
+}> {
   try {
-    assertModel(model, "text");
-    const result = await withDirectSpend(
-      textCall<VariantDirection[]>(model, "artDirection"),
-      (beforeCall) =>
-        getArtDirector(model.provider).proposeDirections(input, {
-          model: model.model,
+    const { value, ranOn } = await runText<VariantDirection[]>(
+      "artDirection",
+      model,
+      (m, beforeCall) =>
+        getArtDirector(m.provider).proposeDirections(input, {
+          model: m.model,
           beforeCall,
         }),
     );
-    return { variants: result.value };
+    return { variants: value, ...(ranOn ? { ranOn } : {}) };
   } catch (error) {
     console.warn("[kiln] art direction degraded:", errorMessage(error));
     return {
       variants: fallbackVariants(input.recipe, input.understanding, input.n),
-      degraded: degraded(model, "artDirection", error),
+      degraded: routeDegraded(error, "artDirection", model),
     };
   }
 }
@@ -136,19 +281,18 @@ export async function directScenes(
 // form stays as it was and the answer says why.
 export async function draftProduct(
   assetUrl: string,
-  model: TextModel,
-): Promise<{ draft?: ProductDraft; degraded?: Degraded }> {
+  model?: TextModel,
+): Promise<{ draft?: ProductDraft; degraded?: Degraded; ranOn?: RanOn }> {
   try {
-    assertModel(model, "text");
-    const result = await withDirectSpend(
-      textCall<ProductDraft>(model, "productDraft"),
-      (beforeCall) =>
-        getVisionProvider(model.provider).draftProduct(
+    const { value: draft, ranOn } = await runText<ProductDraft>(
+      "productDraft",
+      model,
+      (m, beforeCall) =>
+        getVisionProvider(m.provider).draftProduct(
           { assetUrl },
-          { model: model.model, beforeCall },
+          { model: m.model, beforeCall },
         ),
     );
-    const draft = result.value;
     return {
       draft: {
         ...draft,
@@ -157,18 +301,19 @@ export async function draftProduct(
           .slice(0, 4),
         wording: draft.wording.slice(0, 3),
       },
+      ...(ranOn ? { ranOn } : {}),
     };
   } catch (error) {
     console.warn("[kiln] product draft degraded:", errorMessage(error));
-    return { degraded: degraded(model, "productDraft", error) };
+    return { degraded: routeDegraded(error, "productDraft", model) };
   }
 }
 
-// A listing's prose written by the maker's text model (the board's "Write it
-// with the text model"), under the cap. Tags come back trimmed, blanks
-// dropped; nothing is cut to fit — the board checks the answer against the
-// channel's rules and shows what to fix. On failure the listing stays as it
-// was and the answer says why.
+// A listing's prose written by the text model (the board's "Write it with the
+// text model"), under the cap. Tags come back trimmed, blanks dropped; nothing
+// is cut to fit — the board checks the answer against the channel's rules and
+// shows what to fix. On failure the listing stays as it was and the answer
+// says why.
 export async function writeListing(
   input: {
     channel: string;
@@ -176,56 +321,81 @@ export async function writeListing(
     rules: DestinationText;
     draft: ListingText;
   },
-  model: TextModel,
+  model?: TextModel,
   // The project the listing is for: the call's cost counts there.
   projectId?: string,
-): Promise<{ copy?: ListingCopy; degraded?: Degraded }> {
+): Promise<{ copy?: ListingCopy; degraded?: Degraded; ranOn?: RanOn }> {
   try {
-    assertModel(model, "text");
-    const result = await withDirectSpend(
-      { ...textCall<ListingCopy>(model, "listingCopy"), projectId },
-      (beforeCall) =>
-        getArtDirector(model.provider).writeListing(input, {
-          model: model.model,
+    const { value, ranOn } = await runText<ListingCopy>(
+      "listingCopy",
+      model,
+      (m, beforeCall) =>
+        getArtDirector(m.provider).writeListing(input, {
+          model: m.model,
           beforeCall,
         }),
+      projectId,
     );
     const clean = (list: string[]) => list.map((x) => x.trim()).filter(Boolean);
     return {
       copy: {
-        title: result.value.title.trim(),
-        description: result.value.description.trim(),
-        tags: clean(result.value.tags),
-        materials: clean(result.value.materials),
+        title: value.title.trim(),
+        description: value.description.trim(),
+        tags: clean(value.tags),
+        materials: clean(value.materials),
       },
+      ...(ranOn ? { ranOn } : {}),
     };
   } catch (error) {
     console.warn("[kiln] listing copy degraded:", errorMessage(error));
-    return { degraded: degraded(model, "listingCopy", error) };
+    return { degraded: routeDegraded(error, "listingCopy", model) };
   }
 }
 
 // The product form's "Review with AI": suggestions and checks on the form as
-// typed, under the cap. Nothing is applied here (cleanReview keeps what the
-// form can take, the maker accepts each). On failure the form stays as it was
-// and the answer says why.
+// typed, under the cap, on the fast route. Nothing is applied here
+// (cleanReview keeps what the form can take, the maker accepts each). On
+// failure the form stays as it was and the answer says why.
 export async function reviewProduct(
   fields: ReviewField[],
-  model: TextModel,
-): Promise<{ review?: ProductReview; degraded?: Degraded }> {
+  model?: TextModel,
+): Promise<{
+  review?: ProductReview;
+  // The model that answered.
+  label?: string;
+  degraded?: Degraded;
+  ranOn?: RanOn;
+}> {
   try {
-    assertModel(model, "text");
-    const result = await withDirectSpend(
-      textCall<ProductReview>(model, "productReview"),
-      (beforeCall) =>
-        getArtDirector(model.provider).reviewProduct(
+    const { value, label, ranOn } = await runText<ProductReview>(
+      "productReview",
+      model,
+      (m, beforeCall) =>
+        getArtDirector(m.provider).reviewProduct(
           { fields },
-          { model: model.model, beforeCall },
+          { model: m.model, beforeCall },
         ),
     );
-    return { review: result.value };
+    return { review: value, label, ...(ranOn ? { ranOn } : {}) };
   } catch (error) {
     console.warn("[kiln] product review degraded:", errorMessage(error));
-    return { degraded: degraded(model, "productReview", error) };
+    return { degraded: routeDegraded(error, "productReview", model) };
   }
+}
+
+// The most a text call of this kind can cost along its route: one charged
+// call at most, so the dearest model's (the price shown before asking).
+export async function textWorstCase(
+  kind: TextCallKind,
+): Promise<number | null> {
+  const candidates = await textCandidates(kind);
+  let worst: number | null = null;
+  for (const entry of candidates.filter(
+    (c, i) => i === 0 || runnable(kind)(c),
+  )) {
+    const usd = textEstimate(entry, TEXT_CALL_BUDGETS[kind]);
+    if (usd === null) return null;
+    worst = Math.max(worst ?? 0, usd);
+  }
+  return worst;
 }

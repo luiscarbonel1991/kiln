@@ -9,6 +9,7 @@ import {
   videoCost,
 } from "@/domain/generation-cost";
 import type { ImageQuality, VideoResolution } from "@/domain/model-defaults";
+import type { JobRoute } from "@/domain/model-routing";
 import { describeProviderError, hadResponse } from "@/domain/queue";
 import { hasDatabase } from "@/lib/db";
 import type { TextResult } from "@/providers/interfaces";
@@ -29,6 +30,8 @@ import { getCurrentMaker } from "@/server/maker-repository";
 export interface PricedCall<T extends { usage?: unknown }> {
   // The project the call works for, so its cost counts there.
   projectId?: string;
+  // The move along its route that led to this call, kept on its row.
+  route?: JobRoute;
   provider: string;
   model: string;
   // The most the call can cost; null when the model has no pinned price.
@@ -119,6 +122,7 @@ export async function withDirectSpend<T extends { usage?: unknown }>(
     model: priced.model,
     estimateMicros: toMicros(priced.estimateMax),
     ...(priced.projectId ? { projectId: priced.projectId } : {}),
+    ...(priced.route ? { route: priced.route } : {}),
   });
   let callStarted = false;
   let result: T;

@@ -2,6 +2,7 @@
 
 import { RefreshCw } from "lucide-react";
 import { useEffect } from "react";
+import { RanOnNotice } from "@/components/studio/degraded-notice";
 import { GenerationCard } from "@/components/studio/generation-card";
 import { cardEstimate, estimateHint, sumEstimates } from "@/lib/card-estimate";
 import { plural } from "@/lib/plural";
@@ -22,6 +23,7 @@ export function GenerationPhase({
   const master = useProject((s) => s.master);
   const understanding = useProject((s) => s.understanding);
   const regenerateUnlocked = useProject((s) => s.regenerateUnlocked);
+  const directedBy = useProject((s) => s.directedBy);
 
   const ready = cards !== null && cards.length > 0;
   useEffect(() => {
@@ -72,6 +74,11 @@ export function GenerationPhase({
           </button>
         )}
       </div>
+      {directedBy ? (
+        <div className="px-6 pt-4 sm:px-8">
+          <RanOnNotice ranOn={directedBy} testId="directions-ran-on" />
+        </div>
+      ) : null}
       <div className="flex gap-4 overflow-x-auto px-6 py-5 sm:px-8">
         {cards.map((card) => (
           <div

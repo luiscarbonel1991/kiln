@@ -3,7 +3,10 @@
 import { Check, Copy, Loader2, Save, Sparkles } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { saveListingAction, writeListingAction } from "@/app/actions/board";
-import { DegradedNotice } from "@/components/studio/degraded-notice";
+import {
+  DegradedNotice,
+  RanOnNotice,
+} from "@/components/studio/degraded-notice";
 import { Button } from "@/components/ui/button";
 import type { DestinationText } from "@/domain/destination";
 import {
@@ -24,6 +27,7 @@ import {
   type TargetSearch,
   tagSuggestions,
 } from "@/domain/market-brief";
+import type { RanOn } from "@/domain/model-routing";
 import type { Product } from "@/domain/product";
 import { cn } from "@/lib/utils";
 import type { Degraded } from "@/server/text-calls";
@@ -207,6 +211,7 @@ export function ListingPanel({
   const [pending, startTransition] = useTransition();
   const [writing, startWriting] = useTransition();
   const [degraded, setDegraded] = useState<Degraded | null>(null);
+  const [ranOn, setRanOn] = useState<RanOn | null>(null);
   const issues = useMemo(
     () => [
       ...checkListing(listing, product, rules),
@@ -277,6 +282,7 @@ export function ListingPanel({
       });
       if (result.error) setError(result.error);
       setDegraded(result.degraded ?? null);
+      setRanOn(result.ranOn ?? null);
     });
   }
 
@@ -342,6 +348,9 @@ export function ListingPanel({
       </div>
       {error ? (
         <p className="font-mono text-[0.7rem] text-prov-local">{error}</p>
+      ) : null}
+      {ranOn && !degraded ? (
+        <RanOnNotice ranOn={ranOn} testId={`listing-${destinationId}-ran-on`} />
       ) : null}
       {degraded ? (
         <DegradedNotice

@@ -9,11 +9,11 @@ import {
 } from "@/components/studio/constants";
 import { ListingText, listingDraft, withCopy } from "@/domain/listing";
 import {
-  defaultTextModel,
   ImageQuality,
   ProviderId,
   VideoResolution,
 } from "@/domain/model-defaults";
+import type { RanOn } from "@/domain/model-routing";
 import {
   type ProjectPlan,
   replan,
@@ -304,13 +304,13 @@ const ListingWrite = z.object({
     .optional(),
 });
 
-// "Write it with the text model": the maker's text model (or the one the
-// degraded notice offers) rewrites the listing's prose, under the cap. Only
-// the fields the maker has not written are replaced; the result is saved and
-// checked like the draft.
+// "Write it with the text model": the deep route (or the model the degraded
+// notice offers) rewrites the listing's prose, under the cap. Only the fields
+// the maker has not written are replaced; the result is saved and checked
+// like the draft.
 export async function writeListingAction(
   input: unknown,
-): Promise<{ degraded?: Degraded; error?: string }> {
+): Promise<{ degraded?: Degraded; ranOn?: RanOn; error?: string }> {
   const parsed = ListingWrite.safeParse(input);
   if (!parsed.success) return { error: "Nothing to write for." };
   const { projectId, destinationId } = parsed.data;
@@ -331,7 +331,7 @@ export async function writeListingAction(
       rules: destination.text,
       draft: current,
     },
-    parsed.data.model ?? defaultTextModel(await getMakerModels()),
+    parsed.data.model,
     projectId,
   );
   if (!result.copy) return { degraded: result.degraded };
@@ -341,7 +341,7 @@ export async function writeListingAction(
     return { error: (error as Error).message };
   }
   refresh();
-  return {};
+  return result.ranOn ? { ranOn: result.ranOn } : {};
 }
 
 const ListingSave = z.object({

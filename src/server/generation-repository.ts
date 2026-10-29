@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import { GenerationRequest } from "@/domain/generation-request";
 import { modelLabel } from "@/domain/model-defaults";
+import type { JobRoute } from "@/domain/model-routing";
 import { generableCardIds, ProjectPlan } from "@/domain/plan";
 import type { CardSpend } from "@/domain/project-cost";
 import {
@@ -475,6 +476,8 @@ export async function reserveDirectCall(input: {
   estimateMicros: number;
   // The project the call works for (the listing text), so it counts there.
   projectId?: string;
+  // The move along its route that led to this call (domain JobRoute).
+  route?: JobRoute;
 }): Promise<string> {
   assertDatabaseUrl();
   return db.$transaction(async (tx) => {
@@ -508,6 +511,9 @@ export async function reserveDirectCall(input: {
           provider: input.provider,
           model: input.model,
         },
+        ...(input.route
+          ? { route: input.route as unknown as Prisma.InputJsonValue }
+          : {}),
         startedAt: now,
         leaseUntil: new Date(now.getTime() + DIRECT_LEASE_MS),
       },

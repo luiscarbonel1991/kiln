@@ -5,8 +5,14 @@ import type { ProductReview, ReviewField } from "@/providers/text-prompts";
 const reviewProduct = vi.fn(
   async (
     _fields: ReviewField[],
-    _model: { provider: string; model: string },
-  ): Promise<{ review?: ProductReview; degraded?: unknown }> => ({
+    _model?: { provider: string; model: string },
+  ): Promise<{
+    review?: ProductReview;
+    label?: string;
+    degraded?: unknown;
+    ranOn?: unknown;
+  }> => ({
+    label: "GPT-6 Luna",
     review: {
       suggestions: [
         { field: "wording.0.label", value: "Name", why: "Ask for a name." },
@@ -23,11 +29,6 @@ vi.mock("@/server/text-calls", () => ({
   draftProduct: vi.fn(),
 }));
 vi.mock("@/server/product-repository", () => ({ getProduct }));
-vi.mock("@/server/maker-repository", () => ({
-  getMakerModels: async () => ({
-    text: { provider: "openai", model: "gpt-6.1-sol" },
-  }),
-}));
 
 const { reviewProductAction } = await import("@/app/actions/products");
 
@@ -47,7 +48,7 @@ const form = {
 afterEach(() => vi.clearAllMocks());
 
 describe("reviewProductAction", () => {
-  it("reviews the form on the maker's text model and keeps what it can take", async () => {
+  it("reviews the form on the fast route, names the model that answered and keeps what it can take", async () => {
     const result = await reviewProductAction({ form });
     expect(result).toEqual({
       review: {
@@ -55,14 +56,31 @@ describe("reviewProductAction", () => {
           { field: "wording.0.label", value: "Name", why: "Ask for a name." },
         ],
         checks: [{ field: "size", why: "Is it 2.5 in?" }],
-        model: "GPT-6.1 Sol",
+        model: "GPT-6 Luna",
       },
     });
     const [fields, model] = reviewProduct.mock.calls[0];
-    expect(model).toEqual({ provider: "openai", model: "gpt-6.1-sol" });
+    // No model named: the route decides (text-calls).
+    expect(model).toBeUndefined();
     expect(fields.find((f) => f.field === "wording.0.label")?.value).toBe(
       "Sofia",
     );
+  });
+
+  it("says when the review moved down the route", async () => {
+    const ranOn = {
+      label: "Gemini 3.8 Flash",
+      from: "GPT-6 Luna",
+      reason: "OpenAI answered 503",
+    };
+    reviewProduct.mockResolvedValueOnce({
+      label: "Gemini 3.8 Flash",
+      ranOn,
+      review: { suggestions: [], checks: [] },
+    });
+    const result = await reviewProductAction({ form });
+    expect(result.ranOn).toEqual(ranOn);
+    expect(result.review?.model).toBe("Gemini 3.8 Flash");
   });
 
   it("asks the model the degraded notice offers", async () => {

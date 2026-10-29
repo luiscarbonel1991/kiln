@@ -6,11 +6,8 @@ import {
   ACCEPTED_IMAGE_MIME,
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
-import {
-  defaultTextModel,
-  modelLabel,
-  ProviderId,
-} from "@/domain/model-defaults";
+import { ProviderId } from "@/domain/model-defaults";
+import type { RanOn } from "@/domain/model-routing";
 import type { Product } from "@/domain/product";
 import {
   editLimits,
@@ -29,7 +26,6 @@ import {
 } from "@/lib/product-review";
 import { assertAllowedAssetUrl } from "@/providers/asset-bytes";
 import type { ProductDraft } from "@/providers/text-prompts";
-import { getMakerModels } from "@/server/maker-repository";
 import {
   ProductFileRefused,
   type StoredProductFile,
@@ -150,12 +146,15 @@ const Draft = z.object({
     .optional(),
 });
 
-// "Fill from the photo": the product form drafted from the uploaded photo by
-// the maker's text model (or the one the degraded notice offers), under the
-// monthly cap. The photo must be in Kiln's storage.
-export async function draftProductAction(
-  input: unknown,
-): Promise<{ draft?: ProductDraft; degraded?: Degraded; error?: string }> {
+// "Fill from the photo": the product form drafted from the uploaded photo on
+// the deep route (or the model the degraded notice offers), under the monthly
+// cap. The photo must be in Kiln's storage.
+export async function draftProductAction(input: unknown): Promise<{
+  draft?: ProductDraft;
+  degraded?: Degraded;
+  ranOn?: RanOn;
+  error?: string;
+}> {
   const parsed = Draft.safeParse(input);
   if (!parsed.success) return { error: "Upload the photo first." };
   try {
@@ -163,10 +162,7 @@ export async function draftProductAction(
   } catch {
     return { error: "Upload the photo first." };
   }
-  return draftProduct(
-    parsed.data.assetUrl,
-    parsed.data.model ?? defaultTextModel(await getMakerModels()),
-  );
+  return draftProduct(parsed.data.assetUrl, parsed.data.model);
 }
 
 const Review = z.object({
@@ -178,13 +174,14 @@ const Review = z.object({
     .optional(),
 });
 
-// "Review with AI": the form as typed, saved or not, reviewed by the maker's
-// text model (or the one the degraded notice offers) under the cap. Returns
-// the suggestions the form can take and the checks, with the model's name;
-// nothing is saved.
+// "Review with AI": the form as typed, saved or not, reviewed on the fast
+// route (or by the model the degraded notice offers) under the cap. Returns
+// the suggestions the form can take and the checks, with the name of the
+// model that answered; nothing is saved.
 export async function reviewProductAction(input: unknown): Promise<{
   review?: CleanReview & { model: string };
   degraded?: Degraded;
+  ranOn?: RanOn;
   error?: string;
 }> {
   const parsed = Review.safeParse(input);
@@ -195,13 +192,13 @@ export async function reviewProductAction(input: unknown): Promise<{
   }
   const stored = productId ? await getProduct(productId) : null;
   const fields = reviewFields(form, stored ? editLimits(stored) : FORM_LIMITS);
-  const textModel = model ?? defaultTextModel(await getMakerModels());
-  const result = await reviewProduct(fields, textModel);
+  const result = await reviewProduct(fields, model);
   if (!result.review) return { degraded: result.degraded };
   return {
+    ...(result.ranOn ? { ranOn: result.ranOn } : {}),
     review: {
       ...cleanReview(result.review, fields),
-      model: modelLabel(textModel),
+      model: result.label ?? "",
     },
   };
 }

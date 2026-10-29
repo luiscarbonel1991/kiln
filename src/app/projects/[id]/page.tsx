@@ -7,8 +7,7 @@ import {
   waitingCardIds,
 } from "@/components/projects/project-board";
 import { ProjectsHeader } from "@/components/projects/projects-header";
-import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
-import { defaultTextModel, modelLabel } from "@/domain/model-defaults";
+import { modelLabel } from "@/domain/model-defaults";
 import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
 import { projectCost } from "@/domain/project-cost";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
@@ -23,13 +22,13 @@ import {
 import {
   getCurrentMaker,
   getMakerBrand,
-  getMakerModels,
   getMakerPreferences,
 } from "@/server/maker-repository";
 import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
 import { type ProviderHealth, providerHealth } from "@/server/provider-health";
 import { resultsConnector } from "@/server/shop-connector";
+import { textWorstCase } from "@/server/text-calls";
 
 // The estimate of a batch of every waiting scene, built exactly as the queue
 // would build it: each card's model and price, and a line for each provider
@@ -120,10 +119,7 @@ export default async function ProjectBoardPage({
     })
     .map((c) => c.id);
   const maker = await getCurrentMaker();
-  const writeUsd = textEstimate(
-    defaultTextModel(await getMakerModels()),
-    TEXT_CALL_BUDGETS.listingCopy,
-  );
+  const writeUsd = await textWorstCase("listingCopy");
   const listingPrice = writeUsd === null ? null : `≈ $${writeUsd.toFixed(2)}`;
   const generation = await projectGenerationState(maker.id, board.id);
   const brand = await getMakerBrand();

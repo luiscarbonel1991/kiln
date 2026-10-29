@@ -261,6 +261,10 @@ model GenerationJob {
   // The product version its request was built from (its project's at
   // enqueue): which version each scene shows.
   productHash    String?
+  // Its route (domain JobRoute): the models it may still move to, fixed when
+  // the maker approved the estimate, and each move it made, with why. A
+  // direct call records only the move that led to it.
+  route          Json?
 
   // One queued or running job per card. The predicate is written as Postgres
   // stores it (it normalizes IN to = ANY), so migrate sees no drift.

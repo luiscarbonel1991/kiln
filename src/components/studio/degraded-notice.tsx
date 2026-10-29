@@ -1,7 +1,8 @@
 "use client";
 
-import { Loader2, TriangleAlert } from "lucide-react";
+import { Loader2, Route, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import type { RanOn } from "@/domain/model-routing";
 import type { Degraded } from "@/server/text-calls";
 
 const money = (usd: number) => `$${usd.toFixed(2)}`;
@@ -58,5 +59,30 @@ export function DegradedNotice({
         {children}
       </div>
     </div>
+  );
+}
+
+// A text call that moved down its route (Settings → Models): which model
+// answered, and why the first one did not. Nothing to act on; it says so
+// because no model is ever switched unseen.
+export function RanOnNotice({
+  ranOn,
+  testId,
+}: {
+  ranOn: RanOn;
+  testId: string;
+}) {
+  return (
+    <p
+      data-testid={testId}
+      className="mb-5 flex items-start gap-2 rounded-card border border-border-soft bg-secondary/60 px-4 py-3 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
+    >
+      <Route className="mt-0.5 size-4 flex-shrink-0 text-prov-image" />
+      <span>
+        Answered by{" "}
+        <span className="font-semibold text-foreground">{ranOn.label}</span>,
+        next on the route: {ranOn.from} could not ({ranOn.reason}).
+      </span>
+    </p>
   );
 }
