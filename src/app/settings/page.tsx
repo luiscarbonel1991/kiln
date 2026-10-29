@@ -3,14 +3,15 @@ import { connection } from "next/server";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { AccessTokens } from "@/components/settings/access-tokens";
 import { KeyCheck } from "@/components/settings/key-check";
-import { ModelsForm } from "@/components/settings/models-form";
+import { RoutesForm } from "@/components/settings/routes-form";
 import { EtsyConnection } from "@/components/shops/etsy-connection";
 import { fromMicros } from "@/domain/generation-cost";
+import { proposeRoutes } from "@/domain/model-routing";
 import { hasDatabase } from "@/lib/db";
 import { providerMode } from "@/providers/mode";
 import { listAccessTokens } from "@/server/access-tokens";
 import { budget } from "@/server/generation-repository";
-import { getCurrentMaker, getMakerModels } from "@/server/maker-repository";
+import { getCurrentMaker, getMakerModelSetup } from "@/server/maker-repository";
 import { providerHealth } from "@/server/provider-health";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 
@@ -24,8 +25,8 @@ const when = (iso: string) =>
     minute: "2-digit",
   });
 
-// Settings (per request: it reads the maker's defaults and the providers'
-// health). Models: the default per kind. Providers: each key and its last
+// Settings (per request: it reads the maker's routes and the providers'
+// health). Models: a route per role, Kiln's proposal until saved. Providers: each key and its last
 // calls, read for free, and a free key check on a click (the provider lists
 // its models; no paid call). The month's cap, read only.
 // Shops: the Etsy connection. Access tokens: for the HTTP API (README "HTTP
@@ -33,14 +34,23 @@ const when = (iso: string) =>
 export default async function SettingsPage() {
   await connection();
   const maker = hasDatabase() ? await getCurrentMaker() : null;
-  const [models, health, month, tokens, shop] = await Promise.all([
-    getMakerModels(),
+  const [setup, health, month, tokens, shop] = await Promise.all([
+    getMakerModelSetup(),
     providerHealth(maker?.id ?? null),
     maker ? budget(maker.id) : Promise.resolve(null),
     maker ? listAccessTokens() : Promise.resolve(null),
     maker ? shopConnection() : Promise.resolve(null),
   ]);
   const mode = providerMode();
+  // A mock run calls nothing, so every provider counts as keyed.
+  const keys = {
+    openai:
+      mode === "mock" ||
+      health.some((h) => h.provider === "openai" && h.keyPresent),
+    google:
+      mode === "mock" ||
+      health.some((h) => h.provider === "google" && h.keyPresent),
+  };
   return (
     <div className="flex min-h-full flex-col">
       <ProjectsHeader>
@@ -57,11 +67,18 @@ export default async function SettingsPage() {
             Models
           </h2>
           <p className="mt-1 mb-5 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
-            The model each kind of work starts on. Every card and slot can pick
-            its own; every generation names its model and price before it is
-            paid. Kiln never switches provider on its own.
+            Each kind of work runs on a route: the model it starts on and, when
+            you turn fallback on, the ones it may move to if a provider fails.
+            Nothing outside a route ever runs; the estimate before spending
+            counts the dearest model, and every take names the model it ran on.
+            A card or slot can still pick its own model.
           </p>
-          <ModelsForm initial={models} notes={health} />
+          <RoutesForm
+            initial={setup.routes ?? proposeRoutes(setup.models, keys)}
+            saved={setup.routes !== null}
+            notes={health}
+            mock={mode === "mock"}
+          />
         </section>
 
         <section className="rounded-card bg-card p-6 shadow-card">

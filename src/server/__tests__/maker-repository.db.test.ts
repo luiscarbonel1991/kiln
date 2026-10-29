@@ -101,6 +101,7 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/maker-repository");
   const { DEFAULT_MAKER_MODELS } = await import("@/domain/model-defaults");
+  const { proposeRoutes } = await import("@/domain/model-routing");
   let maker: { id: string };
   beforeAll(async () => {
     maker = await repo.getCurrentMaker();
@@ -110,29 +111,71 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
     await db.$executeRaw`UPDATE "Maker" SET "models" = NULL WHERE "id" = ${maker.id}`;
   });
 
-  it("reads Kiln's defaults until the maker saves their own", async () => {
+  it("reads Kiln's defaults and no routes until the maker saves them", async () => {
     await db.$executeRaw`UPDATE "Maker" SET "models" = NULL WHERE "id" = ${maker.id}`;
-    expect(await repo.getMakerModels()).toEqual(DEFAULT_MAKER_MODELS);
-    const mine = {
-      image: { provider: "google" as const, model: "gemini-3-pro-image" },
-      video: {
-        provider: "google" as const,
-        model: "veo-3.1-lite-generate-preview",
-        resolution: "1080p" as const,
-      },
-      text: { provider: "google" as const, model: "gemini-3.8-flash" },
-    };
-    await repo.saveMakerModels(mine);
-    expect(await repo.getMakerModels()).toEqual(mine);
+    expect(await repo.getMakerModelSetup()).toEqual({
+      models: DEFAULT_MAKER_MODELS,
+      routes: null,
+    });
   });
 
-  it("refuses a retired or unknown model, and reads a stale saved kind as the default", async () => {
+  it("saves the routes, and their heads become the defaults", async () => {
+    const routes = proposeRoutes(DEFAULT_MAKER_MODELS, {
+      openai: true,
+      google: true,
+    });
+    const flash = { provider: "google" as const, model: "gemini-3.8-flash" };
+    const mine = {
+      ...routes,
+      deep: { models: [flash, routes.deep.models[0]], fallback: true },
+      // What does not price a kind is not kept.
+      final: {
+        models: [
+          {
+            provider: "google" as const,
+            model: "gemini-3-pro-image",
+            quality: "high" as const,
+          },
+        ],
+        fallback: true,
+      },
+    };
+    await repo.saveMakerRoutes(mine);
+    const setup = await repo.getMakerModelSetup();
+    expect(setup.routes?.deep.models).toEqual(mine.deep.models);
+    expect(setup.routes?.final.models).toEqual([
+      { provider: "google", model: "gemini-3-pro-image" },
+    ]);
+    expect(setup.models).toEqual({
+      image: { provider: "google", model: "gemini-3-pro-image" },
+      video: routes.video.models[0],
+      text: flash,
+    });
+  });
+
+  it("refuses a retired model or a repeat, and reads a stale saved kind as the default", async () => {
+    const routes = proposeRoutes(DEFAULT_MAKER_MODELS, {
+      openai: true,
+      google: true,
+    });
     await expect(
-      repo.saveMakerModels({
-        ...DEFAULT_MAKER_MODELS,
-        video: { provider: "openai", model: "sora-2" },
+      repo.saveMakerRoutes({
+        ...routes,
+        video: {
+          models: [{ provider: "openai", model: "sora-2" }],
+          fallback: false,
+        },
       }),
     ).rejects.toThrow(/Sora 2 was shut down/);
+    await expect(
+      repo.saveMakerRoutes({
+        ...routes,
+        fast: {
+          models: [routes.fast.models[0], routes.fast.models[0]],
+          fallback: true,
+        },
+      }),
+    ).rejects.toThrow(/twice/);
     await db.$executeRaw`UPDATE "Maker" SET "models" = ${JSON.stringify({
       image: { provider: "openai", model: "gpt-image-1.5", quality: "high" },
       video: { provider: "openai", model: "sora-2" },

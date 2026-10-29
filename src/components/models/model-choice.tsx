@@ -51,6 +51,8 @@ export function ModelChoice({
   notes = [],
   disabled = false,
   className,
+  testId = `model-${kind}`,
+  label = `${kind} model`,
 }: {
   kind: ModelKind;
   value: ModelValue;
@@ -58,6 +60,8 @@ export function ModelChoice({
   notes?: ProviderNote[];
   disabled?: boolean;
   className?: string;
+  testId?: string;
+  label?: string;
 }) {
   const catalog = catalogFor(kind);
   const entry = modelEntry(value);
@@ -89,8 +93,8 @@ export function ModelChoice({
       className={cn("flex min-w-0 flex-wrap items-center gap-1.5", className)}
     >
       <select
-        aria-label={`${kind} model`}
-        data-testid={`model-${kind}`}
+        aria-label={label}
+        data-testid={testId}
         className={cn(SELECT, "w-0 min-w-0 flex-1 basis-0")}
         value={key}
         disabled={disabled}
@@ -134,8 +138,8 @@ export function ModelChoice({
       </select>
       {entry?.qualities && offered ? (
         <select
-          aria-label="Quality"
-          data-testid={`model-${kind}-quality`}
+          aria-label={`${label} quality`}
+          data-testid={`${testId}-quality`}
           className={SELECT}
           value={value.quality ?? DEFAULT_IMAGE_QUALITY}
           disabled={disabled}
@@ -152,8 +156,8 @@ export function ModelChoice({
       ) : null}
       {entry?.seconds && offered ? (
         <select
-          aria-label="Resolution"
-          data-testid={`model-${kind}-resolution`}
+          aria-label={`${label} resolution`}
+          data-testid={`${testId}-resolution`}
           className={SELECT}
           value={value.resolution ?? DEFAULT_VIDEO_RESOLUTION}
           disabled={disabled}

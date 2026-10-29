@@ -1,24 +1,24 @@
 "use server";
 
 import { refresh } from "next/cache";
-import {
-  MakerModels,
-  PROVIDER_LABELS,
-  ProviderId,
-} from "@/domain/model-defaults";
-import { saveMakerModels } from "@/server/maker-repository";
+import { PROVIDER_LABELS, ProviderId } from "@/domain/model-defaults";
+import { MakerRoutes } from "@/domain/model-routing";
+import { saveMakerRoutes } from "@/server/maker-repository";
 import { checkKey } from "@/server/provider-health";
 
-// Settings → Models: the maker's default model per kind. Zod is the trust
-// boundary; the repository refuses a model Kiln does not offer or has no
-// pinned price for.
-export async function saveMakerModelsAction(
+// Settings → Models: a route per role. Zod is the trust boundary: every model
+// one Kiln offers for the role, with a pinned price, once per route.
+export async function saveMakerRoutesAction(
   input: unknown,
 ): Promise<{ error?: string }> {
-  const parsed = MakerModels.safeParse(input);
-  if (!parsed.success) return { error: "Pick a model for each kind." };
+  const parsed = MakerRoutes.safeParse(input);
+  if (!parsed.success) {
+    return {
+      error: parsed.error.issues[0]?.message ?? "Pick a model for each role.",
+    };
+  }
   try {
-    await saveMakerModels(parsed.data);
+    await saveMakerRoutes(parsed.data);
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }

@@ -1,6 +1,5 @@
 import type { Prisma } from "@prisma/client";
 import { BrandKit } from "@/domain/brand";
-import { modelPriced } from "@/domain/generation-cost";
 import { type HeroSetting, heroKey } from "@/domain/hero-setting";
 import {
   type MakerPreferences,
@@ -8,12 +7,17 @@ import {
 } from "@/domain/maker-preferences";
 import { SearchColumns } from "@/domain/market-brief";
 import {
-  assertModel,
   DEFAULT_MAKER_MODELS,
-  MakerModels,
-  ModelRefused,
-  makerModels,
+  type MakerModels,
 } from "@/domain/model-defaults";
+import {
+  MakerRoutes,
+  ModelRole,
+  ROLE_KIND,
+  readMakerModels,
+  routeEntry,
+  routeHeads,
+} from "@/domain/model-routing";
 import {
   ListingId,
   MAX_LEFT_OUT,
@@ -71,17 +75,29 @@ export async function saveMakerBrand(brand: BrandKit): Promise<void> {
   });
 }
 
-// The maker's default model per kind (Settings → Models), read leniently: a
-// kind never saved, or saved on a model Kiln no longer offers, reads as Kiln's
-// default. Without a database (tests, demos) Kiln's defaults.
-export async function getMakerModels(): Promise<MakerModels> {
-  if (!hasDatabase()) return DEFAULT_MAKER_MODELS;
+// The maker's default model per kind and routes per role (Settings →
+// Models), read leniently: a kind never saved, or saved on a model Kiln no
+// longer offers, reads as Kiln's default; with routes saved, the defaults are
+// their heads. Without a database (tests, demos) Kiln's defaults, no routes.
+export async function getMakerModelSetup(): Promise<{
+  models: MakerModels;
+  routes: MakerRoutes | null;
+}> {
+  if (!hasDatabase()) return { models: DEFAULT_MAKER_MODELS, routes: null };
   const maker = await getCurrentMaker();
   const row = await db.maker.findUnique({
     where: { id: maker.id },
     select: { models: true },
   });
-  return makerModels(row?.models);
+  return readMakerModels(row?.models);
+}
+
+export async function getMakerModels(): Promise<MakerModels> {
+  return (await getMakerModelSetup()).models;
+}
+
+export async function getMakerRoutes(): Promise<MakerRoutes | null> {
+  return (await getMakerModelSetup()).routes;
 }
 
 // The maker's remembered choices (hero-setting.ts); none without a database.
@@ -215,19 +231,28 @@ export async function leaveOutListing(
   return changed;
 }
 
-// Save the defaults: each kind must be a model Kiln offers for it, with a
-// pinned price (so anything it starts can run under the cap).
-export async function saveMakerModels(input: MakerModels): Promise<void> {
-  const models = MakerModels.parse(input);
-  for (const kind of ["image", "video", "text"] as const) {
-    const entry = assertModel(models[kind], kind);
-    if (!modelPriced(models[kind], kind)) {
-      throw new ModelRefused(`${entry.label} has no pinned price.`);
-    }
-  }
+// Save the routes: every model one Kiln offers for its role's kind, with a
+// pinned price, once per route (MakerRoutes). The heads are saved as the
+// defaults in the same write, so a default and a route never disagree.
+export async function saveMakerRoutes(input: MakerRoutes): Promise<void> {
+  const parsed = MakerRoutes.parse(input);
+  const routes = Object.fromEntries(
+    ModelRole.options.map((role) => [
+      role,
+      {
+        models: parsed[role].models.map((m) => routeEntry(m, ROLE_KIND[role])),
+        fallback: parsed[role].fallback,
+      },
+    ]),
+  ) as MakerRoutes;
   const maker = await getCurrentMaker();
   await db.maker.update({
     where: { id: maker.id },
-    data: { models: models as unknown as Prisma.InputJsonValue },
+    data: {
+      models: {
+        ...routeHeads(routes),
+        routes,
+      } as unknown as Prisma.InputJsonValue,
+    },
   });
 }
