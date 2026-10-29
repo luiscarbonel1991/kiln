@@ -192,8 +192,9 @@ listing**, on one sale destination:
 
 ## HTTP API and the `kiln` CLI
 
-Packages and material photos can reach Kiln without a file picker: from a script, an
-agent, a scheduled job or another system (an ERP, a shop's export).
+Packages and material photos can reach Kiln without a file picker, and a frame can be
+approved without the board: from a script, an agent, a scheduled job or another system
+(an ERP, a shop's export).
 
 **A token.** Settings → Access tokens: name it after what will use it, then Make a
 token. Copy it at once: Kiln keeps only its SHA-256 and cannot show it again. A token
@@ -212,6 +213,10 @@ behind your own sign-in (a VPN, a reverse proxy with authentication) and start i
 | `POST /api/products/:id/colours/:key/swatch` | a PNG, JPEG or WebP (at most 15 MB), as the body or a multipart `file` | the colour with its stored `swatchUrl`, `status`, `changed`, the projects now `behind`, and `photoColour` (a suggestion: the swatch hex stays yours). 404 unknown product or colour, 409 a catalog connector's product, 415 not a photo |
 | `DELETE /api/products/:id/colours/:key/swatch` | none | the same, with `swatchUrl: null` |
 | `GET /api/results` | none | every followed listing (`projectId`, `destinationId`, `listingUrl`, `liveOn`): the reads `due` today, each with its `window`, the `next` one, the `reads` taken, the `comparison` in words and the frames `changed` |
+| `GET /api/projects` | none | the projects that have frames (`id`, `name`, `type`, `phase`, `updatedAt`), newest first |
+| `GET /api/projects/:id/frames` | none | each frame as the board shows it: `frame` (`etsy.hero`), `label`, `fill`, `aspect`, `state`, `failed` and `error`, `output` (the take an approval approves), `approvedOutput`, `approvable`, `versionOf`. 404 unknown project or one with no frames |
+| `PUT /api/projects/:id/frames/:destinationId/:slotKey/approval` | optionally `{ "output": "<url>" }`, the take you checked | the `frame` after its approval. 404 unknown project or frame, 409 a newer take landed since the one you checked, 422 a frame that takes no approval (an exact frame, the maker's photo, a shared frame, no finished take) |
+| `DELETE /api/projects/:id/frames/:destinationId/:slotKey/approval` | none | the `frame`, its approval withdrawn |
 | `PUT /api/projects/:id/results/:destinationId/:read` | `{ visits, views, favourites, orders, revenue, searchVisits }` (any of them), optionally `from`, `to`, `source`, `readOn` | the read kept (`:read` is `before`, `day14` or `day30`; its window and today by default, source "API"). 400 not JSON, 404 unknown project, destination or read, 422 a read Kiln cannot keep |
 
 - `:id` is the product's Kiln id or its SKU. A photo is read from its bytes, not its
@@ -225,6 +230,10 @@ behind your own sign-in (a VPN, a reverse proxy with authentication) and start i
 - The results routes are for an agent or a scheduled job that reads the shop's stats
   where the maker can (their own Shop Manager) and sends the numbers back; Kiln never
   opens a listing page.
+- An approval is the board's Approve, for an agent after its own check of the take: read
+  the frames, check `output`, then send it back with the approval. The take that lands
+  in the meantime is refused (409), never approved unseen. The board shows an approval
+  made here on its next load.
 
 ```bash
 curl -X POST "$KILN_URL/api/import" -H "Authorization: Bearer $KILN_TOKEN" \
@@ -242,13 +251,19 @@ pnpm kiln import package.json            # check, then POST /api/import
 pnpm kiln swatch CB-01 maple maple.jpg   # a colour's material photo
 pnpm kiln swatch CB-01 maple --remove
 pnpm kiln schema                         # the package's JSON Schema
+pnpm kiln projects                       # the projects with frames
+pnpm kiln frames <project>               # each frame, its state and its take
+pnpm kiln approve <project> etsy.hero <take>
+pnpm kiln unapprove <project> etsy.hero
 ```
 
 - `validate` needs no running Kiln. An exporter can run it at build time and fail with
   the words the import would use ("colours › oak › inlayName: at most 40 characters
   (this one has 52)"), plus what the schema cannot say: an inline photo or sample that
   is not a PNG, JPEG or WebP.
-- `import` and `swatch` read `KILN_URL` (where Kiln runs) and `KILN_TOKEN` from the
+- `approve` names the frame by its destination and slot (`etsy.hero`) and the take as
+  `kiln frames` printed it; without a take it approves whatever is latest.
+- `import`, `swatch` and the project commands read `KILN_URL` (where Kiln runs) and `KILN_TOKEN` from the
   environment (`node --env-file=kiln.env packages/cli/dist/kiln.js …` works too). `import`
   sends nothing when no product passes; `--strict` sends nothing when one does not.
   `--json` prints Kiln's answer for scripts and agents.
@@ -257,6 +272,25 @@ pnpm kiln schema                         # the package's JSON Schema
 - From another folder: `node /path/to/kiln/packages/cli/dist/kiln.js validate
   package.json` (paths are the caller's, under `pnpm kiln` too). The package is meant
   for npm later, so an exporter in any repository can add it as a dev dependency.
+
+### Driving the app
+
+An agent or a test runner can also drive the pages, as a maker would:
+- Every button, field, menu item and toggle has a stable `data-testid` and a name;
+  `src/lib/__tests__/agent-ready.test.ts` fails on one without. A frame is
+  `slot-<destination>-<slot>` on the board, with its state as `data-state`, and its
+  controls are inside it (`slot-etsy-hero-approve`).
+- A choice says it is chosen with `aria-pressed` (the product, the type and the
+  destinations on New project, among others).
+- A file is set on the input itself, `<id>-input` (`material-photo-2-input`,
+  `reference-upload-input`): each is its own labelled field, no hidden input clicked by
+  a script.
+- New project and the board set `html[data-ready]` once they answer clicks; a click
+  before then does nothing. No page streams behind a `loading.tsx` (the test refuses
+  one): React shows streamed content on the next animation frame, and a hidden browser
+  pane paints none, so that content never appeared nor answered.
+- Confirmations are `role="dialog"`, named by their title (`generate-confirm`,
+  `video-confirm`). Paid calls stay behind them; for approvals, prefer the API.
 
 ## Shops (Etsy)
 
