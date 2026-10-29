@@ -247,9 +247,11 @@ export function GenerationPanel({
               </dd>
             </dl>
             <p className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
-              Kiln runs them in the background, one retry each if a call fails;
-              you can leave this page. The cost is measured from what each
-              provider reports.
+              Kiln runs them in the background; you can leave this page. A call
+              the provider refuses is not paid. One that times out may have been
+              charged: Kiln counts it at its estimate and tries once more, so
+              that scene can cost up to twice its price. The cost is measured
+              from what each provider reports.
             </p>
             {staleProduct ? (
               <div className="flex flex-col gap-2 rounded-field bg-prov-brand/10 px-3 py-2.5">
