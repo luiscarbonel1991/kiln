@@ -426,7 +426,7 @@ export async function failJob(
 // A job moves to the next model of its route after a failure another model
 // may fix (domain fallbackAfter; nothing was charged): its request is the
 // same on the new model, its route records the move, and it goes back to the
-// queue at once with a fresh retry allowance for the new model. Its batch's
+// queue at once, its attempts counted afresh for the new model. Its batch's
 // jobs still queued on the same model move with it, so a batch stays on one
 // model (another model changes the look); each records why. false = the lease
 // was lost or the batch canceled: the caller fails the job as usual.
@@ -439,12 +439,11 @@ export async function fallBackJob(
     const [row] = await tx.$queryRaw<
       {
         batchId: string | null;
-        attempt: number;
         request: unknown;
         route: unknown;
       }[]
     >`
-      SELECT j."batchId", j."attempt", j."request", j."route"
+      SELECT j."batchId", j."request", j."route"
       FROM "GenerationJob" j
       WHERE j."id" = ${job.id} AND j."leaseToken" = ${job.leaseToken}
         AND j."status" = 'running' AND NOT ${STOPPED}
@@ -476,7 +475,10 @@ export async function fallBackJob(
       data: {
         ...moved(request, readJobRoute(row.route), move.rest, move.reason),
         status: "queued",
-        maxAttempts: row.attempt + MAX_ATTEMPTS,
+        // A new model is a new start: its own retry allowance, and the board
+        // shows it generating, not retrying.
+        attempt: 0,
+        maxAttempts: MAX_ATTEMPTS,
         error: null,
         callStartedAt: null,
         availableAt: new Date(),

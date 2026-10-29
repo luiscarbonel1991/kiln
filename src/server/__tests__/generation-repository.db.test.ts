@@ -559,8 +559,9 @@ describe.skipIf(!enabled)(
         status: "queued",
         leaseToken: null,
         callStartedAt: null,
-        // A fresh retry allowance on the new model.
-        maxAttempts: 3,
+        // Its attempts counted afresh on the new model.
+        attempt: 0,
+        maxAttempts: 2,
       });
       expect(moved.request).toMatchObject({
         prompt: "a scene",
