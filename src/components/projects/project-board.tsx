@@ -621,7 +621,20 @@ export function ProjectBoard({
           const count = (state: SlotView["state"]) =>
             slots.filter((s) => s.view.state === state).length;
           const on = slots.filter((s) => !s.slot.off);
-          const scenes = on.filter((s) => s.slot.fill === "scene").length;
+          // A video is approved like a scene, so it counts with them; a
+          // delivered frame still counts as what it was before delivery.
+          const generated = on.filter(
+            (s) => s.slot.fill === "scene" || s.slot.fill === "video",
+          );
+          const scenes = generated.length;
+          const approved = generated.filter(
+            (s) => s.view.state === "approved" || s.view.state === "delivered",
+          ).length;
+          const exact = on.filter(
+            (s) =>
+              s.slot.fill === "exact" &&
+              (s.view.state === "exact" || s.view.state === "delivered"),
+          ).length;
           const done =
             count("exact") +
             count("kept") +
@@ -673,9 +686,9 @@ export function ProjectBoard({
                     {count("kept") === 1 ? "it is" : "they are"}
                   </li>
                 ) : null}
-                <li>{count("exact")} exact, from the spec</li>
+                <li>{exact} exact, from the spec</li>
                 <li>
-                  {count("approved")} of {plural(scenes, "scene")} approved
+                  {approved} of {plural(scenes, "scene")} approved
                 </li>
                 <li>{count("to-review")} to review</li>
                 <li>
