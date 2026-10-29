@@ -491,6 +491,65 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
     expect(readme.indexOf("2. ")).toBeLessThan(readme.indexOf("On its own"));
   });
 
+  it("prices the photo work: each frame's takes, the total and per approved frame", async () => {
+    const result = await buildDelivery(
+      input({
+        cost: {
+          destinationId: "etsy",
+          spentMicros: 980_000,
+          takes: 4,
+          approved: 3,
+          perApprovedMicros: 326_667,
+          frames: [
+            {
+              slotKey: "in-use",
+              label: "In use",
+              spentMicros: 60_000,
+              takes: 1,
+              approved: true,
+            },
+            {
+              slotKey: "hero",
+              label: "Hero",
+              spentMicros: 120_000,
+              takes: 2,
+              approved: true,
+            },
+            {
+              slotKey: "video",
+              label: "Listing video",
+              spentMicros: 800_000,
+              takes: 1,
+              approved: true,
+            },
+          ],
+        },
+      }),
+    );
+    const files = unzipSync(result.zip);
+    const folder = "botanical-coaster-launch-etsy";
+    const readme = strFromU8(files[`${folder}/README.txt`]);
+    expect(readme).toContain("; $0.12 over 2 takes");
+    expect(readme).toContain("; $0.80 over 1 take");
+    expect(readme).toContain(
+      "Photo work: $0.98 over 4 takes (rejected takes included), $0.33 per approved frame.",
+    );
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    expect(manifest.cost).toEqual({
+      spentMicros: 980_000,
+      takes: 4,
+      approved: 3,
+      perApprovedMicros: 326_667,
+    });
+    expect(manifest.files[1]).toMatchObject({
+      file: "02-hero.jpg",
+      spentMicros: 120_000,
+      takes: 2,
+    });
+    // An exact frame costs nothing and says nothing about takes.
+    expect(manifest.files[2].takes).toBeUndefined();
+  });
+
   it("the README says why: the market brief with its sources and dates, and a scene's own place", async () => {
     const briefed = PlanDestination.parse({
       ...plan,

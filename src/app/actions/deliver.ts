@@ -4,12 +4,14 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { listingDraft } from "@/domain/listing";
 import { slotCardId } from "@/domain/plan";
+import { projectCost } from "@/domain/project-cost";
 import { plateHref } from "@/lib/plate-href";
 import { CATALOG } from "@/lib/recipes";
 import { versionMark } from "@/lib/version-mark";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
+import { providerMode } from "@/providers/mode";
 import { buildDelivery, DeliveryRefusal } from "@/server/deliver/delivery";
-import { outputSources } from "@/server/generation-repository";
+import { outputSources, projectSpend } from "@/server/generation-repository";
 import { readBeforeAtDelivery } from "@/server/listing-results";
 import { getMakerBrand } from "@/server/maker-repository";
 import { loadProjectBoard, setDelivered } from "@/server/project-repository";
@@ -77,6 +79,15 @@ export async function deliverAction(input: unknown): Promise<DeliverResult> {
       fetchOutput: async (url) => (await fetchAsset(url)).bytes,
       sourceOf: (output) => sources.get(output),
       markOf: (slot) => versionMark(fullPlan, slot, { waits: false }),
+      // Spend counts in a live run only (mock jobs are never paid).
+      ...(providerMode() === "live"
+        ? {
+            cost: projectCost(
+              fullPlan,
+              (await projectSpend(projectId)).byCard,
+            ).destinations.find((d) => d.destinationId === destinationId),
+          }
+        : {}),
       ...(destination.text
         ? {
             listing:

@@ -22,6 +22,7 @@ import {
   videoSettings,
 } from "@/domain/plan";
 import type { Product } from "@/domain/product";
+import type { DestinationCost } from "@/domain/project-cost";
 import type { PlateImage } from "@/lib/plate-href";
 import {
   asJpeg,
@@ -72,6 +73,8 @@ export interface DeliveryInput {
   listing?: ListingText;
   // Where a version or a shared frame comes from ("re-frames Hook").
   markOf?(slot: PlanSlot): string | undefined;
+  // What this destination's photo work cost (live spend), when it counts.
+  cost?: DestinationCost;
   now: Date;
 }
 
@@ -94,6 +97,9 @@ export interface DeliveredFile {
   text?: string;
   // Where a version or a shared frame comes from.
   from?: string;
+  // What the frame cost, every take included (scenes and the video).
+  spentMicros?: number;
+  takes?: number;
 }
 
 // A clip's pixel size by resolution and orientation (Veo; Sora rendered 720p).
@@ -161,8 +167,28 @@ function frameLine(folder: string, f: DeliveredFile): string {
       ? "drawn from the product spec"
       : f.kind === "photo"
         ? "your photo, as on the listing"
-        : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${f.from ? `; ${f.from}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}`;
+        : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${f.from ? `; ${f.from}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}${takesLine(f)}`;
   return `${folder}/${f.file} — ${f.label} (${what}), ${f.width} x ${f.height} px`;
+}
+
+const usd = (micros: number) =>
+  `$${(micros / 1e6).toFixed(micros > 0 && micros < 10_000 ? 3 : 2)}`;
+
+// ", $0.12 over 2 takes": a generated frame's cost, its re-rolls included.
+function takesLine(f: DeliveredFile): string {
+  if (f.spentMicros === undefined || !f.takes) return "";
+  return `; ${usd(f.spentMicros)} over ${f.takes === 1 ? "1 take" : `${f.takes} takes`}`;
+}
+
+// The photo work in a line a business can price a product with.
+function costLines(cost: DestinationCost | undefined): string[] {
+  if (!cost) return [];
+  return [
+    "",
+    cost.takes === 0
+      ? "Photo work: nothing paid. Every frame was drawn from the spec or is your own photo."
+      : `Photo work: ${usd(cost.spentMicros)} over ${cost.takes === 1 ? "1 take" : `${cost.takes} takes`} (rejected takes included)${cost.perApprovedMicros !== null ? `, ${usd(cost.perApprovedMicros)} per approved frame` : ""}. Exact frames, your own photos and shared frames cost nothing here.`,
+  ];
 }
 
 function readme(
@@ -193,8 +219,9 @@ function readme(
       .filter((f) => f.kind === "video")
       .map(
         (f) =>
-          `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.label ?? f.source.model}` : ""}), ${f.width} x ${f.height} px`,
+          `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${takesLine(f)}), ${f.width} x ${f.height} px`,
       ),
+    ...costLines(input.cost),
     ...briefLines(input.plan.brief),
     "",
     "manifest.json lists each file with its source (the prompt and model of each",
@@ -224,6 +251,11 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
   }
   const folder = `${slug(input.projectName)}-${input.destination.id}`;
   const on = input.plan.slots.filter((s) => !s.off);
+  const frames = new Map(input.cost?.frames.map((f) => [f.slotKey, f]));
+  const costOf = (key: string) => {
+    const frame = frames.get(key);
+    return frame ? { spentMicros: frame.spentMicros, takes: frame.takes } : {};
+  };
   const entries: Record<string, Uint8Array> = {};
   const files: DeliveredFile[] = [];
   let photo = 0;
@@ -260,6 +292,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
         seconds: source?.seconds ?? settings.seconds,
         output,
         source,
+        ...costOf(slot.key),
       });
       continue;
     }
@@ -347,6 +380,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       ...(slot.place ? { place: slot.place } : {}),
       ...(text ? { text } : {}),
       ...(from ? { from } : {}),
+      ...costOf(slot.key),
     });
   }
   const manifest = {
@@ -354,6 +388,16 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
     product: { sku: input.product.sku, name: input.product.name },
     destination: input.destination.id,
     exportedAt: input.now.toISOString(),
+    ...(input.cost
+      ? {
+          cost: {
+            spentMicros: input.cost.spentMicros,
+            takes: input.cost.takes,
+            approved: input.cost.approved,
+            perApprovedMicros: input.cost.perApprovedMicros,
+          },
+        }
+      : {}),
     files,
     ...(input.plan.brief && !isEmptyBrief(input.plan.brief)
       ? { brief: input.plan.brief }
