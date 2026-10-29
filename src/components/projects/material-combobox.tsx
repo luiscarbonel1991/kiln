@@ -99,6 +99,7 @@ export function MaterialCombobox({
         >
           <div id={listId} role="listbox" aria-label="Materials">
             {items.map((item, i) => (
+              // biome-ignore lint/a11y/useKeyWithClickEvents: the field's arrow keys and Enter choose (aria-activedescendant)
               <div
                 key={`${item.created}-${item.value}`}
                 id={`${listId}-${i}`}
@@ -106,10 +107,10 @@ export function MaterialCombobox({
                 aria-selected={i === active}
                 tabIndex={-1}
                 onMouseEnter={() => setActive(i)}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  pick(item.value);
-                }}
+                // Keep the focus in the field; the pick is the click, so a
+                // plain element.click() picks too.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(item.value)}
                 className={cn(
                   "cursor-pointer rounded-[9px] px-2.5 py-1.5 font-sans text-sm",
                   i === active

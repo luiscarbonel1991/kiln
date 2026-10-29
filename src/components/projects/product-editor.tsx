@@ -35,6 +35,7 @@ import {
 import { DegradedNotice } from "@/components/studio/degraded-notice";
 import { Button } from "@/components/ui/button";
 import { FilePick } from "@/components/ui/file-pick";
+import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
 import {
   type Product,
   Treatment,
@@ -1055,8 +1056,8 @@ export function ProductEditor({
                   alt={`${viewName(v.label)} view`}
                   className="size-9 rounded-swatch object-cover"
                 />
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger asChild>
+                <MenuRoot>
+                  <MenuTrigger asChild>
                     <button
                       type="button"
                       aria-label={`Which view: ${viewName(v.label)}`}
@@ -1065,7 +1066,7 @@ export function ProductEditor({
                       {viewName(v.label)}
                       <ChevronDown className="size-3 text-on-surface-mid" />
                     </button>
-                  </DropdownMenu.Trigger>
+                  </MenuTrigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content
                       align="start"
@@ -1093,7 +1094,7 @@ export function ProductEditor({
                       ))}
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
-                </DropdownMenu.Root>
+                </MenuRoot>
                 <button
                   type="button"
                   aria-label={`Remove the ${viewName(v.label)} view`}

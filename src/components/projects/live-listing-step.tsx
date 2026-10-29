@@ -13,6 +13,7 @@ import { useState, useTransition } from "react";
 import { uploadListingPhotoAction } from "@/app/actions/live-listing";
 import { Button } from "@/components/ui/button";
 import { FilePick } from "@/components/ui/file-pick";
+import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
 import { etsyListingId, MAX_LIVE_PHOTOS } from "@/domain/live-listing";
 import { cn } from "@/lib/utils";
 
@@ -139,8 +140,8 @@ export function LiveListingStep({
                     Photo {i + 1}
                     {row.replaceWith ? " · replace with" : ""}
                   </span>
-                  <DropdownMenu.Root>
-                    <DropdownMenu.Trigger asChild>
+                  <MenuRoot>
+                    <MenuTrigger asChild>
                       <button
                         type="button"
                         data-testid={`live-photo-${i + 1}-choice`}
@@ -159,7 +160,7 @@ export function LiveListingStep({
                         </span>
                         <ChevronDown className="size-3 flex-shrink-0 text-on-surface-mid" />
                       </button>
-                    </DropdownMenu.Trigger>
+                    </MenuTrigger>
                     <DropdownMenu.Portal>
                       <DropdownMenu.Content
                         align="start"
@@ -190,7 +191,7 @@ export function LiveListingStep({
                         ))}
                       </DropdownMenu.Content>
                     </DropdownMenu.Portal>
-                  </DropdownMenu.Root>
+                  </MenuRoot>
                 </div>
                 <div className="flex flex-col">
                   <Button

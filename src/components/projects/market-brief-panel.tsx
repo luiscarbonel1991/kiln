@@ -16,6 +16,7 @@ import { setSlotPlaceAction } from "@/app/actions/board";
 import { saveBriefAction } from "@/app/actions/market-brief";
 import { SearchTableImport } from "@/components/projects/search-table-import";
 import { Button } from "@/components/ui/button";
+import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
 import {
   bandLabel,
   CONVERSION_LABELS,
@@ -563,8 +564,8 @@ export function MarketBriefPanel({
                   onChange={(e) => editNote(i, { place: e.target.value })}
                   className={cn(FIELD, "min-w-[200px] flex-1")}
                 />
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger asChild>
+                <MenuRoot>
+                  <MenuTrigger asChild>
                     <Button
                       variant="secondary"
                       size="sm"
@@ -576,7 +577,7 @@ export function MarketBriefPanel({
                       {placing ? <Loader2 className="animate-spin" /> : null}
                       Use it for <ChevronDown />
                     </Button>
-                  </DropdownMenu.Trigger>
+                  </MenuTrigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content
                       align="end"
@@ -595,7 +596,7 @@ export function MarketBriefPanel({
                       ))}
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
-                </DropdownMenu.Root>
+                </MenuRoot>
               </div>
             </li>
           ))}
