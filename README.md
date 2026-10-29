@@ -466,7 +466,23 @@ it. Exported slots read "delivered" until an approval or the order changes.
   numbering.
 - The maker's own photos (a live listing's, kept) go in their place as they are: a
   JPEG or PNG untouched, a WebP as a JPEG, never cropped or resized.
-- Scenes with text on the image (Instagram's hook) are not exported yet.
+- A scene's text layer (Instagram's hook) is drawn over the approved image at export
+  with the same SVG template the board shows (resvg and the vendored Fraunces, laid on
+  with ImageMagick); the image model never draws it. A story's band sits below the
+  app's top bar.
+- A frame posted on its own (a story, a single post) is its own file (`story.jpg`,
+  `post.jpg`), outside the numbered slides; the README lists it under "On its own".
+
+## Versions and shared frames
+
+An approved scene is made once and reused in every size:
+
+- A **version** re-frames another slot's approved scene at its own aspect (Instagram's
+  9:16 story from the hook, the 1:1 post from "in place"). It is a paid edit with the
+  approved image as the reference, never a crop; it waits until that scene is approved.
+- A **shared frame** repeats another destination's approved scene at the same aspect,
+  for free: in a Launch, Instagram's "in place" and "detail" are Etsy's in-use and
+  material detail (slots of the same `role`). It is approved with its source.
 
 ## System dependencies (vectorize, Deliver)
 
