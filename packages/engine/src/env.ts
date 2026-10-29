@@ -22,6 +22,12 @@ const EnvSchema = z.object({
     blankAsUnset,
     z.coerce.number().int().min(0).default(0),
   ),
+  // A mock run that plays this provider being down: its stubs answer 503, so
+  // a route's fallback and the degraded notices can be walked for free.
+  KILN_MOCK_FAIL: z.preprocess(
+    blankAsUnset,
+    z.enum(["openai", "google"]).optional(),
+  ),
 
   // Origins (besides Kiln's own storage and data: images) the server may fetch
   // asset bytes from, comma-separated — e.g. a maker's CDN that a product

@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { TEXT_CALL_BUDGETS, type TextCallKind } from "@/domain/generation-cost";
 import { assertModel } from "@/domain/model-defaults";
 import { ProviderKeyMissing } from "@/providers/errors";
-import { providerMode } from "@/providers/mode";
+import { mockOutage, providerMode } from "@/providers/mode";
 import { getOpenAI, hasOpenAIKey } from "@/providers/openai/client";
 import type { GenerationUsage } from "@/providers/types";
 
@@ -34,7 +34,10 @@ export type InputContent =
 export function openaiTextModel(model: string): { id: string; mock: boolean } {
   const id = assertModel({ provider: "openai", model }, "text").id;
   if (hasOpenAIKey()) return { id, mock: false };
-  if (providerMode() === "mock") return { id, mock: true };
+  if (providerMode() === "mock") {
+    mockOutage("openai");
+    return { id, mock: true };
+  }
   throw new ProviderKeyMissing("openai");
 }
 

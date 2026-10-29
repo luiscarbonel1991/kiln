@@ -12,3 +12,16 @@ export async function mockDelay(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, env.KILN_MOCK_DELAY_MS));
   }
 }
+
+// In a mock run with KILN_MOCK_FAIL set to this provider, its stub answers
+// as a provider that is down (503): nothing is called either way.
+export function mockOutage(provider: "openai" | "google"): void {
+  if (env.KILN_PROVIDERS === "mock" && env.KILN_MOCK_FAIL === provider) {
+    throw Object.assign(
+      new Error(
+        `${provider === "openai" ? "OpenAI" : "Google"} is down (KILN_MOCK_FAIL).`,
+      ),
+      { status: 503 },
+    );
+  }
+}

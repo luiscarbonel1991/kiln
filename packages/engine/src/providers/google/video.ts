@@ -22,7 +22,7 @@ import type {
   VideoBytesResult,
   VideoProvider,
 } from "@/providers/interfaces";
-import { mockDelay, providerMode } from "@/providers/mode";
+import { mockDelay, mockOutage, providerMode } from "@/providers/mode";
 import { GenerationResult } from "@/providers/types";
 
 // Veo 3.1 (image to video) under the same money rules as the other paid calls.
@@ -126,6 +126,7 @@ async function animateBytes(
 ): Promise<VideoBytesResult> {
   const { entry, resolution, seconds } = vetted(input);
   if (!hasGoogleKey()) {
+    mockOutage("google");
     if (providerMode() === "mock") await options?.beforeCall?.();
     await mockDelay();
     const standIn = await startFrameStandIn(input.startFrameAssetId);

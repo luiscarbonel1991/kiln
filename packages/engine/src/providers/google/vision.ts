@@ -11,7 +11,7 @@ import {
   MOCK_PRODUCT_DRAFT,
   MOCK_UNDERSTANDING,
 } from "@/providers/mock/vision";
-import { providerMode } from "@/providers/mode";
+import { mockOutage, providerMode } from "@/providers/mode";
 import {
   PRODUCT_DRAFT_PROMPT,
   ProductDraft,
@@ -137,8 +137,10 @@ export const googleVisionProvider: VisionProvider = {
   async analyze(input, options) {
     const model = geminiTextModel(options.model);
     if (!hasGoogleKey()) {
-      if (providerMode() === "mock")
+      if (providerMode() === "mock") {
+        mockOutage("google");
         return { value: MOCK_UNDERSTANDING, model };
+      }
       throw new ProviderKeyMissing("google");
     }
     return askGemini(
@@ -155,8 +157,10 @@ export const googleVisionProvider: VisionProvider = {
   async draftProduct(input, options) {
     const model = geminiTextModel(options.model);
     if (!hasGoogleKey()) {
-      if (providerMode() === "mock")
+      if (providerMode() === "mock") {
+        mockOutage("google");
         return { value: MOCK_PRODUCT_DRAFT, model };
+      }
       throw new ProviderKeyMissing("google");
     }
     return askGemini(

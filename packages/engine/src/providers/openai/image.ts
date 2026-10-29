@@ -13,7 +13,7 @@ import type {
   ImageProvider,
 } from "@/providers/interfaces";
 import { mockEditCopy } from "@/providers/mock/edit-copy";
-import { mockDelay, providerMode } from "@/providers/mode";
+import { mockDelay, mockOutage, providerMode } from "@/providers/mode";
 import { getOpenAI, hasOpenAIKey } from "@/providers/openai/client";
 import {
   GenerationResult,
@@ -183,6 +183,7 @@ export const openaiImageProvider: ImageProvider = {
       // so mock runs fill the board with something to look at. Only a mock run
       // marks its call (mock jobs never count); a live run without a key makes
       // no call, so nothing is counted.
+      mockOutage("openai");
       if (providerMode() === "mock") await options.beforeCall?.();
       await mockDelay();
       return {

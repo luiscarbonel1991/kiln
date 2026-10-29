@@ -15,7 +15,7 @@ import type {
   ImageProvider,
 } from "@/providers/interfaces";
 import { mockEditCopy } from "@/providers/mock/edit-copy";
-import { mockDelay, providerMode } from "@/providers/mode";
+import { mockDelay, mockOutage, providerMode } from "@/providers/mode";
 import {
   GenerationResult,
   type GenerationUsage,
@@ -210,6 +210,7 @@ export const googleImageProvider: ImageProvider = {
     if (!hasGoogleKey()) {
       // The stub returns the reference itself, like OpenAI's: only a mock run
       // marks its call (mock jobs never count).
+      mockOutage("google");
       if (providerMode() === "mock") await options.beforeCall?.();
       await mockDelay();
       return {

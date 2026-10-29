@@ -11,7 +11,7 @@ import {
   mockListingCopy,
   mockProductReview,
 } from "@/providers/mock/art-director";
-import { providerMode } from "@/providers/mode";
+import { mockOutage, providerMode } from "@/providers/mode";
 import {
   artDirectionPrompt,
   DirectionsAnswer,
@@ -98,6 +98,7 @@ export const googleArtDirector: ArtDirector = {
     ).id;
     if (!hasGoogleKey()) {
       if (providerMode() === "mock") {
+        mockOutage("google");
         return { value: mockProductReview(fields), model };
       }
       throw new ProviderKeyMissing("google");
@@ -127,6 +128,7 @@ export const googleArtDirector: ArtDirector = {
     ).id;
     if (!hasGoogleKey()) {
       if (providerMode() === "mock") {
+        mockOutage("google");
         return { value: mockListingCopy(input.draft), model };
       }
       throw new ProviderKeyMissing("google");
@@ -156,7 +158,10 @@ export const googleArtDirector: ArtDirector = {
     ).id;
     const fill = fallbackVariants(recipe, understanding, n);
     if (!hasGoogleKey()) {
-      if (providerMode() === "mock") return { value: fill, model };
+      if (providerMode() === "mock") {
+        mockOutage("google");
+        return { value: fill, model };
+      }
       throw new ProviderKeyMissing("google");
     }
     const slots = recipe.directions.slice(0, n);

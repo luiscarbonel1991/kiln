@@ -45,4 +45,29 @@ describe("KILN_PROVIDERS=mock", () => {
     const b = await openaiImageProvider.edit(input);
     expect(a.assets[0].url).not.toBe(b.assets[0].url);
   });
+
+  it("KILN_MOCK_FAIL plays a provider being down: its stubs answer 503", async () => {
+    vi.stubEnv("KILN_PROVIDERS", "mock");
+    vi.stubEnv("KILN_MOCK_FAIL", "openai");
+    const { openaiArtDirector } = await import(
+      "@/providers/openai/art-director"
+    );
+    const { googleArtDirector } = await import(
+      "@/providers/google/art-director"
+    );
+    const ask = { fields: [] };
+    await expect(
+      openaiArtDirector.reviewProduct(ask, { model: "gpt-6-luna" }),
+    ).rejects.toMatchObject({ status: 503 });
+    await expect(
+      googleArtDirector.reviewProduct(ask, { model: "gemini-3.8-flash" }),
+    ).resolves.toMatchObject({ model: "gemini-3.8-flash" });
+  });
+
+  it("KILN_MOCK_FAIL means nothing in a live run", async () => {
+    vi.stubEnv("KILN_PROVIDERS", "live");
+    vi.stubEnv("KILN_MOCK_FAIL", "openai");
+    const { mockOutage } = await import("@/providers/mode");
+    expect(() => mockOutage("openai")).not.toThrow();
+  });
 });
