@@ -473,6 +473,16 @@ it. Exported slots read "delivered" until an approval or the order changes.
 - A frame posted on its own (a story, a single post) is its own file (`story.jpg`,
   `post.jpg`), outside the numbered slides; the README lists it under "On its own".
 
+## Cost per frame
+
+The board's **Cost** card shows what the project has spent (live runs only: a job's
+measured cost, else its estimate once its paid call went out), over how many takes,
+and the cost per approved frame. Each destination's checklist shows its share. Each
+generated frame shows what its takes cost ("$0.12 · 2 takes"), rejected re-rolls
+included. The listing text counts on its project. The export's README and manifest
+carry the same numbers, so the photo work can be priced into the product. Exact frames,
+your own photos and shared frames cost nothing.
+
 ## Versions and shared frames
 
 An approved scene is made once and reused in every size:
