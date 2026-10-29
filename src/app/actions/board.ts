@@ -332,6 +332,7 @@ export async function writeListingAction(
       draft: current,
     },
     parsed.data.model ?? defaultTextModel(await getMakerModels()),
+    projectId,
   );
   if (!result.copy) return { degraded: result.degraded };
   try {

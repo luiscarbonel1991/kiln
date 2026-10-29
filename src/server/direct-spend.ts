@@ -27,6 +27,8 @@ import { getCurrentMaker } from "@/server/maker-repository";
 
 // What a direct call may cost, and how to measure what it did cost.
 export interface PricedCall<T extends { usage?: unknown }> {
+  // The project the call works for, so its cost counts there.
+  projectId?: string;
   provider: string;
   model: string;
   // The most the call can cost; null when the model has no pinned price.
@@ -116,6 +118,7 @@ export async function withDirectSpend<T extends { usage?: unknown }>(
     provider: priced.provider,
     model: priced.model,
     estimateMicros: toMicros(priced.estimateMax),
+    ...(priced.projectId ? { projectId: priced.projectId } : {}),
   });
   let callStarted = false;
   let result: T;

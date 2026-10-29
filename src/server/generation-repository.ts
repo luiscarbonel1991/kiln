@@ -4,6 +4,7 @@ import { canAfford } from "@/domain/generation-cost";
 import { GenerationRequest } from "@/domain/generation-request";
 import { modelLabel } from "@/domain/model-defaults";
 import { generableCardIds, ProjectPlan } from "@/domain/plan";
+import type { CardSpend } from "@/domain/project-cost";
 import {
   ACTIVE_JOB_STATUSES,
   type JobStatus,
@@ -472,6 +473,8 @@ export async function reserveDirectCall(input: {
   provider: string;
   model: string;
   estimateMicros: number;
+  // The project the call works for (the listing text), so it counts there.
+  projectId?: string;
 }): Promise<string> {
   assertDatabaseUrl();
   return db.$transaction(async (tx) => {
@@ -493,6 +496,7 @@ export async function reserveDirectCall(input: {
     const row = await tx.generationJob.create({
       data: {
         makerId: input.makerId,
+        projectId: input.projectId ?? null,
         cardId: "direct",
         mode: "live",
         status: "running",
@@ -711,6 +715,35 @@ export async function outputVersions(
       job.outputUrl ? [[job.outputUrl, job.productHash] as const] : [],
     ),
   );
+}
+
+// What a project spent, card by card, under the budget's rule (live jobs, a
+// job's measured cost, else its estimate once its paid call went out), with
+// each card's takes (its finished generations). Its direct calls (the
+// listing text) belong to no card.
+export async function projectSpend(projectId: string): Promise<{
+  byCard: Map<string, CardSpend>;
+  directMicros: number;
+}> {
+  assertDatabaseUrl();
+  const rows = await db.$queryRaw<
+    { cardId: string; spent: number; takes: number }[]
+  >`
+    SELECT "cardId",
+      COALESCE(SUM(COALESCE("actualMicros",
+        CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)), 0)::float8 AS "spent",
+      (COUNT(*) FILTER (WHERE "status" = 'done' AND "outputUrl" IS NOT NULL))::int AS "takes"
+    FROM "GenerationJob"
+    WHERE "projectId" = ${projectId} AND "mode" = 'live'
+      AND "status" IN ('done', 'failed', 'canceled')
+    GROUP BY "cardId"`;
+  const byCard = new Map<string, CardSpend>();
+  let directMicros = 0;
+  for (const row of rows) {
+    if (row.cardId === "direct") directMicros += row.spent;
+    else byCard.set(row.cardId, { spentMicros: row.spent, takes: row.takes });
+  }
+  return { byCard, directMicros };
 }
 
 // What produced each of these outputs: the queue job that finished with it

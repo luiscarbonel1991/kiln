@@ -177,11 +177,13 @@ export async function writeListing(
     draft: ListingText;
   },
   model: TextModel,
+  // The project the listing is for: the call's cost counts there.
+  projectId?: string,
 ): Promise<{ copy?: ListingCopy; degraded?: Degraded }> {
   try {
     assertModel(model, "text");
     const result = await withDirectSpend(
-      textCall<ListingCopy>(model, "listingCopy"),
+      { ...textCall<ListingCopy>(model, "listingCopy"), projectId },
       (beforeCall) =>
         getArtDirector(model.provider).writeListing(input, {
           model: model.model,
