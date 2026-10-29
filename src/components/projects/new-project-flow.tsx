@@ -29,6 +29,7 @@ import {
   slotPosition,
   unnumbered,
 } from "@/components/projects/slot-frame";
+import { ReadyMark } from "@/components/ready-mark";
 import { Button } from "@/components/ui/button";
 import type { BrandKit } from "@/domain/brand";
 import {
@@ -344,6 +345,7 @@ export function NewProjectFlow({
 
   return (
     <main className="mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-6 py-10 sm:px-8">
+      <ReadyMark page="new-project" />
       <div>
         <p className="font-sans text-[0.656rem] font-bold uppercase tracking-[0.18em] text-prov-brand">
           New project
@@ -407,6 +409,8 @@ export function NewProjectFlow({
             <div key={p.id} className="group/product relative flex">
               <button
                 type="button"
+                aria-pressed={p.id === productId}
+                data-testid={`product-${p.sku}`}
                 onClick={() => setProductId(p.id)}
                 className={cn(
                   "flex w-full flex-col gap-2 rounded-card bg-card p-5 text-left shadow-card transition-shadow",
@@ -450,6 +454,7 @@ export function NewProjectFlow({
           {creating ? null : (
             <button
               type="button"
+              data-testid="product-new"
               onClick={() => setCreating(true)}
               className="flex flex-col justify-center gap-2 rounded-card bg-card p-5 text-left shadow-card transition-shadow hover:ring-1 hover:ring-primary"
             >
@@ -482,6 +487,7 @@ export function NewProjectFlow({
               <Link
                 key={t.type}
                 href="/studio?new=1"
+                data-testid="type-design"
                 className="flex flex-col gap-1.5 rounded-card bg-card/60 p-5 shadow-card hover:ring-1 hover:ring-border"
               >
                 <span className="font-serif text-lg italic text-foreground">
@@ -496,6 +502,8 @@ export function NewProjectFlow({
                 key={t.type}
                 type="button"
                 disabled={!product}
+                aria-pressed={type === t.type}
+                data-testid={`type-${t.type}`}
                 onClick={() => chooseType(t.type as BoardType)}
                 className={cn(
                   "flex flex-col gap-1.5 rounded-card bg-card p-5 text-left shadow-card disabled:opacity-50",
@@ -568,6 +576,8 @@ export function NewProjectFlow({
                 <button
                   key={d.id}
                   type="button"
+                  aria-pressed={on}
+                  data-testid={`destination-${d.id}`}
                   onClick={() => toggleDestination(d.id)}
                   className={cn(
                     "flex min-w-[220px] flex-col gap-1 rounded-card bg-card px-5 py-4 text-left shadow-card",
@@ -698,6 +708,7 @@ export function NewProjectFlow({
                                 variant="ghost"
                                 size="xs"
                                 className="self-start"
+                                data-testid={`plan-slot-${id}-switch`}
                                 onClick={() => toggleSlot(id)}
                               >
                                 {isOff ? <Eye /> : <EyeOff />}
@@ -810,6 +821,7 @@ export function NewProjectFlow({
                 </p>
               </div>
               <Button
+                data-testid="project-start"
                 onClick={start}
                 disabled={starting}
                 className="h-10 rounded-field px-5 font-semibold shadow-button"

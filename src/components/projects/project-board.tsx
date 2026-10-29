@@ -40,6 +40,7 @@ import {
   AddVideoButton,
   VideoControls,
 } from "@/components/projects/video-controls";
+import { ReadyMark } from "@/components/ready-mark";
 import type { BrandKit } from "@/domain/brand";
 import type { Card } from "@/domain/card";
 import {
@@ -297,6 +298,7 @@ export function ProjectBoard({
 
   return (
     <main className="mx-auto flex w-full max-w-[1320px] flex-col gap-8 px-6 py-8 sm:px-8 lg:flex-row">
+      <ReadyMark page="board" />
       <div className="flex min-w-0 flex-1 flex-col gap-8">
         <div>
           <p className="font-sans text-[0.656rem] font-bold uppercase tracking-[0.18em] text-prov-brand">
