@@ -277,6 +277,117 @@ describe("kiln swatch", () => {
   });
 });
 
+describe("kiln projects, frames, approve", () => {
+  const frames = {
+    project: { id: "p1", name: "Coaster listing kit" },
+    frames: [
+      {
+        frame: "etsy.hero",
+        label: "Marketplace hero",
+        state: "to-review",
+        failed: false,
+        output: "https://storage/hero-2.png",
+        approvedOutput: null,
+        approvable: true,
+      },
+      {
+        frame: "etsy.size",
+        label: "Size & spec",
+        state: "exact",
+        failed: false,
+        output: null,
+        approvedOutput: null,
+        approvable: false,
+      },
+      {
+        frame: "etsy.in-use",
+        label: "In-use mockup",
+        state: "queued",
+        failed: true,
+        error: "the provider timed out",
+        output: null,
+        approvedOutput: null,
+        approvable: false,
+      },
+    ],
+  };
+
+  it("lists the projects, and a project's frames with the take to check", async () => {
+    const c = cli({}, (sent) =>
+      sent.url.endsWith("/api/projects")
+        ? {
+            status: 200,
+            body: {
+              projects: [
+                {
+                  id: "p1",
+                  name: "Coaster listing kit",
+                  type: "listing-kit",
+                  phase: "generation",
+                },
+              ],
+            },
+          }
+        : { status: 200, body: frames },
+    );
+    expect(await c.run("projects")).toBe(0);
+    expect(c.out).toEqual(["p1  listing-kit Coaster listing kit"]);
+    expect(await c.run("frames", "p1")).toBe(0);
+    expect(c.sent[1]).toMatchObject({
+      url: "http://kiln.test/api/projects/p1/frames",
+      method: "GET",
+      headers: { Authorization: "Bearer kiln_pat_test" },
+    });
+    expect(c.out.slice(1)).toEqual([
+      "etsy.hero    to-review  Marketplace hero · https://storage/hero-2.png",
+      "etsy.size    exact      Size & spec",
+      "etsy.in-use  queued     In-use mockup · failed: the provider timed out",
+      "1 to review. After your check: kiln approve p1 <frame> <take>",
+    ]);
+  });
+
+  it("approves the take that was checked, and withdraws with a DELETE", async () => {
+    const c = cli({}, () => ({
+      status: 200,
+      body: {
+        frame: {
+          ...frames.frames[0],
+          state: "approved",
+          approvedOutput: "https://storage/hero-2.png",
+        },
+      },
+    }));
+    expect(
+      await c.run("approve", "p1", "etsy.hero", "https://storage/hero-2.png"),
+    ).toBe(0);
+    expect(c.sent[0]).toMatchObject({
+      url: "http://kiln.test/api/projects/p1/frames/etsy/hero/approval",
+      method: "PUT",
+      body: JSON.stringify({ output: "https://storage/hero-2.png" }),
+    });
+    expect(c.out).toEqual(["approved  etsy.hero · https://storage/hero-2.png"]);
+    expect(await c.run("unapprove", "p1", "etsy.hero")).toBe(0);
+    expect(c.sent[1].method).toBe("DELETE");
+  });
+
+  it("passes a stale take's refusal on (exit 1), and needs a frame (exit 2)", async () => {
+    const c = cli({}, () => ({
+      status: 409,
+      body: {
+        error:
+          "A newer take landed since: https://storage/hero-3.png. Check it, then approve that one.",
+      },
+    }));
+    expect(
+      await c.run("approve", "p1", "etsy.hero", "https://storage/hero-2.png"),
+    ).toBe(1);
+    expect(c.err[0]).toMatch(/A newer take landed since/);
+    expect(await c.run("approve", "p1", "hero")).toBe(2);
+    expect(await c.run("frames")).toBe(2);
+    expect(c.sent).toHaveLength(1);
+  });
+});
+
 describe("kiln", () => {
   it("prints the JSON Schema, and the usage for anything else (exit 2)", async () => {
     const c = cli({});

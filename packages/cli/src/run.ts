@@ -6,13 +6,18 @@ import type {
   RejectedProduct,
 } from "@kiln/engine/domain/product-package";
 
-// kiln — feed Kiln without a file picker (ROADMAP 2026-10-26, P0-1).
+// kiln — feed Kiln without a file picker, and approve its frames without a
+// browser (ROADMAP 2026-10-26, P0-1 and P2-10).
 //
 //   kiln validate <package.json>             the import's own checks, offline
 //   kiln import <package.json>               check, then POST /api/import
 //   kiln swatch <product> <colour> <photo>   a colour's material photo
 //   kiln swatch <product> <colour> --remove
 //   kiln schema                              the package's JSON Schema
+//   kiln projects                            the projects with frames
+//   kiln frames <project>                    each frame, its state and take
+//   kiln approve <project> <frame> [<take>]  approve a frame (P2-10)
+//   kiln unapprove <project> <frame>
 //
 // The checks are the engine's (`parseProductPackage`, `rasterType`), so an
 // exporter fails at build time with the words the import would use. KILN_URL
@@ -25,9 +30,15 @@ export const USAGE = `Usage:
   kiln swatch <product> <colour> <photo>   set a colour's material photo
   kiln swatch <product> <colour> --remove  remove it
   kiln schema                              print the package's JSON Schema
+  kiln projects                            list the projects with frames
+  kiln frames <project>                    each frame, its state and its take
+  kiln approve <project> <frame> [<take>]  approve a frame's take
+  kiln unapprove <project> <frame>         withdraw the approval
 
-<product> is its sku or Kiln id, <colour> its key. --json prints Kiln's
-answer as JSON.
+<product> is its sku or Kiln id, <colour> its key. <project> is a project's
+Kiln id, <frame> its destination and slot (etsy.hero), and <take> the take
+you checked, as kiln frames prints it: Kiln refuses when a newer one has
+landed since. --json prints Kiln's answer as JSON.
 
 Environment: KILN_URL (where Kiln runs, e.g. http://localhost:3009) and
 KILN_TOKEN (a personal access token: Settings → Access tokens).
@@ -186,6 +197,26 @@ interface SwatchAnswer {
   status: "updated" | "unchanged";
   behind: { projectId: string; name: string }[];
   photoColour?: { name: string; hex: string };
+}
+
+interface FrameAnswer {
+  frame: string;
+  label: string;
+  state: string;
+  failed: boolean;
+  error?: string;
+  output: string | null;
+  approvedOutput: string | null;
+  approvable: boolean;
+}
+
+interface FramesAnswer {
+  project: { id: string; name: string };
+  frames: FrameAnswer[];
+}
+
+interface ProjectsAnswer {
+  projects: { id: string; name: string; type: string; phase: string }[];
 }
 
 type Answer = { exit: number } | { status: number; body: unknown };
@@ -387,6 +418,115 @@ async function swatch(
   return 0;
 }
 
+// One GET to Kiln and its 200 answer, else the exit code (its refusal
+// printed).
+async function read<T>(
+  io: Io,
+  path: string,
+): Promise<{ body: T } | { exit: number }> {
+  const conn = connection(io);
+  if (!conn) return { exit: 2 };
+  const answer = await call(io, conn, path, { method: "GET", headers: {} });
+  if ("exit" in answer) return answer;
+  if (answer.status !== 200) {
+    io.err(errorOf(answer.body) ?? `Kiln answered ${answer.status}.`);
+    return { exit: 1 };
+  }
+  return { body: answer.body as T };
+}
+
+async function projects(io: Io, flags: Flags): Promise<number> {
+  const answer = await read<ProjectsAnswer>(io, "/api/projects");
+  if ("exit" in answer) return answer.exit;
+  if (flags.json) {
+    io.out(JSON.stringify(answer.body, null, 2));
+    return 0;
+  }
+  for (const p of answer.body.projects) {
+    io.out(`${p.id}  ${p.type.padEnd(11)} ${p.name}`);
+  }
+  if (answer.body.projects.length === 0) io.out("No project has frames yet.");
+  return 0;
+}
+
+const project = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
+
+async function frames(
+  io: Io,
+  id: string | undefined,
+  flags: Flags,
+): Promise<number> {
+  if (!id) {
+    io.err(USAGE);
+    return 2;
+  }
+  const answer = await read<FramesAnswer>(io, `${project(id)}/frames`);
+  if ("exit" in answer) return answer.exit;
+  if (flags.json) {
+    io.out(JSON.stringify(answer.body, null, 2));
+    return 0;
+  }
+  const all = answer.body.frames;
+  const width = Math.max(...all.map((f) => f.frame.length));
+  for (const f of all) {
+    const failed = f.failed ? ` · failed${f.error ? `: ${f.error}` : ""}` : "";
+    const take = f.output ? ` · ${f.output}` : "";
+    io.out(
+      `${f.frame.padEnd(width)}  ${f.state.padEnd(10)} ${f.label}${take}${failed}`,
+    );
+  }
+  const waiting = all.filter((f) => f.approvable);
+  if (waiting.length > 0) {
+    io.out(
+      `${waiting.length} to review. After your check: kiln approve ${id} <frame> <take>`,
+    );
+  }
+  return 0;
+}
+
+async function approve(
+  io: Io,
+  [id, frame, take]: (string | undefined)[],
+  approved: boolean,
+  flags: Flags,
+): Promise<number> {
+  const dot = frame?.indexOf(".") ?? -1;
+  if (!id || !frame || dot <= 0 || dot === frame.length - 1) {
+    io.err(USAGE);
+    return 2;
+  }
+  const conn = connection(io);
+  if (!conn) return 2;
+  const destination = encodeURIComponent(frame.slice(0, dot));
+  const slot = encodeURIComponent(frame.slice(dot + 1));
+  const answer = await call(
+    io,
+    conn,
+    `${project(id)}/frames/${destination}/${slot}/approval`,
+    approved
+      ? {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(take ? { output: take } : {}),
+        }
+      : { method: "DELETE", headers: {} },
+  );
+  if ("exit" in answer) return answer.exit;
+  if (answer.status !== 200) {
+    io.err(errorOf(answer.body) ?? `Kiln answered ${answer.status}.`);
+    return 1;
+  }
+  const result = answer.body as { frame?: FrameAnswer };
+  if (flags.json) {
+    io.out(JSON.stringify(result, null, 2));
+  } else if (approved) {
+    io.out(`approved  ${frame} · ${result.frame?.approvedOutput ?? ""}`);
+  } else {
+    io.out(`withdrawn ${frame}: its take waits for review again.`);
+  }
+  return 0;
+}
+
 export async function run(argv: string[], io: Io): Promise<number> {
   const flags: Flags = {
     json: argv.includes("--json"),
@@ -411,6 +551,13 @@ export async function run(argv: string[], io: Io): Promise<number> {
     case "schema":
       io.out(JSON.stringify(io.engine.packageJsonSchema(), null, 2));
       return 0;
+    case "projects":
+      return projects(io, flags);
+    case "frames":
+      return frames(io, args[0], flags);
+    case "approve":
+    case "unapprove":
+      return approve(io, args, command === "approve", flags);
     case "help":
     case undefined:
       io.out(USAGE);
