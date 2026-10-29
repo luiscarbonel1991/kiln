@@ -1,7 +1,6 @@
 import { connection } from "next/server";
 import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import { ProjectsHeader } from "@/components/projects/projects-header";
-import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
 import { etsyListingId, ListingUrl } from "@/domain/live-listing";
 import {
   getMakerBrand,
@@ -10,6 +9,7 @@ import {
 } from "@/server/maker-repository";
 import { describeStoredSvg } from "@/server/product-files";
 import { listProducts } from "@/server/product-repository";
+import { textWorstCase } from "@/server/text-calls";
 
 // New project (ROADMAP screen 2): product -> type -> destinations -> plan ->
 // Start. Rendered per request (it reads the maker's products and defaults).
@@ -41,8 +41,9 @@ export default async function NewProjectPage({
   const brand = await getMakerBrand();
   const models = await getMakerModels();
   const { heroSetting } = await getMakerPreferences();
-  const draft = textEstimate(models.text, TEXT_CALL_BUDGETS.productDraft);
-  const review = textEstimate(models.text, TEXT_CALL_BUDGETS.productReview);
+  // Priced at the dearest model of each call's route (deep, fast).
+  const draft = await textWorstCase("productDraft");
+  const review = await textWorstCase("productReview");
   return (
     <div className="flex min-h-full flex-col">
       <ProjectsHeader />

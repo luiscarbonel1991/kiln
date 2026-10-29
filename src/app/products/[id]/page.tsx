@@ -2,15 +2,14 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ProductEditPage } from "@/components/projects/product-edit-page";
 import { ProjectsHeader } from "@/components/projects/projects-header";
-import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
 import { editLimits, formFromProduct, keptWords } from "@/lib/product-form";
-import { getMakerModels } from "@/server/maker-repository";
 import {
   getProduct,
   listProducts,
   productProjects,
 } from "@/server/product-repository";
 import { productHash } from "@/server/product-version";
+import { textWorstCase } from "@/server/text-calls";
 
 // Where the page may send the maker back to: Home, a project's board, or a
 // new project with this product picked.
@@ -33,9 +32,9 @@ export default async function ProductPage({
   const product = await getProduct(id);
   if (!product) notFound();
   const products = await listProducts();
-  const models = await getMakerModels();
-  const draft = textEstimate(models.text, TEXT_CALL_BUDGETS.productDraft);
-  const review = textEstimate(models.text, TEXT_CALL_BUDGETS.productReview);
+  // Priced at the dearest model of each call's route (deep, fast).
+  const draft = await textWorstCase("productDraft");
+  const review = await textWorstCase("productReview");
   const now = productHash(product);
   const uses = (await productProjects(id)).map((use) => ({
     projectId: use.projectId,
