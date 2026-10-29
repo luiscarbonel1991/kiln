@@ -33,6 +33,7 @@ export {
   sizeComparison,
 } from "@/domain/exact";
 export { Field, FieldSource } from "@/domain/field";
+export { type FrameView, frameViews } from "@/domain/frame-view";
 export {
   canAfford,
   costFromUsage,
@@ -196,6 +197,7 @@ export {
   replacementFrames,
   replan,
   type SlotRef,
+  SlotRefusal,
   SlotState,
   type SlotView,
   sceneCardIds,

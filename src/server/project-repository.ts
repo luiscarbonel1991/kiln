@@ -19,6 +19,7 @@ import {
   ProjectPlan,
   type SlotMove,
   type SlotRef,
+  SlotRefusal,
   slotCardId,
   unapproveSlot,
   withBrief,
@@ -464,11 +465,14 @@ const CardState = Card.pick({ status: true, outputs: true });
 // Approve (or withdraw approval of) a scene slot's current output. The project
 // row is locked for the read-modify-write of the plan, so two quick approvals
 // on different slots both land. The card is read from the database, never
-// trusted from the client.
+// trusted from the client. `checked` is the take the caller looked at (an
+// agent after its QC): a newer take landed since is refused, not approved
+// unseen.
 export async function setSlotApproval(
   projectId: string,
   ref: SlotRef,
   approved: boolean,
+  checked?: string,
 ): Promise<void> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
@@ -482,7 +486,11 @@ export async function setSlotApproval(
       where: { id: projectId },
       select: { plan: true },
     });
-    const plan = ProjectPlan.parse(project.plan);
+    const parsed = ProjectPlan.safeParse(project.plan);
+    if (!parsed.success) {
+      throw new SlotRefusal("missing", "That project has no frames.");
+    }
+    const plan = parsed.data;
     const row = await tx.card.findUnique({
       where: {
         projectId_cardId: {
@@ -493,6 +501,15 @@ export async function setSlotApproval(
       select: { status: true, outputs: true },
     });
     const card = row ? CardState.safeParse(row) : undefined;
+    const current = card?.success ? card.data.outputs[0] : undefined;
+    if (approved && checked !== undefined && current !== checked) {
+      throw new SlotRefusal(
+        "stale",
+        current
+          ? `A newer take landed since: ${current}. Check it, then approve that one.`
+          : "That take is not the frame's latest: it has no finished take now.",
+      );
+    }
     const next = approved
       ? approveSlot(plan, ref, card?.success ? card.data : undefined)
       : unapproveSlot(plan, ref);

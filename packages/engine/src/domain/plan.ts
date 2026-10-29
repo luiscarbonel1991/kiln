@@ -590,7 +590,7 @@ export interface SlotView {
   inBatch?: boolean;
 }
 
-interface JobLike {
+export interface JobLike {
   status: "queued" | "running" | "done" | "failed" | "canceled";
   attempt: number;
   error?: string;
@@ -657,6 +657,19 @@ export interface SlotRef {
   slotKey: string;
 }
 
+// Why a slot change was refused, in words a caller can show: no such slot,
+// a change the slot does not take, or a newer take than the one the caller
+// checked (the HTTP API answers 404, 422 and 409).
+export class SlotRefusal extends Error {
+  constructor(
+    readonly kind: "missing" | "refused" | "stale",
+    message: string,
+  ) {
+    super(message);
+    this.name = "SlotRefusal";
+  }
+}
+
 // Approve the output a scene slot's card shows now. Refuses anything but a
 // finished card with a real output; re-rolling the card later un-approves it
 // (the approved output no longer matches). A new approval is not delivered
@@ -668,14 +681,22 @@ export function approveSlot(
 ): ProjectPlan {
   const output = card?.outputs[0];
   const approved = updateSlot(plan, ref, (slot) => {
-    if (slot.fill === "exact") throw new Error("exact slots need no approval");
-    if (slot.fill === "photo")
-      throw new Error("your own photo needs no approval");
+    if (slot.fill === "exact")
+      throw new SlotRefusal("refused", "exact slots need no approval");
+    if (slot.fill === "photo") {
+      throw new SlotRefusal("refused", "your own photo needs no approval");
+    }
     if (slot.fill === "shared") {
-      throw new Error("a shared frame follows the scene it repeats");
+      throw new SlotRefusal(
+        "refused",
+        "a shared frame follows the scene it repeats",
+      );
     }
     if (card?.status !== "done" || !output) {
-      throw new Error("nothing to approve: the slot has no finished output");
+      throw new SlotRefusal(
+        "refused",
+        "nothing to approve: the slot has no finished output",
+      );
     }
     const { deliveredAt: _d, ...rest } = slot;
     return { ...rest, approvedOutput: output };
@@ -750,7 +771,10 @@ export function moveSlot(
       if (d.destinationId !== ref.destinationId) return d;
       const from = d.slots.findIndex((s) => s.key === ref.slotKey);
       if (from < 0) {
-        throw new Error(`no slot "${ref.slotKey}" on "${ref.destinationId}"`);
+        throw new SlotRefusal(
+          "missing",
+          `no slot "${ref.slotKey}" on "${ref.destinationId}"`,
+        );
       }
       const slots = [...d.slots];
       if (slots[from].fill === "video") return d;
@@ -1022,7 +1046,10 @@ function updateSlot(
         },
   );
   if (!found) {
-    throw new Error(`no slot "${ref.slotKey}" on "${ref.destinationId}"`);
+    throw new SlotRefusal(
+      "missing",
+      `no slot "${ref.slotKey}" on "${ref.destinationId}"`,
+    );
   }
   return { ...plan, destinations };
 }
