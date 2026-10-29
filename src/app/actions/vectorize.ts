@@ -60,19 +60,35 @@ async function centerlineSvg(bytes: Buffer): Promise<string> {
   }
 }
 
+// Why a trace failed, in words the maker can act on.
+function traceProblem(error: unknown, mode: "outline" | "centerline"): string {
+  const e = error as { code?: unknown; message?: unknown } | null;
+  if (mode === "centerline" && e?.code === "ENOENT") {
+    return "Centerline needs autotrace and ImageMagick on the server. Try Outline.";
+  }
+  const message = typeof e?.message === "string" ? e.message : String(error);
+  return `Could not trace this image: ${message.slice(0, 200)}`;
+}
+
 // Server Function: trace a raster (a generated line-art image) into a REAL SVG.
 // Two modes (see VectorizeInput); the bundled OXVG optimizer shrinks the result.
 // Stored as image/svg+xml. Only meaningful for high-contrast line art — tracing a
 // photo yields a bloated SVG, so the UI only exposes this for line-art cards.
+// A failure comes back with its reason, never silently.
 export async function vectorizeCardAction(
   input: unknown,
-): Promise<{ url: string }> {
+): Promise<{ url: string } | { error: string }> {
   const { imageUrl, mode } = VectorizeInput.parse(input);
-  const { bytes } = await fetchAsset(imageUrl);
-  const traced =
-    mode === "centerline"
-      ? await centerlineSvg(bytes)
-      : await vectorize(bytes, Preset.Bw);
+  let traced: string;
+  try {
+    const { bytes } = await fetchAsset(imageUrl);
+    traced =
+      mode === "centerline"
+        ? await centerlineSvg(bytes)
+        : await vectorize(bytes, Preset.Bw);
+  } catch (error) {
+    return { error: traceProblem(error, mode) };
+  }
   // OXVG handles vtracer output cleanly; autotrace's SVG can have quirks it rejects,
   // so fall back to the raw (already-compact) trace if optimization throws.
   let svg = traced;

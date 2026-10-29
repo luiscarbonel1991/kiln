@@ -17,16 +17,12 @@ import { CardActions } from "@/components/studio/card-actions";
 import { CardFieldRow } from "@/components/studio/card-field-row";
 import { RenderCanvas } from "@/components/studio/render-canvas";
 import { assemblePrompt, type FieldKey } from "@/domain/cascade";
-import {
-  estimateGeneration,
-  estimateVideo,
-  toMicros,
-} from "@/domain/generation-cost";
+import { toMicros } from "@/domain/generation-cost";
 import type { MasterAsset } from "@/domain/master-asset";
 import { isActiveJob } from "@/domain/queue";
 import { SEED_BRAND } from "@/domain/seed";
 import type { BaseUnderstanding } from "@/domain/understanding";
-import { snapSeconds, videoSecondsFor } from "@/domain/video";
+import { cardEstimate, estimateHint } from "@/lib/card-estimate";
 import { assetFilename, downloadAsset } from "@/lib/download";
 import { gradientForSeed } from "@/lib/gradient";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
@@ -70,6 +66,7 @@ export function GenerationCard({
   const job = useProject((s) => s.jobs[card.id]);
   const [open, setOpen] = useState(false);
   const [vectorizing, setVectorizing] = useState(false);
+  const [vectorError, setVectorError] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
   const inQueue = projectMode && isActiveJob(job);
 
@@ -127,28 +124,7 @@ export function GenerationCard({
     }
   }
 
-  // What one generation of this card costs on its own model: an image at its
-  // aspect and quality, a video at the length its model renders.
-  const videoUsd =
-    card.type === "video"
-      ? estimateVideo(
-          card.model,
-          snapSeconds(
-            card.video?.durationSec,
-            videoSecondsFor(undefined, card.model),
-          ),
-        )
-      : null;
-  const estimate =
-    card.type === "video"
-      ? videoUsd === null
-        ? null
-        : { typical: videoUsd, max: videoUsd }
-      : estimateGeneration(
-          card.model,
-          card.model.aspect,
-          card.references.length,
-        );
+  const estimate = cardEstimate(card);
   const busyLabel =
     job?.status === "queued"
       ? job.attempt >= 1
@@ -168,11 +144,13 @@ export function GenerationCard({
     const src = card.outputs[0];
     if (!src) return;
     setVectorizing(true);
+    setVectorError(null);
     try {
-      const { url } = await vectorizeCardAction({ imageUrl: src, mode });
-      applyVector(card.id, url);
+      const result = await vectorizeCardAction({ imageUrl: src, mode });
+      if ("error" in result) setVectorError(result.error);
+      else applyVector(card.id, result.url);
     } catch {
-      // keep the buttons so the user can retry
+      setVectorError("Could not reach the server. Try again.");
     } finally {
       setVectorizing(false);
     }
@@ -239,11 +217,7 @@ export function GenerationCard({
         }
         onPromote={() => promoteToVideo(card.id)}
         busyLabel={projectMode ? busyLabel : undefined}
-        generateHint={
-          projectMode && estimate
-            ? `≈ $${estimate.typical.toFixed(2)}–${estimate.max.toFixed(2)}`
-            : undefined
-        }
+        generateHint={estimate ? estimateHint(estimate) : "no pinned price"}
         canPromote={!projectMode}
         disabledReason={
           projectMode && card.type === "video"
@@ -285,6 +259,14 @@ export function GenerationCard({
               </>
             )}
           </div>
+          {vectorError && !vectorizing ? (
+            <p
+              className="border-border-soft border-t px-4 py-2.5 font-mono text-[0.625rem] leading-snug text-prov-local"
+              role="alert"
+            >
+              {vectorError}
+            </p>
+          ) : null}
           {card.vectorUrl && !vectorizing ? (
             <button
               type="button"
