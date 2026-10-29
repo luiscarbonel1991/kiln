@@ -214,7 +214,7 @@ behind your own sign-in (a VPN, a reverse proxy with authentication) and start i
 | `DELETE /api/products/:id/colours/:key/swatch` | none | the same, with `swatchUrl: null` |
 | `GET /api/results` | none | every followed listing (`projectId`, `destinationId`, `listingUrl`, `liveOn`): the reads `due` today, each with its `window`, the `next` one, the `reads` taken, the `comparison` in words and the frames `changed` |
 | `GET /api/projects` | none | the projects that have frames (`id`, `name`, `type`, `phase`, `updatedAt`), newest first |
-| `GET /api/projects/:id/frames` | none | each frame as the board shows it: `frame` (`etsy.hero`), `label`, `fill`, `aspect`, `state`, `failed` and `error`, `output` (the take an approval approves), `approvedOutput`, `approvable`, `versionOf`. 404 unknown project or one with no frames |
+| `GET /api/projects/:id/frames` | none | each frame as the board shows it: `frame` (`etsy.hero`), `label`, `fill`, `aspect`, `state`, `failed` and `error`, `output` (the take an approval approves), `approvedOutput`, `approvable`, `versionOf`, and `ranOn` when its latest take moved down its route. 404 unknown project or one with no frames |
 | `PUT /api/projects/:id/frames/:destinationId/:slotKey/approval` | optionally `{ "output": "<url>" }`, the take you checked | the `frame` after its approval. 404 unknown project or frame, 409 a newer take landed since the one you checked, 422 a frame that takes no approval (an exact frame, the maker's photo, a shared frame, no finished take) |
 | `DELETE /api/projects/:id/frames/:destinationId/:slotKey/approval` | none | the `frame`, its approval withdrawn |
 | `PUT /api/projects/:id/results/:destinationId/:read` | `{ visits, views, favourites, orders, revenue, searchVisits }` (any of them), optionally `from`, `to`, `source`, `readOn` | the read kept (`:read` is `before`, `day14` or `day30`; its window and today by default, source "API"). 400 not JSON, 404 unknown project, destination or read, 422 a read Kiln cannot keep |
@@ -358,17 +358,41 @@ pinned price, with its date and source, is in `generation-cost.ts`. A model
 without a price cannot be queued. OpenAI shut Sora down on 2026-09-24; its old
 outputs keep their label.
 
-Settings → Models (`/settings`) holds the maker's default per kind. The
-defaults are images on gpt-image-2 medium, video on Veo 3.1 Fast 720p, and text
-on GPT-6.1 Sol. Every board slot and editor card can pick its own model, and
-every generation names its model and price before it is paid.
+### Routes
 
-Kiln never switches provider on its own:
+Work runs on **roles**, never on a model id: text `deep` (reading a photo,
+drafting a product, the art director, the listing text) and `fast` (the
+product review), images `final` (the board's frames) and `draft` (the studio's
+new cards), and `video`. Settings → Models (`/settings`) gives each role a
+**route**: the model its work starts on and, when "Fall back to the next
+model" is on, the models it may move to if a provider fails. A route holds
+only catalog models with a pinned price, at most four.
 
-- A retired or unknown model is refused with the reason.
-- A live job whose provider has no key is refused.
-- When vision or the art director cannot run, the studio says so and offers
-  the other provider, with its price, on a click.
+- Until the maker saves, Settings shows Kiln's proposal and every task runs its
+  one default model with no fallback (images on gpt-image-2 medium, video on Veo
+  3.1 Fast 720p, text on GPT-6.1 Sol). The proposal starts each route on that
+  default and adds the other provider's counterpart when it has a key.
+- Text falls back by default; images and video do not until the maker turns it
+  on, since another model changes the look. A batch stays on one model: when a
+  frame moves, its batch's frames still queued move with it.
+- A frame starts on its card's own model and follows the rest of the route. A
+  model picked for a card outside the route runs alone, and a model named on a
+  click (the degraded notice's offer) runs alone.
+- A failure the provider answered moves on (429, 5xx, 408); a rejected key or
+  no credit skips that provider. A call with no answer may have been charged:
+  it stays final, counted at its estimate. The month's cap, a content refusal
+  and a bad request stop.
+- So a frame pays one call at most, and the estimate before spending (the
+  Generate dialog, Tune's "New take", the editor, the video) counts the
+  dearest model it may run on; the queue reserves the same.
+- Every take that moved says so under its frame ("Gemini 3.1 Flash Image ·
+  from GPT Image 2: OpenAI answered 503"), and so do the frames API, `kiln
+  frames` and Deliver's README and manifest. A text call that moved says which
+  model answered. Provider health counts a move as a failure of the provider
+  it left.
+
+Nothing else switches a model: a retired or unknown model is refused with the
+reason, and a live job whose provider has no key is refused.
 
 Settings → Providers shows each key and the provider's last calls (the last
 error, the last call that worked). It reads them from the job ledger, so it
@@ -461,6 +485,13 @@ client it loaded, so a new column reads as "Unknown field".
 ```bash
 pnpm db:mock:setup   # once (and after new migrations): the mock database
 pnpm dev:mock        # stubs only (no paid calls, nothing counted), 4 s per stub
+```
+
+`KILN_MOCK_FAIL=openai` (or `google`) makes that provider's stubs answer as if
+it were down (503), so a route's fallback can be walked for free:
+
+```bash
+KILN_MOCK_FAIL=openai pnpm dev:mock
 ```
 
 Mock runs use their own database (`KILN_MOCK_DATABASE_URL`, by default
