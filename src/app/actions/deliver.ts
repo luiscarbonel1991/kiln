@@ -6,6 +6,7 @@ import { listingDraft } from "@/domain/listing";
 import { slotCardId } from "@/domain/plan";
 import { plateHref } from "@/lib/plate-href";
 import { CATALOG } from "@/lib/recipes";
+import { versionMark } from "@/lib/version-mark";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { buildDelivery, DeliveryRefusal } from "@/server/deliver/delivery";
 import { outputSources } from "@/server/generation-repository";
@@ -44,6 +45,10 @@ export async function deliverAction(input: unknown): Promise<DeliverResult> {
   if (!loaded?.product || !plan || !destination) {
     return { error: "This destination is not part of a planned project." };
   }
+  const fullPlan = loaded.board.plan;
+  if (!fullPlan) {
+    return { error: "This destination is not part of a planned project." };
+  }
   const cards = new Map(loaded.board.cards.map((c) => [c.id, c]));
   const outputs = plan.slots.flatMap((s) =>
     !s.off && s.approvedOutput ? [s.approvedOutput] : [],
@@ -71,6 +76,7 @@ export async function deliverAction(input: unknown): Promise<DeliverResult> {
       plate: plate ? { ...plate, href: await dataUrl(plate.href) } : null,
       fetchOutput: async (url) => (await fetchAsset(url)).bytes,
       sourceOf: (output) => sources.get(output),
+      markOf: (slot) => versionMark(fullPlan, slot, { waits: false }),
       ...(destination.text
         ? {
             listing:

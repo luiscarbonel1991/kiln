@@ -395,6 +395,102 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
     expect(readme).toContain(`with "${coaster.hook}" drawn by Kiln`);
   });
 
+  it("a story is posted on its own, and a shared slide says where its scene comes from", async () => {
+    const STORY = "https://storage.test/cards/story.png";
+    const instagram = DestinationProfile.parse({
+      id: "instagram",
+      name: "Instagram",
+      kind: "content",
+      formats: [
+        { key: "feed", label: "Feed", aspect: "4:5", minPx: 1080 },
+        { key: "story", label: "Story", aspect: "9:16", minPx: 1080 },
+      ],
+      rules: { textOnImage: "allowed", negative: [] },
+      delivery: { mode: "export" },
+    });
+    const carousel = PlanDestination.parse({
+      destinationId: "instagram",
+      shotListId: "instagram-carousel",
+      slots: [
+        {
+          key: "hook",
+          label: "Hook",
+          purpose: "p",
+          aspect: "4:5",
+          approvedOutput: HERO,
+        },
+        {
+          key: "story",
+          label: "Story",
+          purpose: "p",
+          aspect: "9:16",
+          versionOf: "instagram.hook",
+          standalone: true,
+          approvedOutput: STORY,
+        },
+        {
+          key: "in-place",
+          label: "Product in place",
+          purpose: "p",
+          aspect: "4:5",
+          fill: "shared",
+          versionOf: "etsy.in-use",
+          approvedOutput: IN_USE,
+        },
+      ],
+    });
+    const result = await buildDelivery(
+      input({
+        destination: instagram,
+        plan: carousel,
+        cardOf: (key: string) =>
+          key === "story"
+            ? { status: "done" as const, outputs: [STORY] }
+            : key === "hook"
+              ? { status: "done" as const, outputs: [HERO] }
+              : undefined,
+        fetchOutput: async () => png("1024x1536"),
+        markOf: (slot: { versionOf?: string; fill: string }) =>
+          slot.fill === "shared"
+            ? "same scene as Etsy · In-use mockup"
+            : slot.versionOf
+              ? "re-frames Hook"
+              : undefined,
+      }),
+    );
+    const files = unzipSync(result.zip);
+    const folder = "botanical-coaster-launch-instagram";
+    expect(Object.keys(files).sort()).toEqual(
+      [
+        "01-hook.jpg",
+        "02-in-place.jpg",
+        "README.txt",
+        "manifest.json",
+        "story.jpg",
+      ].map((f) => `${folder}/${f}`),
+    );
+    expect(imageSize(files[`${folder}/story.jpg`])).toEqual({
+      width: 1080,
+      height: 1920,
+    });
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    expect(
+      manifest.files.map((f: { file: string; photo: number | null }) => [
+        f.file,
+        f.photo,
+      ]),
+    ).toEqual([
+      ["01-hook.jpg", 1],
+      ["story.jpg", null],
+      ["02-in-place.jpg", 2],
+    ]);
+    const readme = strFromU8(files[`${folder}/README.txt`]);
+    expect(readme).toContain(`On its own: ${folder}/story.jpg — Story`);
+    expect(readme).toContain("re-frames Hook");
+    expect(readme).toContain("same scene as Etsy · In-use mockup");
+    expect(readme.indexOf("2. ")).toBeLessThan(readme.indexOf("On its own"));
+  });
+
   it("the README says why: the market brief with its sources and dates, and a scene's own place", async () => {
     const briefed = PlanDestination.parse({
       ...plan,

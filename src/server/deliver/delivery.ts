@@ -18,6 +18,7 @@ import {
   type CardLike,
   deliveryBlockers,
   type PlanDestination,
+  type PlanSlot,
   videoSettings,
 } from "@/domain/plan";
 import type { Product } from "@/domain/product";
@@ -69,12 +70,15 @@ export interface DeliveryInput {
   // The listing text (saved, else the free draft), on a destination with
   // text rules: it goes along as the paste sheet.
   listing?: ListingText;
+  // Where a version or a shared frame comes from ("re-frames Hook").
+  markOf?(slot: PlanSlot): string | undefined;
   now: Date;
 }
 
 export interface DeliveredFile {
   file: string;
-  // The photo number; null for the listing video.
+  // The photo number; null for the listing video and a frame posted on its
+  // own (a story, a single post).
   photo: number | null;
   slot: string;
   label: string;
@@ -88,6 +92,8 @@ export interface DeliveredFile {
   place?: string;
   // The text layer drawn over a scene by its template.
   text?: string;
+  // Where a version or a shared frame comes from.
+  from?: string;
 }
 
 // A clip's pixel size by resolution and orientation (Veo; Sora rendered 720p).
@@ -148,6 +154,17 @@ function briefLines(brief: MarketBrief | undefined): string[] {
   ];
 }
 
+// One delivered image in the README: what it is and what made it.
+function frameLine(folder: string, f: DeliveredFile): string {
+  const what =
+    f.kind === "exact"
+      ? "drawn from the product spec"
+      : f.kind === "photo"
+        ? "your photo, as on the listing"
+        : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${f.from ? `; ${f.from}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}`;
+  return `${folder}/${f.file} — ${f.label} (${what}), ${f.width} x ${f.height} px`;
+}
+
 function readme(
   input: DeliveryInput,
   files: DeliveredFile[],
@@ -166,11 +183,18 @@ function readme(
           "photo 1 is the listing's thumbnail. A human publishes.",
         ]),
     "",
-    ...files.map((f) =>
-      f.kind === "video"
-        ? `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.label ?? f.source.model}` : ""}), ${f.width} x ${f.height} px`
-        : `${f.photo}. ${folder}/${f.file} — ${f.label} (${f.kind === "exact" ? "drawn from the product spec" : f.kind === "photo" ? "your photo, as on the listing" : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}`}), ${f.width} x ${f.height} px`,
-    ),
+    ...files
+      .filter((f) => f.photo !== null)
+      .map((f) => `${f.photo}. ${frameLine(folder, f)}`),
+    ...files
+      .filter((f) => f.photo === null && f.kind !== "video")
+      .map((f) => `On its own: ${frameLine(folder, f)}`),
+    ...files
+      .filter((f) => f.kind === "video")
+      .map(
+        (f) =>
+          `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.label ?? f.source.model}` : ""}), ${f.width} x ${f.height} px`,
+      ),
     ...briefLines(input.plan.brief),
     "",
     "manifest.json lists each file with its source (the prompt and model of each",
@@ -239,9 +263,13 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       });
       continue;
     }
-    photo += 1;
+    // A frame posted on its own takes no number: it is named by its slot.
+    const number = slot.standalone ? null : ++photo;
     const size = targetSize(slot.aspect, input.destination);
-    const stem = `${String(photo).padStart(2, "0")}-${slot.key}`;
+    const stem =
+      number === null
+        ? slot.key
+        : `${String(number).padStart(2, "0")}-${slot.key}`;
     if (slot.fill === "photo" && slot.photo) {
       // The maker's own photo goes as it is: a JPEG or PNG untouched, a WebP
       // as a JPEG (Etsy takes neither WebP nor a crop of the maker's photo).
@@ -249,7 +277,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       const type = rasterType(bytes);
       if (!type) {
         throw new DeliveryRefusal(
-          `"${slot.label}" (photo ${photo}) is not a PNG, JPEG or WebP image.`,
+          `"${slot.label}" (photo ${number}) is not a PNG, JPEG or WebP image.`,
         );
       }
       const out = type === "image/webp" ? await asJpeg(bytes) : bytes;
@@ -258,7 +286,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       entries[`${folder}/${file}`] = out;
       files.push({
         file,
-        photo,
+        photo: number,
         slot: slot.key,
         label: slot.label,
         kind: "photo",
@@ -280,7 +308,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       entries[`${folder}/${file}`] = renderExactPng(svg, size.width);
       files.push({
         file,
-        photo,
+        photo: number,
         slot: slot.key,
         label: slot.label,
         kind: "exact",
@@ -306,9 +334,10 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
           ),
         )
       : scene;
+    const from = input.markOf?.(slot);
     files.push({
       file,
-      photo,
+      photo: number,
       slot: slot.key,
       label: slot.label,
       kind: "scene",
@@ -317,6 +346,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       source: input.sourceOf(output),
       ...(slot.place ? { place: slot.place } : {}),
       ...(text ? { text } : {}),
+      ...(from ? { from } : {}),
     });
   }
   const manifest = {
