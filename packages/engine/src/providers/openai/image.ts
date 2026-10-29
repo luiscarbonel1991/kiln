@@ -12,6 +12,7 @@ import type {
   EditBytesResult,
   ImageProvider,
 } from "@/providers/interfaces";
+import { mockEditCopy } from "@/providers/mock/edit-copy";
 import { mockDelay, providerMode } from "@/providers/mode";
 import { getOpenAI, hasOpenAIKey } from "@/providers/openai/client";
 import {
@@ -158,7 +159,9 @@ export const openaiImageProvider: ImageProvider = {
     const model = modelOf(input);
     if (!hasOpenAIKey()) {
       await mockDelay();
-      return mockResult("edit", model);
+      return providerMode() === "mock"
+        ? mockEditCopy(input.masterAssetUrl, "openai", model)
+        : mockResult("edit", model);
     }
     const image = await editImages(input);
     await options?.beforeCall?.();

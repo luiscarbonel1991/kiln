@@ -14,6 +14,7 @@ import type {
   EditBytesResult,
   ImageProvider,
 } from "@/providers/interfaces";
+import { mockEditCopy } from "@/providers/mock/edit-copy";
 import { mockDelay, providerMode } from "@/providers/mode";
 import {
   GenerationResult,
@@ -183,7 +184,9 @@ export const googleImageProvider: ImageProvider = {
     const model = modelOf(input);
     if (!hasGoogleKey()) {
       await mockDelay();
-      return mockResult("edit", model);
+      return providerMode() === "mock"
+        ? mockEditCopy(input.masterAssetUrl, "google", model)
+        : mockResult("edit", model);
     }
     const master = await fetchAsset(input.masterAssetUrl);
     const refs = await Promise.all(input.imageInputs.map((u) => fetchAsset(u)));
