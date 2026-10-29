@@ -25,7 +25,7 @@ const ROWS: { kind: ModelKind; label: string; what: string }[] = [
   {
     kind: "text",
     label: "Text",
-    what: "Reads a product photo and directs the scenes in the studio.",
+    what: "Reads a product photo, drafts and reviews a product, writes the listing text and directs the studio's scenes.",
   },
 ];
 
