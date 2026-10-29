@@ -195,6 +195,38 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
     ]);
   });
 
+  it("names the model a frame ran on after it moved down its route", async () => {
+    const result = await buildDelivery(
+      input({
+        sourceOf: (url: string) =>
+          url === HERO
+            ? {
+                prompt: "a hero",
+                provider: "google",
+                model: "gemini-3.1-flash-image",
+                label: "Gemini 3.1 Flash Image",
+                costMicros: 68_000,
+                generatedAt: "2026-10-29T12:00:00.000Z",
+                fallback: {
+                  from: "GPT Image 2",
+                  reason: "OpenAI answered 503",
+                },
+              }
+            : undefined,
+      }),
+    );
+    const files = unzipSync(result.zip);
+    const folder = "botanical-coaster-launch-etsy";
+    expect(strFromU8(files[`${folder}/README.txt`])).toContain(
+      "Gemini 3.1 Flash Image (moved from GPT Image 2: OpenAI answered 503)",
+    );
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    expect(manifest.files[1].source).toMatchObject({
+      model: "gemini-3.1-flash-image",
+      fallback: { from: "GPT Image 2", reason: "OpenAI answered 503" },
+    });
+  });
+
   it("delivers the maker's own photos as they are, numbered in their place; a WebP as a JPEG", async () => {
     const LIVE_1 = "https://storage.test/listings/live-1.png";
     const LIVE_3 = "https://storage.test/listings/live-3.webp";

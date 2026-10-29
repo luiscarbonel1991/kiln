@@ -53,7 +53,13 @@ export interface SceneSource {
   seconds?: number;
   aspect?: string;
   resolution?: string;
+  // It moved down its route (Settings → Models): the model it left and why.
+  fallback?: { from: string; reason: string };
 }
+
+// "Gemini 3.1 Flash Image (moved from GPT Image 2: OpenAI answered 503)".
+const sourceModel = (source: SceneSource) =>
+  `${source.label ?? source.model}${source.fallback ? ` (moved from ${source.fallback.from}: ${source.fallback.reason})` : ""}`;
 
 export interface DeliveryInput {
   projectName: string;
@@ -167,7 +173,7 @@ function frameLine(folder: string, f: DeliveredFile): string {
       ? "drawn from the product spec"
       : f.kind === "photo"
         ? "your photo, as on the listing"
-        : `approved scene${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${f.from ? `; ${f.from}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}${takesLine(f)}`;
+        : `approved scene${f.source ? `, ${sourceModel(f.source)}` : ""}${f.from ? `; ${f.from}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}${takesLine(f)}`;
   return `${folder}/${f.file} — ${f.label} (${what}), ${f.width} x ${f.height} px`;
 }
 
@@ -219,7 +225,7 @@ function readme(
       .filter((f) => f.kind === "video")
       .map(
         (f) =>
-          `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${f.source.label ?? f.source.model}` : ""}${takesLine(f)}), ${f.width} x ${f.height} px`,
+          `Listing video: ${folder}/${f.file} — ${f.label} (approved, ${f.seconds} s${f.source ? `, ${sourceModel(f.source)}` : ""}${takesLine(f)}), ${f.width} x ${f.height} px`,
       ),
     ...costLines(input.cost),
     ...briefLines(input.plan.brief),

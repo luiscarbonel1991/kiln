@@ -823,6 +823,8 @@ export interface OutputSource {
   seconds?: number;
   aspect?: string;
   resolution?: string;
+  // It moved down its route: the first model it left and why.
+  fallback?: { from: string; reason: string };
 }
 
 // The product version each of these outputs was made from (the job that
@@ -887,6 +889,7 @@ export async function outputSources(
     select: {
       outputUrl: true,
       request: true,
+      route: true,
       actualMicros: true,
       finishedAt: true,
     },
@@ -895,7 +898,11 @@ export async function outputSources(
   for (const job of jobs) {
     const request = GenerationRequest.safeParse(job.request);
     if (!job.outputUrl || !request.success) continue;
+    const moved = ranOn(readJobRoute(job.route));
     sources.set(job.outputUrl, {
+      ...(moved
+        ? { fallback: { from: moved.from, reason: moved.reason } }
+        : {}),
       prompt: request.data.prompt,
       provider: request.data.model.provider,
       model: request.data.model.model,
