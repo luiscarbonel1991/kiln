@@ -53,7 +53,13 @@ export function ZoomableImage({
       </button>
       {open
         ? createPortal(
-            <div className="fixed inset-0 z-50">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={alt}
+              data-testid="zoom-view"
+              className="fixed inset-0 z-50"
+            >
               <button
                 type="button"
                 onClick={() => setOpen(false)}

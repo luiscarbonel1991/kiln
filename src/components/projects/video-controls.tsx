@@ -10,6 +10,7 @@ import type {
 } from "@/components/models/model-choice";
 import { SlotModel } from "@/components/projects/slot-model";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { estimateVideo, toMicros } from "@/domain/generation-cost";
 import { modelLabel } from "@/domain/model-defaults";
 import type { VideoSettings } from "@/domain/plan";
@@ -162,66 +163,55 @@ export function VideoControls({
         <span className="font-mono text-[0.6rem] text-prov-local">{error}</span>
       ) : null}
 
-      {confirming ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 bg-foreground/60 backdrop-blur-sm"
-            onClick={() => !pending && setConfirming(false)}
-          />
-          <div className="relative flex w-full max-w-md flex-col gap-4 rounded-card bg-card p-6 shadow-card">
-            <h3
-              className="font-serif text-xl italic text-foreground"
-              style={{ fontVariationSettings: "'opsz' 40" }}
-            >
-              Generate the video?
-            </h3>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 font-sans text-sm">
-              <dt className="text-on-surface-mid">Starts from</dt>
-              <dd className="text-foreground">{frameLabel} (approved)</dd>
-              <dt className="text-on-surface-mid">Motion</dt>
-              <dd className="text-foreground">
-                {VIDEO_MOTIONS[settings.motion].label}, {settings.seconds} s,{" "}
-                {settings.orientation === "landscape"
-                  ? "landscape 16:9"
-                  : "vertical 9:16"}
-              </dd>
-              <dt className="text-on-surface-mid">Model</dt>
-              <dd className="text-foreground">
-                {modelLabel(model)}
-                {model.resolution ? `, ${model.resolution}` : ""}
-              </dd>
-              <dt className="text-on-surface-mid">Estimated</dt>
-              <dd className="text-foreground">
-                {usd === null ? "no pinned price" : money(usd)} (billed by the
-                second)
-              </dd>
-              <dt className="text-on-surface-mid">This month</dt>
-              <dd className="text-foreground">{budgetLine}</dd>
-            </dl>
-            <p className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
-              Kiln animates the approved scene in the background; the product
-              stays exactly as photographed. A render that fails is never paid
-              twice.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                onClick={() => setConfirming(false)}
-              >
-                Cancel
-              </Button>
-              <Button size="sm" disabled={pending} onClick={generate}>
-                {pending ? <Loader2 className="animate-spin" /> : <Film />}
-                Generate · {usd === null ? "" : money(usd)}
-              </Button>
-            </div>
-          </div>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        busy={pending}
+        testId="video-confirm"
+        title="Generate the video?"
+      >
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 font-sans text-sm">
+          <dt className="text-on-surface-mid">Starts from</dt>
+          <dd className="text-foreground">{frameLabel} (approved)</dd>
+          <dt className="text-on-surface-mid">Motion</dt>
+          <dd className="text-foreground">
+            {VIDEO_MOTIONS[settings.motion].label}, {settings.seconds} s,{" "}
+            {settings.orientation === "landscape"
+              ? "landscape 16:9"
+              : "vertical 9:16"}
+          </dd>
+          <dt className="text-on-surface-mid">Model</dt>
+          <dd className="text-foreground">
+            {modelLabel(model)}
+            {model.resolution ? `, ${model.resolution}` : ""}
+          </dd>
+          <dt className="text-on-surface-mid">Estimated</dt>
+          <dd className="text-foreground">
+            {usd === null ? "no pinned price" : money(usd)} (billed by the
+            second)
+          </dd>
+          <dt className="text-on-surface-mid">This month</dt>
+          <dd className="text-foreground">{budgetLine}</dd>
+        </dl>
+        <p className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
+          Kiln animates the approved scene in the background; the product stays
+          exactly as photographed. A render that fails is never paid twice.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={() => setConfirming(false)}
+          >
+            Cancel
+          </Button>
+          <Button size="sm" disabled={pending} onClick={generate}>
+            {pending ? <Loader2 className="animate-spin" /> : <Film />}
+            Generate · {usd === null ? "" : money(usd)}
+          </Button>
         </div>
-      ) : null}
+      </ConfirmDialog>
     </div>
   );
 }

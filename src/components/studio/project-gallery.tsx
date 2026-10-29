@@ -42,7 +42,13 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Projects"
+      data-testid="project-gallery"
+      className="fixed inset-0 z-50 overflow-y-auto"
+    >
       {/* Real button backdrop: keyboard-accessible, fixed so it stays put while the
           content scrolls, behind the relative content layer. */}
       <button
