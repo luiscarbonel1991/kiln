@@ -80,6 +80,7 @@ export function SlotTune({
         <Popover.Trigger asChild>
           <button
             type="button"
+            data-testid={`tune-${destinationId}-${slotKey}-open`}
             className="inline-flex shrink-0 items-center gap-1 font-sans text-[0.72rem] font-semibold text-primary hover:underline"
           >
             <SlidersHorizontal className="size-3" /> Tune
@@ -121,6 +122,7 @@ export function SlotTune({
                       <ToggleGroup.Item
                         key={stop.key}
                         value={stop.key}
+                        data-testid={`tune-${destinationId}-${slotKey}-${knob.key}-${stop.key}`}
                         className={cn(
                           "rounded-field px-2.5 py-1 font-sans text-[0.75rem] transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                           knob.stop === stop.key
@@ -151,6 +153,7 @@ export function SlotTune({
                         your choice
                         <button
                           type="button"
+                          data-testid={`tune-${destinationId}-${slotKey}-${knob.key}-reset`}
                           disabled={disabled}
                           onClick={() =>
                             set({ knob: knob.key, stop: null } as KnobChoice)
@@ -217,6 +220,7 @@ export function SlotTune({
                     <button
                       key={reason.key}
                       type="button"
+                      data-testid={`tune-${destinationId}-${slotKey}-reason-${reason.key}`}
                       disabled={disabled}
                       onClick={() => set(reason.move)}
                       className="rounded-pill border border-border-soft bg-secondary px-3 py-1 font-sans text-xs text-on-surface-mid transition-colors hover:border-primary disabled:opacity-60"
@@ -237,6 +241,7 @@ export function SlotTune({
                 </span>
                 <button
                   type="button"
+                  data-testid={`tune-${destinationId}-${slotKey}-take`}
                   disabled={pending}
                   onClick={take}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-field bg-primary px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-primary-foreground transition-opacity disabled:opacity-60"
@@ -295,17 +300,19 @@ function PlacePicker({
           type="button"
           disabled={disabled}
           aria-pressed={place.own === null}
+          data-testid={`${testId}-default`}
           onClick={() => onPlace(null)}
           className={item(place.own === null)}
         >
           The product's places, in order
         </button>
-        {options.map((o) => (
+        {options.map((o, i) => (
           <button
             key={o.place}
             type="button"
             disabled={disabled}
             aria-pressed={place.own === o.place}
+            data-testid={`${testId}-option-${i + 1}`}
             onClick={() => onPlace(o.place)}
             className={item(place.own === o.place)}
           >
@@ -331,6 +338,7 @@ function PlacePicker({
       >
         <input
           aria-label="Another place"
+          data-testid={`${testId}-other`}
           value={typed}
           maxLength={160}
           disabled={disabled}
@@ -340,6 +348,7 @@ function PlacePicker({
         />
         <button
           type="submit"
+          data-testid={`${testId}-other-use`}
           disabled={disabled || !typed.trim()}
           className="font-sans text-[0.72rem] font-semibold text-primary hover:underline disabled:opacity-60"
         >

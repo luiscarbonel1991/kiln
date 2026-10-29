@@ -55,6 +55,7 @@ export function MaterialCombobox({
             shown && items[active] ? `${listId}-${active}` : undefined
           }
           data-field="material"
+          data-testid={`combobox-${label.toLowerCase()}`}
           className={field}
           value={value}
           placeholder={placeholder}

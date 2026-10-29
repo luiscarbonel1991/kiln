@@ -36,12 +36,17 @@ export function ReviewNote({
             {suggestion.why}
           </span>
           <span className="ml-auto flex gap-1">
-            <Button size="xs" onClick={() => onUse(suggestion)}>
+            <Button
+              size="xs"
+              data-testid={`review-${suggestion.field}-use`}
+              onClick={() => onUse(suggestion)}
+            >
               Use
             </Button>
             <Button
               size="xs"
               variant="ghost"
+              data-testid={`review-${suggestion.field}-dismiss`}
               onClick={() => onDismiss("suggestion")}
             >
               Dismiss
@@ -58,6 +63,7 @@ export function ReviewNote({
             size="xs"
             variant="ghost"
             className="ml-auto"
+            data-testid={`review-${check.field}-check-dismiss`}
             onClick={() => onDismiss("check")}
           >
             Dismiss

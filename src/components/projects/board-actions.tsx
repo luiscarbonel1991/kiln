@@ -42,6 +42,7 @@ export function ApproveButton({
     <Button
       variant={approved ? "ghost" : "secondary"}
       size="xs"
+      data-testid={`slot-${destinationId}-${slotKey}-approve`}
       disabled={pending}
       onClick={() =>
         startTransition(() =>
@@ -86,6 +87,7 @@ export function SlotSwitch({
       <Button
         variant="ghost"
         size="xs"
+        data-testid={`slot-${destinationId}-${slotKey}-switch`}
         disabled={pending}
         onClick={() =>
           startTransition(async () => {
@@ -185,6 +187,7 @@ export function DeliverButton({
       <Button
         variant={delivered ? "secondary" : "default"}
         size="sm"
+        data-testid={`deliver-${destinationId}`}
         disabled={pending || blocker !== null}
         onClick={() =>
           startTransition(async () => {
@@ -254,6 +257,7 @@ export function SlotOrder({
         <Button
           variant="ghost"
           size="xs"
+          data-testid={`slot-${destinationId}-${slotKey}-first`}
           disabled={pending}
           onClick={() => move("first")}
         >
@@ -266,6 +270,7 @@ export function SlotOrder({
         size="xs"
         aria-label="Move earlier"
         title="Move earlier"
+        data-testid={`slot-${destinationId}-${slotKey}-earlier`}
         disabled={pending || place === 0}
         onClick={() => move("earlier")}
       >
@@ -276,6 +281,7 @@ export function SlotOrder({
         size="xs"
         aria-label="Move later"
         title="Move later"
+        data-testid={`slot-${destinationId}-${slotKey}-later`}
         disabled={pending || place >= last}
         onClick={() => move("later")}
       >

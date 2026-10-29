@@ -244,11 +244,24 @@ export default function Preview() {
       <Section eyebrow="Themed shadcn primitives">
         <div className="flex flex-col gap-8">
           <div className="flex flex-wrap items-center gap-3">
-            <Button>Generate variants</Button>
-            <Button variant="secondary">Secondary</Button>
-            <Button variant="outline">Outline</Button>
-            <Button variant="ghost">Ghost</Button>
-            <Button variant="destructive">Destructive</Button>
+            <Button data-testid="preview-button-default">
+              Generate variants
+            </Button>
+            <Button variant="secondary" data-testid="preview-button-secondary">
+              Secondary
+            </Button>
+            <Button variant="outline" data-testid="preview-button-outline">
+              Outline
+            </Button>
+            <Button variant="ghost" data-testid="preview-button-ghost">
+              Ghost
+            </Button>
+            <Button
+              variant="destructive"
+              data-testid="preview-button-destructive"
+            >
+              Destructive
+            </Button>
           </div>
           <div className="grid gap-6 sm:grid-cols-2">
             <Card className="shadow-card">

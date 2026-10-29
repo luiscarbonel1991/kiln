@@ -129,8 +129,13 @@ export function EtsyConnection({
         </p>
       )}
       {reads}
-      <Button asChild size="sm" className="self-start">
-        <a href={CONNECT_HREF} data-testid="etsy-connect-button">
+      <Button
+        asChild
+        size="sm"
+        className="self-start"
+        data-testid="etsy-connect-button"
+      >
+        <a href={CONNECT_HREF}>
           <Plug /> {connection ? "Connect again" : "Connect your Etsy shop"}
         </a>
       </Button>

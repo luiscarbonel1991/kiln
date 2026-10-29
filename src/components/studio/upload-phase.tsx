@@ -284,6 +284,8 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
                   key={m.id}
                   type="button"
                   onClick={() => setMode(m.id)}
+                  aria-pressed={mode === m.id}
+                  data-testid={`upload-mode-${m.id}`}
                   className={cn(
                     "rounded-pill px-4 py-1.5 font-sans text-[0.78rem] font-semibold transition-colors",
                     mode === m.id

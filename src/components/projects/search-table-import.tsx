@@ -153,6 +153,7 @@ export function SearchTableImport({
               <input
                 type="date"
                 aria-label="Read on"
+                data-testid={`${testId}-read-on`}
                 value={readOn}
                 max={today}
                 onChange={(e) => setReadOn(e.target.value)}
@@ -224,7 +225,12 @@ export function SearchTableImport({
           Add {result?.searches.length ?? 0}{" "}
           {result?.searches.length === 1 ? "search" : "searches"}
         </Button>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid={`${testId}-cancel`}
+          onClick={onCancel}
+        >
           Cancel
         </Button>
       </div>

@@ -69,6 +69,7 @@ export function ProjectCard({
         type="button"
         onClick={onOpen}
         disabled={disabled}
+        data-testid={`project-${summary.id}-open`}
         className="block w-full cursor-pointer text-left disabled:cursor-default"
       >
         <div className="p-3 pb-0">
@@ -121,6 +122,7 @@ export function ProjectCard({
             setRenaming(true);
           }}
           aria-label="Rename project"
+          data-testid={`project-${summary.id}-rename`}
           className="flex size-7 items-center justify-center rounded-pill bg-card/90 text-on-surface-mid shadow-render transition hover:text-foreground"
         >
           <Pencil className="size-3.5" />
@@ -129,6 +131,7 @@ export function ProjectCard({
           type="button"
           onClick={() => setConfirming(true)}
           aria-label="Delete project"
+          data-testid={`project-${summary.id}-delete`}
           className="flex size-7 items-center justify-center rounded-pill bg-card/90 text-on-surface-mid shadow-render transition hover:text-destructive"
         >
           <Trash2 className="size-3.5" />
@@ -147,6 +150,7 @@ export function ProjectCard({
               if (e.key === "Escape") setRenaming(false);
             }}
             aria-label="Project name"
+            data-testid={`project-${summary.id}-name`}
             className="w-full rounded-field border border-border-soft bg-background px-3 py-1.5 font-sans text-sm text-foreground outline-none focus:border-primary"
           />
           <div className="flex gap-2 pt-1">
@@ -154,6 +158,7 @@ export function ProjectCard({
               variant="default"
               size="sm"
               onClick={saveRename}
+              data-testid={`project-${summary.id}-rename-save`}
               disabled={disabled || draft.trim().length === 0}
             >
               Save
@@ -162,6 +167,7 @@ export function ProjectCard({
               variant="ghost"
               size="sm"
               onClick={() => setRenaming(false)}
+              data-testid={`project-${summary.id}-rename-cancel`}
             >
               Cancel
             </Button>
@@ -182,6 +188,7 @@ export function ProjectCard({
               variant="destructive"
               size="sm"
               onClick={onDelete}
+              data-testid={`project-${summary.id}-delete-confirm`}
               disabled={disabled}
             >
               Delete
@@ -190,6 +197,7 @@ export function ProjectCard({
               variant="ghost"
               size="sm"
               onClick={() => setConfirming(false)}
+              data-testid={`project-${summary.id}-delete-cancel`}
             >
               Cancel
             </Button>

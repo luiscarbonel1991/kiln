@@ -90,6 +90,7 @@ export function ModelChoice({
     >
       <select
         aria-label={`${kind} model`}
+        data-testid={`model-${kind}`}
         className={cn(SELECT, "w-0 min-w-0 flex-1 basis-0")}
         value={key}
         disabled={disabled}
@@ -134,6 +135,7 @@ export function ModelChoice({
       {entry?.qualities && offered ? (
         <select
           aria-label="Quality"
+          data-testid={`model-${kind}-quality`}
           className={SELECT}
           value={value.quality ?? DEFAULT_IMAGE_QUALITY}
           disabled={disabled}
@@ -151,6 +153,7 @@ export function ModelChoice({
       {entry?.seconds && offered ? (
         <select
           aria-label="Resolution"
+          data-testid={`model-${kind}-resolution`}
           className={SELECT}
           value={value.resolution ?? DEFAULT_VIDEO_RESOLUTION}
           disabled={disabled}

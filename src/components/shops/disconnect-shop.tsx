@@ -50,6 +50,7 @@ export function DisconnectShop({ shopName }: { shopName: string }) {
         <Button
           size="sm"
           variant="ghost"
+          data-testid="shop-disconnect-cancel"
           disabled={pending}
           onClick={() => setAsking(false)}
         >

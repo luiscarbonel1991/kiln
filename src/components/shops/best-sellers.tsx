@@ -259,20 +259,25 @@ function Row({ row, rank, by }: { row: BestSeller; rank: number; by: RankBy }) {
       ))}
       <div className="col-start-2 flex items-center gap-1 sm:col-start-auto sm:justify-end">
         {row.project ? (
-          <Button asChild size="sm" variant="outline">
-            <Link
-              href={`/projects/${row.project.id}`}
-              title={row.project.name}
-              data-testid={`best-seller-${row.listingId}-project`}
-            >
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            data-testid={`best-seller-${row.listingId}-project`}
+          >
+            <Link href={`/projects/${row.project.id}`} title={row.project.name}>
               Open project
             </Link>
           </Button>
         ) : (
-          <Button asChild size="sm" variant="outline">
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            data-testid={`best-seller-${row.listingId}-refresh`}
+          >
             <Link
               href={`/projects/new?listing=${encodeURIComponent(row.url)}&title=${encodeURIComponent(row.title)}`}
-              data-testid={`best-seller-${row.listingId}-refresh`}
             >
               <ImagePlus /> Refresh photos
             </Link>

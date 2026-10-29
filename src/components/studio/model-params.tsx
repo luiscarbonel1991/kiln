@@ -15,9 +15,11 @@ const fieldClass =
 export function ModelParams({
   model,
   onEdit,
+  testId,
 }: {
   model: ModelConfig;
   onEdit: (patch: Partial<ModelConfig>) => void;
+  testId: string;
 }) {
   return (
     <div className="font-mono text-[0.6875rem]">
@@ -26,6 +28,8 @@ export function ModelParams({
         <select
           value={model.aspect}
           onChange={(e) => onEdit({ aspect: e.target.value })}
+          aria-label="Aspect ratio"
+          data-testid={`${testId}-aspect`}
           className={fieldClass}
         >
           {ASPECTS.map((a) => (
@@ -44,6 +48,8 @@ export function ModelParams({
           max="20"
           value={model.guidance}
           onChange={(e) => onEdit({ guidance: Number(e.target.value) })}
+          aria-label="Guidance"
+          data-testid={`${testId}-guidance`}
           className={`${fieldClass} w-16`}
         />
       </div>
@@ -56,6 +62,8 @@ export function ModelParams({
           max="1"
           value={model.strength}
           onChange={(e) => onEdit({ strength: Number(e.target.value) })}
+          aria-label="Strength"
+          data-testid={`${testId}-strength`}
           className={`${fieldClass} w-16`}
         />
       </div>

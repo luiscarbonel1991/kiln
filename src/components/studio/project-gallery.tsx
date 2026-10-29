@@ -54,6 +54,7 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
       <button
         type="button"
         aria-label="Close projects"
+        data-testid="project-gallery-backdrop"
         onClick={() => {
           if (!busy) onClose();
         }}
@@ -73,6 +74,7 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
               size="sm"
               disabled={busy}
               onClick={newProject}
+              data-testid="project-gallery-new"
             >
               <Plus /> New project
             </Button>
@@ -80,6 +82,7 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
               type="button"
               onClick={onClose}
               aria-label="Close projects"
+              data-testid="project-gallery-close"
               className="flex size-9 items-center justify-center rounded-pill bg-card/90 text-foreground shadow-render transition-colors hover:bg-card"
             >
               <X className="size-5" />
@@ -100,6 +103,7 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
               variant="secondary"
               size="sm"
               onClick={() => void refresh()}
+              data-testid="project-gallery-retry"
             >
               Retry
             </Button>
@@ -112,7 +116,12 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
             <p className="font-mono text-[0.6875rem] text-card/70">
               Start one and it'll show up here.
             </p>
-            <Button variant="default" size="sm" onClick={newProject}>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={newProject}
+              data-testid="project-gallery-empty-new"
+            >
               <Plus /> New project
             </Button>
           </div>

@@ -125,6 +125,7 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
             <button
               type="button"
               onClick={() => setAttempt((n) => n + 1)}
+              data-testid="analysis-retry"
               className="mt-3 inline-flex items-center gap-2 rounded-field bg-primary px-4 py-2 font-sans text-sm font-semibold text-primary-foreground shadow-button"
             >
               Try again
@@ -186,6 +187,7 @@ export function AnalysisPhase({ master }: { master: MasterAsset }) {
             <button
               type="button"
               onClick={goToPlanning}
+              data-testid="analysis-continue"
               className="inline-flex w-fit items-center gap-2 rounded-field bg-primary px-5 py-[11px] font-sans text-sm font-semibold text-primary-foreground shadow-button transition-colors hover:bg-primary/90"
             >
               Continue to planning <ArrowRight className="size-[15px]" />

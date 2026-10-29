@@ -60,6 +60,7 @@ export function ProjectTitle({
             setRenaming(true);
           }}
           aria-label="Rename project"
+          data-testid="project-rename"
           className="flex size-7 items-center justify-center rounded-pill text-on-surface-dim transition hover:bg-secondary hover:text-foreground"
         >
           <Pencil className="size-3.5" />
@@ -80,18 +81,25 @@ export function ProjectTitle({
             if (e.key === "Escape") setRenaming(false);
           }}
           aria-label="Project name"
+          data-testid="project-name"
           className={`${TITLE} w-full max-w-[32rem] rounded-field border border-border-soft bg-card px-3 py-1 outline-none focus:border-primary`}
           style={{ fontVariationSettings: "'opsz' 144" }}
         />
         <Button
           size="sm"
+          data-testid="project-rename-save"
           onClick={save}
           disabled={pending || draft.trim().length === 0}
         >
           {pending ? <Loader2 className="animate-spin" /> : null}
           Save
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => setRenaming(false)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="project-rename-cancel"
+          onClick={() => setRenaming(false)}
+        >
           Cancel
         </Button>
       </div>

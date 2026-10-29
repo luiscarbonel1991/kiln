@@ -31,6 +31,7 @@ export function SlotFrame({
   actions,
   mark,
   cost,
+  testId,
 }: {
   position: string;
   label: string;
@@ -43,9 +44,16 @@ export function SlotFrame({
   mark?: string;
   // What the frame has cost so far, its takes included ("$0.12 · 2 takes").
   cost?: string;
+  // The frame's own id, so its controls can be found inside it; its state is
+  // data-state.
+  testId?: string;
 }) {
   return (
-    <figure className="row-span-2 grid min-w-0 grid-rows-subgrid gap-y-2">
+    <figure
+      data-testid={testId}
+      data-state={view.state}
+      className="row-span-2 grid min-w-0 grid-rows-subgrid gap-y-2"
+    >
       <div
         className={cn(
           "self-end overflow-hidden rounded-render bg-surface-soft shadow-render transition-opacity",

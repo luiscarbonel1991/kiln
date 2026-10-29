@@ -22,7 +22,12 @@ export default function ProjectsError({
       <p className="font-sans text-sm text-on-surface-mid">
         {error.message || "The project could not be loaded."}
       </p>
-      <Button onClick={() => unstable_retry()}>Try again</Button>
+      <Button
+        data-testid="projects-error-retry"
+        onClick={() => unstable_retry()}
+      >
+        Try again
+      </Button>
     </div>
   );
 }

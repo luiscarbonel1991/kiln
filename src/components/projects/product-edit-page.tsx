@@ -168,7 +168,11 @@ export function ProductEditPage({
       <div className="flex flex-wrap items-center gap-3 border-t border-border-soft pt-4">
         <AlertDialog.Root>
           <AlertDialog.Trigger asChild>
-            <Button variant="ghost" disabled={uses.length > 0 || deleting}>
+            <Button
+              variant="ghost"
+              data-testid="product-delete"
+              disabled={uses.length > 0 || deleting}
+            >
               <Trash2 /> Delete product
             </Button>
           </AlertDialog.Trigger>
@@ -183,10 +187,12 @@ export function ProductEditPage({
               </AlertDialog.Description>
               <div className="flex justify-end gap-2">
                 <AlertDialog.Cancel asChild>
-                  <Button variant="ghost">Keep it</Button>
+                  <Button variant="ghost" data-testid="product-delete-cancel">
+                    Keep it
+                  </Button>
                 </AlertDialog.Cancel>
                 <AlertDialog.Action asChild>
-                  <Button onClick={remove}>
+                  <Button data-testid="product-delete-confirm" onClick={remove}>
                     {deleting ? <Loader2 className="animate-spin" /> : null}
                     Delete
                   </Button>

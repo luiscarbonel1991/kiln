@@ -73,11 +73,12 @@ export function ChatGenerate() {
               Describe the base image to create
             </p>
             <div className="flex max-w-[300px] flex-wrap justify-center gap-2">
-              {PROMPT_PRESETS.map((preset) => (
+              {PROMPT_PRESETS.map((preset, i) => (
                 <button
                   key={preset}
                   type="button"
                   onClick={() => send(preset)}
+                  data-testid={`chat-preset-${i + 1}`}
                   className="rounded-pill border border-border-soft bg-secondary px-3 py-1 font-sans text-xs text-on-surface-mid transition-colors hover:border-primary"
                 >
                   {preset}
@@ -125,6 +126,7 @@ export function ChatGenerate() {
         <Button
           className="mx-4 mb-2.5 bg-prov-recipe text-primary-foreground hover:bg-prov-recipe/90"
           onClick={useAsMaster}
+          data-testid="chat-use-as-master"
         >
           <Check /> Use this as master asset
         </Button>
@@ -147,6 +149,7 @@ export function ChatGenerate() {
           onClick={() => send()}
           disabled={pending}
           aria-label="Send prompt"
+          data-testid="chat-send"
         >
           <ArrowRight />
         </Button>

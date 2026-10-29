@@ -149,6 +149,8 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
               key={recipe.id}
               type="button"
               onClick={() => selectRecipe(recipe.id)}
+              aria-pressed={selected}
+              data-testid={`planning-recipe-${recipe.id}`}
               className={cn(
                 "flex flex-col items-start gap-1 rounded-card border px-4 py-3 text-left transition-colors",
                 selected
@@ -270,6 +272,7 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
             <button
               type="button"
               disabled={busy}
+              data-testid="planning-use-recipe-directions"
               onClick={() => {
                 const variants = degraded.variants;
                 setDegraded(null);
@@ -285,6 +288,7 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
           type="button"
           onClick={() => void handleGenerate()}
           disabled={busy}
+          data-testid="planning-generate-variants"
           className="inline-flex w-fit items-center gap-2 rounded-field bg-primary px-5 py-[11px] font-sans text-sm font-semibold text-primary-foreground shadow-button transition-colors hover:bg-primary/90 disabled:opacity-60"
         >
           {busy ? (

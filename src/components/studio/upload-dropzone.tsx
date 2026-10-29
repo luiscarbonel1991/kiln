@@ -108,6 +108,7 @@ export function UploadDropzone() {
         <input
           id={inputId}
           type="file"
+          data-testid="upload-file"
           accept="image/png,image/jpeg,image/webp"
           className="sr-only"
           disabled={uploading}

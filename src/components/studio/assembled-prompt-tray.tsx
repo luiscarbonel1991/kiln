@@ -21,6 +21,7 @@ export function AssembledPromptTray({
   onEditModel,
   onEditPrompt,
   video,
+  testId,
 }: {
   open: boolean;
   onToggle: () => void;
@@ -31,6 +32,7 @@ export function AssembledPromptTray({
   onEditModel: (patch: Partial<ModelConfig>) => void;
   onEditPrompt: (value: string) => void;
   video?: { durationSec: number; motion: string };
+  testId: string;
 }) {
   // Cards only ever `edit` (never `compose`), so the sole provider limit that can
   // actually break generation is maxRefs. Warn only when this card exceeds it —
@@ -42,6 +44,7 @@ export function AssembledPromptTray({
       <button
         type="button"
         onClick={onToggle}
+        data-testid={`${testId}-prompt-toggle`}
         className="flex w-full items-center gap-1.5 px-4 py-3 font-sans text-xs font-medium text-on-surface-mid"
       >
         <ChevronDown
@@ -57,12 +60,15 @@ export function AssembledPromptTray({
               onChange={(e) => onEditPrompt(e.target.value)}
               rows={4}
               spellCheck={false}
+              aria-label="Assembled prompt"
+              data-testid={`${testId}-prompt`}
               className="w-full resize-y rounded-field bg-secondary px-3 py-2 font-mono text-[0.6875rem] leading-relaxed text-foreground outline-none focus:ring-1 focus:ring-ring"
             />
             {promptOverride ? (
               <button
                 type="button"
                 onClick={() => onEditPrompt("")}
+                data-testid={`${testId}-prompt-reset`}
                 className="flex items-center gap-1 self-end font-sans text-[0.625rem] text-on-surface-mid transition-colors hover:text-primary"
               >
                 <RotateCcw className="size-2.5" /> reset to fields
@@ -74,7 +80,7 @@ export function AssembledPromptTray({
             value={model}
             onChange={(next) => onEditModel(next)}
           />
-          <ModelParams model={model} onEdit={onEditModel} />
+          <ModelParams model={model} onEdit={onEditModel} testId={testId} />
           {video ? (
             <div className="font-mono text-[0.6875rem]">
               <div className="flex justify-between border-border-soft border-b py-1">

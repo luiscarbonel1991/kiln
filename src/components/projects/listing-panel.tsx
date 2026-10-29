@@ -77,13 +77,22 @@ function SourceBadge({ source }: { source: TextSource }) {
   );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+function CopyButton({
+  text,
+  label,
+  testId,
+}: {
+  text: string;
+  label: string;
+  testId: string;
+}) {
   const [copied, setCopied] = useState(false);
   return (
     <Button
       variant="ghost"
       size="xs"
       aria-label={`Copy ${label}`}
+      data-testid={testId}
       onClick={async () => {
         await navigator.clipboard.writeText(text);
         setCopied(true);
@@ -132,11 +141,13 @@ function FieldHead({
   source,
   copy,
   extra,
+  testId,
 }: {
   label: string;
   source: TextSource;
   copy: string;
   extra?: React.ReactNode;
+  testId: string;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -145,7 +156,11 @@ function FieldHead({
         <SourceBadge source={source} />
         {extra}
       </span>
-      <CopyButton text={copy} label={label.toLowerCase()} />
+      <CopyButton
+        text={copy}
+        label={label.toLowerCase()}
+        testId={`${testId}-copy`}
+      />
     </div>
   );
 }
@@ -305,6 +320,7 @@ export function ListingPanel({
           <Button
             variant="secondary"
             size="sm"
+            data-testid={`listing-${destinationId}-write`}
             disabled={writing || pending}
             onClick={() => write()}
           >
@@ -314,6 +330,7 @@ export function ListingPanel({
           </Button>
           <Button
             size="sm"
+            data-testid={`listing-${destinationId}-save`}
             disabled={pending || (!dirty && saved)}
             onClick={save}
             className="font-semibold shadow-button"
@@ -341,12 +358,14 @@ export function ListingPanel({
           label="Title"
           source={listing.title.source}
           copy={listing.title.value}
+          testId={`listing-${destinationId}-title`}
           extra={
             <Count n={listing.title.value.length} max={rules.title.maxChars} />
           }
         />
         <input
           aria-label="Title"
+          data-testid={`listing-${destinationId}-title`}
           className={FIELD}
           value={listing.title.value}
           onChange={(e) => edit("title", e.target.value)}
@@ -359,9 +378,11 @@ export function ListingPanel({
           label="Description"
           source={listing.description.source}
           copy={listing.description.value}
+          testId={`listing-${destinationId}-description`}
         />
         <textarea
           aria-label="Description"
+          data-testid={`listing-${destinationId}-description`}
           rows={10}
           className={cn(FIELD, "resize-y font-sans leading-relaxed")}
           value={listing.description.value}
@@ -427,6 +448,7 @@ export function ListingPanel({
                 label={`Field ${i + 1}`}
                 source={listing.personalization.source}
                 copy={f.instructions}
+                testId={`listing-${destinationId}-field-${i + 1}`}
                 extra={
                   <span className="font-mono text-[0.625rem] text-on-surface-mid">
                     {f.required ? "required" : "optional"}
@@ -437,6 +459,7 @@ export function ListingPanel({
               <div className="flex items-center gap-2">
                 <input
                   aria-label={`Field ${i + 1} title`}
+                  data-testid={`listing-${destinationId}-field-${i + 1}-title`}
                   className={cn(FIELD, "max-w-[320px]")}
                   value={f.title}
                   onChange={(e) => editField(i, { title: e.target.value })}
@@ -448,6 +471,7 @@ export function ListingPanel({
               </div>
               <textarea
                 aria-label={`Field ${i + 1} instructions`}
+                data-testid={`listing-${destinationId}-field-${i + 1}-instructions`}
                 rows={2}
                 className={cn(FIELD, "resize-y")}
                 value={f.instructions}
@@ -471,17 +495,18 @@ export function ListingPanel({
           label={`Tags (${rules.tags.count})`}
           source={listing.tags.source}
           copy={listing.tags.value.join(", ")}
+          testId={`listing-${destinationId}-tags`}
         />
         {suggested.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-sans text-[0.72rem] text-on-surface-mid">
               From your brief:
             </span>
-            {suggested.map((s) => (
+            {suggested.map((s, i) => (
               <button
                 key={s.term}
                 type="button"
-                data-testid={`tag-suggestion-${destinationId}`}
+                data-testid={`tag-suggestion-${destinationId}-${i + 1}`}
                 onClick={() => edit("tags", [...listing.tags.value, s.term])}
                 className="rounded-pill border border-border-soft bg-secondary px-2.5 py-0.5 font-sans text-[0.72rem] text-foreground transition-colors hover:border-primary"
               >
@@ -505,6 +530,7 @@ export function ListingPanel({
               <div className="flex items-center gap-1.5">
                 <input
                   aria-label={`Tag ${i + 1}`}
+                  data-testid={`listing-${destinationId}-tag-${i + 1}`}
                   className={cn(FIELD, "py-1.5")}
                   value={tag}
                   placeholder={`tag ${i + 1}`}
@@ -539,9 +565,11 @@ export function ListingPanel({
           label="Materials"
           source={listing.materials.source}
           copy={listing.materials.value.join(", ")}
+          testId={`listing-${destinationId}-materials`}
         />
         <input
           aria-label="Materials"
+          data-testid={`listing-${destinationId}-materials`}
           className={FIELD}
           value={materialsText}
           placeholder="hardwood, oil finish"

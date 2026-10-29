@@ -613,6 +613,7 @@ export function ProductEditor({
           variant="ghost"
           size="icon-sm"
           aria-label="Close"
+          data-testid="product-close"
           disabled={busy}
           onClick={onCancel}
         >
@@ -653,6 +654,7 @@ export function ProductEditor({
                 <Button
                   variant="ghost"
                   size="xs"
+                  data-testid="product-file-remove"
                   disabled={busy}
                   onClick={() => setFile(null)}
                 >
@@ -689,6 +691,7 @@ export function ProductEditor({
           <Button
             variant="secondary"
             size="sm"
+            data-testid="product-fill"
             disabled={busy}
             onClick={() => fill()}
           >
@@ -713,6 +716,7 @@ export function ProductEditor({
           <Label text="Name" value={name} limit={limits.name} />
           <input
             data-field="name"
+            data-testid="product-name"
             className={FIELD}
             value={name}
             placeholder="Engraved family cutting board"
@@ -725,6 +729,7 @@ export function ProductEditor({
           <Label text="What it is" value={whatItIs} limit={limits.whatItIs} />
           <input
             data-field="whatItIs"
+            data-testid="product-what-it-is"
             className={FIELD}
             value={whatItIs}
             placeholder="cutting board, round coaster…"
@@ -739,6 +744,7 @@ export function ProductEditor({
             <input
               aria-label="Width"
               data-field="width"
+              data-testid="product-width"
               className={FIELD}
               inputMode="decimal"
               value={width}
@@ -749,6 +755,7 @@ export function ProductEditor({
             <input
               aria-label="Height"
               data-field="height"
+              data-testid="product-height"
               className={FIELD}
               inputMode="decimal"
               value={height}
@@ -768,6 +775,7 @@ export function ProductEditor({
                 <ToggleGroup.Item
                   key={u}
                   value={u}
+                  data-testid={`product-unit-${u}`}
                   className={cn(
                     "h-7 rounded-[9px] px-2.5 font-sans text-[0.8rem] transition-colors",
                     unit === u
@@ -839,6 +847,8 @@ export function ProductEditor({
             <button
               key={f.value}
               type="button"
+              aria-pressed={treatment === f.value}
+              data-testid={`product-finish-${f.value}`}
               onClick={() => setTreatment(f.value)}
               className={cn(
                 "rounded-field px-3 py-1.5 font-sans text-[0.8rem] transition-colors",
@@ -870,6 +880,7 @@ export function ProductEditor({
                 <input
                   type="color"
                   aria-label={`Colour ${i + 1}`}
+                  data-testid={`colour-${i + 1}`}
                   value={c.hex}
                   onChange={(e) =>
                     setColours((all) =>
@@ -884,6 +895,7 @@ export function ProductEditor({
                 />
                 <input
                   aria-label={`Colour ${i + 1} name`}
+                  data-testid={`colour-${i + 1}-name`}
                   data-field={`colours.${i}.name`}
                   className={cn(FIELD, "max-w-[260px]")}
                   value={c.name}
@@ -913,6 +925,7 @@ export function ProductEditor({
                     <button
                       type="button"
                       aria-label="Remove the material photo"
+                      data-testid={`material-photo-${i + 1}-remove`}
                       onClick={() =>
                         setColours((all) =>
                           all.map((x, j) =>
@@ -947,6 +960,7 @@ export function ProductEditor({
                   <Button
                     variant="ghost"
                     size="xs"
+                    data-testid={`colour-${i + 1}-default`}
                     onClick={() => setDefaultColour(i)}
                   >
                     Make default
@@ -957,6 +971,7 @@ export function ProductEditor({
                     variant="ghost"
                     size="icon-sm"
                     aria-label={`Remove colour ${i + 1}`}
+                    data-testid={`colour-${i + 1}-remove`}
                     onClick={() => {
                       forget("colours");
                       setColours((all) => all.filter((_, j) => j !== i));
@@ -988,6 +1003,7 @@ export function ProductEditor({
               variant="ghost"
               size="xs"
               className="self-start"
+              data-testid="colour-add"
               onClick={() => {
                 forget("colours");
                 setColours((all) => [...all, { name: "", hex: "#808080" }]);
@@ -1028,6 +1044,7 @@ export function ProductEditor({
         <label className="flex flex-col gap-1.5">
           <span className={LABEL}>Price (optional)</span>
           <input
+            data-testid="product-price"
             className={cn(FIELD, "max-w-[160px]")}
             type="number"
             min="0"
@@ -1061,6 +1078,7 @@ export function ProductEditor({
                     <button
                       type="button"
                       aria-label={`Which view: ${viewName(v.label)}`}
+                      data-testid={`product-view-${i + 1}-label`}
                       className="inline-flex items-center gap-1 rounded-[9px] px-1.5 py-1 font-sans text-[0.8rem] text-foreground hover:bg-secondary"
                     >
                       {viewName(v.label)}
@@ -1076,6 +1094,7 @@ export function ProductEditor({
                       {VIEW_LABELS.map((option) => (
                         <DropdownMenu.Item
                           key={option.value}
+                          data-testid={`product-view-${i + 1}-label-${option.value}`}
                           disabled={views.some(
                             (other, j) =>
                               j !== i && other.label === option.value,
@@ -1098,6 +1117,7 @@ export function ProductEditor({
                 <button
                   type="button"
                   aria-label={`Remove the ${viewName(v.label)} view`}
+                  data-testid={`product-view-${i + 1}-remove`}
                   onClick={() =>
                     setViews((all) => all.filter((_, j) => j !== i))
                   }
@@ -1160,6 +1180,7 @@ export function ProductEditor({
           {open.length > 1 ? (
             <Button
               size="xs"
+              data-testid="product-review-use-all"
               onClick={() => {
                 for (const s of open) takeSuggestion(s);
               }}
@@ -1167,7 +1188,12 @@ export function ProductEditor({
               Use all
             </Button>
           ) : null}
-          <Button size="xs" variant="ghost" onClick={() => setReview(null)}>
+          <Button
+            size="xs"
+            variant="ghost"
+            data-testid="product-review-dismiss"
+            onClick={() => setReview(null)}
+          >
             {open.length + review.checks.length === 0 ? "Close" : "Dismiss all"}
           </Button>
         </output>
@@ -1175,6 +1201,7 @@ export function ProductEditor({
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border-soft pt-4">
         <Button
+          data-testid="product-save"
           disabled={busy}
           onClick={save}
           className="h-10 rounded-field px-5 font-semibold shadow-button"
@@ -1182,10 +1209,20 @@ export function ProductEditor({
           {saving ? <Loader2 className="animate-spin" /> : null}
           {editing ? "Save changes" : "Save product"}
         </Button>
-        <Button variant="ghost" disabled={busy} onClick={onCancel}>
+        <Button
+          variant="ghost"
+          data-testid="product-cancel"
+          disabled={busy}
+          onClick={onCancel}
+        >
           Cancel
         </Button>
-        <Button variant="secondary" disabled={busy} onClick={() => runReview()}>
+        <Button
+          variant="secondary"
+          data-testid="product-review"
+          disabled={busy}
+          onClick={() => runReview()}
+        >
           {reviewing ? <Loader2 className="animate-spin" /> : <Sparkles />}
           Review with AI{reviewPrice ? ` · ${reviewPrice}` : ""}
         </Button>

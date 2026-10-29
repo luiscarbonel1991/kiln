@@ -114,7 +114,12 @@ export function AccessTokens({ tokens }: { tokens: AccessTokenView[] }) {
               {copied ? <Check /> : <Copy />}
               {copied ? "Copied" : "Copy"}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setMade(null)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="token-done"
+              onClick={() => setMade(null)}
+            >
               Done
             </Button>
           </div>
@@ -163,6 +168,7 @@ export function AccessTokens({ tokens }: { tokens: AccessTokenView[] }) {
                   <Button
                     variant="ghost"
                     size="sm"
+                    data-testid={`token-revoke-cancel-${t.id}`}
                     disabled={pending}
                     onClick={() => setConfirming(null)}
                   >

@@ -24,6 +24,7 @@ export function UpdateProjectButton({
       <Button
         size={size}
         className="self-start font-semibold shadow-button"
+        data-testid="project-update"
         disabled={pending}
         onClick={() =>
           startTransition(async () => {

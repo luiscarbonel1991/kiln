@@ -179,6 +179,7 @@ export function ListingResultsPanel({
                 variant="ghost"
                 size="xs"
                 aria-label="Change the listing address"
+                data-testid={`${testId}-url-edit`}
                 onClick={() => setEditingUrl(true)}
               >
                 <PenLine /> Change
@@ -215,6 +216,7 @@ export function ListingResultsPanel({
                 {view.deliveredOn ? (
                   <button
                     type="button"
+                    data-testid={`${testId}-live-on-reset`}
                     className="font-semibold text-primary hover:underline"
                     onClick={() =>
                       act(() => setLiveOnAction({ ...where, liveOn: null }))
@@ -427,6 +429,7 @@ function ReadCard({
               <input
                 type="date"
                 aria-label={`${read.label} from`}
+                data-testid={`${testId}-from`}
                 value={span.from}
                 onChange={(e) => setSpan({ ...span, from: e.target.value })}
                 className={FIELD}
@@ -437,6 +440,7 @@ function ReadCard({
               <input
                 type="date"
                 aria-label={`${read.label} to`}
+                data-testid={`${testId}-to`}
                 value={span.to}
                 onChange={(e) => setSpan({ ...span, to: e.target.value })}
                 className={FIELD}
@@ -463,6 +467,7 @@ function ReadCard({
             <span className={LABEL}>Read from</span>
             <input
               aria-label={`${read.label} source`}
+              data-testid={`${testId}-source`}
               value={from}
               onChange={(e) => setFrom(e.target.value)}
               className={FIELD}
@@ -483,7 +488,12 @@ function ReadCard({
               {pending ? <Loader2 className="animate-spin" /> : <Save />}
               Keep
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid={`${testId}-cancel`}
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
           </div>

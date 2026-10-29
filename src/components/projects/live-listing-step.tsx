@@ -168,6 +168,7 @@ export function LiveListingStep({
                         className="z-50 max-h-[320px] min-w-[13rem] overflow-y-auto rounded-field bg-card p-1 shadow-card ring-1 ring-border"
                       >
                         <DropdownMenu.Item
+                          data-testid={`live-photo-${i + 1}-keep`}
                           onSelect={() => set(i, undefined)}
                           className="cursor-pointer rounded-[9px] px-2.5 py-1.5 font-sans text-sm text-foreground outline-none data-[highlighted]:bg-secondary"
                         >
@@ -180,6 +181,7 @@ export function LiveListingStep({
                         {frames.map((frame) => (
                           <DropdownMenu.Item
                             key={frame.key}
+                            data-testid={`live-photo-${i + 1}-replace-${frame.key}`}
                             disabled={rows.some(
                               (r, j) => j !== i && r.replaceWith === frame.key,
                             )}

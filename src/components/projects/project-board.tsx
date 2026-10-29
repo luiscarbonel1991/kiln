@@ -424,6 +424,7 @@ export function ProjectBoard({
                   return (
                     <SlotFrame
                       key={slot.key}
+                      testId={`slot-${plan.destinationId}-${slot.key}`}
                       position={framePosition(
                         destination,
                         slot,

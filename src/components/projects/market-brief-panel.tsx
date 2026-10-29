@@ -517,6 +517,7 @@ export function MarketBriefPanel({
               <div className="flex flex-wrap items-center gap-2">
                 <select
                   aria-label={`Note ${i + 1} search`}
+                  data-testid={`${testId}-note-${i + 1}-search`}
                   value={n.term}
                   onChange={(e) => editNote(i, { term: e.target.value })}
                   className={cn(FIELD, "w-auto max-w-[260px]")}
@@ -538,6 +539,7 @@ export function MarketBriefPanel({
                   size="icon-xs"
                   className="ml-auto"
                   aria-label={`Remove note ${i + 1}`}
+                  data-testid={`${testId}-note-${i + 1}-remove`}
                   onClick={() =>
                     change({ notes: brief.notes.filter((_, j) => j !== i) })
                   }

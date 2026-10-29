@@ -46,7 +46,7 @@ export function StudioHeader({
           <AutosaveStatus status={saveStatus} />
         ) : null}
         {boardHref ? (
-          <Button variant="ghost" size="sm" asChild>
+          <Button variant="ghost" size="sm" asChild data-testid="studio-board">
             <Link href={boardHref}>
               <LayoutGrid /> Board
             </Link>
@@ -54,12 +54,22 @@ export function StudioHeader({
         ) : (
           <>
             <ProjectsButton onOpen={onOpenGallery} />
-            <Button variant="ghost" size="sm" asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              data-testid="studio-settings"
+            >
               <Link href="/settings">
                 <Settings2 /> Settings
               </Link>
             </Button>
-            <Button variant="ghost" size="sm" asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              data-testid="studio-new-project"
+            >
               <Link href="/projects/new">
                 <Plus /> New project
               </Link>
@@ -67,7 +77,12 @@ export function StudioHeader({
           </>
         )}
         {showStartOver && !boardHref ? (
-          <Button variant="ghost" size="sm" onClick={onStartOver}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onStartOver}
+            data-testid="studio-start-over"
+          >
             <ArrowLeft /> Start over
           </Button>
         ) : null}

@@ -165,6 +165,7 @@ export function GenerationCard({
           type={card.type}
           direction={card.direction}
           outputUrl={card.outputs[0]}
+          testId={`card-${card.id}`}
         />
         {purpose ? (
           <p className="px-0.5 pt-2 font-mono text-[0.625rem] leading-snug text-on-surface-mid">
@@ -190,6 +191,7 @@ export function GenerationCard({
             field={card.fields[key]}
             onEdit={(value) => editCardField(card.id, key, value)}
             onToggleLock={() => toggleCardLock(card.id, key)}
+            testId={`card-${card.id}-field-${key}`}
           />
         ))}
       </div>
@@ -204,6 +206,7 @@ export function GenerationCard({
         onEditModel={(patch) => editCardModel(card.id, patch)}
         onEditPrompt={(value) => editCardPrompt(card.id, value)}
         video={card.type === "video" ? card.video : undefined}
+        testId={`card-${card.id}`}
       />
 
       <CardActions
@@ -224,6 +227,7 @@ export function GenerationCard({
             ? "The video is made on the board, from an approved scene."
             : undefined
         }
+        testId={`card-${card.id}`}
       />
       {queueError || failure ? (
         <p className="px-4 pb-3 font-mono text-[0.625rem] leading-snug text-prov-local">
@@ -245,6 +249,7 @@ export function GenerationCard({
                 <button
                   type="button"
                   onClick={() => handleVectorize("centerline")}
+                  data-testid={`card-${card.id}-centerline`}
                   className="flex flex-1 items-center justify-center gap-1.5 border-border-soft border-r py-3 font-sans text-[0.78rem] font-medium text-on-surface-mid transition-colors hover:bg-secondary"
                 >
                   <Scissors className="size-3" /> Centerline
@@ -252,6 +257,7 @@ export function GenerationCard({
                 <button
                   type="button"
                   onClick={() => handleVectorize("outline")}
+                  data-testid={`card-${card.id}-outline`}
                   className="flex flex-1 items-center justify-center gap-1.5 py-3 font-sans text-[0.78rem] font-medium text-on-surface-mid transition-colors hover:bg-secondary"
                 >
                   <Spline className="size-3" /> Outline
@@ -277,6 +283,7 @@ export function GenerationCard({
                     assetFilename(card.direction, "vector"),
                   );
               }}
+              data-testid={`card-${card.id}-download-svg`}
               className="flex w-full items-center justify-center gap-1.5 border-border-soft border-t py-3 font-sans text-[0.78rem] font-semibold text-prov-recipe transition-colors hover:bg-secondary"
             >
               <Download className="size-3" /> Download .svg

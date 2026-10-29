@@ -37,6 +37,7 @@ export function RecentProjects({ onViewAll }: { onViewAll?: () => void }) {
           <button
             type="button"
             onClick={onViewAll}
+            data-testid="recent-projects-view-all"
             className="rounded-pill font-mono text-[0.6875rem] text-on-surface-mid transition-colors hover:text-foreground"
           >
             View all {projects.length} →

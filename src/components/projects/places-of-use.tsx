@@ -33,6 +33,7 @@ export function PlacesOfUse({
           <div className="flex items-center gap-2">
             <input
               aria-label={`Place ${i + 1}`}
+              data-testid={`place-${i + 1}`}
               data-field={`useContexts.${i}`}
               className={cn(field)}
               value={place}
@@ -45,6 +46,7 @@ export function PlacesOfUse({
               variant="ghost"
               size="icon-sm"
               aria-label={`Remove place ${i + 1}`}
+              data-testid={`place-${i + 1}-remove`}
               onClick={() => onChange(places.filter((_, j) => j !== i))}
             >
               <Trash2 />
@@ -59,6 +61,7 @@ export function PlacesOfUse({
           variant="ghost"
           size="xs"
           className="self-start"
+          data-testid="place-add"
           onClick={() => onChange([...places, ""])}
         >
           <Plus /> {places.length === 0 ? "Add a place" : "Add another place"}

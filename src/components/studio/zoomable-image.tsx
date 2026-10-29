@@ -12,10 +12,12 @@ export function ZoomableImage({
   src,
   alt,
   type = "image",
+  testId = "zoom",
 }: {
   src: string;
   alt: string;
   type?: "image" | "video";
+  testId?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -36,6 +38,7 @@ export function ZoomableImage({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Zoom ${alt}`}
+        data-testid={`${testId}-open`}
         className="block size-full cursor-zoom-in"
       >
         {type === "video" ? (
@@ -64,6 +67,7 @@ export function ZoomableImage({
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close zoom"
+                data-testid="zoom-backdrop"
                 className="absolute inset-0 cursor-zoom-out bg-foreground/85 backdrop-blur-sm"
               />
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 sm:p-12">
@@ -91,6 +95,7 @@ export function ZoomableImage({
                   void downloadAsset(src, filename);
                 }}
                 aria-label="Download"
+                data-testid="zoom-download"
                 className="absolute top-5 right-[68px] flex size-10 items-center justify-center rounded-pill bg-card/90 text-foreground shadow-render transition-colors hover:bg-card"
               >
                 <Download className="size-5" />
@@ -99,6 +104,7 @@ export function ZoomableImage({
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close"
+                data-testid="zoom-close"
                 className="absolute top-5 right-5 flex size-10 items-center justify-center rounded-pill bg-card/90 text-foreground shadow-render transition-colors hover:bg-card"
               >
                 <X className="size-5" />

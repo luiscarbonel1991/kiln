@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 // landing) so past jobs are reachable from anywhere.
 export function ProjectsButton({ onOpen }: { onOpen: () => void }) {
   return (
-    <Button variant="ghost" size="sm" onClick={onOpen}>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onOpen}
+      data-testid="studio-projects"
+    >
       <Layers /> Projects
     </Button>
   );

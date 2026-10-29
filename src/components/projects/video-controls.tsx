@@ -92,6 +92,7 @@ export function VideoControls({
       <label className="flex flex-col gap-0.5 font-mono text-[0.58rem] text-on-surface-dim">
         Starts from
         <select
+          data-testid={`video-${destinationId}-${slotKey}-starts-from`}
           className={SELECT}
           value={settings.from ?? ""}
           disabled={pending || busy || scenes.length === 0}
@@ -110,6 +111,7 @@ export function VideoControls({
       <div className="grid grid-cols-2 gap-1.5">
         <select
           aria-label="Motion"
+          data-testid={`video-${destinationId}-${slotKey}-motion`}
           className={SELECT}
           value={settings.motion}
           disabled={pending || busy}
@@ -123,6 +125,7 @@ export function VideoControls({
         </select>
         <select
           aria-label="Length"
+          data-testid={`video-${destinationId}-${slotKey}-length`}
           className={SELECT}
           value={settings.seconds}
           disabled={pending || busy}
@@ -139,6 +142,7 @@ export function VideoControls({
       </div>
       <select
         aria-label="Orientation"
+        data-testid={`video-${destinationId}-${slotKey}-orientation`}
         className={SELECT}
         value={settings.orientation}
         disabled={pending || busy}
@@ -152,6 +156,7 @@ export function VideoControls({
       <Button
         variant="secondary"
         size="xs"
+        data-testid={`video-${destinationId}-${slotKey}-generate`}
         disabled={pending || busy || !settings.startFrame || usd === null}
         onClick={() => setConfirming(true)}
       >
@@ -201,12 +206,18 @@ export function VideoControls({
           <Button
             variant="ghost"
             size="sm"
+            data-testid="video-confirm-cancel"
             disabled={pending}
             onClick={() => setConfirming(false)}
           >
             Cancel
           </Button>
-          <Button size="sm" disabled={pending} onClick={generate}>
+          <Button
+            size="sm"
+            data-testid="video-confirm-generate"
+            disabled={pending}
+            onClick={generate}
+          >
             {pending ? <Loader2 className="animate-spin" /> : <Film />}
             Generate · {usd === null ? "" : money(usd)}
           </Button>
@@ -231,6 +242,7 @@ export function AddVideoButton({
       <Button
         variant="ghost"
         size="xs"
+        data-testid={`video-${destinationId}-add`}
         disabled={pending}
         onClick={() =>
           startTransition(async () => {

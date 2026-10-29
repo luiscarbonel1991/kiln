@@ -74,6 +74,7 @@ export function WordingRows({
               <input
                 aria-label={`Line ${i + 1}: what the buyer writes`}
                 data-field={`wording.${i}.label`}
+                data-testid={`wording-${i + 1}-label`}
                 className={field}
                 value={row.label}
                 placeholder="Name"
@@ -82,6 +83,7 @@ export function WordingRows({
               <input
                 aria-label={`Line ${i + 1}: example`}
                 data-field={`wording.${i}.example`}
+                data-testid={`wording-${i + 1}-example`}
                 className={field}
                 value={row.example}
                 placeholder="Sofia"
@@ -90,6 +92,7 @@ export function WordingRows({
               <input
                 aria-label={`Line ${i + 1}: most characters`}
                 data-field={`wording.${i}.maxChars`}
+                data-testid={`wording-${i + 1}-max`}
                 className={cn(field, "px-2")}
                 inputMode="numeric"
                 value={row.maxChars}
@@ -102,6 +105,7 @@ export function WordingRows({
                 type="button"
                 aria-pressed={row.optional}
                 aria-label={`Line ${i + 1}: the buyer may leave it out`}
+                data-testid={`wording-${i + 1}-optional`}
                 onClick={() => set(i, { optional: !row.optional })}
                 className={cn(
                   "inline-flex h-9 items-center justify-center gap-1 rounded-field px-2 font-sans text-[0.75rem] transition-colors",
@@ -117,6 +121,7 @@ export function WordingRows({
                 variant="ghost"
                 size="icon-sm"
                 aria-label={`Remove line ${i + 1}`}
+                data-testid={`wording-${i + 1}-remove`}
                 onClick={() => onChange(rows.filter((_, j) => j !== i))}
               >
                 <Trash2 />
@@ -133,6 +138,7 @@ export function WordingRows({
                 {hint.swap ? (
                   <button
                     type="button"
+                    data-testid={`wording-${i + 1}-swap`}
                     onClick={() => set(i, { label: "", example: hint.swap })}
                     className="rounded-pill border border-border-soft bg-secondary px-2.5 py-0.5 text-xs text-on-surface-mid transition-colors hover:border-primary"
                   >
@@ -152,6 +158,7 @@ export function WordingRows({
           variant="ghost"
           size="xs"
           className="self-start"
+          data-testid="wording-add"
           onClick={() => onChange([...rows, emptyWordingRow()])}
         >
           <Plus /> {rows.length === 0 ? "Add a line (optional)" : "Add a line"}

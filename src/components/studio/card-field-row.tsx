@@ -20,11 +20,13 @@ export function CardFieldRow({
   field,
   onEdit,
   onToggleLock,
+  testId,
 }: {
   label: string;
   field: Field;
   onEdit: (value: string) => void;
   onToggleLock: () => void;
+  testId: string;
 }) {
   return (
     <div className="flex items-center gap-2 rounded-field px-2 py-1.5 transition-colors hover:bg-secondary">
@@ -32,6 +34,9 @@ export function CardFieldRow({
         type="button"
         onClick={onToggleLock}
         title={field.locked ? "Locked" : "Unlocked"}
+        aria-label={`Lock ${label}`}
+        aria-pressed={field.locked}
+        data-testid={`${testId}-lock`}
         className={cn(
           "flex flex-shrink-0",
           field.locked ? PROV_TOKENS[field.source].text : "text-on-surface-dim",
@@ -53,6 +58,8 @@ export function CardFieldRow({
               value={field.value}
               disabled={field.locked}
               onChange={(e) => onEdit(e.target.value)}
+              aria-label={label}
+              data-testid={`${testId}-input`}
               className={cn(
                 "w-full bg-transparent font-sans text-[0.8125rem] text-foreground outline-none focus:text-primary",
                 field.locked && "opacity-50",
@@ -65,6 +72,8 @@ export function CardFieldRow({
             value={field.value}
             disabled={field.locked}
             onChange={(e) => onEdit(e.target.value)}
+            aria-label={label}
+            data-testid={`${testId}-input`}
             className={cn(
               "w-full bg-transparent font-sans text-[0.8125rem] text-foreground outline-none focus:text-primary",
               field.locked && "opacity-50",

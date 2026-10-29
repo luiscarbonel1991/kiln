@@ -133,6 +133,7 @@ export function GenerationPanel({
               variant="ghost"
               size="xs"
               className="self-start"
+              data-testid="generate-cancel-queued"
               disabled={pending}
               onClick={() =>
                 startTransition(() =>
@@ -148,6 +149,7 @@ export function GenerationPanel({
 
       {estimate && estimate.count > 0 ? (
         <Button
+          data-testid="generate-open"
           onClick={() => setConfirming(true)}
           className="h-9 self-start rounded-field font-semibold shadow-button"
         >
@@ -275,12 +277,14 @@ export function GenerationPanel({
           <div className="flex justify-end gap-2">
             <Button
               variant="ghost"
+              data-testid="generate-confirm-cancel"
               disabled={pending}
               onClick={() => setConfirming(false)}
             >
               Not now
             </Button>
             <Button
+              data-testid="generate-confirm-go"
               disabled={pending || !fits}
               onClick={generate}
               className="font-semibold shadow-button"

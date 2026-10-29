@@ -16,12 +16,14 @@ export function RenderCanvas({
   type,
   direction,
   outputUrl,
+  testId,
 }: {
   seed: number;
   status: Card["status"];
   type: Card["type"];
   direction: string;
   outputUrl?: string;
+  testId: string;
 }) {
   const rendering = status === "rendering";
   const failed = status === "error";
@@ -34,7 +36,12 @@ export function RenderCanvas({
       }
     >
       {showOutput && outputUrl ? (
-        <ZoomableImage src={outputUrl} alt={direction} type={type} />
+        <ZoomableImage
+          src={outputUrl}
+          alt={direction}
+          type={type}
+          testId={`${testId}-zoom`}
+        />
       ) : null}
       {showOutput && outputUrl ? (
         <button
@@ -43,6 +50,7 @@ export function RenderCanvas({
             void downloadAsset(outputUrl, assetFilename(direction, type));
           }}
           aria-label="Download"
+          data-testid={`${testId}-download`}
           className="absolute top-2.5 left-2.5 z-10 flex size-7 items-center justify-center rounded-pill bg-card/90 text-foreground shadow-render transition-colors hover:bg-card"
         >
           <Download className="size-3.5" />

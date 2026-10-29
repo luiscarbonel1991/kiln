@@ -45,6 +45,7 @@ export function ImportCatalogCard({
         <Button
           variant="ghost"
           size="sm"
+          data-testid="catalog-paste"
           disabled={importing}
           onClick={() => setPasting((open) => !open)}
         >
@@ -59,12 +60,14 @@ export function ImportCatalogCard({
             rows={5}
             spellCheck={false}
             aria-label="Catalog JSON"
+            data-testid="catalog-pasted"
             placeholder='{ "products": [ … ] }'
             className="w-full resize-y rounded-field bg-secondary px-3 py-2 font-mono text-[0.6875rem] leading-relaxed text-foreground outline-none focus:ring-1 focus:ring-ring"
           />
           <Button
             size="sm"
             className="self-start"
+            data-testid="catalog-import"
             disabled={importing || pasted.trim() === ""}
             onClick={() => onImport(pasted, "The pasted text")}
           >
@@ -126,6 +129,7 @@ export function ImportResultPanel({
       <button
         type="button"
         aria-label="Dismiss"
+        data-testid="catalog-result-dismiss"
         onClick={onDismiss}
         className="absolute top-4 right-4 text-on-surface-dim hover:text-foreground"
       >

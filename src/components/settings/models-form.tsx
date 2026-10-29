@@ -79,7 +79,12 @@ export function ModelsForm({
         </div>
       ))}
       <div className="flex items-center gap-3">
-        <Button size="sm" disabled={pending || !dirty} onClick={save}>
+        <Button
+          size="sm"
+          data-testid="models-save"
+          disabled={pending || !dirty}
+          onClick={save}
+        >
           {pending ? <Loader2 className="animate-spin" /> : <Check />}
           Save defaults
         </Button>

@@ -661,6 +661,7 @@ export function NewProjectFlow({
                       return (
                         <SlotFrame
                           key={slot.key}
+                          testId={`plan-slot-${id}`}
                           position={framePosition(
                             destination,
                             slot,

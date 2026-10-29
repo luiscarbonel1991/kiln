@@ -44,6 +44,7 @@ export function DegradedNotice({
           <button
             type="button"
             disabled={pending}
+            data-testid={`degraded-${verb.toLowerCase().replace(/\s+/g, "-")}`}
             onClick={() =>
               onAlternative({ provider: alt.provider, model: alt.model })
             }

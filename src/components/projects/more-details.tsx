@@ -70,6 +70,7 @@ export function MoreDetails({
       <button
         type="button"
         aria-expanded={open}
+        data-testid="product-more-details"
         onClick={() => setOpen((o) => !o)}
         className="inline-flex items-center gap-1.5 self-start font-sans text-[0.8rem] font-semibold text-on-surface-mid hover:text-foreground"
       >
@@ -87,6 +88,7 @@ export function MoreDetails({
             <span className={label}>Thickness ({unit})</span>
             <input
               data-field="depth"
+              data-testid="product-depth"
               className={cn(field, "max-w-[160px]")}
               inputMode="decimal"
               value={details.depth}
@@ -101,6 +103,7 @@ export function MoreDetails({
               </span>
               <input
                 data-field="relief"
+                data-testid="product-relief"
                 className={cn(field, "max-w-[160px]")}
                 inputMode="decimal"
                 value={details.relief}
@@ -116,6 +119,7 @@ export function MoreDetails({
             </span>
             <input
               data-field="hook"
+              data-testid="product-hook"
               className={field}
               value={details.hook}
               placeholder="Your name, on your desk."
@@ -130,6 +134,7 @@ export function MoreDetails({
             </span>
             <input
               data-field="cta"
+              data-testid="product-cta"
               className={field}
               value={details.cta}
               placeholder="Order yours"
@@ -144,6 +149,7 @@ export function MoreDetails({
             </span>
             <textarea
               data-field="description"
+              data-testid="product-description"
               className={cn(field, "h-auto min-h-[5rem] py-2")}
               value={details.description}
               placeholder="What it is made of, how it is made, what comes with it."

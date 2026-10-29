@@ -201,6 +201,7 @@ export function OtherShops({
               size="icon-xs"
               variant="ghost"
               aria-label="Close the shops found"
+              data-testid="shop-found-close"
               onClick={() => setFound(null)}
             >
               <X />
@@ -476,6 +477,7 @@ export function OtherShops({
                   size="icon-sm"
                   variant="ghost"
                   aria-label={`Take ${f.name} off the list`}
+                  data-testid={`watched-shop-${f.shopId}-remove`}
                   disabled={pending}
                   onClick={() => unwatch(f.shopId)}
                 >

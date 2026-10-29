@@ -24,6 +24,7 @@ export function CardActions({
   generateHint,
   canPromote = true,
   disabledReason,
+  testId,
 }: {
   type: Card["type"];
   status: Card["status"];
@@ -34,6 +35,7 @@ export function CardActions({
   generateHint?: string;
   canPromote?: boolean;
   disabledReason?: string;
+  testId: string;
 }) {
   const isVideo = type === "video";
 
@@ -63,6 +65,7 @@ export function CardActions({
         <button
           type="button"
           onClick={onGenerate}
+          data-testid={`${testId}-generate`}
           className="flex flex-1 items-center justify-center gap-1.5 py-3 font-sans text-[0.78rem] font-semibold text-primary transition-colors hover:bg-secondary"
         >
           <Sparkles className="size-3" />
@@ -86,6 +89,7 @@ export function CardActions({
       <button
         type="button"
         onClick={onReroll}
+        data-testid={`${testId}-reroll`}
         className={cn(
           "flex flex-1 items-center justify-center gap-1.5 py-3 font-sans text-[0.78rem] font-medium text-on-surface-mid transition-colors hover:bg-secondary",
           !isVideo && canPromote && "border-border-soft border-r",
@@ -102,6 +106,7 @@ export function CardActions({
         <button
           type="button"
           onClick={onPromote}
+          data-testid={`${testId}-to-video`}
           className="flex flex-1 items-center justify-center gap-1.5 py-3 font-sans text-[0.78rem] font-medium text-on-surface-mid transition-colors hover:bg-secondary"
         >
           <Film className="size-3" /> To video
