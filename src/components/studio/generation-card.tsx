@@ -124,7 +124,8 @@ export function GenerationCard({
     }
   }
 
-  const estimate = cardEstimate(card);
+  const takeRoutes = useProject((s) => s.takeRoutes);
+  const estimate = cardEstimate(card, takeRoutes);
   const busyLabel =
     job?.status === "queued"
       ? job.attempt >= 1

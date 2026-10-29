@@ -40,7 +40,7 @@ export function GenerationPhase({
   const unlocked = cards.filter((c) =>
     Object.values(c.fields).some((f) => !f.locked),
   );
-  const total = sumEstimates(unlocked.map(cardEstimate));
+  const total = sumEstimates(unlocked.map((c) => cardEstimate(c)));
 
   return (
     <div>

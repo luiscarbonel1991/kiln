@@ -1,4 +1,9 @@
-import { estimateGeneration, estimateVideo } from "@/domain/generation-cost";
+import {
+  NO_TAKE_ROUTES,
+  type TakeRoutes,
+  takeEstimate,
+  videoTakeEstimate,
+} from "@/domain/model-routing";
 import { snapSeconds, videoSecondsFor } from "@/domain/video";
 import type { StudioCard } from "@/store/project";
 
@@ -7,27 +12,26 @@ export interface CardEstimate {
   max: number;
 }
 
-// What one generation of a studio card costs on its own model: an image at its
-// aspect and quality, a video at the length its model renders. null when the
-// model has no pinned price.
+// What one generation of a studio card costs: an image at its aspect and
+// quality, a video at the length its model renders; its max the dearest model
+// of its route it may run on (a planned project's card goes through the
+// queue, which reserves the same). null when its model has no pinned price.
 export function cardEstimate(
   card: Pick<StudioCard, "type" | "model" | "references" | "video">,
+  routes: TakeRoutes = NO_TAKE_ROUTES,
 ): CardEstimate | null {
   if (card.type === "video") {
-    const usd = estimateVideo(
+    const usd = videoTakeEstimate(
       card.model,
       snapSeconds(
         card.video?.durationSec,
         videoSecondsFor(undefined, card.model),
       ),
+      routes.video,
     );
     return usd === null ? null : { typical: usd, max: usd };
   }
-  return estimateGeneration(
-    card.model,
-    card.model.aspect,
-    card.references.length,
-  );
+  return takeEstimate(card.model, card.references.length, routes.final);
 }
 
 // Several cards at once: null when any has no pinned price.

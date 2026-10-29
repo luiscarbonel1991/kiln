@@ -1,5 +1,5 @@
 import type { Card } from "@/domain/card";
-import { estimateGeneration } from "@/domain/generation-cost";
+import { type Route, takeEstimate } from "@/domain/model-routing";
 import type { PlanSlot, SlotView } from "@/domain/plan";
 import type { JobView } from "@/domain/queue";
 import {
@@ -90,6 +90,9 @@ export function tuneView(input: {
   places?: TunePlace[];
   // The project's view from above, when it applies to its reference.
   above?: ThreeQuarterView | null;
+  // The scenes' route (final), its models that may run here: a take is
+  // priced at the dearest model it may run on, as the queue reserves it.
+  route?: Route | null;
 }): TuneView | null {
   const { slot, card, view, job, places = [], above = null } = input;
   if (slot.fill !== "scene" || !slot.knobs) return null;
@@ -107,11 +110,7 @@ export function tuneView(input: {
   const reviewing = view.state === "to-review" && locked === null && !!card;
   const price =
     reviewing && card
-      ? estimateGeneration(
-          card.model,
-          card.model.aspect,
-          card.references.length,
-        )
+      ? takeEstimate(card.model, card.references.length, input.route)
       : null;
   return {
     summary: knobSummary(knobs),

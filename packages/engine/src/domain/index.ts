@@ -182,6 +182,7 @@ export {
   MAX_ROUTE,
   MakerRoutes,
   ModelRole,
+  NO_TAKE_ROUTES,
   pickNext,
   proposeRoutes,
   type RanOn,
@@ -199,7 +200,10 @@ export {
   routeEntry,
   routeHeads,
   sameModel,
+  type TakeRoutes,
   TEXT_CALL_ROLES,
+  takeEstimate,
+  videoTakeEstimate,
   worstCase,
 } from "@/domain/model-routing";
 export {

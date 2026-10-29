@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateGeneration } from "@/domain/generation-cost";
+import { estimateGeneration, estimateVideo } from "@/domain/generation-cost";
 import type {
   ImageGenerationRequest,
   VideoGenerationRequest,
@@ -17,6 +17,8 @@ import {
   readRoutes,
   routeCandidates,
   routedRequest,
+  takeEstimate,
+  videoTakeEstimate,
   worstCase,
 } from "@/domain/model-routing";
 
@@ -415,5 +417,41 @@ describe("ranOn", () => {
       reason: "OpenAI answered 503",
     });
     expect(ranOn({ next: [], switched: [] })).toBeUndefined();
+  });
+});
+
+describe("takeEstimate and videoTakeEstimate", () => {
+  const card = { ...GPT_IMAGE, aspect: "4:5" };
+  const route = { models: [GPT_IMAGE, PRO_IMAGE], fallback: true };
+
+  it("prices a take on its own model when it does not fall back", () => {
+    expect(takeEstimate(card, 0, { ...route, fallback: false })).toEqual(
+      estimateGeneration(GPT_IMAGE, "4:5"),
+    );
+    expect(takeEstimate(card, 0, null)).toEqual(
+      estimateGeneration(GPT_IMAGE, "4:5"),
+    );
+  });
+
+  it("keeps its typical and takes the dearest max along the route", () => {
+    const own = estimateGeneration(GPT_IMAGE, "4:5");
+    const pro = estimateGeneration(PRO_IMAGE, "4:5");
+    expect(takeEstimate(card, 0, route)).toEqual({
+      typical: own?.typical,
+      max: Math.max(own?.max ?? 0, pro?.max ?? 0),
+    });
+  });
+
+  it("prices a video at the dearest model it may run on", () => {
+    const fast = {
+      provider: "google" as const,
+      model: "veo-3.1-fast-generate-preview",
+      resolution: "720p" as const,
+    };
+    const full = { ...fast, model: "veo-3.1-generate-preview" };
+    expect(videoTakeEstimate(fast, 8, null)).toBe(estimateVideo(fast, 8));
+    expect(
+      videoTakeEstimate(fast, 8, { models: [fast, full], fallback: true }),
+    ).toBe(estimateVideo(full, 8));
   });
 });

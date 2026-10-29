@@ -9,6 +9,7 @@ import { ProjectGallery } from "@/components/studio/project-gallery";
 import { StudioHeader } from "@/components/studio/studio-header";
 import { UploadPhase } from "@/components/studio/upload-phase";
 import type { MakerModels } from "@/domain/model-defaults";
+import { NO_TAKE_ROUTES, type TakeRoutes } from "@/domain/model-routing";
 import { useProject } from "@/store/project";
 import { useGenerationSync } from "@/store/use-generation-sync";
 import { useProjectPersistence } from "@/store/use-project-persistence";
@@ -21,6 +22,7 @@ export function StudioShell({
   openId,
   focusCardId,
   makerModels,
+  takeRoutes = NO_TAKE_ROUTES,
 }: {
   fresh?: boolean;
   projectId?: string;
@@ -28,9 +30,13 @@ export function StudioShell({
   openId?: string;
   focusCardId?: string;
   makerModels: MakerModels;
+  // A planned project's routes: its cards' takes are priced along them.
+  takeRoutes?: TakeRoutes;
 }) {
   const setMakerModels = useProject((s) => s.setMakerModels);
   useEffect(() => setMakerModels(makerModels), [makerModels, setMakerModels]);
+  const setTakeRoutes = useProject((s) => s.setTakeRoutes);
+  useEffect(() => setTakeRoutes(takeRoutes), [takeRoutes, setTakeRoutes]);
   const phase = useProject((s) => s.phase);
   const master = useProject((s) => s.master);
   const loadedId = useProject((s) => s.projectId);

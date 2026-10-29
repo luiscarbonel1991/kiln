@@ -53,6 +53,11 @@ import { checkListing, listingDraft } from "@/domain/listing";
 import { etsyListingId } from "@/domain/live-listing";
 import type { SearchColumns } from "@/domain/market-brief";
 import {
+  NO_TAKE_ROUTES,
+  type Route,
+  type TakeRoutes,
+} from "@/domain/model-routing";
+import {
   addVideoSlot,
   deliveryBlockers,
   type PlanSlot,
@@ -244,6 +249,7 @@ export function ProjectBoard({
   today,
   shop,
   cost,
+  takeRoutes = NO_TAKE_ROUTES,
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -272,6 +278,9 @@ export function ProjectBoard({
   shop: string | null;
   // What the project's photo work has cost (live spend only).
   cost: ProjectCost | null;
+  // The scenes' and the video's routes, with only the models that may run
+  // here: a new take is priced at the dearest one, as the queue reserves it.
+  takeRoutes?: TakeRoutes;
 }) {
   const rows = boardRows(board, jobs);
   const frameCosts = new Map(
@@ -463,6 +472,7 @@ export function ProjectBoard({
                             job: jobs[cardId],
                             places: placeOptions,
                             above,
+                            route: takeRoutes.final,
                           })}
                           hasReference={board.master !== null}
                           model={card ? (card.model as ModelValue) : null}
@@ -474,6 +484,7 @@ export function ProjectBoard({
                                   scenes: approvedScenes,
                                   rendered: card.outputs.length > 0,
                                   budgetLine,
+                                  route: takeRoutes.video,
                                 }
                               : null
                           }
@@ -931,6 +942,7 @@ function SlotActions({
     scenes: { key: string; label: string }[];
     rendered: boolean;
     budgetLine: string;
+    route: Route | null;
   } | null;
   model: ModelValue | null;
   notes: ProviderNote[];
@@ -995,6 +1007,7 @@ function SlotActions({
               busy={view.inBatch === true || view.state === "generating"}
               rendered={video.rendered}
               budgetLine={video.budgetLine}
+              route={video.route}
             />
           ) : (
             <span className="font-mono text-[0.6rem] text-on-surface-dim">

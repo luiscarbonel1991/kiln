@@ -443,6 +443,53 @@ export function worstCase(
   return worst;
 }
 
+// What one take of a scene costs along its route, as Tune prices it: the
+// typical of the model it starts on, the max of the dearest model it may run
+// on (the queue reserves the same). null when its own model has no price.
+// `route` holds only the models that may run here (keyed providers).
+export function takeEstimate(
+  model: RouteEntry & { aspect?: string },
+  references: number,
+  route: Route | null | undefined,
+): { typical: number; max: number } | null {
+  const own = estimateGeneration(model, model.aspect, references);
+  if (!own) return null;
+  let max = own.max;
+  for (const entry of routeCandidates(route, model).slice(1)) {
+    const caps = PROVIDER_CAPABILITIES[entry.provider];
+    if (!caps.edit || references > caps.maxRefs) continue;
+    const e = estimateGeneration(entry, model.aspect, references);
+    if (e) max = Math.max(max, e.max);
+  }
+  return { typical: own.typical, max };
+}
+
+// What one video costs along its route: billed by the seconds rendered, so
+// the dearest model's price at that length. null when its own model has none.
+export function videoTakeEstimate(
+  model: RouteEntry,
+  seconds: number,
+  route: Route | null | undefined,
+): number | null {
+  const own = estimateVideo(model, seconds);
+  if (own === null) return null;
+  let max = own;
+  for (const entry of routeCandidates(route, model).slice(1)) {
+    const usd = estimateVideo(entry, seconds);
+    if (usd !== null) max = Math.max(max, usd);
+  }
+  return max;
+}
+
+// The routes a new take is priced along (the scenes', the video's), each with
+// only the models that may run here; null where no route was saved.
+export interface TakeRoutes {
+  final: Route | null;
+  video: Route | null;
+}
+
+export const NO_TAKE_ROUTES: TakeRoutes = { final: null, video: null };
+
 // What a job carries of its route: the models it may still move to, fixed when
 // the maker approved the estimate, and each move it made.
 export const RouteSwitch = z.object({

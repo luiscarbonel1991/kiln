@@ -28,6 +28,7 @@ import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
 import { type ProviderHealth, providerHealth } from "@/server/provider-health";
 import { resultsConnector } from "@/server/shop-connector";
+import { takeRoutes } from "@/server/take-routes";
 import { textWorstCase } from "@/server/text-calls";
 
 // The estimate of a batch of every waiting scene, built exactly as the queue
@@ -169,6 +170,7 @@ export default async function ProjectBoardPage({
           today={new Date().toLocaleDateString("en-CA")}
           shop={(await resultsConnector())?.label ?? null}
           cost={cost}
+          takeRoutes={await takeRoutes()}
         />
       ) : (
         <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">

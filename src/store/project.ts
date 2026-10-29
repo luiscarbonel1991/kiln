@@ -16,7 +16,11 @@ import {
   defaultVideoModel,
   type MakerModels,
 } from "@/domain/model-defaults";
-import type { RanOn } from "@/domain/model-routing";
+import {
+  NO_TAKE_ROUTES,
+  type RanOn,
+  type TakeRoutes,
+} from "@/domain/model-routing";
 import type {
   PersistedProject,
   PersistedProjectRecord,
@@ -63,6 +67,9 @@ interface ProjectState {
   // The maker's default models (Settings → Models): what new cards start on.
   makerModels: MakerModels;
   setMakerModels: (models: MakerModels) => void;
+  // The routes a planned project's take is priced along (Settings → Models).
+  takeRoutes: TakeRoutes;
+  setTakeRoutes: (routes: TakeRoutes) => void;
   setMaster: (master: MasterAsset) => void;
   setUnderstanding: (understanding: BaseUnderstanding) => void;
   editUnderstandingField: (
@@ -108,6 +115,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   serverMergeStamp: 0,
   makerModels: DEFAULT_MAKER_MODELS,
   setMakerModels: (makerModels) => set({ makerModels }),
+  takeRoutes: NO_TAKE_ROUTES,
+  setTakeRoutes: (takeRoutes) => set({ takeRoutes }),
   // Re-capturing clears everything downstream of the new master.
   setMaster: (master) =>
     set({

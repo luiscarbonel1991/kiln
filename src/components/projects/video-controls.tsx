@@ -11,8 +11,9 @@ import type {
 import { SlotModel } from "@/components/projects/slot-model";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { estimateVideo, toMicros } from "@/domain/generation-cost";
+import { toMicros } from "@/domain/generation-cost";
 import { modelLabel } from "@/domain/model-defaults";
+import { type Route, videoTakeEstimate } from "@/domain/model-routing";
 import type { VideoSettings } from "@/domain/plan";
 import {
   VIDEO_MOTIONS,
@@ -45,6 +46,7 @@ export function VideoControls({
   busy,
   rendered,
   budgetLine,
+  route = null,
 }: {
   projectId: string;
   destinationId: string;
@@ -57,11 +59,13 @@ export function VideoControls({
   busy: boolean;
   rendered: boolean;
   budgetLine: string;
+  // The video route's models that may run here: the price is the dearest.
+  route?: Route | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const usd = estimateVideo(model, settings.seconds);
+  const usd = videoTakeEstimate(model, settings.seconds, route);
   const choose = (choice: VideoChoice) =>
     startTransition(() =>
       setVideoChoiceAction({ projectId, destinationId, slotKey, choice }),
