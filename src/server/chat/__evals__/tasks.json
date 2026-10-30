@@ -126,5 +126,41 @@
     "message": "Improve the tags of the Etsy listing.",
     "calls": ["suggest_specialist"],
     "language": "en"
+  },
+  {
+    "id": "svg-list-designs",
+    "on": "maker",
+    "specialist": "svg",
+    "message": "Which of my designs still have drawings to trace?",
+    "calls": ["list_designs"],
+    "never": ["draw"],
+    "language": "en"
+  },
+  {
+    "id": "svg-vectorize-clean",
+    "on": "design",
+    "specialist": "svg",
+    "message": "Vectorizá el dibujo que ya está hecho, con un trazo limpio.",
+    "calls": ["get_design", "vectorize"],
+    "never": ["draw"],
+    "language": "es"
+  },
+  {
+    "id": "svg-draw-waits",
+    "on": "design",
+    "specialist": "svg",
+    "message": "Draw the line art for the drawings that have none yet.",
+    "calls": ["quote"],
+    "waits": ["draw"],
+    "language": "en"
+  },
+  {
+    "id": "kiln-suggests-svg",
+    "on": "design",
+    "specialist": "kiln",
+    "message": "Clean up this design's SVG so it has fewer specks.",
+    "calls": ["suggest_specialist"],
+    "never": ["draw"],
+    "language": "en"
   }
 ]

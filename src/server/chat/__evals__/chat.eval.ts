@@ -13,10 +13,11 @@ import tasks from "./tasks.json";
 interface Task {
   id: string;
   // The project a task needs: one with scenes waiting, one with a hero to
-  // review, or none (the maker's own conversation).
-  on: "waiting" | "review" | "maker";
+  // review, a design with a drawing drawn and others not, or none (the
+  // maker's own conversation).
+  on: "waiting" | "review" | "design" | "maker";
   // The mode the maker picked; the general one when not named.
-  specialist?: "kiln" | "etsy" | "scenes";
+  specialist?: "kiln" | "etsy" | "scenes" | "svg";
   // Starts from a long Etsy title, written as the model's: an earlier run
   // may have shortened it, and then there is nothing left to do.
   longTitle?: boolean;
@@ -72,6 +73,46 @@ function grade(task: Task, reply: KilnMessage | undefined): string[] {
   return failures;
 }
 
+// A design to draw and trace: one with a drawing drawn and others not, or,
+// when there is none, one made for free as the studio makes it, from a
+// project's image, its first drawing standing in as drawn.
+async function designForEval(sources: string[]): Promise<string | undefined> {
+  const { listDesigns } = await import("@/server/designs");
+  const found = (await listDesigns()).find(
+    (d) => d.drawn > 0 && d.drawn < d.drawings,
+  );
+  if (found) return found.id;
+  const { loadProject, saveProject } = await import(
+    "@/server/project-repository"
+  );
+  const { buildCards } = await import("@/domain/cards");
+  const { buildPlanningContext } = await import("@/domain/cascade");
+  const { SEED_BRAND } = await import("@/domain/seed");
+  const { SEED_RECIPE_LINE_ART } = await import("@/lib/recipes");
+  for (const id of sources) {
+    const record = await loadProject(id);
+    if (!record?.master || !record.understanding) continue;
+    const { master, understanding } = record;
+    const recipe = SEED_RECIPE_LINE_ART;
+    const planning = buildPlanningContext(understanding, recipe, SEED_BRAND);
+    const cards = buildCards({ master, recipe, planning }).map((card, i) =>
+      i === 0
+        ? { ...card, outputs: [master.assetUrl], status: "done" as const }
+        : card,
+    );
+    return saveProject({
+      name: "Eval design",
+      phase: "generation",
+      master,
+      understanding,
+      recipeId: recipe.id,
+      planning,
+      cards,
+    });
+  }
+  return undefined;
+}
+
 describe("the chat agent's fixed tasks", async () => {
   const { textRoute } = await import("@/server/text-calls");
   const { MAX_STEPS, runTurn } = await import("@/server/chat/run-turn");
@@ -101,7 +142,7 @@ describe("the chat agent's fixed tasks", async () => {
     select: { id: true },
     take: 40,
   });
-  const projects: { waiting?: string; review?: string } = {};
+  const projects: { waiting?: string; review?: string; design?: string } = {};
   for (const { id } of candidates) {
     if (!projects.waiting) {
       const w = await waitingProjectFrames(id);
@@ -142,6 +183,7 @@ describe("the chat agent's fixed tasks", async () => {
       }
     }
   }
+  projects.design = await designForEval(candidates.map((c) => c.id));
   const { listingTarget } = await import("@/server/listing-write");
   const { setListing } = await import("@/server/project-repository");
   const { listingDraft } = await import("@/domain/listing");
