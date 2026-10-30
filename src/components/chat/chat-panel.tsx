@@ -8,7 +8,14 @@ import {
 import { ArrowUp, Loader2, Plus, Square, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { createChatAction } from "@/app/actions/chat";
 import { ChatMessage, money } from "@/components/chat/chat-parts";
 import { Button } from "@/components/ui/button";
@@ -61,6 +68,7 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [starting, startTransition] = useTransition();
   const fresh = sessionId === null;
+  const firstSent = useCallback(() => setPending(null), []);
 
   const start = (first: Pending) =>
     startTransition(async () => {
@@ -130,6 +138,7 @@ export function ChatPanel({
           estimates={data.estimates}
           toolTitles={data.toolTitles}
           first={pending}
+          onFirstSent={firstSent}
           refreshBoard={projectId !== undefined}
         />
       ) : (
@@ -183,6 +192,7 @@ function Conversation({
   estimates,
   toolTitles,
   first,
+  onFirstSent,
   refreshBoard,
 }: {
   sessionId: string;
@@ -191,6 +201,7 @@ function Conversation({
   estimates: ChatPanelData["estimates"];
   toolTitles: Record<string, string>;
   first: Pending | null;
+  onFirstSent: () => void;
   refreshBoard: boolean;
 }) {
   const router = useRouter();
@@ -253,21 +264,29 @@ function Conversation({
     };
   }, [catchingUp, sessionId, setMessages, refreshBoard, router]);
 
-  // The message that made the conversation, sent once it is open (a timer,
-  // so a remount in development does not lose or repeat it).
-  const sentFirst = useRef(false);
+  // The message that made the conversation, sent once it is open, then
+  // cleared, so a remount never sends it again (a timer, so a remount in
+  // development does not lose it either).
   useEffect(() => {
-    if (!first || sentFirst.current) return;
+    if (!first) return;
     const timer = setTimeout(() => {
-      sentFirst.current = true;
+      onFirstSent();
       plan.current = first.plan;
       void sendMessage({ text: first.text });
     }, 0);
     return () => clearTimeout(timer);
-  }, [first, sendMessage]);
+  }, [first, onFirstSent, sendMessage]);
 
   const working = status === "submitted" || status === "streaming";
   const busy = working || catchingUp;
+
+  // A page refresh (the board's, when a batch ends) brings what Kiln stored
+  // since, such as its notice: taken in while no turn runs.
+  useEffect(() => {
+    if (busy || initial.length === 0) return;
+    const known = new Set(messages.map((m) => m.id));
+    if (initial.some((m) => !known.has(m.id))) setMessages(initial);
+  }, [initial, busy, messages, setMessages]);
 
   const stopTurn = async () => {
     await fetch(`/api/chat/${sessionId}/stop`, { method: "POST" }).catch(

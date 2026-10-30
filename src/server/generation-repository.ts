@@ -22,6 +22,7 @@ import {
   readableFailure,
 } from "@/domain/queue";
 import { assertDatabaseUrl, db } from "@/lib/db";
+import { noteBatchEnd } from "@/server/batch-end";
 
 // Persistence for the background generation queue. Every closing write on a
 // job is guarded by its lease token, so a worker that lost its lease (another
@@ -361,7 +362,7 @@ export async function completeJob(
   token: string,
   outputUrl: string,
 ): Promise<boolean> {
-  return db.$transaction(async (tx) => {
+  const batchId = await db.$transaction(async (tx) => {
     const done = await tx.generationJob.updateMany({
       where: { id, leaseToken: token, status: "running" },
       data: {
@@ -376,7 +377,7 @@ export async function completeJob(
     if (done.count !== 1) return false;
     const job = await tx.generationJob.findUniqueOrThrow({
       where: { id },
-      select: { projectId: true, cardId: true },
+      select: { projectId: true, cardId: true, batchId: true },
     });
     if (job.projectId) {
       await tx.card.updateMany({
@@ -384,8 +385,11 @@ export async function completeJob(
         data: { outputs: [outputUrl], status: "done", vectorUrl: null },
       });
     }
-    return true;
+    return job.batchId;
   });
+  if (batchId === false) return false;
+  await noteBatchEnd(batchId);
+  return true;
 }
 
 // A failed attempt: back to the queue after the backoff, or failed for good.
@@ -420,6 +424,13 @@ export async function failJob(
         "leaseToken" = NULL,
         "leaseUntil" = NULL
     WHERE j."id" = ${id} AND j."leaseToken" = ${token} AND j."status" = 'running'`;
+  if (count === 1) {
+    const job = await db.generationJob.findUnique({
+      where: { id },
+      select: { batchId: true, status: true },
+    });
+    if (job && job.status !== "queued") await noteBatchEnd(job.batchId);
+  }
   return count === 1;
 }
 
@@ -566,8 +577,8 @@ export async function cancelBatch(
   batchId: string,
 ): Promise<number> {
   assertDatabaseUrl();
-  return db.$transaction(async (tx) => {
-    const canceled = await tx.generationJob.updateMany({
+  const canceled = await db.$transaction(async (tx) => {
+    const jobs = await tx.generationJob.updateMany({
       where: { batchId, makerId, status: "queued" },
       data: { status: "canceled", finishedAt: new Date() },
     });
@@ -575,8 +586,10 @@ export async function cancelBatch(
       where: { id: batchId, makerId },
       data: { canceledAt: new Date() },
     });
-    return canceled.count;
+    return jobs.count;
   });
+  await noteBatchEnd(batchId);
+  return canceled;
 }
 
 // A direct studio call (no batch) holds its reservation in a running row, so
