@@ -108,10 +108,41 @@ function cardData(projectId: string, cards: CardRow[]) {
 // Every query is scoped to the current maker: a project id from another maker
 // reads as not found.
 
+// What a studio card keeps of the server's writes when the editor saves it: a
+// take the editor never saw (the queue drew it, or the editor's own request
+// settled after this state was read) and a vector traced on the server for
+// the take the editor shows. The editor still owns the card set and every
+// other column.
+function keepServerResults(
+  incoming: CardRow,
+  saved:
+    | { outputs: unknown; status: string; vectorUrl: string | null }
+    | undefined,
+): CardRow {
+  if (!saved) return incoming;
+  const take = Array.isArray(saved.outputs) ? saved.outputs[0] : undefined;
+  if (typeof take !== "string") return incoming;
+  const shown = Array.isArray(incoming.outputs) ? incoming.outputs : [];
+  if (!shown.includes(take)) {
+    return {
+      ...incoming,
+      outputs: saved.outputs,
+      status: saved.status,
+      vectorUrl: saved.vectorUrl,
+    };
+  }
+  if (shown[0] === take && !incoming.vectorUrl && saved.vectorUrl) {
+    return { ...incoming, vectorUrl: saved.vectorUrl };
+  }
+  return incoming;
+}
+
 // Create (no id) or overwrite (id passed), in one transaction. The update writes
 // only projectUpdateData (never name, maker, products or plan). A studio
-// project's master and cards are then replaced wholesale (no worker writes
-// there). A planned project's are not: its cards and reference are created by
+// project's master and cards are then replaced wholesale, keeping what the
+// server wrote since the editor read them (keepServerResults: the queue draws
+// a design's line art, the server traces its vector). A planned project's are
+// not: its cards and reference are created by
 // the server and its generation state is written by the queue, so the editor
 // only updates the columns it owns on cards that exist (editorCardColumns) —
 // a stale editor tab can never revert a result, the reference or the card set.
@@ -173,6 +204,19 @@ export async function saveProject(
       });
     }
 
+    const saved = new Map(
+      (
+        await tx.card.findMany({
+          where: { projectId: project.id },
+          select: {
+            cardId: true,
+            outputs: true,
+            status: true,
+            vectorUrl: true,
+          },
+        })
+      ).map((c) => [c.cardId, c]),
+    );
     await tx.card.deleteMany({ where: { projectId: project.id } });
     await tx.masterAsset.deleteMany({ where: { projectId: project.id } });
     if (rows.master) {
@@ -181,7 +225,12 @@ export async function saveProject(
       });
     }
     if (rows.cards.length > 0) {
-      await tx.card.createMany({ data: cardData(project.id, rows.cards) });
+      await tx.card.createMany({
+        data: cardData(
+          project.id,
+          rows.cards.map((c) => keepServerResults(c, saved.get(c.cardId))),
+        ),
+      });
     }
     return project.id;
   });
@@ -368,6 +417,29 @@ export async function saveCardOutput(
     },
     data: { outputs: [url], status: "done", vectorUrl: null },
   });
+}
+
+// A studio card's vector, traced on the server from the take it shows: kept
+// only while the card still shows that take (a newer take clears the vector,
+// so a late trace never lands on it). False when nothing was written.
+export async function setCardVector(
+  projectId: string,
+  cardId: string,
+  take: string,
+  vectorUrl: string,
+): Promise<boolean> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  const written = await db.card.updateMany({
+    where: {
+      projectId,
+      cardId,
+      outputs: { equals: [take] },
+      project: { makerId: maker.id, plan: { equals: Prisma.DbNull } },
+    },
+    data: { vectorUrl },
+  });
+  return written.count === 1;
 }
 
 const CARD_COLUMNS = {
