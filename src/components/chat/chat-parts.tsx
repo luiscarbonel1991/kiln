@@ -284,7 +284,7 @@ export function ChatMessage({
     return (
       <Message align="end" data-testid="chat-message-user">
         <MessageContent>
-          <div className="max-w-[85%] rounded-[14px_14px_4px_14px] bg-secondary px-3 py-2 font-sans text-[0.8125rem] whitespace-pre-wrap text-foreground">
+          <div className="max-w-[85%] self-end rounded-[14px_14px_4px_14px] bg-secondary px-3 py-2 font-sans text-[0.8125rem] whitespace-pre-wrap text-foreground">
             {text}
           </div>
         </MessageContent>
