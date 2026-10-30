@@ -5,6 +5,7 @@ import {
   readBody,
 } from "@/server/http-api";
 import { handleMcp } from "@/server/mcp/server";
+import { callAndRecord } from "@/server/tool-calls";
 import { TOOLS } from "@/server/tools";
 
 // POST /api/mcp — Kiln's MCP server (README "MCP server"): JSON-RPC over the
@@ -52,7 +53,9 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  return handleMcp(request, message, TOOLS, caller);
+  return handleMcp(request, message, TOOLS, (name, args) =>
+    callAndRecord(TOOLS, name, args, caller),
+  );
 }
 
 // Stateless: no stream to open and no session to end.

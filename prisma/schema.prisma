@@ -58,8 +58,49 @@ model AccessToken {
   hash       String    @unique
   createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
+  // A paid tool (generate, write_listing, review_product) runs for this
+  // token, after a quote and within the monthly cap; off until the maker
+  // turns it on.
+  canSpend   Boolean   @default(false)
 
   @@index([makerId])
+}
+
+// What a paid tool was quoted (ROADMAP "Agents", stage 1): the action and its
+// input as quoted, the estimate, and until when it may run. The paid tool
+// takes only the quote's id and runs what was quoted, once.
+model SpendQuote {
+  id            String    @id @default(cuid())
+  makerId       String
+  tokenId       String?
+  action        String
+  input         Json
+  typicalMicros Int
+  maxMicros     Int
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt     DateTime  @db.Timestamptz(3)
+  usedAt        DateTime? @db.Timestamptz(3)
+
+  @@index([makerId, createdAt])
+}
+
+// One tool call (MCP or `kiln call`): the token, the tool, its arguments (a
+// product package only by its size) and how it ended; Settings → Access
+// tokens shows the latest. tokenName outlives a revoked token.
+model ToolCall {
+  id        String   @id @default(cuid())
+  makerId   String
+  tokenId   String?
+  tokenName String
+  tool      String
+  args      Json
+  quoteId   String?
+  ok        Boolean
+  error     String?
+  ms        Int
+  at        DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([makerId, at])
 }
 
 // A shop the maker connected to Kiln through its platform's OAuth (Etsy,

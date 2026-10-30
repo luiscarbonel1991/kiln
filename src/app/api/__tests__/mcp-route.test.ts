@@ -10,8 +10,26 @@ const auth = vi.hoisted(() => ({ ok: true }));
 vi.mock("@/server/access-tokens", async (original) => ({
   ...(await original<typeof import("@/server/access-tokens")>()),
   verifyAccessToken: async () =>
-    auth.ok ? { tokenId: "t1", makerId: "m1" } : null,
+    auth.ok
+      ? { tokenId: "t1", makerId: "m1", name: "agent", canSpend: false }
+      : null,
 }));
+const recorded = vi.hoisted(() => [] as unknown[]);
+vi.mock("@/server/tool-calls", async () => {
+  const { callTool } = await import("@/server/tools/registry");
+  return {
+    callAndRecord: async (
+      tools: Parameters<typeof callTool>[0],
+      name: string,
+      args: unknown,
+      ctx: Parameters<typeof callTool>[3],
+    ) => {
+      const answer = await callTool(tools, name, args, ctx);
+      recorded.push({ name, ctx, ok: answer.ok });
+      return answer;
+    },
+  };
+});
 vi.mock("@/server/project-frames", () => ({
   framedProjects: async () => [
     {
@@ -114,6 +132,11 @@ describe("/api/mcp", () => {
       arguments: { project: "p1" },
     });
     expect(result.isError).toBeFalsy();
+    expect(recorded.at(-1)).toEqual({
+      name: "get_frames",
+      ctx: { tokenId: "t1", tokenName: "agent", canSpend: false },
+      ok: true,
+    });
     expect(result.structuredContent).toMatchObject({
       project: { id: "p1" },
       frames: [

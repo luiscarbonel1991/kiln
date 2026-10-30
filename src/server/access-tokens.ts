@@ -111,19 +111,27 @@ export async function revokeAccessToken(id: string): Promise<boolean> {
 // The token behind a request, if it is one of the current maker's: its id,
 // with its last use stamped. Null for anything else (unknown, revoked, made
 // for another maker, not a token).
-export async function verifyAccessToken(
-  token: string,
-): Promise<{ tokenId: string; makerId: string } | null> {
+export async function verifyAccessToken(token: string): Promise<{
+  tokenId: string;
+  makerId: string;
+  name: string;
+  canSpend: boolean;
+} | null> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
   const row = await db.accessToken.findUnique({
     where: { hash: hashToken(token) },
-    select: { id: true, makerId: true },
+    select: { id: true, makerId: true, name: true, canSpend: true },
   });
   if (!row || row.makerId !== maker.id) return null;
   await db.accessToken.updateMany({
     where: { id: row.id },
     data: { lastUsedAt: new Date() },
   });
-  return { tokenId: row.id, makerId: row.makerId };
+  return {
+    tokenId: row.id,
+    makerId: row.makerId,
+    name: row.name,
+    canSpend: row.canSpend,
+  };
 }

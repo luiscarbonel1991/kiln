@@ -10,6 +10,7 @@ const { callTool, defineTool, inputJsonSchema, ToolRefusal } = await import(
   "@/server/tools/registry"
 );
 
+const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
 // The tool list itself: names a client can call, inputs it can read, and no
 // tool that lets an agent pick a model (ROADMAP "Agents ask for roles").
 
@@ -57,35 +58,27 @@ describe("callTool", () => {
   });
 
   it("parses the input before running", async () => {
-    expect(
-      await callTool([echo], "echo", { word: "hi" }, { tokenId: "t" }),
-    ).toEqual({
+    expect(await callTool([echo], "echo", { word: "hi" }, CTX)).toEqual({
       ok: true,
       output: { data: { word: "hi" } },
     });
-    expect(
-      await callTool([echo], "echo", { word: 1 }, { tokenId: "t" }),
-    ).toMatchObject({
+    expect(await callTool([echo], "echo", { word: 1 }, CTX)).toMatchObject({
       ok: false,
       error: expect.stringMatching(/^echo needs: word:/),
     });
   });
 
   it("answers an unknown tool, a refusal and a failure in words", async () => {
-    expect(await callTool([echo], "nope", {}, { tokenId: "t" })).toEqual({
+    expect(await callTool([echo], "nope", {}, CTX)).toEqual({
       ok: false,
       error: 'Kiln has no tool named "nope".',
     });
-    expect(
-      await callTool([echo], "echo", { word: "no" }, { tokenId: "t" }),
-    ).toEqual({
+    expect(await callTool([echo], "echo", { word: "no" }, CTX)).toEqual({
       ok: false,
       error: "Refused in words.",
     });
     vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(
-      await callTool([echo], "echo", { word: "boom" }, { tokenId: "t" }),
-    ).toEqual({
+    expect(await callTool([echo], "echo", { word: "boom" }, CTX)).toEqual({
       ok: false,
       error: "echo failed: disk on fire",
     });

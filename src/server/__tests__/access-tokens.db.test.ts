@@ -52,6 +52,8 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
     expect(await repo.verifyAccessToken(token)).toEqual({
       tokenId: created.id,
       makerId: maker.id,
+      name: "Verify test",
+      canSpend: false,
     });
     const used = (await repo.listAccessTokens()).find(
       (t) => t.id === created.id,

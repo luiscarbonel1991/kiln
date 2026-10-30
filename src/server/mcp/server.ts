@@ -7,11 +7,9 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import {
-  callTool,
   inputJsonSchema,
   type Tool,
   type ToolAnswer,
-  type ToolContext,
 } from "@/server/tools/registry";
 
 // Kiln's MCP server (ROADMAP "Agents", stage 1): the tool list over the
@@ -63,7 +61,7 @@ export async function handleMcp(
   request: Request,
   body: unknown,
   tools: readonly Tool[],
-  ctx: ToolContext,
+  call: (name: string, args: unknown) => Promise<ToolAnswer>,
 ): Promise<Response> {
   const server = new Server(
     { name: "kiln", version: "0.1.0" },
@@ -72,10 +70,8 @@ export async function handleMcp(
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: tools.map(listedTool),
   }));
-  server.setRequestHandler(CallToolRequestSchema, async (call) =>
-    toolResult(
-      await callTool(tools, call.params.name, call.params.arguments, ctx),
-    ),
+  server.setRequestHandler(CallToolRequestSchema, async (request) =>
+    toolResult(await call(request.params.name, request.params.arguments)),
   );
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,

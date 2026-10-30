@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SlotRefusal } from "@/domain/plan";
 import { QueueRefusal } from "@/server/generation-repository";
+import { QuoteRefusal } from "@/server/spend-quotes";
 
 // Kiln's actions as typed tools (ROADMAP "Agents", stage 1): one list, served
 // over MCP (/api/mcp) and the CLI's `kiln call`. Each tool runs the same
@@ -9,9 +10,12 @@ import { QueueRefusal } from "@/server/generation-repository";
 // takes a model: an agent asks for a task, and the task runs on its role's
 // route (Settings → Models).
 
-// Who is calling: the access token the request carried.
+// Who is calling: the access token the request carried, and whether the
+// maker lets it spend (Settings → Access tokens).
 export interface ToolContext {
   tokenId: string;
+  tokenName: string;
+  canSpend: boolean;
 }
 
 export interface ToolImage {
@@ -97,7 +101,8 @@ export async function callTool(
     if (
       error instanceof ToolRefusal ||
       error instanceof SlotRefusal ||
-      error instanceof QueueRefusal
+      error instanceof QueueRefusal ||
+      error instanceof QuoteRefusal
     ) {
       return { ok: false, error: error.message };
     }

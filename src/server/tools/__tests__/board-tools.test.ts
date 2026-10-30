@@ -97,8 +97,9 @@ vi.mock("@/providers/asset-bytes", () => ({ fetchAsset: vi.fn() }));
 
 const { TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
+const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
 const call = (name: string, args: Record<string, unknown>) =>
-  callTool(TOOLS, name, args, { tokenId: "t1" });
+  callTool(TOOLS, name, args, CTX);
 
 afterEach(() => {
   state.approvals.length = 0;

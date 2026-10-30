@@ -31,10 +31,18 @@ export async function authorize(request: Request): Promise<Response | null> {
 // the 401 to send back.
 export async function authorizeToken(
   request: Request,
-): Promise<{ tokenId: string } | Response> {
+): Promise<
+  { tokenId: string; tokenName: string; canSpend: boolean } | Response
+> {
   const token = bearerToken(request.headers.get("authorization"));
   const verified = token ? await verifyAccessToken(token) : null;
-  if (verified) return { tokenId: verified.tokenId };
+  if (verified) {
+    return {
+      tokenId: verified.tokenId,
+      tokenName: verified.name,
+      canSpend: verified.canSpend,
+    };
+  }
   return apiError(
     401,
     token
