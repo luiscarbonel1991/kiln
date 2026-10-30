@@ -17,8 +17,6 @@ const Input = z.object({
   destinationId: z.string().min(1),
 });
 
-export type { DeliverResult };
-
 export async function deliverAction(input: unknown): Promise<DeliverResult> {
   const { projectId, destinationId } = Input.parse(input);
   const result = await deliverDestination(projectId, destinationId);
