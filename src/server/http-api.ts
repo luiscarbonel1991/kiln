@@ -77,3 +77,18 @@ export async function readBody(
 }
 
 export const megabytes = (bytes: number) => `${bytes / (1024 * 1024)} MB`;
+
+const LOCAL = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+// A request a page on another origin sent (its Origin header names another
+// host). A request with no Origin (a script, the CLI) is not one.
+export function foreignOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  try {
+    const { hostname, host } = new URL(origin);
+    return !LOCAL.has(hostname) && host !== request.headers.get("host");
+  } catch {
+    return true;
+  }
+}

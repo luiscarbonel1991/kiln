@@ -1,6 +1,7 @@
 import {
   apiError,
   authorizeToken,
+  foreignOrigin,
   megabytes,
   readBody,
 } from "@/server/http-api";
@@ -14,18 +15,6 @@ import { TOOLS } from "@/server/tools";
 // could otherwise reach a local Kiln through DNS rebinding). The body cap is
 // an import's: a product package can travel in a tool call.
 const MAX_BODY_BYTES = 32 * 1024 * 1024;
-const LOCAL = new Set(["localhost", "127.0.0.1", "[::1]"]);
-
-function foreignOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  try {
-    const { hostname, host } = new URL(origin);
-    return !LOCAL.has(hostname) && host !== request.headers.get("host");
-  } catch {
-    return true;
-  }
-}
 
 export async function POST(request: Request) {
   if (foreignOrigin(request)) {
