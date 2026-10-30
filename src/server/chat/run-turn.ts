@@ -47,8 +47,11 @@ export class TurnRefusal extends Error {
 }
 
 // The turns running in this process, by session, so Stop can end one.
-const global = globalThis as { kilnChatTurns?: Map<string, AbortController> };
-const running = (global.kilnChatTurns ??= new Map());
+const globalForTurns = globalThis as {
+  kilnChatTurns?: Map<string, AbortController>;
+};
+globalForTurns.kilnChatTurns ??= new Map();
+const running = globalForTurns.kilnChatTurns;
 
 export function stopTurn(sessionId: string): boolean {
   const turn = running.get(sessionId);
