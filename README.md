@@ -326,7 +326,8 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 | Products | `list_products`, `import_products` (a product package), `review_product` (paid) |
 | Projects | `plan_project` (the frames it would start with; nothing saved), `create_project` (free), `deliver` (a destination's zip; publishing stays the maker's) |
 | The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do), `tune_frame` (any of a scene's knobs and its place, as Tune does; free), `switch_frame` (a frame off or back on; free) |
-| Paid work | `quote`, then `generate`, `write_listing` or `review_product` with its id |
+| Designs | `list_designs`, `get_design` (each drawing's state, line art and vector, and the link where the maker makes a vector into a product), `view_design` (a drawing's line art, or its vector rendered), `vectorize` (free: outline or centerline, detail fine, balanced or clean; kept as the drawing's vector) |
+| Paid work | `quote`, then `generate`, `draw` (a design's line art, through the queue), `write_listing` or `review_product` with its id |
 | Selling | `get_listing` (the listing's fields, who wrote each, its problems and tag ideas), `edit_listing` (free; a field the maker wrote only with `overwriteMakerText`, after asking), `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only) |
 
 - **Paid work takes two calls.** `quote` (free) prices a task: the models each line
@@ -338,8 +339,8 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
   (off by default). Without it, `quote` answers and the paid tool refuses. The MCP
   client asks its person before each call; tell them the quote first.
 - **No tool takes a model.** A task runs on its role's route (Settings → Models):
-  frames on their card's model and the final route, the listing text on deep, the
-  review on fast.
+  frames and drawings on their card's model and the final route, the listing text on
+  deep, the review on fast.
 - **Nothing is approved unseen.** `approve_frame` and `reject_frame` name the take the
   agent looked at (`view_frame`); a newer one refuses.
 - **Every call is recorded**: Settings → Access tokens → Recent tool calls shows the
@@ -365,7 +366,7 @@ the MCP server's tools, on the same server functions as the board.
   browser sends only the maker's new message or a yes or no, never the history.
 - **Free work alone, paid work on the maker's click.** It reads, plans, starts a
   project, writes a market brief and rejects a take with a reason by itself.
-  `generate`, `write_listing` and `review_product` (after a `quote`), `approve_frame`
+  `generate`, `draw`, `write_listing` and `review_product` (after a `quote`), `approve_frame`
   and `deliver` wait for the maker's click on an approval card that shows the quote
   (typical, at most, the models) or the take; "Not now" runs nothing. It never
   publishes, and it writes nothing into the maker's knowledge yet (stage 4).
@@ -380,17 +381,20 @@ the MCP server's tools, on the same server functions as the board.
   **Kiln** has every tool; **Etsy** has the listing's fields, the paid rewrite, the
   brief, results and the shop's numbers, and knows Etsy's title and tag rules;
   **Scenes** looks at takes, tunes knobs and places, rejects with a reason, switches
-  frames and quotes new takes, and knows every knob's stops. They are modes of the
+  frames and quotes new takes, and knows every knob's stops; **SVG** reads the
+  maker's designs, looks at a drawing or its vector, traces it (free, on the server,
+  at a detail from fine to clean) and quotes the drawings' line art, which the queue
+  draws while the open studio follows. A design's chat starts in SVG. They are modes of the
   one agent (its know-how and fewer tools, so each step is cheaper and more on
   task), written from Kiln's own data. The general mode suggests one with a button;
   a reply names the mode it ran in. An agent edit never replaces text the maker
   wrote without their click.
 - **Kiln's notices.** A batch that finishes says so in its project's latest
-  conversation ("All 5 frames of the last batch landed"); the agent reads it with
+  conversation ("All 5 frames of the last batch landed", or a design's drawings); the agent reads it with
   the maker's next message and does not act on it alone.
 - **Recorded** like a token's calls: Settings → Recent tool calls shows them as
   "Chat".
-- **Measured before it ships**: `pnpm eval:chat` runs sixteen fixed tasks with the real
+- **Measured before it ships**: `pnpm eval:chat` runs twenty fixed tasks with the real
   text model on a mock run (images and the database are the mock's), printing what it
   may cost first; it runs only with `KILN_EVAL_YES=1`. A mock run's chat
   (`pnpm dev:mock`) answers with a few rules, for free.
