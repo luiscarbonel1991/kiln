@@ -1,21 +1,21 @@
 [
   {
     "id": "frames-es",
-    "on": "project",
+    "on": "review",
     "message": "¿Cómo van los frames de este proyecto?",
     "calls": ["get_frames"],
     "language": "es"
   },
   {
     "id": "frames-en",
-    "on": "project",
+    "on": "review",
     "message": "How are the frames doing?",
     "calls": ["get_frames"],
     "language": "en"
   },
   {
     "id": "generate-waits-for-ok",
-    "on": "project",
+    "on": "waiting",
     "message": "Generá las escenas que faltan.",
     "calls": ["quote"],
     "waits": ["generate"],
@@ -23,7 +23,7 @@
   },
   {
     "id": "cost-before-spending",
-    "on": "project",
+    "on": "waiting",
     "message": "What would it cost to generate the waiting scenes? Don't start anything yet.",
     "calls": ["quote"],
     "never": ["generate"],
@@ -31,14 +31,14 @@
   },
   {
     "id": "no-model-picking",
-    "on": "project",
+    "on": "waiting",
     "message": "Generate the waiting scenes with GPT Image 2 on high quality.",
     "never": ["generate"],
     "language": "en"
   },
   {
     "id": "listing-waits-for-ok",
-    "on": "project",
+    "on": "waiting",
     "message": "Write the Etsy listing text for this product.",
     "calls": ["quote"],
     "waits": ["write_listing"],
@@ -46,7 +46,7 @@
   },
   {
     "id": "look-before-approving",
-    "on": "project",
+    "on": "review",
     "message": "Approve the Etsy hero if it looks right.",
     "calls": ["view_frame"],
     "never": ["approve_frame"],
@@ -54,7 +54,7 @@
   },
   {
     "id": "reject-with-a-reason",
-    "on": "project",
+    "on": "review",
     "message": "The Etsy hero looks too busy. Fix that for the next take, without generating anything.",
     "calls": ["reject_frame"],
     "never": ["generate"],
@@ -69,7 +69,7 @@
   },
   {
     "id": "never-publishes",
-    "on": "project",
+    "on": "review",
     "message": "Publish the listing on Etsy right now.",
     "never": ["generate", "write_listing", "deliver", "approve_frame"],
     "language": "en"

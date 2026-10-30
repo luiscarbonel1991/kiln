@@ -11,7 +11,9 @@ import tasks from "./tasks.json";
 
 interface Task {
   id: string;
-  on: "project" | "maker";
+  // The project a task needs: one with scenes waiting, one with a hero to
+  // review, or none (the maker's own conversation).
+  on: "waiting" | "review" | "maker";
   message: string;
   calls?: string[];
   waits?: string[];
@@ -80,16 +82,58 @@ describe("the chat agent's fixed tasks", async () => {
   const chats = await import("@/server/chat/chat-repository");
   const { getCurrentMaker } = await import("@/server/maker-repository");
   const maker = await getCurrentMaker();
-  const project = await db.project.findFirst({
-    where: {
-      makerId: maker.id,
-      plan: { not: undefined },
-      master: { isNot: null },
-      cards: { some: { status: "draft" } },
-    },
+  // The projects the tasks need, found as the board finds them: scenes
+  // waiting to be generated (with the reference), or a hero to review.
+  const { projectFrames, waitingProjectFrames } = await import(
+    "@/server/project-frames"
+  );
+  const candidates = await db.project.findMany({
+    where: { makerId: maker.id, master: { isNot: null } },
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true },
+    select: { id: true },
+    take: 40,
   });
+  const projects: { waiting?: string; review?: string } = {};
+  for (const { id } of candidates) {
+    if (!projects.waiting) {
+      const w = await waitingProjectFrames(id);
+      if (w?.reference && w.waiting.length > 0) projects.waiting = id;
+    }
+    if (!projects.review) {
+      const f = await projectFrames(id);
+      if (
+        f?.frames.some(
+          (x) => x.frame === "etsy.hero" && x.state === "to-review",
+        )
+      ) {
+        projects.review = id;
+      }
+    }
+    if (projects.waiting && projects.review) break;
+  }
+  // None left waiting (earlier runs generated them): start one, free, as New
+  // project does, for a product Kiln already made a reference for.
+  if (!projects.waiting) {
+    const { startProject } = await import("@/server/start-project");
+    const products = await db.projectProduct.findMany({
+      where: { projectId: { in: candidates.map((c) => c.id) } },
+      select: { productId: true },
+      distinct: ["productId"],
+    });
+    for (const { productId } of products) {
+      const started = await startProject({
+        productId,
+        type: "listing-kit",
+        destinationIds: ["etsy"],
+      });
+      if (!("id" in started)) continue;
+      const w = await waitingProjectFrames(started.id);
+      if (w?.reference && w.waiting.length > 0) {
+        projects.waiting = started.id;
+        break;
+      }
+    }
+  }
   const results: { id: string; failures: string[]; costMicros: number }[] = [];
 
   afterAll(() => {
@@ -107,14 +151,11 @@ describe("the chat agent's fixed tasks", async () => {
 
   for (const task of tasks as Task[]) {
     it(task.id, async () => {
-      if (task.on === "project" && !project) {
-        throw new Error(
-          "The mock has no project with a reference and waiting scenes.",
-        );
+      const projectId = task.on === "maker" ? undefined : projects[task.on];
+      if (task.on !== "maker" && !projectId) {
+        throw new Error(`The mock has no project for "${task.on}".`);
       }
-      const { id } = await chats.createChatSession(
-        task.on === "project" ? project?.id : undefined,
-      );
+      const { id } = await chats.createChatSession(projectId);
       const response = await runTurn({
         sessionId: id,
         message: {
