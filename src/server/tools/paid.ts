@@ -6,6 +6,7 @@ import { modelLabel } from "@/domain/model-defaults";
 import { editLimits, formFromProduct } from "@/lib/product-form";
 import { cleanReview, ReviewForm, reviewFields } from "@/lib/product-review";
 import { providerMode } from "@/providers/mode";
+import { designView } from "@/server/designs";
 import {
   enqueueProjectCards,
   estimateProjectCards,
@@ -26,11 +27,11 @@ import { defineTool, ToolRefusal } from "@/server/tools/registry";
 import { takeQuote } from "@/server/tools/spend";
 
 // The paid tools (ROADMAP "Agents", stage 1): `quote` prices a task and
-// stores it; generate, write_listing and review_product take only the quote's
-// id, run what was quoted once, and only for a token the maker lets spend.
-// Each task runs on its role's route (Settings → Models): frames on their
-// card's model and the final route, the listing text on deep, the review on
-// fast. The cap rules every attempt, as on the board.
+// stores it; generate, draw, write_listing and review_product take only the
+// quote's id, run what was quoted once, and only for a token the maker lets
+// spend. Each task runs on its role's route (Settings → Models): frames and
+// drawings on their card's model and the final route, the listing text on
+// deep, the review on fast. The cap rules every attempt, as on the board.
 
 const usd = (micros: number) =>
   Math.round(fromMicros(micros) * 10_000) / 10_000;
@@ -38,6 +39,10 @@ const usd = (micros: number) =>
 const GenerateQuote = z.object({
   project: z.string(),
   frames: z.array(z.string()).min(1),
+});
+const DrawQuote = z.object({
+  project: z.string(),
+  cards: z.array(z.string()).min(1),
 });
 const ListingQuote = z.object({ project: z.string(), destination: z.string() });
 const ReviewQuote = z.object({ product: z.string() });
@@ -109,6 +114,53 @@ async function priceGenerate(
   };
 }
 
+// A design's drawings: each card's line art, on the card's own model, from
+// the design's image.
+async function priceDraw(project: string, cards?: string[]): Promise<Priced> {
+  const design = await designView(project);
+  if (!design) throw new ToolRefusal("No design of yours has that id.");
+  const byCard = new Map(design.drawings.map((d) => [d.card, d]));
+  for (const card of cards ?? []) {
+    const drawing = byCard.get(card);
+    if (!drawing) {
+      throw new ToolRefusal(
+        `"${card}" is not a drawing of this design: get_design names them.`,
+      );
+    }
+    if (drawing.state === "drawing") {
+      throw new ToolRefusal(`${drawing.label} is being drawn already.`);
+    }
+  }
+  const asked =
+    cards ??
+    design.drawings
+      .filter((d) => d.state === "to-draw" || d.state === "failed")
+      .map((d) => d.card);
+  if (asked.length === 0) {
+    throw new ToolRefusal(
+      "Every drawing has its line art or is being drawn: name cards to draw again.",
+    );
+  }
+  const { cards: priced } = await estimateProjectCards(project, [
+    ...new Set(asked),
+  ]).catch((error) => {
+    throw asRefusal(error);
+  });
+  return {
+    input: { project, cards: priced.map((c) => c.cardId) },
+    typicalMicros: priced.reduce((t, c) => t + c.typicalMicros, 0),
+    maxMicros: priced.reduce((t, c) => t + c.maxMicros, 0),
+    lines: priced.map((c) => ({
+      card: c.cardId,
+      drawing: byCard.get(c.cardId)?.label,
+      model: requestModel(c.request),
+      fallbacks: c.next.map(modelLabel),
+      typicalUsd: usd(c.typicalMicros),
+      atMostUsd: usd(c.maxMicros),
+    })),
+  };
+}
+
 async function priceText(
   kind: "listingCopy" | "productReview",
   task: string,
@@ -140,13 +192,13 @@ const QuoteInput = z.object({
   action: z
     .enum(QUOTE_ACTIONS)
     .describe(
-      "generate: new takes of a project's scenes (project, and frames or every scene waiting); write_listing: a destination's listing text (project, destination); review_product: an AI review of a product's fields (product).",
+      "generate: new takes of a project's scenes (project, and frames or every scene waiting); draw: a design's line art (project, and cards or every drawing without one); write_listing: a destination's listing text (project, destination); review_product: an AI review of a product's fields (product).",
     ),
   project: z
     .string()
     .min(1)
     .optional()
-    .describe("generate, write_listing: the project's Kiln id."),
+    .describe("generate, draw, write_listing: the project's Kiln id."),
   frames: z
     .array(z.string().min(1))
     .min(1)
@@ -154,6 +206,14 @@ const QuoteInput = z.object({
     .optional()
     .describe(
       'generate: the frames to take ("etsy.hero"); every scene waiting on the board when left out.',
+    ),
+  cards: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(20)
+    .optional()
+    .describe(
+      "draw: the design's drawings to draw (get_design's card ids); every drawing without line art when left out.",
     ),
   destination: z
     .string()
@@ -174,46 +234,41 @@ function needs<T>(value: T | undefined, action: QuoteAction, field: string): T {
   return value;
 }
 
+async function priceOf(input: z.output<typeof QuoteInput>): Promise<Priced> {
+  const { action } = input;
+  if (action === "generate") {
+    return priceGenerate(needs(input.project, action, "project"), input.frames);
+  }
+  if (action === "draw") {
+    return priceDraw(needs(input.project, action, "project"), input.cards);
+  }
+  if (action === "write_listing") {
+    const project = needs(input.project, action, "project");
+    const destination = needs(input.destination, action, "destination");
+    if (!(await listingTarget(project, destination))) {
+      throw new ToolRefusal(
+        "That destination of that project takes no listing text.",
+      );
+    }
+    return priceText("listingCopy", "listing text", { project, destination });
+  }
+  const product = needs(input.product, action, "product");
+  if (!(await getProduct(product))) {
+    throw new ToolRefusal("No product of yours has that id.");
+  }
+  return priceText("productReview", "product review", { product });
+}
+
 export const quote = defineTool({
   name: "quote",
   title: "Quote a paid task",
-  description: `Price a paid task before it runs, for free: the models it runs on (and may fall back to), what it typically costs and the most it can cost, and what is left of the month's cap. Answers a quote id that generate, write_listing or review_product take; it runs exactly what was quoted, once, within ${QUOTE_MINUTES} minutes, and only for a token the maker lets spend (canSpend says whether this one may).`,
+  description: `Price a paid task before it runs, for free: the models it runs on (and may fall back to), what it typically costs and the most it can cost, and what is left of the month's cap. Answers a quote id that generate, draw, write_listing or review_product take; it runs exactly what was quoted, once, within ${QUOTE_MINUTES} minutes, and only for a token the maker lets spend (canSpend says whether this one may).`,
   input: QuoteInput,
   // It stores the quote and nothing the maker sees: free, and safe to ask.
   hints: { readOnly: true },
   run: async (input, ctx) => {
     const { action } = input;
-    const priced =
-      action === "generate"
-        ? await priceGenerate(
-            needs(input.project, action, "project"),
-            input.frames,
-          )
-        : action === "write_listing"
-          ? await (async () => {
-              const project = needs(input.project, action, "project");
-              const destination = needs(
-                input.destination,
-                action,
-                "destination",
-              );
-              if (!(await listingTarget(project, destination))) {
-                throw new ToolRefusal(
-                  "That destination of that project takes no listing text.",
-                );
-              }
-              return priceText("listingCopy", "listing text", {
-                project,
-                destination,
-              });
-            })()
-          : await (async () => {
-              const product = needs(input.product, action, "product");
-              if (!(await getProduct(product))) {
-                throw new ToolRefusal("No product of yours has that id.");
-              }
-              return priceText("productReview", "product review", { product });
-            })();
+    const priced = await priceOf(input);
     const mock = providerMode() === "mock";
     const maker = await getCurrentMaker();
     const month = mock ? null : await budget(maker.id);
@@ -276,6 +331,36 @@ export const generate = defineTool({
         queued: queued.queued,
         skipped: queued.skipped,
         next: "Read get_frames until each frame is to-review, then view_frame.",
+      },
+    };
+  },
+});
+
+export const draw = defineTool({
+  name: "draw",
+  title: "Draw the quoted line art",
+  description:
+    "Queue the drawings a draw quote priced, as the studio's Generate does for a design's line art: one batch, within the month's cap, refused if the estimate rose since the quote. Drawings land over the next minutes: read get_design until each is drawn, look with view_design, then vectorize.",
+  input: QuoteId,
+  hints: {},
+  run: async ({ quote: id }, ctx) => {
+    const quoted = await takeQuote(ctx, id, "draw");
+    const { project, cards } = DrawQuote.parse(quoted.input);
+    const queued = await enqueueProjectCards({
+      projectId: project,
+      cardIds: cards,
+      shownMaxMicros: quoted.maxMicros,
+    }).catch((error) => {
+      throw asRefusal(error);
+    });
+    return {
+      data: {
+        quote: quoted.id,
+        project,
+        batch: queued.batchId,
+        queued: queued.queued,
+        skipped: queued.skipped,
+        next: "Read get_design until each drawing is drawn, then view_design and vectorize.",
       },
     };
   },

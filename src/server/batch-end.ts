@@ -10,6 +10,8 @@ import { appendChatEvent } from "@/server/chat/chat-repository";
 // How a batch's jobs ended, once its last one did.
 export interface BatchEnd {
   projectId: string | null;
+  // A design's batch draws line art, which waits in the studio.
+  design?: boolean;
   count: number;
   done: number;
   failed: number;
@@ -22,14 +24,15 @@ export interface BatchEnd {
 // always sees the others ended.
 export async function finishBatch(batchId: string): Promise<BatchEnd | null> {
   const marked = await db.$queryRaw<
-    { projectId: string | null; count: number }[]
+    { projectId: string | null; count: number; type: string | null }[]
   >`
     UPDATE "GenerationBatch" AS b SET "finishedAt" = now()
     WHERE b."id" = ${batchId} AND b."finishedAt" IS NULL
       AND NOT EXISTS (
         SELECT 1 FROM "GenerationJob" AS j
         WHERE j."batchId" = b."id" AND j."status" IN ('queued', 'running'))
-    RETURNING b."projectId", b."count"`;
+    RETURNING b."projectId", b."count",
+      (SELECT p."type" FROM "Project" AS p WHERE p."id" = b."projectId") AS "type"`;
   if (marked.length === 0) return null;
   const ended = await db.generationJob.groupBy({
     by: ["status"],
@@ -40,6 +43,7 @@ export async function finishBatch(batchId: string): Promise<BatchEnd | null> {
     ended.find((e) => e.status === status)?._count._all ?? 0;
   return {
     projectId: marked[0].projectId,
+    design: marked[0].type === "design",
     count: marked[0].count,
     done: n("done"),
     failed: n("failed"),
@@ -48,19 +52,22 @@ export async function finishBatch(batchId: string): Promise<BatchEnd | null> {
 }
 
 export function batchWords(ended: BatchEnd): string {
-  const { count, done, failed, canceled } = ended;
+  const { count, done, failed, canceled, design } = ended;
   const tail = [
     failed ? `${failed} failed` : null,
     canceled ? `${canceled} canceled` : null,
   ]
     .filter(Boolean)
     .join(", ");
+  const [one, many, where] = design
+    ? ["drawing", "drawings", "in the studio, to vectorize"]
+    : ["frame", "frames", "for review on the board"];
   if (done === count) {
     return count === 1
-      ? "The frame of the last batch landed: it waits for review on the board."
-      : `All ${count} frames of the last batch landed: they wait for review on the board.`;
+      ? `The ${one} of the last batch landed: it waits ${where}.`
+      : `All ${count} ${many} of the last batch landed: they wait ${where}.`;
   }
-  return `${done} of ${count} frames of the last batch landed${tail ? `, ${tail}` : ""}.`;
+  return `${done} of ${count} ${many} of the last batch landed${tail ? `, ${tail}` : ""}.`;
 }
 
 export async function noteBatchEnd(batchId: string | null): Promise<void> {

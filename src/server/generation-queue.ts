@@ -327,7 +327,9 @@ export async function estimateProjectCards(
   };
 }
 
-// Queue a planned project's cards as one batch and wake the worker.
+// Queue a planned project's cards, or a design's drawings (an agent's draw:
+// the studio shows the job and saves around its result), as one batch and
+// wake the worker.
 export async function enqueueProjectCards(input: {
   projectId: string;
   cardIds: string[];
@@ -336,10 +338,12 @@ export async function enqueueProjectCards(input: {
   const maker = await getCurrentMaker();
   const planned = await db.project.findFirst({
     where: { id: input.projectId, makerId: maker.id },
-    select: { plan: true },
+    select: { plan: true, type: true },
   });
-  if (!planned || planned.plan === null) {
-    throw new Error("Only a planned project generates through the queue.");
+  if (!planned || (planned.plan === null && planned.type !== "design")) {
+    throw new Error(
+      "Only a planned project or a design generates through the queue.",
+    );
   }
   const { cards, model } = await estimateProjectCards(
     input.projectId,

@@ -9,6 +9,12 @@ import {
   viewFrame,
 } from "@/server/tools/board";
 import {
+  getDesign,
+  listDesignsTool,
+  vectorizeTool,
+  viewDesign,
+} from "@/server/tools/designs";
+import {
   bestSellersTool,
   editListingTool,
   findShopsTool,
@@ -20,6 +26,7 @@ import {
   watchedShopsTool,
 } from "@/server/tools/listings";
 import {
+  draw,
   generate,
   quote,
   reviewProductTool,
@@ -47,8 +54,13 @@ export const TOOLS: readonly Tool[] = [
   rejectFrame,
   tuneFrame,
   switchFrame,
+  listDesignsTool,
+  getDesign,
+  viewDesign,
+  vectorizeTool,
   quote,
   generate,
+  draw,
   writeListingTool,
   getListingTool,
   editListingTool,

@@ -153,24 +153,39 @@ export async function enqueueBatch(input: {
       WHERE "id" = ${makerId} FOR UPDATE`;
     if (!maker) throw new Error("maker not found");
     // The project row too (setSlotOff and approvals take it): a planned
-    // project generates only its scene slots that are switched on.
-    const [project] = await tx.$queryRaw<{ plan: unknown }[]>`
-      SELECT "plan" FROM "Project"
+    // project generates only its scene slots that are switched on, a design
+    // only its drawings (the studio's image cards).
+    const [project] = await tx.$queryRaw<{ plan: unknown; type: string }[]>`
+      SELECT "plan", "type" FROM "Project"
       WHERE "id" = ${projectId} AND "makerId" = ${makerId} FOR UPDATE`;
     if (!project) throw new Error("project not found");
-    const plan = ProjectPlan.safeParse(project.plan);
-    if (!plan.success) {
-      throw new QueueRefusal(
-        "not-in-plan",
-        "The project's plan could not be read, so nothing was queued.",
-      );
-    }
-    const allowed = new Set(generableCardIds(plan.data));
-    if (input.jobs.some((j) => !allowed.has(j.cardId))) {
-      throw new QueueRefusal(
-        "not-in-plan",
-        "Only the scenes switched on in the plan can be generated.",
-      );
+    if (project.plan === null && project.type === "design") {
+      const drawings = await tx.card.findMany({
+        where: { projectId, type: "image" },
+        select: { cardId: true },
+      });
+      const allowed = new Set(drawings.map((c) => c.cardId));
+      if (input.jobs.some((j) => !allowed.has(j.cardId))) {
+        throw new QueueRefusal(
+          "not-in-plan",
+          "Only the design's drawings can be drawn.",
+        );
+      }
+    } else {
+      const plan = ProjectPlan.safeParse(project.plan);
+      if (!plan.success) {
+        throw new QueueRefusal(
+          "not-in-plan",
+          "The project's plan could not be read, so nothing was queued.",
+        );
+      }
+      const allowed = new Set(generableCardIds(plan.data));
+      if (input.jobs.some((j) => !allowed.has(j.cardId))) {
+        throw new QueueRefusal(
+          "not-in-plan",
+          "Only the scenes switched on in the plan can be generated.",
+        );
+      }
     }
     const busy = new Set(
       (

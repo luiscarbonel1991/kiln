@@ -18,7 +18,7 @@ const s = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/spend-quotes", () => ({
-  QUOTE_ACTIONS: ["generate", "write_listing", "review_product"],
+  QUOTE_ACTIONS: ["generate", "draw", "write_listing", "review_product"],
   QUOTE_MINUTES: 30,
   QuoteRefusal: class QuoteRefusal extends Error {},
   createQuote: async (q: {
@@ -118,6 +118,22 @@ vi.mock("@/server/listing-write", () => ({
 }));
 vi.mock("@/server/product-repository", () => ({
   getProduct: async () => null,
+}));
+vi.mock("@/server/designs", () => ({
+  designView: async (id: string) =>
+    id === "d1"
+      ? {
+          project: { id: "d1", name: "Fern", updatedAt: "" },
+          master: null,
+          subject: null,
+          drawings: [
+            { card: "recipe-line-art-0", label: "Outline", state: "to-draw" },
+            { card: "recipe-line-art-1", label: "Detail", state: "drawn" },
+            { card: "recipe-line-art-2", label: "Badge", state: "drawing" },
+            { card: "recipe-line-art-3", label: "Minimal", state: "failed" },
+          ],
+        }
+      : null,
 }));
 
 const { TOOLS } = await import("@/server/tools");
@@ -252,6 +268,70 @@ describe("generate", () => {
       ok: false,
       error: expect.stringContaining("generate needs"),
     });
+  });
+});
+
+describe("draw", () => {
+  it("prices a design's drawings that have no line art, and queues them on the quote", async () => {
+    const answer = await call("quote", { action: "draw", project: "d1" });
+    expect(answer).toMatchObject({
+      ok: true,
+      output: {
+        data: {
+          quote: "q1",
+          cards: ["recipe-line-art-0", "recipe-line-art-3"],
+          lines: [
+            { card: "recipe-line-art-0", drawing: "Outline" },
+            { card: "recipe-line-art-3", drawing: "Minimal" },
+          ],
+          atMostUsd: 0.14,
+        },
+      },
+    });
+    expect(await call("draw", { quote: "q1" })).toMatchObject({
+      ok: true,
+      output: { data: { batch: "b1" } },
+    });
+    expect(s.enqueued).toEqual([
+      {
+        projectId: "d1",
+        cardIds: ["recipe-line-art-0", "recipe-line-art-3"],
+        shownMaxMicros: 140_000,
+      },
+    ]);
+  });
+
+  it("draws a drawn one again when named, never one being drawn", async () => {
+    expect(
+      await call("quote", {
+        action: "draw",
+        project: "d1",
+        cards: ["recipe-line-art-1"],
+      }),
+    ).toMatchObject({ ok: true, output: { data: { atMostUsd: 0.07 } } });
+    expect(
+      await call("quote", {
+        action: "draw",
+        project: "d1",
+        cards: ["recipe-line-art-2"],
+      }),
+    ).toEqual({ ok: false, error: "Badge is being drawn already." });
+    expect(
+      await call("quote", { action: "draw", project: "d1", cards: ["nope"] }),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("not a drawing"),
+    });
+    expect(await call("quote", { action: "draw", project: "p1" })).toEqual({
+      ok: false,
+      error: "No design of yours has that id.",
+    });
+  });
+
+  it("takes only a draw quote", async () => {
+    await call("quote", { action: "generate", project: "p1" });
+    expect(await call("draw", { quote: "q1" })).toMatchObject({ ok: false });
+    expect(s.enqueued).toEqual([]);
   });
 });
 

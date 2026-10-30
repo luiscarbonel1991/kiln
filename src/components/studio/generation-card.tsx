@@ -68,7 +68,9 @@ export function GenerationCard({
   const [vectorizing, setVectorizing] = useState(false);
   const [vectorError, setVectorError] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
-  const inQueue = projectMode && isActiveJob(job);
+  // A studio card is queued only when an agent asked for its drawing (the
+  // chat's draw); it shows the job like a planned card does.
+  const inQueue = isActiveJob(job);
 
   const recipe = findRecipe(card.recipeId) ?? SEED_RECIPES[0];
   const costModule = useModule("laser-pricing");
@@ -135,7 +137,9 @@ export function GenerationCard({
         ? "Retrying…"
         : "Generating…";
   const failure =
-    projectMode && job?.status === "failed" ? (job.error ?? "failed") : null;
+    job?.status === "failed" && (projectMode || card.status !== "done")
+      ? (job.error ?? "failed")
+      : null;
 
   // Vectorize: trace the rendered line-art into a REAL SVG. Only exposed for
   // line-art recipes (tracing a photo produces a bloated, posterized file).
@@ -147,7 +151,12 @@ export function GenerationCard({
     setVectorizing(true);
     setVectorError(null);
     try {
-      const result = await vectorizeCardAction({ imageUrl: src, mode });
+      const projectId = useProject.getState().projectId;
+      const result = await vectorizeCardAction({
+        imageUrl: src,
+        mode,
+        ...(projectId ? { projectId, cardId: card.id } : {}),
+      });
       if ("error" in result) setVectorError(result.error);
       else applyVector(card.id, result.url);
     } catch {
@@ -220,7 +229,7 @@ export function GenerationCard({
           projectMode ? void enqueue() : regenerateCard(card.id)
         }
         onPromote={() => promoteToVideo(card.id)}
-        busyLabel={projectMode ? busyLabel : undefined}
+        busyLabel={inQueue ? busyLabel : undefined}
         generateHint={estimate ? estimateHint(estimate) : "no pinned price"}
         canPromote={!projectMode}
         disabledReason={

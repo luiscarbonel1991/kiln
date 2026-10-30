@@ -11,6 +11,7 @@ export const QUOTE_MINUTES = 30;
 
 export const QUOTE_ACTIONS = [
   "generate",
+  "draw",
   "write_listing",
   "review_product",
 ] as const;
