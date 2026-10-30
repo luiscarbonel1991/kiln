@@ -17,6 +17,9 @@ interface Task {
   on: "waiting" | "review" | "maker";
   // The mode the maker picked; the general one when not named.
   specialist?: "kiln" | "etsy" | "scenes";
+  // Starts from a long Etsy title, written as the model's: an earlier run
+  // may have shortened it, and then there is nothing left to do.
+  longTitle?: boolean;
   message: string;
   calls?: string[];
   waits?: string[];
@@ -139,6 +142,21 @@ describe("the chat agent's fixed tasks", async () => {
       }
     }
   }
+  const { listingTarget } = await import("@/server/listing-write");
+  const { setListing } = await import("@/server/project-repository");
+  const { listingDraft } = await import("@/domain/listing");
+  async function lengthenTitle(projectId: string) {
+    const target = await listingTarget(projectId, "etsy");
+    if (!target) throw new Error("The mock's project has no Etsy listing.");
+    const name = listingDraft(target.product, target.rules).title.value;
+    await setListing(projectId, "etsy", {
+      ...target.current,
+      title: {
+        value: `${name}, handmade in a small studio, a thoughtful gift for any home, made to order with care`,
+        source: "model",
+      },
+    });
+  }
   const results: { id: string; failures: string[]; costMicros: number }[] = [];
 
   afterAll(() => {
@@ -160,6 +178,7 @@ describe("the chat agent's fixed tasks", async () => {
       if (task.on !== "maker" && !projectId) {
         throw new Error(`The mock has no project for "${task.on}".`);
       }
+      if (task.longTitle && projectId) await lengthenTitle(projectId);
       const { id } = await chats.createChatSession(projectId);
       const response = await runTurn({
         sessionId: id,

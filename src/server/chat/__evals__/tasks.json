@@ -78,6 +78,7 @@
     "id": "etsy-shorten-title",
     "on": "review",
     "specialist": "etsy",
+    "longTitle": true,
     "message": "Shorten the Etsy title to under 60 characters, keeping what the item is.",
     "calls": ["get_listing", "edit_listing"],
     "never": ["write_listing"],
