@@ -10,12 +10,15 @@ import { QuoteRefusal } from "@/server/spend-quotes";
 // takes a model: an agent asks for a task, and the task runs on its role's
 // route (Settings → Models).
 
-// Who is calling: the access token the request carried, and whether the
-// maker lets it spend (Settings → Access tokens).
+// Who is calling: the access token the request carried and whether the
+// maker lets it spend (Settings → Access tokens), or a chat session
+// (`tokenName` "Chat"), where a paid tool runs only once the maker approved
+// that call in the chat.
 export interface ToolContext {
-  tokenId: string;
+  tokenId: string | null;
   tokenName: string;
   canSpend: boolean;
+  sessionId?: string;
 }
 
 export interface ToolImage {

@@ -224,19 +224,23 @@ export async function saveChatMessages(
   });
 }
 
-// A notice from Kiln in a project's latest conversation (a batch that
-// finished), stored once by its key. Nothing when the project has no chat.
+// A notice from Kiln, stored once by its key: in a conversation, or in a
+// project's latest one (a batch that finished). Nothing when the project has
+// no chat.
 export async function appendChatEvent(
-  projectId: string,
+  target: { sessionId: string } | { projectId: string },
   key: string,
   text: string,
 ): Promise<boolean> {
   assertDatabaseUrl();
-  const session = await db.chatSession.findFirst({
-    where: { projectId },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true },
-  });
+  const session =
+    "sessionId" in target
+      ? { id: target.sessionId }
+      : await db.chatSession.findFirst({
+          where: { projectId: target.projectId },
+          orderBy: { updatedAt: "desc" },
+          select: { id: true },
+        });
   if (!session) return false;
   const messageId = `${EVENT_PREFIX}${key}`;
   const last = await db.chatMessage.findFirst({

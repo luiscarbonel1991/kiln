@@ -34,7 +34,7 @@ export async function createQuote(
     input: Prisma.InputJsonValue;
     typicalMicros: number;
     maxMicros: number;
-    tokenId: string;
+    tokenId: string | null;
   },
   now = new Date(),
 ): Promise<{ id: string; expiresAt: Date }> {

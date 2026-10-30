@@ -111,7 +111,7 @@ class RouteFailed extends Error {
 
 // The models a call may run on: the one asked for by name alone, else its
 // role's route (the default text model alone until the maker saves routes).
-async function textCandidates(
+export async function textCandidates(
   kind: TextCallKind,
   asked?: TextModel,
 ): Promise<RouteEntry[]> {
@@ -121,7 +121,9 @@ async function textCandidates(
   return routeCandidates(route, route?.models[0] ?? models.text);
 }
 
-const runnable = (kind: TextCallKind) => (entry: RouteEntry) =>
+// Whether a model of the route may take a call of this kind now: a pinned
+// price, and its key in a live run.
+export const textRunnable = (kind: TextCallKind) => (entry: RouteEntry) =>
   textEstimate(entry, TEXT_CALL_BUDGETS[kind]) !== null &&
   (providerMode() === "mock" || hasProviderKey(entry.provider));
 
@@ -190,7 +192,7 @@ async function runText<T>(
       };
     } catch (error) {
       const failure = fallbackAfter(model.provider, error, { callStarted });
-      const picked = pickNext(rest, model, failure, runnable(kind));
+      const picked = pickNext(rest, model, failure, textRunnable(kind));
       if (!picked) throw new RouteFailed(model, tried, error);
       console.warn(
         `[kiln] ${kind} moved from ${model.model} to ${picked.entry.model}: ${failure.reason}`,
@@ -393,7 +395,7 @@ export async function textRoute(kind: TextCallKind): Promise<{
   max: number | null;
 }> {
   const candidates = (await textCandidates(kind)).filter(
-    (c, i) => i === 0 || runnable(kind)(c),
+    (c, i) => i === 0 || textRunnable(kind)(c),
   );
   let worst: number | null = null;
   for (const entry of candidates) {

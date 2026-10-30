@@ -13,6 +13,12 @@ describe.skipIf(!enabled)("chat sessions (database)", async () => {
   const { getCurrentMaker } = await import("@/server/maker-repository");
   let maker: { id: string };
   let project: { id: string };
+  const made: string[] = [];
+  const session = async (projectId?: string) => {
+    const created = await repo.createChatSession(projectId);
+    made.push(created.id);
+    return created;
+  };
 
   const user = (id: string, text: string): KilnMessage => ({
     id,
@@ -33,12 +39,12 @@ describe.skipIf(!enabled)("chat sessions (database)", async () => {
   });
 
   afterAll(async () => {
-    await db.chatSession.deleteMany({ where: { makerId: maker.id } });
+    await db.chatSession.deleteMany({ where: { id: { in: made } } });
     await db.project.delete({ where: { id: project.id } });
   });
 
   it("stores a turn's messages in order, and titles the session from the first", async () => {
-    const { id } = await repo.createChatSession(project.id);
+    const { id } = await session(project.id);
     await repo.saveChatMessages(id, [
       user("u1", "How are the frames of this planter doing today?"),
     ]);
@@ -65,13 +71,21 @@ describe.skipIf(!enabled)("chat sessions (database)", async () => {
   });
 
   it("a notice is stored once, after the turn's messages, and a later save leaves it", async () => {
-    const { id } = await repo.createChatSession(project.id);
+    const { id } = await session(project.id);
     await repo.saveChatMessages(id, [user("u1", "generate")]);
     expect(
-      await repo.appendChatEvent(project.id, "b1", "5 scenes landed."),
+      await repo.appendChatEvent(
+        { projectId: project.id },
+        "b1",
+        "5 scenes landed.",
+      ),
     ).toBe(true);
     expect(
-      await repo.appendChatEvent(project.id, "b1", "5 scenes landed."),
+      await repo.appendChatEvent(
+        { projectId: project.id },
+        "b1",
+        "5 scenes landed.",
+      ),
     ).toBe(false);
     await repo.saveChatMessages(id, [
       user("u1", "generate"),
@@ -86,7 +100,7 @@ describe.skipIf(!enabled)("chat sessions (database)", async () => {
   });
 
   it("one turn holds the session; a lock left by a dead turn is taken over", async () => {
-    const { id } = await repo.createChatSession();
+    const { id } = await session();
     expect(await repo.lockChat(id)).toEqual({ locked: true, stale: false });
     expect(await repo.lockChat(id)).toEqual({ locked: false, stale: false });
     expect((await repo.getChat(id))?.running).toBe(true);

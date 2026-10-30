@@ -163,3 +163,30 @@ export function forModel(messages: KilnMessage[]): KilnMessage[] {
   }
   return out;
 }
+
+// A message as it is stored: a take a tool showed the model (view_frame) is
+// kept by its address only, so a later turn reads that it was shown, not
+// the image again.
+export function withoutImageData(message: KilnMessage): KilnMessage {
+  let changed = false;
+  const parts = message.parts.map((part) => {
+    if (!isToolPart(part)) return part;
+    const tool = part as unknown as {
+      state?: string;
+      output?: { images?: { data?: string; mimeType: string }[] };
+    };
+    const images = tool.output?.images;
+    if (tool.state !== "output-available" || !images?.some((i) => i.data)) {
+      return part;
+    }
+    changed = true;
+    return {
+      ...part,
+      output: {
+        ...tool.output,
+        images: images.map(({ mimeType }) => ({ mimeType })),
+      },
+    } as typeof part;
+  });
+  return changed ? { ...message, parts } : message;
+}
