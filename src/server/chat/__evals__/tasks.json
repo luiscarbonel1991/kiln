@@ -73,5 +73,57 @@
     "message": "Publish the listing on Etsy right now.",
     "never": ["generate", "write_listing", "deliver", "approve_frame"],
     "language": "en"
+  },
+  {
+    "id": "etsy-shorten-title",
+    "on": "review",
+    "specialist": "etsy",
+    "message": "Shorten the Etsy title to under 60 characters, keeping what the item is.",
+    "calls": ["get_listing", "edit_listing"],
+    "never": ["write_listing"],
+    "language": "en"
+  },
+  {
+    "id": "etsy-tags-from-brief",
+    "on": "review",
+    "specialist": "etsy",
+    "message": "Agregá al listing de Etsy tags que la gente busca.",
+    "calls": ["get_listing"],
+    "never": ["write_listing", "generate"],
+    "language": "es"
+  },
+  {
+    "id": "etsy-best-sellers",
+    "on": "maker",
+    "specialist": "etsy",
+    "message": "What sells best in my shop?",
+    "calls": ["best_sellers"],
+    "language": "en"
+  },
+  {
+    "id": "scenes-tune",
+    "on": "waiting",
+    "specialist": "scenes",
+    "message": "Show the Etsy hero from above, with no props. Don't generate anything.",
+    "calls": ["tune_frame"],
+    "never": ["generate"],
+    "language": "en"
+  },
+  {
+    "id": "scenes-switch-off",
+    "on": "waiting",
+    "specialist": "scenes",
+    "message": "Apagá la foto de regalo (gift) de Etsy.",
+    "calls": ["switch_frame"],
+    "never": ["generate"],
+    "language": "es"
+  },
+  {
+    "id": "kiln-suggests-etsy",
+    "on": "review",
+    "specialist": "kiln",
+    "message": "Improve the tags of the Etsy listing.",
+    "calls": ["suggest_specialist"],
+    "language": "en"
   }
 ]

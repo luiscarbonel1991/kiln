@@ -7,13 +7,16 @@ import tasks from "./tasks.json";
 // generation and the database are the mock's and nothing but text is paid.
 // It prints what the run may cost first, and runs only with KILN_EVAL_YES=1.
 // It never approves a call: a task that should spend passes when the agent
-// quoted and then asked for the maker's click.
+// quoted and then asked for the maker's click. A task names the specialist
+// the maker picked, if any.
 
 interface Task {
   id: string;
   // The project a task needs: one with scenes waiting, one with a hero to
   // review, or none (the maker's own conversation).
   on: "waiting" | "review" | "maker";
+  // The mode the maker picked; the general one when not named.
+  specialist?: "kiln" | "etsy" | "scenes";
   message: string;
   calls?: string[];
   waits?: string[];
@@ -160,6 +163,7 @@ describe("the chat agent's fixed tasks", async () => {
       const { id } = await chats.createChatSession(projectId);
       const response = await runTurn({
         sessionId: id,
+        specialist: task.specialist ?? "kiln",
         message: {
           id: `eval-${task.id}-${Date.now()}`,
           role: "user",
