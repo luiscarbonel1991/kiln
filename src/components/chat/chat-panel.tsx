@@ -447,17 +447,13 @@ function Composer({
         send();
       }}
     >
-      <div
-        role="radiogroup"
-        aria-label="Who works on it"
-        className="flex items-center gap-1"
-      >
+      <fieldset className="m-0 flex items-center gap-1 border-0 p-0">
+        <legend className="sr-only">Who works on it</legend>
         {specialists.map((s) => (
           <button
             key={s.id}
             type="button"
-            role="radio"
-            aria-checked={s.id === specialist}
+            aria-pressed={s.id === specialist}
             title={s.about}
             disabled={busy}
             data-testid={`chat-specialist-${s.id}`}
@@ -472,7 +468,7 @@ function Composer({
             {s.label}
           </button>
         ))}
-      </div>
+      </fieldset>
       <label className="sr-only" htmlFor="chat-input">
         Message Kiln
       </label>
