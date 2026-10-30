@@ -5,8 +5,10 @@ import { useState, useTransition } from "react";
 import {
   createAccessTokenAction,
   revokeAccessTokenAction,
+  setTokenSpendAction,
 } from "@/app/actions/access-tokens";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import type { AccessTokenView } from "@/server/access-tokens";
 
 const FIELD =
@@ -20,10 +22,12 @@ const when = (iso: string) =>
     minute: "2-digit",
   });
 
-// Settings → Access tokens: make one per script or system that feeds Kiln,
-// copy it once, revoke it when that system stops using it.
+// Settings → Access tokens: make one per script, agent or system that uses
+// Kiln, copy it once, revoke it when that system stops using it. A token may
+// run paid tools (after a quote, within the cap) only when it is let spend.
 export function AccessTokens({ tokens }: { tokens: AccessTokenView[] }) {
   const [name, setName] = useState("");
+  const [canSpend, setCanSpend] = useState(false);
   const [made, setMade] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +37,7 @@ export function AccessTokens({ tokens }: { tokens: AccessTokenView[] }) {
   const create = () =>
     startTransition(async () => {
       setError(null);
-      const result = await createAccessTokenAction(name);
+      const result = await createAccessTokenAction({ name, canSpend });
       if ("error" in result) {
         setError(result.error);
         return;
@@ -41,6 +45,13 @@ export function AccessTokens({ tokens }: { tokens: AccessTokenView[] }) {
       setMade(result.token);
       setCopied(false);
       setName("");
+      setCanSpend(false);
+    });
+
+  const spend = (id: string, value: boolean) =>
+    startTransition(async () => {
+      const result = await setTokenSpendAction({ id, canSpend: value });
+      setError(result.error ?? null);
     });
 
   const revoke = (id: string) =>
@@ -82,6 +93,14 @@ export function AccessTokens({ tokens }: { tokens: AccessTokenView[] }) {
           Make a token
         </Button>
       </form>
+      <Switch
+        checked={canSpend}
+        disabled={pending}
+        testId="token-can-spend"
+        onChange={setCanSpend}
+      >
+        May spend after a quote, within the monthly cap
+      </Switch>
 
       {error ? (
         <p className="font-mono text-[0.65rem] text-prov-local">{error}</p>
@@ -151,6 +170,15 @@ export function AccessTokens({ tokens }: { tokens: AccessTokenView[] }) {
                     : "never used"}
                 </div>
               </div>
+              <Switch
+                checked={t.canSpend}
+                disabled={pending}
+                testId={`token-spend-${t.id}`}
+                label={`${t.name} may spend`}
+                onChange={(value) => spend(t.id, value)}
+              >
+                May spend
+              </Switch>
               {confirming === t.id ? (
                 <div className="flex items-center gap-2">
                   <span className="font-sans text-[0.75rem] text-foreground">

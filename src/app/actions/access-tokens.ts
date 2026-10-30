@@ -5,19 +5,25 @@ import { z } from "zod";
 import {
   createAccessToken,
   revokeAccessToken,
+  setTokenSpend,
   TokenName,
 } from "@/server/access-tokens";
 
 // Settings → Access tokens. Zod is the trust boundary. The token comes back
 // this once; Kiln keeps only its hash.
+const NewToken = z.object({ name: TokenName, canSpend: z.boolean() });
+
 export async function createAccessTokenAction(
   input: unknown,
 ): Promise<{ token: string } | { error: string }> {
-  const parsed = TokenName.safeParse(input);
+  const parsed = NewToken.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Name the token." };
   }
-  const { token } = await createAccessToken(parsed.data);
+  const { token } = await createAccessToken(
+    parsed.data.name,
+    parsed.data.canSpend,
+  );
   refresh();
   return { token };
 }
@@ -30,4 +36,17 @@ export async function revokeAccessTokenAction(
   const revoked = await revokeAccessToken(parsed.data);
   refresh();
   return revoked ? {} : { error: "That token was already revoked." };
+}
+
+const Spend = z.object({ id: z.string().min(1), canSpend: z.boolean() });
+
+// Let a token run paid tools (after a quote, within the cap), or stop it.
+export async function setTokenSpendAction(
+  input: unknown,
+): Promise<{ error?: string }> {
+  const parsed = Spend.safeParse(input);
+  if (!parsed.success) return { error: "Which token?" };
+  const changed = await setTokenSpend(parsed.data.id, parsed.data.canSpend);
+  refresh();
+  return changed ? {} : { error: "That token was revoked." };
 }

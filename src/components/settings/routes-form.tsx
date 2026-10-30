@@ -8,6 +8,7 @@ import {
   type ProviderNote,
 } from "@/components/models/model-choice";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { modelPriced } from "@/domain/generation-cost";
 import {
   catalogFor,
@@ -23,7 +24,6 @@ import {
   type RouteEntry,
   sameModel,
 } from "@/domain/model-routing";
-import { cn } from "@/lib/utils";
 
 const ROLES: { role: ModelRole; label: string; what: string; off: string }[] = [
   {
@@ -237,31 +237,14 @@ export function RoutesForm({
                     Add a fallback
                   </Button>
                 ) : null}
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={route.fallback}
-                  data-testid={`route-${role}-fallback`}
+                <Switch
+                  checked={route.fallback}
+                  testId={`route-${role}-fallback`}
                   disabled={pending}
-                  onClick={() => change(role, { fallback: !route.fallback })}
-                  className="group flex items-center gap-2 font-sans text-[0.75rem] text-foreground disabled:opacity-50"
+                  onChange={(fallback) => change(role, { fallback })}
                 >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "relative h-4 w-7 rounded-full border border-border transition-colors",
-                      route.fallback ? "bg-primary" : "bg-input",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "absolute top-0.5 size-2.5 rounded-full bg-card shadow-sm transition-all",
-                        route.fallback ? "left-3.5" : "left-0.5",
-                      )}
-                    />
-                  </span>
                   Fall back to the next model
-                </button>
+                </Switch>
               </div>
               {route.fallback ? null : (
                 <p className="pl-10 font-sans text-[0.7rem] leading-snug text-on-surface-dim">

@@ -4,6 +4,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { AccessTokens } from "@/components/settings/access-tokens";
 import { KeyCheck } from "@/components/settings/key-check";
 import { RoutesForm } from "@/components/settings/routes-form";
+import { ToolCalls } from "@/components/settings/tool-calls";
 import { EtsyConnection } from "@/components/shops/etsy-connection";
 import { fromMicros } from "@/domain/generation-cost";
 import { proposeRoutes } from "@/domain/model-routing";
@@ -14,6 +15,7 @@ import { budget } from "@/server/generation-repository";
 import { getCurrentMaker, getMakerModelSetup } from "@/server/maker-repository";
 import { providerHealth } from "@/server/provider-health";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
+import { recentToolCalls } from "@/server/tool-calls";
 
 const money = (usd: number) => `$${usd.toFixed(2)}`;
 
@@ -34,12 +36,13 @@ const when = (iso: string) =>
 export default async function SettingsPage() {
   await connection();
   const maker = hasDatabase() ? await getCurrentMaker() : null;
-  const [setup, health, month, tokens, shop] = await Promise.all([
+  const [setup, health, month, tokens, shop, calls] = await Promise.all([
     getMakerModelSetup(),
     providerHealth(maker?.id ?? null),
     maker ? budget(maker.id) : Promise.resolve(null),
     maker ? listAccessTokens() : Promise.resolve(null),
     maker ? shopConnection() : Promise.resolve(null),
+    maker ? recentToolCalls() : Promise.resolve([]),
   ]);
   const mode = providerMode();
   // A mock run calls nothing, so every provider counts as keyed.
@@ -176,19 +179,29 @@ export default async function SettingsPage() {
             </h2>
             <p className="mt-1 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
               For scripts, agents and other systems: they send a product package
-              or a colour&apos;s material photo over HTTP, with no file picker.
-              A token acts as this studio; make one per system, so each can be
-              revoked on its own.
+              or a colour&apos;s material photo over HTTP, and an agent drives
+              the board through Kiln&apos;s MCP server. A token acts as this
+              studio; make one per system, so each can be revoked on its own. A
+              paid tool runs only for a token that may spend, after a quote and
+              within the monthly cap.
             </p>
             <ul className="mt-3 mb-5 flex flex-col gap-1 font-mono text-[0.68rem] text-on-surface-mid">
+              <li>POST /api/mcp · the MCP server, for an agent</li>
               <li>POST /api/import · a product package (JSON)</li>
               <li>
                 POST /api/products/&lt;id or sku&gt;/colours/&lt;key&gt;/swatch
                 · a material photo
               </li>
-              <li>pnpm kiln validate | import | swatch · from a terminal</li>
+              <li>
+                pnpm kiln validate | import | swatch | call | mcp · from a
+                terminal
+              </li>
             </ul>
             <AccessTokens tokens={tokens} />
+            <h3 className="mt-6 mb-1 font-sans text-[0.8rem] font-semibold text-foreground">
+              Recent tool calls
+            </h3>
+            <ToolCalls calls={calls} />
           </section>
         ) : null}
       </main>

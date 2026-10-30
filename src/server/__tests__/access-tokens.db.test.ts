@@ -62,6 +62,30 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
     expect(await repo.verifyAccessToken(repo.newToken().token)).toBeNull();
   });
 
+  it("a token may spend only once the maker lets it, and that can be undone", async () => {
+    const { token, created } = await repo.createAccessToken("Spend test");
+    made.push(created.id);
+    expect(created.canSpend).toBe(false);
+    expect(await repo.setTokenSpend(created.id, true)).toBe(true);
+    expect((await repo.verifyAccessToken(token))?.canSpend).toBe(true);
+    expect(await repo.setTokenSpend(created.id, false)).toBe(true);
+    expect((await repo.verifyAccessToken(token))?.canSpend).toBe(false);
+    const allowed = await repo.createAccessToken("Spend from the start", true);
+    made.push(allowed.created.id);
+    expect(allowed.created.canSpend).toBe(true);
+    const theirs = repo.newToken();
+    const row = await db.accessToken.create({
+      data: {
+        makerId: other.id,
+        name: "Elsewhere",
+        prefix: theirs.prefix,
+        hash: theirs.hash,
+      },
+    });
+    made.push(row.id);
+    expect(await repo.setTokenSpend(row.id, true)).toBe(false);
+  });
+
   it("a token made for another maker does not act here", async () => {
     const { token, prefix, hash } = repo.newToken();
     const row = await db.accessToken.create({

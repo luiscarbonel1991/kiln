@@ -45,6 +45,8 @@ export interface AccessTokenView {
   prefix: string;
   createdAt: string;
   lastUsedAt: string | null;
+  // It may run a paid tool after a quote, within the monthly cap.
+  canSpend: boolean;
 }
 
 const SELECT = {
@@ -53,6 +55,7 @@ const SELECT = {
   prefix: true,
   createdAt: true,
   lastUsedAt: true,
+  canSpend: true,
 } as const;
 
 function view(row: {
@@ -61,6 +64,7 @@ function view(row: {
   prefix: string;
   createdAt: Date;
   lastUsedAt: Date | null;
+  canSpend: boolean;
 }): AccessTokenView {
   return {
     id: row.id,
@@ -68,6 +72,7 @@ function view(row: {
     prefix: row.prefix,
     createdAt: row.createdAt.toISOString(),
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+    canSpend: row.canSpend,
   };
 }
 
@@ -84,17 +89,40 @@ export async function listAccessTokens(): Promise<AccessTokenView[]> {
 }
 
 // Make a token for the current maker: the token itself is returned this once.
+// It may spend only when the maker says so.
 export async function createAccessToken(
   name: string,
+  canSpend = false,
 ): Promise<{ token: string; created: AccessTokenView }> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
   const { token, prefix, hash } = newToken();
   const row = await db.accessToken.create({
-    data: { makerId: maker.id, name: TokenName.parse(name), prefix, hash },
+    data: {
+      makerId: maker.id,
+      name: TokenName.parse(name),
+      prefix,
+      hash,
+      canSpend,
+    },
     select: SELECT,
   });
   return { token, created: view(row) };
+}
+
+// Let one of the current maker's tokens spend, or stop it; false when it is
+// not there. The next call reads the change.
+export async function setTokenSpend(
+  id: string,
+  canSpend: boolean,
+): Promise<boolean> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  const { count } = await db.accessToken.updateMany({
+    where: { id, makerId: maker.id },
+    data: { canSpend },
+  });
+  return count > 0;
 }
 
 // Revoke (delete) one of the current maker's tokens; false when it was not
