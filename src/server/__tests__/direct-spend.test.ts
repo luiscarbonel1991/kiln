@@ -16,9 +16,8 @@ vi.mock("@/server/maker-repository", () => ({
   getCurrentMaker: async () => ({ id: "maker-1" }),
 }));
 
-const { imageCall, videoCall, withDirectSpend } = await import(
-  "@/server/direct-spend"
-);
+const { imageCall, openDirectCall, textCall, videoCall, withDirectSpend } =
+  await import("@/server/direct-spend");
 
 const VEO = {
   provider: "google" as const,
@@ -99,6 +98,41 @@ describe("direct spend", () => {
     expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
       error: "Sora did not finish",
       mayBeCharged: true,
+    });
+  });
+
+  it("a call opened around a stream closes once, with its measured cost", async () => {
+    const luna = { provider: "openai" as const, model: "gpt-6-luna" };
+    const direct = await openDirectCall(textCall<string>(luna, "chatTurn"));
+    expect(reserveDirectCall).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "gpt-6-luna" }),
+    );
+    await direct.beforeCall();
+    expect(markDirectCall).toHaveBeenCalledWith("row-1");
+    const usage = {
+      inputTextTokens: 10_000,
+      inputImageTokens: 0,
+      outputTokens: 1_000,
+    };
+    await direct.done({ value: "", model: luna.model, usage });
+    await direct.failed(new Error("late"));
+    expect(closeDirectCall).toHaveBeenCalledTimes(1);
+    expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
+      usage,
+      actualMicros: 1_500,
+    });
+  });
+
+  it("a stream that answered an HTTP error counts nothing", async () => {
+    const luna = { provider: "openai" as const, model: "gpt-6-luna" };
+    const direct = await openDirectCall(textCall<string>(luna, "chatTurn"));
+    await direct.beforeCall();
+    await direct.failed(
+      Object.assign(new Error("Bad Request"), { status: 400 }),
+    );
+    expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
+      error: "Bad Request",
+      mayBeCharged: false,
     });
   });
 });

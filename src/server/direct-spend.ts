@@ -97,19 +97,31 @@ export function textCall<T>(
   };
 }
 
-// Run one direct (studio) call against the cap. Its estimated max is reserved
-// first, under the maker lock, so parallel calls cannot pass the cap together;
-// the row then carries the measured cost. The provider marks the row right
-// before its paid request (`beforeCall`): an error it answered counts nothing,
-// a call with no answer counts at its estimate, and a call never made (a stub)
-// records nothing.
-export async function withDirectSpend<T extends { usage?: unknown }>(
+// One direct call against the cap, opened before its request and closed
+// once with what it did: `beforeCall` right before the paid request, then
+// `done` with its result or `failed` with its error. A streamed call (the
+// chat) closes when its stream ends. Mock runs and runs without a database
+// reserve and record nothing.
+export interface DirectCall<T> {
+  beforeCall(): Promise<void>;
+  done(result: T): Promise<void>;
+  failed(error: unknown): Promise<void>;
+}
+
+const UNCOUNTED: DirectCall<never> = {
+  beforeCall: async () => {},
+  done: async () => {},
+  failed: async () => {},
+};
+
+// The estimated max is reserved first, under the maker lock, so parallel
+// calls cannot pass the cap together; the row then carries the measured cost.
+// An error the provider answered counts nothing, a call with no answer counts
+// at its estimate, and a call never made (a stub) records nothing.
+export async function openDirectCall<T extends { usage?: unknown }>(
   priced: PricedCall<T>,
-  call: (beforeCall: () => Promise<void>) => Promise<T>,
-): Promise<T> {
-  if (!hasDatabase() || providerMode() === "mock") {
-    return call(async () => {});
-  }
+): Promise<DirectCall<T>> {
+  if (!hasDatabase() || providerMode() === "mock") return UNCOUNTED;
   if (priced.estimateMax === null) {
     throw new Error(
       `No pinned price for ${priced.model}, so it cannot run under the cap.`,
@@ -125,26 +137,48 @@ export async function withDirectSpend<T extends { usage?: unknown }>(
     ...(priced.route ? { route: priced.route } : {}),
   });
   let callStarted = false;
-  let result: T;
-  try {
-    result = await call(async () => {
+  let closed = false;
+  return {
+    async beforeCall() {
       await markDirectCall(id);
       callStarted = true;
-    });
+    },
+    async done(result) {
+      if (closed) return;
+      closed = true;
+      const usd = callStarted ? priced.costOf(result) : null;
+      await closeDirectCall(id, {
+        usage: result.usage,
+        actualMicros: usd === null ? null : toMicros(usd),
+      }).catch((e) => console.warn("[kiln spend] could not record a call", e));
+    },
+    async failed(error) {
+      if (closed) return;
+      closed = true;
+      await closeDirectCall(id, {
+        error:
+          priced.provider === "google" || priced.provider === "openai"
+            ? describeProviderError(priced.provider, error)
+            : String(error),
+        mayBeCharged: callStarted && !hadResponse(error),
+      }).catch((e) => console.warn("[kiln spend] could not close a call", e));
+    },
+  };
+}
+
+// Run one direct (studio) call against the cap (openDirectCall).
+export async function withDirectSpend<T extends { usage?: unknown }>(
+  priced: PricedCall<T>,
+  call: (beforeCall: () => Promise<void>) => Promise<T>,
+): Promise<T> {
+  const direct = await openDirectCall(priced);
+  let result: T;
+  try {
+    result = await call(() => direct.beforeCall());
   } catch (error) {
-    await closeDirectCall(id, {
-      error:
-        priced.provider === "google" || priced.provider === "openai"
-          ? describeProviderError(priced.provider, error)
-          : String(error),
-      mayBeCharged: callStarted && !hadResponse(error),
-    }).catch((e) => console.warn("[kiln spend] could not close a call", e));
+    await direct.failed(error);
     throw error;
   }
-  const usd = callStarted ? priced.costOf(result) : null;
-  await closeDirectCall(id, {
-    usage: result.usage,
-    actualMicros: usd === null ? null : toMicros(usd),
-  }).catch((e) => console.warn("[kiln spend] could not record a call", e));
+  await direct.done(result);
   return result;
 }
