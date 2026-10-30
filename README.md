@@ -325,9 +325,9 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 |---|---|
 | Products | `list_products`, `import_products` (a product package), `review_product` (paid) |
 | Projects | `plan_project` (the frames it would start with; nothing saved), `create_project` (free), `deliver` (a destination's zip; publishing stays the maker's) |
-| The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do) |
+| The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do), `tune_frame` (any of a scene's knobs and its place, as Tune does; free), `switch_frame` (a frame off or back on; free) |
 | Paid work | `quote`, then `generate`, `write_listing` or `review_product` with its id |
-| Selling | `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only) |
+| Selling | `get_listing` (the listing's fields, who wrote each, its problems and tag ideas), `edit_listing` (free; a field the maker wrote only with `overwriteMakerText`, after asking), `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only) |
 
 - **Paid work takes two calls.** `quote` (free) prices a task: the models each line
   runs on and may fall back to, typical and at most, what is left of the month's cap,
@@ -376,12 +376,21 @@ the MCP server's tools, on the same server functions as the board.
   monthly cap, its measured cost recorded; a refused step moves down a saved route, a
   step with no answer never retries or moves. The composer shows what a step costs
   and the most a turn can; each reply shows the models it ran on and its cost.
+- **Specialists** (stage 3): a chip in the composer picks who works on a message.
+  **Kiln** has every tool; **Etsy** has the listing's fields, the paid rewrite, the
+  brief, results and the shop's numbers, and knows Etsy's title and tag rules;
+  **Scenes** looks at takes, tunes knobs and places, rejects with a reason, switches
+  frames and quotes new takes, and knows every knob's stops. They are modes of the
+  one agent (its know-how and fewer tools, so each step is cheaper and more on
+  task), written from Kiln's own data. The general mode suggests one with a button;
+  a reply names the mode it ran in. An agent edit never replaces text the maker
+  wrote without their click.
 - **Kiln's notices.** A batch that finishes says so in its project's latest
   conversation ("All 5 frames of the last batch landed"); the agent reads it with
   the maker's next message and does not act on it alone.
 - **Recorded** like a token's calls: Settings → Recent tool calls shows them as
   "Chat".
-- **Measured before it ships**: `pnpm eval:chat` runs ten fixed tasks with the real
+- **Measured before it ships**: `pnpm eval:chat` runs sixteen fixed tasks with the real
   text model on a mock run (images and the database are the mock's), printing what it
   may cost first; it runs only with `KILN_EVAL_YES=1`. A mock run's chat
   (`pnpm dev:mock`) answers with a few rules, for free.
