@@ -10,7 +10,9 @@ import {
 } from "@/server/tools/board";
 import {
   bestSellersTool,
+  editListingTool,
   findShopsTool,
+  getListingTool,
   listResultsTool,
   saveBriefTool,
   saveReadTool,
@@ -48,6 +50,8 @@ export const TOOLS: readonly Tool[] = [
   quote,
   generate,
   writeListingTool,
+  getListingTool,
+  editListingTool,
   reviewProductTool,
   deliverTool,
   saveBriefTool,

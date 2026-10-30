@@ -1,6 +1,16 @@
 import { z } from "zod";
+import {
+  checkListing,
+  type ListingField,
+  type ListingText,
+} from "@/domain/listing";
 import { ReadKey } from "@/domain/listing-results";
-import { isEmptyBrief, MarketBrief } from "@/domain/market-brief";
+import {
+  briefIssues,
+  isEmptyBrief,
+  MarketBrief,
+  tagSuggestions,
+} from "@/domain/market-brief";
 import { RANK_BY, RANK_WINDOWS, SHOP_RANK_BY } from "@/domain/shop-ranking";
 import { localDate } from "@/lib/results-view";
 import {
@@ -10,7 +20,8 @@ import {
   ResultsRefusal,
   saveRead,
 } from "@/server/listing-results";
-import { setBrief } from "@/server/project-repository";
+import { listingTarget } from "@/server/listing-write";
+import { setBrief, setListing } from "@/server/project-repository";
 import {
   findShops,
   shopFavourites,
@@ -164,4 +175,122 @@ export const shopFavouritesTool = defineTool({
   run: async ({ shop }) => ({
     data: { shop, ...(await shopFavourites(shop)) },
   }),
+});
+
+type Target = NonNullable<Awaited<ReturnType<typeof listingTarget>>>;
+
+async function targetOf(project: string, destination: string) {
+  const target = await listingTarget(project, destination);
+  if (!target) {
+    throw new ToolRefusal(
+      `No project of yours has listing text on "${destination}": it needs a planned project and a sale destination.`,
+    );
+  }
+  return target;
+}
+
+// The listing's problems against the channel's rules and its market brief.
+const issuesOf = (listing: ListingText, target: Target) => [
+  ...checkListing(listing, target.product, target.rules),
+  ...briefIssues(listing, target.product, target.brief),
+];
+
+const PROSE: ListingField[] = ["title", "description", "tags", "materials"];
+
+export const getListingTool = defineTool({
+  name: "get_listing",
+  title: "Read a listing's text",
+  description:
+    "A destination's listing text as the board's Listing panel shows it: the title, description, tags and materials, each with who wrote it (spec: drafted from the product; model: a text model or an agent; maker: the maker), whether it is saved or still the free draft, every problem against the channel's rules and the market brief (errors the channel refuses, warnings), the rules (title length, tag count, length and characters), and tag ideas from the brief's searches. Free.",
+  input: z.object(Where),
+  hints: { readOnly: true },
+  run: async ({ project, destination }) => {
+    const target = await targetOf(project, destination);
+    const listing = target.current;
+    return {
+      data: {
+        project,
+        destination,
+        saved: target.saved,
+        ...Object.fromEntries(PROSE.map((f) => [f, listing[f]])),
+        personalization: listing.personalization.value.length,
+        issues: issuesOf(listing, target),
+        rules: {
+          titleMaxChars: target.rules.title.maxChars,
+          ...(target.rules.title.adviseMaxWords
+            ? { titleAdviseMaxWords: target.rules.title.adviseMaxWords }
+            : {}),
+          tags: target.rules.tags,
+        },
+        tagIdeas: tagSuggestions(
+          target.brief,
+          listing.tags.value,
+          target.rules,
+        ).map((s) => ({
+          term: s.term,
+          ...(s.searches !== undefined ? { searches: s.searches } : {}),
+        })),
+      },
+    };
+  },
+});
+
+export const editListingTool = defineTool({
+  name: "edit_listing",
+  title: "Edit a listing's text",
+  description:
+    "Write a destination's listing fields (title, description, tags, materials), each marked as written by a model; the fields not given stay as they are. A field the maker wrote is kept unless overwriteMakerText is true: ask the maker first (in Kiln's chat they click to allow it). Free. The answer is the listing's problems after the edit, as get_listing gives them: fix the errors before you stop.",
+  input: z.object({
+    ...Where,
+    title: z.string().trim().min(1).max(400).optional(),
+    description: z.string().trim().min(1).max(20_000).optional(),
+    tags: z
+      .array(z.string().trim().min(1).max(60))
+      .max(40)
+      .optional()
+      .describe("The whole tag list, in order; it replaces the old one."),
+    materials: z
+      .array(z.string().trim().min(1).max(60))
+      .max(40)
+      .optional()
+      .describe("The whole materials list; it replaces the old one."),
+    overwriteMakerText: z
+      .boolean()
+      .optional()
+      .describe("Replace a field the maker wrote; only after they agreed."),
+  }),
+  hints: { idempotent: true },
+  run: async ({ project, destination, overwriteMakerText, ...fields }) => {
+    const target = await targetOf(project, destination);
+    const given = PROSE.filter(
+      (f) => fields[f as keyof typeof fields] !== undefined,
+    );
+    if (given.length === 0) {
+      throw new ToolRefusal(
+        "Name a field to write: title, description, tags or materials.",
+      );
+    }
+    const theirs = given.filter((f) => target.current[f].source === "maker");
+    if (theirs.length > 0 && !overwriteMakerText) {
+      throw new ToolRefusal(
+        `The maker wrote the ${theirs.join(" and ")}: ask them, then pass overwriteMakerText to replace it.`,
+      );
+    }
+    const listing = { ...target.current } as ListingText;
+    for (const field of given) {
+      (listing as Record<ListingField, unknown>)[field] = {
+        value: fields[field as keyof typeof fields],
+        source: "model",
+      };
+    }
+    await setListing(project, destination, listing).catch(refused);
+    return {
+      data: {
+        project,
+        destination,
+        written: given,
+        issues: issuesOf(listing, target),
+      },
+    };
+  },
 });

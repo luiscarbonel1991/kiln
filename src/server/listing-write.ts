@@ -21,6 +21,8 @@ export async function listingTarget(projectId: string, destinationId: string) {
     destination,
     rules: destination.text,
     current: plan.listing ?? listingDraft(loaded.product, destination.text),
+    saved: plan.listing !== undefined,
+    brief: plan.brief,
   };
 }
 
