@@ -350,6 +350,42 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 - From a terminal: `kiln tools` lists them; `kiln call <tool> '<json>'` (or
   `@args.json`) calls one and prints its data, a refusal on stderr with exit 1.
 
+## Chat
+
+Kiln's own agent (ROADMAP "Agents", stage 2): the maker asks for the work in words, on
+a project (the board's Chat link opens its conversation beside the board) or on the
+Chat page (their own conversations and each project's). The agent works only through
+the MCP server's tools, on the same server functions as the board.
+
+- **The loop runs inside Kiln** (Luis, 2026-10-30: no dependency on Vercel). One turn
+  is one request to `POST /api/chat`: the AI SDK's `streamText` (v7, Apache-2.0) on
+  Kiln's tools, at most 12 model calls and 4 minutes, each step stored in Postgres as
+  it ends; a closed tab or a reload loses nothing, and Stop ends a turn
+  (`POST /api/chat/:id/stop`). Conversations are `ChatSession` and `ChatMessage`; the
+  browser sends only the maker's new message or a yes or no, never the history.
+- **Free work alone, paid work on the maker's click.** It reads, plans, starts a
+  project, writes a market brief and rejects a take with a reason by itself.
+  `generate`, `write_listing` and `review_product` (after a `quote`), `approve_frame`
+  and `deliver` wait for the maker's click on an approval card that shows the quote
+  (typical, at most, the models) or the take; "Not now" runs nothing. It never
+  publishes, and it writes nothing into the maker's knowledge yet (stage 4).
+- **Models: the roles' routes.** A turn runs on `fast`, one with "Plan first" on
+  `deep` (Settings → Models), through Kiln's adapters (`@ai-sdk/openai` and
+  `@ai-sdk/google`, each only in its adapter folder); a model named by a string is
+  refused, so nothing goes through Vercel's gateway. Each step is one call under the
+  monthly cap, its measured cost recorded; a refused step moves down a saved route, a
+  step with no answer never retries or moves. The composer shows what a step costs
+  and the most a turn can; each reply shows the models it ran on and its cost.
+- **Kiln's notices.** A batch that finishes says so in its project's latest
+  conversation ("All 5 frames of the last batch landed"); the agent reads it with
+  the maker's next message and does not act on it alone.
+- **Recorded** like a token's calls: Settings → Recent tool calls shows them as
+  "Chat".
+- **Measured before it ships**: `pnpm eval:chat` runs ten fixed tasks with the real
+  text model on a mock run (images and the database are the mock's), printing what it
+  may cost first; it runs only with `KILN_EVAL_YES=1`. A mock run's chat
+  (`pnpm dev:mock`) answers with a few rules, for free.
+
 ## Shops (Etsy)
 
 Shops (header) reads Etsy through its official API, never its pages:
@@ -644,8 +680,9 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Hosting
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Kiln runs on a long-running Node host (Docker, a VPS, Railway, Fly, Render) with its
+Postgres and S3-compatible storage: the generation worker and the chat's turns run in
+the server's process (Luis, 2026-10-30: no dependency on Vercel's platform). A SaaS
+would add a worker process beside the web app, on the same database.
