@@ -206,6 +206,30 @@ describe("/api/mcp", () => {
     ).resolves.toBeDefined();
   });
 
+  it("answers a call without initialize, as `kiln call` sends it", async () => {
+    const res = await POST(
+      new Request(URL_, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "list_projects", arguments: {} },
+        }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      id: 1,
+      result: { structuredContent: { projects: [{ id: "p1" }] } },
+    });
+  });
+
   it("keeps no session: GET is not served", async () => {
     expect((await GET()).status).toBe(405);
   });

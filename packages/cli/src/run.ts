@@ -6,8 +6,9 @@ import type {
   RejectedProduct,
 } from "@kiln/engine/domain/product-package";
 
-// kiln — feed Kiln without a file picker, and approve its frames without a
-// browser (ROADMAP 2026-10-26, P0-1 and P2-10).
+// kiln — feed Kiln without a file picker, approve its frames without a
+// browser, and reach every tool Kiln serves to agents (ROADMAP 2026-10-26,
+// P0-1, P2-10 and "Agents", stage 1).
 //
 //   kiln validate <package.json>             the import's own checks, offline
 //   kiln import <package.json>               check, then POST /api/import
@@ -18,6 +19,10 @@ import type {
 //   kiln frames <project>                    each frame, its state and take
 //   kiln approve <project> <frame> [<take>]  approve a frame (P2-10)
 //   kiln unapprove <project> <frame>
+//   kiln tools                               the tools Kiln serves (MCP)
+//   kiln call <tool> [<json>]                call one, as an agent would
+//   kiln mcp                                 a stdio MCP server for a client
+//                                            that speaks only stdio
 //
 // The checks are the engine's (`parseProductPackage`, `rasterType`), so an
 // exporter fails at build time with the words the import would use. KILN_URL
@@ -34,11 +39,16 @@ export const USAGE = `Usage:
   kiln frames <project>                    each frame, its state and its take
   kiln approve <project> <frame> [<take>]  approve a frame's take
   kiln unapprove <project> <frame>         withdraw the approval
+  kiln tools                               list the tools Kiln serves agents
+  kiln call <tool> [<json>]                call a tool with its JSON arguments
+  kiln mcp                                 serve Kiln's MCP tools over stdio
 
 <product> is its sku or Kiln id, <colour> its key. <project> is a project's
 Kiln id, <frame> its destination and slot (etsy.hero), and <take> the take
 you checked, as kiln frames prints it: Kiln refuses when a newer one has
-landed since. --json prints Kiln's answer as JSON.
+landed since. <json> is the tool's arguments ('{"project":"..."}'), or
+@file.json. A paid tool takes a quote's id, and runs only for a token the
+maker lets spend. --json prints Kiln's answer as JSON.
 
 Environment: KILN_URL (where Kiln runs, e.g. http://localhost:3009) and
 KILN_TOKEN (a personal access token: Settings → Access tokens).
@@ -60,6 +70,8 @@ export interface Io {
   fetch: (url: string, init: RequestInit) => Promise<Response>;
   readText: (path: string) => Promise<string>;
   readBytes: (path: string) => Promise<Uint8Array>;
+  // Standard input, line by line (kiln mcp).
+  stdin: () => AsyncIterable<string>;
   out: (line: string) => void;
   err: (line: string) => void;
 }
@@ -531,6 +543,188 @@ async function approve(
   return 0;
 }
 
+// Kiln's MCP server (POST /api/mcp): JSON-RPC, answered in JSON.
+const MCP_HEADERS = {
+  "Content-Type": "application/json",
+  Accept: "application/json, text/event-stream",
+};
+
+interface ToolResult {
+  content: { type: string; text?: string; mimeType?: string; data?: string }[];
+  structuredContent?: unknown;
+  isError?: boolean;
+}
+
+async function rpc<T>(
+  io: Io,
+  method: string,
+  params: Record<string, unknown>,
+): Promise<{ result: T } | { exit: number }> {
+  const conn = connection(io);
+  if (!conn) return { exit: 2 };
+  const answer = await call(io, conn, "/api/mcp", {
+    method: "POST",
+    headers: MCP_HEADERS,
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  if ("exit" in answer) return answer;
+  const body = answer.body as {
+    result?: T;
+    error?: string | { message?: string };
+  };
+  if (answer.status !== 200 || !body.result) {
+    const error = body.error;
+    io.err(
+      (typeof error === "string" ? error : error?.message) ??
+        `Kiln answered ${answer.status}.`,
+    );
+    return { exit: 1 };
+  }
+  return { result: body.result };
+}
+
+async function tools(io: Io, flags: Flags): Promise<number> {
+  const answer = await rpc<{ tools: { name: string; title?: string }[] }>(
+    io,
+    "tools/list",
+    {},
+  );
+  if ("exit" in answer) return answer.exit;
+  if (flags.json) {
+    io.out(JSON.stringify(answer.result, null, 2));
+    return 0;
+  }
+  const width = Math.max(...answer.result.tools.map((t) => t.name.length));
+  for (const t of answer.result.tools) {
+    io.out(`${t.name.padEnd(width)}  ${t.title ?? ""}`);
+  }
+  return 0;
+}
+
+async function callTool(
+  io: Io,
+  [name, args]: (string | undefined)[],
+  flags: Flags,
+): Promise<number> {
+  if (!name) {
+    io.err(USAGE);
+    return 2;
+  }
+  let input: unknown = {};
+  if (args) {
+    const text = args.startsWith("@")
+      ? await io.readText(resolve(io.cwd, args.slice(1)))
+      : args;
+    try {
+      input = JSON.parse(text);
+    } catch (error) {
+      io.err(`The arguments are not JSON (${(error as Error).message}).`);
+      return 2;
+    }
+  }
+  const answer = await rpc<ToolResult>(io, "tools/call", {
+    name,
+    arguments: input,
+  });
+  if ("exit" in answer) return answer.exit;
+  const result = answer.result;
+  if (flags.json) {
+    io.out(JSON.stringify(result, null, 2));
+    return result.isError ? 1 : 0;
+  }
+  if (result.isError) {
+    for (const c of result.content) if (c.text) io.err(c.text);
+    return 1;
+  }
+  if (result.structuredContent !== undefined) {
+    io.out(JSON.stringify(result.structuredContent, null, 2));
+  } else {
+    for (const c of result.content) if (c.text) io.out(c.text);
+  }
+  for (const c of result.content) {
+    if (c.type === "image") {
+      io.out(
+        `[an image: ${c.mimeType}, ${Math.round(((c.data?.length ?? 0) * 3) / 4 / 1024)} KB]`,
+      );
+    }
+  }
+  return 0;
+}
+
+// A stdio MCP server that relays each message to Kiln's: one JSON-RPC
+// message per line in, each answer one line out (a notification has none).
+// Only protocol goes to stdout; what goes wrong goes to stderr, and a request
+// that could not be relayed is answered with a JSON-RPC error.
+async function bridge(io: Io): Promise<number> {
+  const conn = connection(io);
+  if (!conn) return 2;
+  let version: string | null = null;
+  const fail = (id: unknown, message: string) => {
+    io.err(message);
+    if (id !== undefined && id !== null) {
+      io.out(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32603, message },
+        }),
+      );
+    }
+  };
+  for await (const line of io.stdin()) {
+    if (!line.trim()) continue;
+    let message: { id?: unknown; method?: string };
+    try {
+      message = JSON.parse(line);
+    } catch {
+      io.out(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: null,
+          error: { code: -32700, message: "Not JSON." },
+        }),
+      );
+      continue;
+    }
+    let res: Response;
+    try {
+      res = await io.fetch(`${conn.url}/api/mcp`, {
+        method: "POST",
+        headers: {
+          ...MCP_HEADERS,
+          Authorization: `Bearer ${conn.token}`,
+          ...(version ? { "MCP-Protocol-Version": version } : {}),
+        },
+        body: line,
+      });
+    } catch (error) {
+      fail(
+        message.id,
+        `Kiln did not answer at ${conn.url}: ${(error as Error).message}`,
+      );
+      continue;
+    }
+    if (res.status === 202) continue;
+    const text = await res.text();
+    let body: { result?: { protocolVersion?: string }; error?: unknown };
+    try {
+      body = JSON.parse(text);
+    } catch {
+      fail(message.id, `Kiln answered ${res.status} without JSON.`);
+      continue;
+    }
+    if (!("jsonrpc" in body)) {
+      fail(message.id, errorOf(body) ?? `Kiln answered ${res.status}.`);
+      continue;
+    }
+    if (message.method === "initialize" && body.result?.protocolVersion) {
+      version = body.result.protocolVersion;
+    }
+    io.out(JSON.stringify(body));
+  }
+  return 0;
+}
+
 export async function run(argv: string[], io: Io): Promise<number> {
   const flags: Flags = {
     json: argv.includes("--json"),
@@ -562,6 +756,12 @@ export async function run(argv: string[], io: Io): Promise<number> {
     case "approve":
     case "unapprove":
       return approve(io, args, command === "approve", flags);
+    case "tools":
+      return tools(io, flags);
+    case "call":
+      return callTool(io, args, flags);
+    case "mcp":
+      return bridge(io);
     case "help":
     case undefined:
       io.out(USAGE);

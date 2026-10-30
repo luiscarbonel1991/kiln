@@ -57,6 +57,7 @@ function cli(
     KILN_URL: "http://kiln.test/",
     KILN_TOKEN: "kiln_pat_test",
   },
+  stdin: string[] = [],
 ) {
   const out: string[] = [];
   const err: string[] = [];
@@ -74,6 +75,9 @@ function cli(
     err: (line) => err.push(line),
     readText: async (path) => file(path).toString(),
     readBytes: async (path) => new Uint8Array(Buffer.from(file(path))),
+    stdin: async function* () {
+      yield* stdin;
+    },
     fetch: async (url, init) => {
       const s: Sent = { url, ...init };
       sent.push(s);
@@ -400,5 +404,167 @@ describe("kiln", () => {
     expect(JSON.parse(c.out.join("\n")).title).toBe("Kiln product package");
     expect(await c.run("frobnicate")).toBe(2);
     expect(c.err[0]).toMatch(/^Usage:/);
+  });
+});
+
+describe("kiln tools and kiln call", () => {
+  const rpc = (s: Sent) =>
+    JSON.parse(String(s.body)) as {
+      method: string;
+      params: { name?: string; arguments?: unknown };
+    };
+
+  it("lists the tools Kiln serves", async () => {
+    const c = cli({}, () => ({
+      status: 200,
+      body: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          tools: [
+            { name: "get_frames", title: "Get a project's frames" },
+            { name: "quote", title: "Quote a paid task" },
+          ],
+        },
+      },
+    }));
+    expect(await c.run("tools")).toBe(0);
+    expect(c.out).toEqual([
+      "get_frames  Get a project's frames",
+      "quote       Quote a paid task",
+    ]);
+    expect(c.sent[0]).toMatchObject({
+      url: "http://kiln.test/api/mcp",
+      method: "POST",
+    });
+    expect(rpc(c.sent[0]).method).toBe("tools/list");
+    expect(c.sent[0].headers).toMatchObject({
+      Accept: "application/json, text/event-stream",
+      Authorization: "Bearer kiln_pat_test",
+    });
+  });
+
+  it("calls a tool with its arguments, inline or from a file, and prints its data", async () => {
+    const c = cli({ "/work/args.json": '{"project":"p1"}' }, () => ({
+      status: 200,
+      body: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          content: [{ type: "text", text: "{}" }],
+          structuredContent: { project: { id: "p1" }, frames: [] },
+        },
+      },
+    }));
+    expect(await c.run("call", "get_frames", '{"project":"p1"}')).toBe(0);
+    expect(await c.run("call", "get_frames", "@args.json")).toBe(0);
+    expect(c.sent.map((s) => rpc(s).params)).toEqual([
+      { name: "get_frames", arguments: { project: "p1" } },
+      { name: "get_frames", arguments: { project: "p1" } },
+    ]);
+    expect(JSON.parse(c.out[0])).toEqual({ project: { id: "p1" }, frames: [] });
+  });
+
+  it("prints a tool's refusal on stderr (exit 1), and refuses arguments that are not JSON (exit 2)", async () => {
+    const c = cli({}, () => ({
+      status: 200,
+      body: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          content: [
+            { type: "text", text: 'The token "Nightly" may not spend.' },
+          ],
+          isError: true,
+        },
+      },
+    }));
+    expect(await c.run("call", "generate", '{"quote":"q1"}')).toBe(1);
+    expect(c.err).toEqual(['The token "Nightly" may not spend.']);
+    expect(await c.run("call", "get_frames", "{project")).toBe(2);
+    expect(c.sent).toHaveLength(1);
+  });
+});
+
+describe("kiln mcp", () => {
+  it("relays each line to Kiln and each answer back, one line each", async () => {
+    const initialize = {
+      jsonrpc: "2.0",
+      id: 0,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "x", version: "1" },
+      },
+    };
+    const c = cli(
+      {},
+      (s) => {
+        const message = JSON.parse(String(s.body)) as {
+          id?: number;
+          method: string;
+        };
+        if (message.method === "notifications/initialized") {
+          return { status: 202, body: null };
+        }
+        return {
+          status: 200,
+          body: {
+            jsonrpc: "2.0",
+            id: message.id,
+            result:
+              message.method === "initialize"
+                ? {
+                    protocolVersion: "2025-06-18",
+                    serverInfo: { name: "kiln" },
+                  }
+                : { tools: [] },
+          },
+        };
+      },
+      undefined,
+      [
+        JSON.stringify(initialize),
+        JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+        "",
+        JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+        "not json",
+      ],
+    );
+    expect(await c.run("mcp")).toBe(0);
+    expect(c.out.map((l) => JSON.parse(l))).toEqual([
+      expect.objectContaining({
+        id: 0,
+        result: expect.objectContaining({ protocolVersion: "2025-06-18" }),
+      }),
+      { jsonrpc: "2.0", id: 1, result: { tools: [] } },
+      {
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32700, message: "Not JSON." },
+      },
+    ]);
+    // The version agreed at initialize travels with the later messages.
+    expect(c.sent[0].headers).not.toHaveProperty("MCP-Protocol-Version");
+    expect(c.sent[2].headers).toMatchObject({
+      "MCP-Protocol-Version": "2025-06-18",
+    });
+  });
+
+  it("answers a request Kiln refused with a JSON-RPC error, and says why on stderr", async () => {
+    const c = cli(
+      {},
+      () => ({ status: 401, body: { error: "That token is not valid here." } }),
+      undefined,
+      [JSON.stringify({ jsonrpc: "2.0", id: 7, method: "tools/list" })],
+    );
+    expect(await c.run("mcp")).toBe(0);
+    expect(JSON.parse(c.out[0])).toEqual({
+      jsonrpc: "2.0",
+      id: 7,
+      error: { code: -32603, message: "That token is not valid here." },
+    });
+    expect(c.err).toEqual(["That token is not valid here."]);
   });
 });

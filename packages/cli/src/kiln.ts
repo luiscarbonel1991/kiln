@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
+import { createInterface } from "node:readline";
 import { rasterType } from "@kiln/engine/domain/image-type";
 import {
   packageJsonSchema,
@@ -16,6 +17,7 @@ process.exitCode = await run(process.argv.slice(2), {
   fetch: (url, init) => fetch(url, init),
   readText: (path) => readFile(path, "utf8"),
   readBytes: async (path) => new Uint8Array(await readFile(path)),
+  stdin: () => createInterface({ input: process.stdin, crlfDelay: Infinity }),
   out: (line) => console.log(line),
   err: (line) => console.error(line),
 });
