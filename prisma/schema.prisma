@@ -42,6 +42,7 @@ model Maker {
   moduleSettings  ModuleSettings[]
   accessTokens    AccessToken[]
   shopConnections ShopConnection[]
+  chatSessions    ChatSession[]
 }
 
 // A personal access token for Kiln's HTTP API (/api/import, a colour's
@@ -84,13 +85,15 @@ model SpendQuote {
   @@index([makerId, createdAt])
 }
 
-// One tool call (MCP or `kiln call`): the token, the tool, its arguments (a
-// product package only by its size) and how it ended; Settings → Access
-// tokens shows the latest. tokenName outlives a revoked token.
+// One tool call (MCP, `kiln call` or the chat): the token or the chat
+// session, the tool, its arguments (a product package only by its size) and
+// how it ended; Settings → Access tokens shows the latest. tokenName (the
+// token's name, or "Chat") outlives a revoked token.
 model ToolCall {
   id        String   @id @default(cuid())
   makerId   String
   tokenId   String?
+  sessionId String?
   tokenName String
   tool      String
   args      Json
@@ -101,6 +104,47 @@ model ToolCall {
   at        DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([makerId, at])
+  @@index([sessionId, at])
+}
+
+// A conversation with Kiln's agent (ROADMAP "Agents", stage 2): one of the
+// maker's own, or one on a project. `lockedAt` is set while a turn runs, so
+// two turns of a session never run at once; a lock older than ten minutes is
+// a turn that died.
+model ChatSession {
+  id        String        @id @default(cuid())
+  makerId   String
+  maker     Maker         @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  lockedAt  DateTime?     @db.Timestamptz(3)
+  createdAt DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime      @updatedAt @db.Timestamptz(3)
+  messages  ChatMessage[]
+
+  @@index([makerId, updatedAt])
+  @@index([projectId, updatedAt])
+}
+
+// One message of a chat as the chat shows it (the AI SDK's UIMessage): its
+// parts, tool calls and approvals included, and its metadata (the model a
+// turn ran on, what it cost). `messageId` is the message's own id, `seq` its
+// place in the session.
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  messageId String
+  seq       Int
+  role      String
+  parts     Json
+  metadata  Json?
+  createdAt DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime    @updatedAt @db.Timestamptz(3)
+
+  @@unique([sessionId, messageId])
+  @@index([sessionId, seq])
 }
 
 // A shop the maker connected to Kiln through its platform's OAuth (Etsy,
@@ -166,6 +210,7 @@ model Project {
   products      ProjectProduct[]
   batches       GenerationBatch[]
   jobs          GenerationJob[]
+  chatSessions  ChatSession[]
 
   @@index([makerId])
 }
@@ -260,6 +305,8 @@ model GenerationBatch {
   model          String
   createdAt      DateTime        @default(now()) @db.Timestamptz(3)
   canceledAt     DateTime?       @db.Timestamptz(3)
+  // When its last job ended (done, failed or canceled), set once.
+  finishedAt     DateTime?       @db.Timestamptz(3)
   jobs           GenerationJob[]
 
   @@index([projectId])
