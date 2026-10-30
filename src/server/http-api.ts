@@ -23,8 +23,18 @@ export function apiError(
 // Null when the request carries a token of the current maker; otherwise the
 // 401 to send back, saying what is missing.
 export async function authorize(request: Request): Promise<Response | null> {
+  const caller = await authorizeToken(request);
+  return caller instanceof Response ? caller : null;
+}
+
+// The token a request carries, if it is one of the current maker's; otherwise
+// the 401 to send back.
+export async function authorizeToken(
+  request: Request,
+): Promise<{ tokenId: string } | Response> {
   const token = bearerToken(request.headers.get("authorization"));
-  if (token && (await verifyAccessToken(token))) return null;
+  const verified = token ? await verifyAccessToken(token) : null;
+  if (verified) return { tokenId: verified.tokenId };
   return apiError(
     401,
     token

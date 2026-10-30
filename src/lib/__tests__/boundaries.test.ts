@@ -37,3 +37,14 @@ describe("core boundaries", () => {
     expect(leaks).toEqual([]);
   });
 });
+
+describe("the MCP SDK", () => {
+  it("is imported only by Kiln's MCP server (src/server/mcp)", () => {
+    const outside = sources(root).filter(
+      (path) =>
+        !relative(root, path).startsWith(join("server", "mcp")) &&
+        /@modelcontextprotocol\/sdk/.test(readFileSync(path, "utf8")),
+    );
+    expect(outside.map((p) => relative(root, p))).toEqual([]);
+  });
+});
