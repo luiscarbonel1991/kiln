@@ -60,7 +60,7 @@ function summary(toolName: string, value: unknown): MockReply {
 
 export function mockReply(prompt: LanguageModelV4Prompt): MockReply {
   const system = prompt.find((m) => m.role === "system");
-  const project = /Project id: (\S+)/.exec(
+  const project = /Project id: ([\w-]+)/.exec(
     system ? textOf(system.content) : "",
   )?.[1];
   const last = prompt.at(-1);

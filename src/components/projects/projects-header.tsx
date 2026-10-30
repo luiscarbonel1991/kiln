@@ -1,10 +1,17 @@
-import { Palette, Plus, Settings2, Store } from "lucide-react";
+import { MessageCircle, Palette, Plus, Settings2, Store } from "lucide-react";
 import Link from "next/link";
 
-// Header for Home and the project pages: the wordmark (Home), the studio,
-// Shops, Settings and a "New project" entry. Same chrome as the studio header
-// (DESIGN.md).
-export function ProjectsHeader({ children }: { children?: React.ReactNode }) {
+// Header for Home and the project pages: the wordmark (Home), the chat, the
+// studio, Shops, Settings and a "New project" entry. Same chrome as the
+// studio header (DESIGN.md). On a project the chat opens beside its board
+// (`chatHref`).
+export function ProjectsHeader({
+  children,
+  chatHref = "/chat",
+}: {
+  children?: React.ReactNode;
+  chatHref?: string;
+}) {
   return (
     <header className="flex items-center justify-between border-b border-border-soft bg-card/70 px-6 py-4 backdrop-blur-md sm:px-8">
       <div className="flex items-center gap-5">
@@ -18,6 +25,16 @@ export function ProjectsHeader({ children }: { children?: React.ReactNode }) {
         {children}
       </div>
       <div className="flex items-center gap-1 sm:gap-2">
+        <Link
+          href={chatHref}
+          scroll={false}
+          aria-label="Chat"
+          data-testid="header-chat"
+          className="inline-flex h-7 items-center gap-1 rounded-field px-2.5 font-sans text-[0.8rem] font-semibold text-on-surface-mid transition-colors hover:text-foreground"
+        >
+          <MessageCircle className="size-3.5" />
+          <span className="hidden sm:inline">Chat</span>
+        </Link>
         <Link
           href="/studio"
           aria-label="Studio"

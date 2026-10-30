@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChatPanel } from "@/components/chat/chat-panel";
 import type { BatchEstimate } from "@/components/projects/generation-panel";
 import {
   boardRows,
@@ -12,6 +13,7 @@ import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
 import { projectCost } from "@/domain/project-cost";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerMode } from "@/providers/mode";
+import { chatPanelData } from "@/server/chat/chat-view";
 import { estimateProjectCards } from "@/server/generation-queue";
 import {
   outputVersions,
@@ -99,13 +101,17 @@ async function batchEstimate(
 
 // The Project board (ROADMAP screen 3): the storyboard of a planned project.
 // Dynamic per request (no static params); a project of another maker or an
-// unknown id is a 404.
+// unknown id is a 404. `?chat=1` opens the project's chat beside the board
+// (full screen on a phone).
 export default async function ProjectBoardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ chat?: string }>;
 }) {
   const { id } = await params;
+  const chatOpen = (await searchParams).chat === "1";
   const loaded = await loadProjectBoard(id);
   if (!loaded) notFound();
   const { board, product, version } = loaded;
@@ -144,49 +150,70 @@ export default async function ProjectBoardPage({
           health,
         )
       : null;
+  const chat = chatOpen ? await chatPanelData({ projectId: board.id }) : null;
+  const content =
+    board.plan && product ? (
+      <ProjectBoard
+        projectId={board.id}
+        board={{ ...board, plan: board.plan }}
+        product={product}
+        jobs={generation.jobs}
+        generation={generation}
+        estimate={estimate}
+        mode={providerMode()}
+        brand={brand}
+        notes={health}
+        drift={drift}
+        earlier={earlier}
+        ownPrompts={cardsWithOwnPrompt(board.cards)}
+        listingPrice={listingPrice}
+        searchSources={searchColumns}
+        today={new Date().toLocaleDateString("en-CA")}
+        shop={(await resultsConnector())?.label ?? null}
+        cost={cost}
+        takeRoutes={await takeRoutes()}
+      />
+    ) : (
+      <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
+        <h1 className="font-serif text-2xl italic text-foreground">
+          {board.name}
+        </h1>
+        <p className="font-sans text-sm text-on-surface-mid">
+          This project was made in the studio; it has no plan to show.
+        </p>
+        <Link
+          href={`/projects/${board.id}/editor`}
+          className="font-sans text-sm font-semibold text-primary"
+        >
+          Open it in the editor
+        </Link>
+      </main>
+    );
   return (
     <div className="flex min-h-full flex-col">
-      <ProjectsHeader>
+      <ProjectsHeader
+        chatHref={
+          chatOpen ? `/projects/${board.id}` : `/projects/${board.id}?chat=1`
+        }
+      >
         <span className="font-mono text-[0.625rem] text-on-surface-dim">
           project
         </span>
       </ProjectsHeader>
-      {board.plan && product ? (
-        <ProjectBoard
-          projectId={board.id}
-          board={{ ...board, plan: board.plan }}
-          product={product}
-          jobs={generation.jobs}
-          generation={generation}
-          estimate={estimate}
-          mode={providerMode()}
-          brand={brand}
-          notes={health}
-          drift={drift}
-          earlier={earlier}
-          ownPrompts={cardsWithOwnPrompt(board.cards)}
-          listingPrice={listingPrice}
-          searchSources={searchColumns}
-          today={new Date().toLocaleDateString("en-CA")}
-          shop={(await resultsConnector())?.label ?? null}
-          cost={cost}
-          takeRoutes={await takeRoutes()}
-        />
+      {chat ? (
+        <div className="flex flex-1">
+          <div className="min-w-0 flex-1">{content}</div>
+          <aside className="fixed inset-0 z-40 lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[380px] lg:shrink-0 lg:self-start lg:border-l lg:border-border-soft">
+            <ChatPanel
+              data={chat}
+              projectId={board.id}
+              title={board.name}
+              closeHref={`/projects/${board.id}`}
+            />
+          </aside>
+        </div>
       ) : (
-        <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
-          <h1 className="font-serif text-2xl italic text-foreground">
-            {board.name}
-          </h1>
-          <p className="font-sans text-sm text-on-surface-mid">
-            This project was made in the studio; it has no plan to show.
-          </p>
-          <Link
-            href={`/projects/${board.id}/editor`}
-            className="font-sans text-sm font-semibold text-primary"
-          >
-            Open it in the editor
-          </Link>
-        </main>
+        content
       )}
     </div>
   );
