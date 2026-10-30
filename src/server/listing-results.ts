@@ -263,3 +263,29 @@ export async function readBeforeAtDelivery(
     console.warn("[kiln results] no before read at delivery", error);
   }
 }
+
+// The listings the maker follows, as an agent or a scheduled job reads them
+// (GET /api/results, the list_results tool): the reads due today and the next
+// one to come, each read by its window; `comparison` is before against the
+// latest after, in words.
+export function followedView(
+  listings: Awaited<ReturnType<typeof followedListings>>,
+) {
+  return listings
+    .filter((l) => l.view.following)
+    .map(({ view, ...l }) => ({
+      ...l,
+      listingUrl: view.listingUrl,
+      listingId: view.listingId,
+      liveOn: view.liveOn,
+      due: view.reads
+        .filter((r) => r.due)
+        .map((r) => ({ read: r.key, window: r.window, dueOn: r.dueOn })),
+      next: view.next ? { read: view.next.key, dueOn: view.next.dueOn } : null,
+      reads: Object.fromEntries(
+        view.reads.flatMap((r) => (r.read ? [[r.key, r.read]] : [])),
+      ),
+      comparison: view.comparison?.line ?? null,
+      changed: view.changed.map((f) => f.label),
+    }));
+}

@@ -7,6 +7,15 @@ import {
   viewFrame,
 } from "@/server/tools/board";
 import {
+  bestSellersTool,
+  findShopsTool,
+  listResultsTool,
+  saveBriefTool,
+  saveReadTool,
+  shopFavouritesTool,
+  watchedShopsTool,
+} from "@/server/tools/listings";
+import {
   generate,
   quote,
   reviewProductTool,
@@ -37,4 +46,11 @@ export const TOOLS: readonly Tool[] = [
   writeListingTool,
   reviewProductTool,
   deliverTool,
+  saveBriefTool,
+  listResultsTool,
+  saveReadTool,
+  bestSellersTool,
+  watchedShopsTool,
+  findShopsTool,
+  shopFavouritesTool,
 ];
