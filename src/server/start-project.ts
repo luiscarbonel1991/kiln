@@ -123,10 +123,7 @@ export async function startProject(
   const product = await getProduct(productId);
   if (!product) return { error: "That product no longer exists." };
   try {
-    const { plan: shaped, proposed } = await startingPlan(
-      product,
-      parsed.data,
-    );
+    const { plan: shaped, proposed } = await startingPlan(product, parsed.data);
     // A product with a part lying flat also gets its view from above.
     const master = await productReference(product);
     const plan = withThreeQuarter(
