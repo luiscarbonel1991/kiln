@@ -255,6 +255,9 @@ pnpm kiln projects                       # the projects with frames
 pnpm kiln frames <project>               # each frame, its state and its take
 pnpm kiln approve <project> etsy.hero <take>
 pnpm kiln unapprove <project> etsy.hero
+pnpm kiln tools                          # the MCP tools (below)
+pnpm kiln call get_frames '{"project":"<project>"}'
+pnpm kiln mcp                            # Kiln's MCP server over stdio
 ```
 
 - `validate` needs no running Kiln. An exporter can run it at build time and fail with
@@ -263,7 +266,7 @@ pnpm kiln unapprove <project> etsy.hero
   is not a PNG, JPEG or WebP.
 - `approve` names the frame by its destination and slot (`etsy.hero`) and the take as
   `kiln frames` printed it; without a take it approves whatever is latest.
-- `import`, `swatch` and the project commands read `KILN_URL` (where Kiln runs) and `KILN_TOKEN` from the
+- `import`, `swatch`, the project commands, `tools`, `call` and `mcp` read `KILN_URL` (where Kiln runs) and `KILN_TOKEN` from the
   environment (`node --env-file=kiln.env packages/cli/dist/kiln.js …` works too). `import`
   sends nothing when no product passes; `--strict` sends nothing when one does not.
   `--json` prints Kiln's answer for scripts and agents.
@@ -291,6 +294,61 @@ An agent or a test runner can also drive the pages, as a maker would:
   pane paints none, so that content never appeared nor answered.
 - Confirmations are `role="dialog"`, named by their title (`generate-confirm`,
   `video-confirm`). Paid calls stay behind them; for approvals, prefer the API.
+
+## MCP server
+
+Kiln serves its actions as MCP tools (ROADMAP "Agents", stage 1), so an agent
+(Claude Code, Claude Desktop, any MCP client) can import products, start a project,
+generate, look at each take, approve or reject it and deliver, on the same server
+functions as the board. `POST /api/mcp` is the Streamable HTTP transport, stateless,
+answering in JSON, behind the same personal access token as the HTTP API; a request
+from a page on another origin is refused.
+
+```bash
+# Claude Code, over HTTP
+claude mcp add --transport http kiln http://127.0.0.1:3009/api/mcp \
+  --header "Authorization: Bearer $KILN_TOKEN"
+```
+
+A client that speaks only stdio (Claude Desktop) runs `kiln mcp`, which relays each
+message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
+
+```json
+{ "mcpServers": { "kiln": {
+  "command": "node",
+  "args": ["/path/to/kiln/packages/cli/dist/kiln.js", "mcp"],
+  "env": { "KILN_URL": "http://127.0.0.1:3009", "KILN_TOKEN": "kiln_pat_…" }
+} } }
+```
+
+| Tools | |
+|---|---|
+| Products | `list_products`, `import_products` (a product package), `review_product` (paid) |
+| Projects | `plan_project` (the frames it would start with; nothing saved), `create_project` (free), `deliver` (a destination's zip; publishing stays the maker's) |
+| The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do) |
+| Paid work | `quote`, then `generate`, `write_listing` or `review_product` with its id |
+| Selling | `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only) |
+
+- **Paid work takes two calls.** `quote` (free) prices a task: the models each line
+  runs on and may fall back to, typical and at most, what is left of the month's cap,
+  when it expires (30 minutes) and whether this token may spend. The paid tool takes
+  only the quote's id and runs what was quoted, once; if the estimate rose since, it
+  refuses ("quote again"). The cap rules every attempt, as on the board.
+- **A token spends only when the maker lets it**: Settings → Access tokens, May spend
+  (off by default). Without it, `quote` answers and the paid tool refuses. The MCP
+  client asks its person before each call; tell them the quote first.
+- **No tool takes a model.** A task runs on its role's route (Settings → Models):
+  frames on their card's model and the final route, the listing text on deep, the
+  review on fast.
+- **Nothing is approved unseen.** `approve_frame` and `reject_frame` name the take the
+  agent looked at (`view_frame`); a newer one refuses.
+- **Every call is recorded**: Settings → Access tokens → Recent tool calls shows the
+  token, the tool, done or the refusal, and a paid call's quote.
+- A project whose product Kiln cannot draw for free needs its photo on the board
+  before its scenes can be quoted; `create_project` says so. Filling a product from a
+  photo is not a tool yet (it needs an upload).
+- From a terminal: `kiln tools` lists them; `kiln call <tool> '<json>'` (or
+  `@args.json`) calls one and prints its data, a refusal on stderr with exit 1.
 
 ## Shops (Etsy)
 
