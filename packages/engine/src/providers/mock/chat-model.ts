@@ -140,7 +140,9 @@ export function mockReply(prompt: LanguageModelV4Prompt): MockReply {
     );
   }
   const asked = last?.role === "user" ? textOf(last.content).toLowerCase() : "";
-  const general = /general mode/.test(system ? textOf(system.content) : "");
+  const general = /You are in Kiln's general mode/.test(
+    system ? textOf(system.content) : "",
+  );
   const wantsListing = /t[ií]tulo|title|tags|etiquetas/.test(asked);
   const wantsAbove = /desde arriba|from above/.test(asked);
   if ((wantsListing || wantsAbove) && !project) {

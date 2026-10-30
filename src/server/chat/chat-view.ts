@@ -1,6 +1,7 @@
 import { getChat, listChatSessions } from "@/server/chat/chat-repository";
 import type { KilnMessage } from "@/server/chat/messages";
 import { MAX_STEPS } from "@/server/chat/run-turn";
+import { SPECIALIST_CHOICES } from "@/server/chat/specialists";
 import { textRoute } from "@/server/text-calls";
 import { TOOLS } from "@/server/tools";
 
@@ -21,6 +22,7 @@ export interface ChatPanelData {
   running: boolean;
   estimates: { fast: ChatEstimate; deep: ChatEstimate };
   toolTitles: Record<string, string>;
+  specialists: typeof SPECIALIST_CHOICES;
 }
 
 async function estimate(kind: "chatTurn" | "chatPlan"): Promise<ChatEstimate> {
@@ -52,5 +54,6 @@ export async function chatPanelData(target: {
       deep: await estimate("chatPlan"),
     },
     toolTitles: Object.fromEntries(TOOLS.map((t) => [t.name, t.title])),
+    specialists: SPECIALIST_CHOICES,
   };
 }

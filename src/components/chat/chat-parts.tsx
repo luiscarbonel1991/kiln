@@ -21,6 +21,7 @@ import {
   MessageFooter,
 } from "@/components/ui/message";
 import type { KilnMessage } from "@/server/chat/messages";
+import type { SpecialistId } from "@/server/chat/specialists";
 
 // One message of the chat as the maker reads it: the maker's own on the
 // right; the agent's text, each tool it ran (one quiet line, its details on
@@ -264,17 +265,66 @@ function stripImages(output: Record<string, unknown>) {
   return rest;
 }
 
+// Kiln's suggestion to switch to a specialist: a button that switches the
+// chip (it runs nothing).
+function Suggestion({
+  tool,
+  specialists,
+  specialist,
+  onSwitch,
+}: {
+  tool: ToolPart;
+  specialists: { id: SpecialistId; label: string; about: string }[];
+  specialist: SpecialistId;
+  onSwitch: (id: SpecialistId) => void;
+}) {
+  const asked = specialists.find((s) => s.id === tool.input?.specialist);
+  if (!asked) return null;
+  const why =
+    typeof tool.input?.why === "string" ? tool.input.why : asked.about;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2 self-start rounded-field bg-secondary px-3 py-2"
+      data-testid="chat-suggestion"
+    >
+      <span className="font-sans text-[0.78rem] text-foreground">
+        {asked.label} does this best: {why}
+      </span>
+      {asked.id === specialist ? (
+        <span className="font-mono text-[0.62rem] text-prov-recipe">
+          switched
+        </span>
+      ) : (
+        <Button
+          size="xs"
+          variant="outline"
+          data-testid={`chat-switch-${asked.id}`}
+          onClick={() => onSwitch(asked.id)}
+        >
+          Switch to {asked.label}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function ChatMessage({
   message,
   messages,
   toolTitles,
   busy,
+  specialists,
+  specialist,
+  onSwitch,
   onAnswer,
 }: {
   message: KilnMessage;
   messages: KilnMessage[];
   toolTitles: Record<string, string>;
   busy: boolean;
+  specialists: { id: SpecialistId; label: string; about: string }[];
+  specialist: SpecialistId;
+  onSwitch: (id: SpecialistId) => void;
   onAnswer: (approvalId: string, approved: boolean) => void;
 }) {
   if (message.role === "user") {
@@ -324,6 +374,17 @@ export function ChatMessage({
           const tool = asTool(part);
           const name = tool ? toolName(tool) : null;
           if (!tool || !name) return null;
+          if (name === "suggest_specialist") {
+            return (
+              <Suggestion
+                key={key}
+                tool={tool}
+                specialists={specialists}
+                specialist={specialist}
+                onSwitch={onSwitch}
+              />
+            );
+          }
           const title = toolTitles[name] ?? name;
           if (
             tool.state === "approval-requested" &&
@@ -352,6 +413,13 @@ export function ChatMessage({
             ) : null}
             {meta.costMicros ? (
               <span>· {money(meta.costMicros / 1_000_000)}</span>
+            ) : null}
+            {meta.specialist && meta.specialist !== "kiln" ? (
+              <span>
+                ·{" "}
+                {specialists.find((s) => s.id === meta.specialist)?.label ??
+                  meta.specialist}
+              </span>
             ) : null}
             {meta.role === "deep" ? <span>· planned</span> : null}
             {meta.stopped ? (

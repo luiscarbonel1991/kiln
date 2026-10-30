@@ -29,8 +29,10 @@ import {
 } from "@/components/ui/message-scroller";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type { ChatEstimate, ChatPanelData } from "@/server/chat/chat-view";
 import type { KilnMessage } from "@/server/chat/messages";
+import type { SpecialistId } from "@/server/chat/specialists";
 
 // Kiln's chat (ROADMAP "Agents", stage 2): a project's conversation beside
 // its board, or one of the maker's own on the Chat page. The maker writes;
@@ -48,7 +50,15 @@ const SUGGESTIONS = {
   maker: ["Which projects need me?", "List my products"],
 };
 
-type Pending = { text: string; plan: boolean };
+type Pending = { text: string; plan: boolean; specialist: SpecialistId };
+
+// The mode the chip starts in: the one the last turn ran in.
+function lastSpecialist(messages: KilnMessage[]): SpecialistId {
+  for (const message of [...messages].reverse()) {
+    if (message.metadata?.specialist) return message.metadata.specialist;
+  }
+  return "kiln";
+}
 
 export function ChatPanel({
   data,
@@ -66,6 +76,9 @@ export function ChatPanel({
   const [sessionId, setSessionId] = useState(data.sessionId);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [specialist, setSpecialist] = useState<SpecialistId>(() =>
+    lastSpecialist(data.messages),
+  );
   const [starting, startTransition] = useTransition();
   const fresh = sessionId === null;
   const firstSent = useCallback(() => setPending(null), []);
@@ -140,6 +153,9 @@ export function ChatPanel({
           first={pending}
           onFirstSent={firstSent}
           refreshBoard={projectId !== undefined}
+          specialists={data.specialists}
+          specialist={specialist}
+          onSpecialist={setSpecialist}
         />
       ) : (
         <>
@@ -161,7 +177,7 @@ export function ChatPanel({
                   type="button"
                   disabled={starting}
                   data-testid={`chat-suggestion-${i + 1}`}
-                  onClick={() => start({ text: s, plan: false })}
+                  onClick={() => start({ text: s, plan: false, specialist })}
                   className="rounded-pill border border-border-soft bg-secondary px-3 py-1 font-sans text-xs text-on-surface-mid transition-colors hover:border-primary"
                 >
                   {s}
@@ -177,7 +193,10 @@ export function ChatPanel({
           <Composer
             estimates={data.estimates}
             busy={starting}
-            onSend={(text, plan) => start({ text, plan })}
+            specialists={data.specialists}
+            specialist={specialist}
+            onSpecialist={setSpecialist}
+            onSend={(text, plan) => start({ text, plan, specialist })}
           />
         </>
       )}
@@ -194,6 +213,9 @@ function Conversation({
   first,
   onFirstSent,
   refreshBoard,
+  specialists,
+  specialist,
+  onSpecialist,
 }: {
   sessionId: string;
   initial: KilnMessage[];
@@ -203,16 +225,33 @@ function Conversation({
   first: Pending | null;
   onFirstSent: () => void;
   refreshBoard: boolean;
+  specialists: ChatPanelData["specialists"];
+  specialist: SpecialistId;
+  onSpecialist: (id: SpecialistId) => void;
 }) {
   const router = useRouter();
   const plan = useRef(false);
+  const mode = useRef(specialist);
+  mode.current = specialist;
   const transport = useMemo(
     () =>
       new DefaultChatTransport<KilnMessage>({
         api: "/api/chat",
-        prepareSendMessagesRequest: ({ id, messages }) => ({
-          body: { sessionId: id, message: messages.at(-1), plan: plan.current },
-        }),
+        // A yes or no to a waiting call continues in the mode that asked.
+        prepareSendMessagesRequest: ({ id, messages }) => {
+          const last = messages.at(-1);
+          return {
+            body: {
+              sessionId: id,
+              message: last,
+              plan: plan.current,
+              specialist:
+                last?.role === "assistant"
+                  ? (last.metadata?.specialist ?? mode.current)
+                  : mode.current,
+            },
+          };
+        },
       }),
     [],
   );
@@ -272,6 +311,7 @@ function Conversation({
     const timer = setTimeout(() => {
       onFirstSent();
       plan.current = first.plan;
+      mode.current = first.specialist;
       void sendMessage({ text: first.text });
     }, 0);
     return () => clearTimeout(timer);
@@ -313,6 +353,9 @@ function Conversation({
                     messages={messages}
                     toolTitles={toolTitles}
                     busy={busy}
+                    specialists={specialists}
+                    specialist={specialist}
+                    onSwitch={onSpecialist}
                     onAnswer={(id, approved) => {
                       plan.current = false;
                       addToolApprovalResponse({ id, approved });
@@ -349,6 +392,9 @@ function Conversation({
       <Composer
         estimates={estimates}
         busy={busy}
+        specialists={specialists}
+        specialist={specialist}
+        onSpecialist={onSpecialist}
         onSend={(text, planned) => {
           plan.current = planned;
           void sendMessage({ text });
@@ -369,11 +415,17 @@ function costLine(estimate: ChatEstimate): string {
 function Composer({
   estimates,
   busy,
+  specialists,
+  specialist,
+  onSpecialist,
   onSend,
   onStop,
 }: {
   estimates: ChatPanelData["estimates"];
   busy: boolean;
+  specialists: ChatPanelData["specialists"];
+  specialist: SpecialistId;
+  onSpecialist: (id: SpecialistId) => void;
   onSend: (text: string, plan: boolean) => void;
   onStop?: () => void;
 }) {
@@ -395,6 +447,32 @@ function Composer({
         send();
       }}
     >
+      <div
+        role="radiogroup"
+        aria-label="Who works on it"
+        className="flex items-center gap-1"
+      >
+        {specialists.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            role="radio"
+            aria-checked={s.id === specialist}
+            title={s.about}
+            disabled={busy}
+            data-testid={`chat-specialist-${s.id}`}
+            onClick={() => onSpecialist(s.id)}
+            className={cn(
+              "rounded-pill px-2.5 py-0.5 font-sans text-[0.72rem] font-semibold transition-colors disabled:opacity-50",
+              s.id === specialist
+                ? "bg-primary/10 text-primary"
+                : "text-on-surface-mid hover:text-foreground",
+            )}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
       <label className="sr-only" htmlFor="chat-input">
         Message Kiln
       </label>
