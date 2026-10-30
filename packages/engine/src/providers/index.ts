@@ -7,6 +7,7 @@ export {
 export { CapabilityError, ProviderKeyMissing } from "@/providers/errors";
 export type {
   ArtDirector,
+  ChatModels,
   ImageProvider,
   ProviderId,
   VideoProvider,
@@ -15,6 +16,7 @@ export type {
 export { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 export { hasProviderKey } from "@/providers/keys";
 export { mockArtDirector } from "@/providers/mock/art-director";
+export { type MockReply, mockReply } from "@/providers/mock/chat-model";
 export { mockVisionProvider } from "@/providers/mock/vision";
 export {
   composePlateSvg,
@@ -36,6 +38,7 @@ export {
   CAPABILITY_MAP,
   getArtDirector,
   getCapabilities,
+  getChatModels,
   getImageProvider,
   getVideoProvider,
   getVisionProvider,

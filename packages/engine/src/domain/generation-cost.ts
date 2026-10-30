@@ -322,6 +322,11 @@ export const TEXT_CALL_BUDGETS = {
   listingCopy: { inputTokens: 3_000, outputTokens: 3_000 },
   // The product form, each field with its use; a few suggestions and checks.
   productReview: { inputTokens: 3_000, outputTokens: 2_000 },
+  // One step of a chat turn: the instructions, Kiln's tools and the
+  // conversation (old images left out); a reply or a tool call.
+  chatTurn: { inputTokens: 20_000, outputTokens: 2_000 },
+  // One step of a turn the maker asked to plan first.
+  chatPlan: { inputTokens: 20_000, outputTokens: 4_000 },
 } as const;
 export type TextCallKind = keyof typeof TEXT_CALL_BUDGETS;
 

@@ -46,14 +46,17 @@ export const ROLE_KIND: Record<ModelRole, ModelKind> = {
   video: "video",
 };
 
-// A field suggestion runs on `fast`; a read of the photo, a plan, the art
-// director and the listing text on `deep`.
+// A field suggestion and a chat turn run on `fast`; a read of the photo, a
+// plan, the art director, the listing text and a chat turn planned first on
+// `deep`.
 export const TEXT_CALL_ROLES: Record<TextCallKind, "fast" | "deep"> = {
   vision: "deep",
   productDraft: "deep",
   artDirection: "deep",
   listingCopy: "deep",
   productReview: "fast",
+  chatTurn: "fast",
+  chatPlan: "deep",
 };
 
 export const MAX_ROUTE = 4;

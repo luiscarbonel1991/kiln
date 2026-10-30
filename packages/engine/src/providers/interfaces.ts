@@ -1,3 +1,4 @@
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type { BrandProfile } from "@/domain/brand";
 import type { DestinationText } from "@/domain/destination";
 import type { ListingText } from "@/domain/listing";
@@ -86,6 +87,13 @@ export interface ArtDirector {
 // (the cap reservation marks it there); if it throws, no request is made.
 export interface DirectCallOptions {
   beforeCall?: () => Promise<void>;
+}
+
+// The chat (ROADMAP "Agents", stage 2): a catalog text model as a streaming
+// language model the chat's loop drives, step by step. An error the provider
+// answered carries its HTTP `status` (hadResponse), like every adapter's.
+export interface ChatModels {
+  model(id: string): LanguageModelV4;
 }
 
 // (c) Image executor.

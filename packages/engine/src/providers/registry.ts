@@ -1,17 +1,22 @@
 import type { Card } from "@/domain/card";
 import { assertCapability, canUse } from "@/providers/capabilities";
 import { googleArtDirector } from "@/providers/google/art-director";
+import { googleChatModels } from "@/providers/google/chat-model";
 import { googleImageProvider } from "@/providers/google/image";
 import { googleVideoProvider } from "@/providers/google/video";
 import { googleVisionProvider } from "@/providers/google/vision";
 import type {
   ArtDirector,
+  ChatModels,
   ImageProvider,
   ProviderId,
   VideoProvider,
   VisionProvider,
 } from "@/providers/interfaces";
+import { mockChatModels } from "@/providers/mock/chat-model";
+import { providerMode } from "@/providers/mode";
 import { openaiArtDirector } from "@/providers/openai/art-director";
+import { openaiChatModels } from "@/providers/openai/chat-model";
 import { openaiImageProvider } from "@/providers/openai/image";
 import { openaiVisionProvider } from "@/providers/openai/vision";
 import type { Capabilities } from "@/providers/types";
@@ -68,6 +73,17 @@ export const CAPABILITY_MAP: Record<ProviderId, Capabilities> = {
 
 export function getArtDirector(id: ProviderId): ArtDirector {
   return ART_DIRECTORS[id];
+}
+
+// The chat's models: the provider's own in a live run, the free rules in a
+// mock run.
+const CHAT_MODELS: Record<ProviderId, ChatModels> = {
+  google: googleChatModels,
+  openai: openaiChatModels,
+};
+
+export function getChatModels(id: ProviderId): ChatModels {
+  return providerMode() === "mock" ? mockChatModels(id) : CHAT_MODELS[id];
 }
 
 export { getStorageProvider } from "@/providers/storage";

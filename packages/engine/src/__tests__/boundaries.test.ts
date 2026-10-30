@@ -23,9 +23,16 @@ function sources(dir: string): string[] {
 
 // A provider SDK is imported only inside its own adapter folder (CLAUDE.md:
 // "never import an SDK outside its adapter"), in the engine and in the app.
+// The AI SDK's loop and UI (`ai`, `@ai-sdk/react`) stay in the chat.
 const SDK = [
-  { from: /from "openai(\/[^"]*)?"/, home: "providers/openai/" },
-  { from: /from "@google\/genai"/, home: "providers/google/" },
+  { from: /from "openai(\/[^"]*)?"/, homes: ["providers/openai/"] },
+  { from: /from "@google\/genai"/, homes: ["providers/google/"] },
+  { from: /from "@ai-sdk\/openai"/, homes: ["providers/openai/"] },
+  { from: /from "@ai-sdk\/google"/, homes: ["providers/google/"] },
+  {
+    from: /from "(ai|@ai-sdk\/react)(\/[^"]*)?"/,
+    homes: ["src/server/chat/", "src/components/chat/", "src/app/api/chat/"],
+  },
 ];
 
 describe("engine boundaries", () => {
@@ -48,7 +55,8 @@ describe("engine boundaries", () => {
     const strays = files.flatMap((path) => {
       const text = readFileSync(path, "utf8");
       return SDK.filter(
-        (sdk) => sdk.from.test(text) && !path.includes(sdk.home),
+        (sdk) =>
+          sdk.from.test(text) && !sdk.homes.some((home) => path.includes(home)),
       ).map(() => relative(join(root, "..", "..", ".."), path));
     });
     expect(strays).toEqual([]);
