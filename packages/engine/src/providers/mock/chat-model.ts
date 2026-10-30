@@ -13,9 +13,12 @@ import { mockDelay, mockOutage } from "@/providers/mode";
 // The chat in a mock run: no model, a few rules, so the chat can be tried for
 // free. "frames" or "estado" reads the frames; "genera" or "generate" quotes
 // the waiting scenes, then asks to generate them on that quote (the maker
-// approves); anything else says how to try it. The project comes from the
-// instructions ("Project id: <id>"). KILN_MOCK_FAIL naming the provider makes
-// it answer as a provider that is down.
+// approves); "from above" tunes the Etsy hero's camera; "title" or "tags"
+// reads the Etsy listing, then shortens its title or adds the brief's tag
+// ideas (in the general mode it suggests the Etsy specialist instead);
+// anything else says how to try it. The project comes from the instructions
+// ("Project id: <id>"). KILN_MOCK_FAIL naming the provider makes it answer
+// as a provider that is down.
 
 export type MockReply =
   | { text: string }
@@ -34,8 +37,60 @@ function textOf(content: unknown): string {
     .join(" ");
 }
 
-function summary(toolName: string, value: unknown): MockReply {
+// A title cut to its first words, under 60 characters.
+function shorter(title: string): string {
+  const words = title.split(/\s+/);
+  let out = "";
+  for (const word of words) {
+    if (`${out} ${word}`.trim().length > 60) break;
+    out = `${out} ${word}`.trim();
+  }
+  return out || title.slice(0, 60);
+}
+
+function listingEdit(
+  v: Record<string, unknown>,
+  asked: string,
+  project: string | undefined,
+): MockReply {
+  const where = { project, destination: "etsy" };
+  if (/t[ií]tulo|title/.test(asked)) {
+    const title = (v.title as { value?: string } | undefined)?.value ?? "";
+    return { tool: "edit_listing", input: { ...where, title: shorter(title) } };
+  }
+  const tags = (v.tags as { value?: string[] } | undefined)?.value ?? [];
+  const ideas = ((v.tagIdeas as { term: string }[] | undefined) ?? []).map(
+    (i) => i.term,
+  );
+  if (ideas.length === 0) return { text: "The brief has no tag ideas left." };
+  return {
+    tool: "edit_listing",
+    input: { ...where, tags: [...tags, ...ideas].slice(0, 13) },
+  };
+}
+
+function summary(
+  toolName: string,
+  value: unknown,
+  asked: string,
+  project: string | undefined,
+): MockReply {
   const v = (value ?? {}) as Record<string, unknown>;
+  if (toolName === "get_listing") return listingEdit(v, asked, project);
+  if (toolName === "edit_listing" && Array.isArray(v.written)) {
+    const issues = Array.isArray(v.issues) ? v.issues.length : 0;
+    return {
+      text: `Edited the ${v.written.join(" and ")}: ${issues} issues left.`,
+    };
+  }
+  if (toolName === "tune_frame" && typeof v.summary === "string") {
+    return { text: `${v.frame} now: ${v.summary}. Nothing was generated.` };
+  }
+  if (toolName === "suggest_specialist") {
+    return {
+      text: "The Etsy specialist does this best: switch with the button.",
+    };
+  }
   if (toolName === "quote" && typeof v.quote === "string") {
     return { tool: "generate", input: { quote: v.quote } };
   }
@@ -76,12 +131,39 @@ export function mockReply(prompt: LanguageModelV4Prompt): MockReply {
     if (output.type === "error-text" || output.type === "error-json") {
       return { text: `That was refused: ${JSON.stringify(output.value)}` };
     }
+    const user = [...prompt].reverse().find((m) => m.role === "user");
     return summary(
       result.toolName,
       output.type === "json" ? output.value : undefined,
+      user ? textOf(user.content).toLowerCase() : "",
+      project,
     );
   }
   const asked = last?.role === "user" ? textOf(last.content).toLowerCase() : "";
+  const general = /general mode/.test(system ? textOf(system.content) : "");
+  const wantsListing = /t[ií]tulo|title|tags|etiquetas/.test(asked);
+  const wantsAbove = /desde arriba|from above/.test(asked);
+  if ((wantsListing || wantsAbove) && !project) {
+    return { text: "Open a project's chat to try that." };
+  }
+  if (wantsListing && general) {
+    return {
+      tool: "suggest_specialist",
+      input: {
+        specialist: "etsy",
+        why: "It reads and edits the listing's text.",
+      },
+    };
+  }
+  if (wantsListing) {
+    return { tool: "get_listing", input: { project, destination: "etsy" } };
+  }
+  if (wantsAbove) {
+    return {
+      tool: "tune_frame",
+      input: { project, frame: "etsy.hero", knobs: { camera: "above" } },
+    };
+  }
   const wantsFrames = /frame|estado|status|c[oó]mo van|how are/.test(asked);
   const wantsScenes = /gener[aá]|generate/.test(asked);
   if ((wantsFrames || wantsScenes) && !project) {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runTurn, TurnRefusal } from "@/server/chat/run-turn";
+import { SpecialistId } from "@/server/chat/specialists";
 import { apiError, foreignOrigin, readBody } from "@/server/http-api";
 
 // POST /api/chat — one turn of Kiln's chat (ROADMAP "Agents", stage 2): the
@@ -13,6 +14,7 @@ const Body = z.object({
   sessionId: z.string().min(1).max(100),
   message: z.unknown(),
   plan: z.boolean().optional(),
+  specialist: SpecialistId.optional(),
 });
 
 export async function POST(request: Request) {

@@ -1,4 +1,6 @@
-import { type ToolSet, tool } from "ai";
+import { type ToolApprovalStatus, type ToolSet, tool } from "ai";
+import { z } from "zod";
+import { type Specialist, SpecialistId } from "@/server/chat/specialists";
 import { callAndRecord } from "@/server/tool-calls";
 import { TOOLS } from "@/server/tools";
 import type { ToolContext, ToolOutput } from "@/server/tools/registry";
@@ -22,9 +24,21 @@ export const NEEDS_CLICK = [
   "deliver",
 ] as const;
 
-export const TOOL_APPROVAL = Object.fromEntries(
-  NEEDS_CLICK.map((name) => [name, "user-approval" as const]),
-);
+// Each tool that waits for the maker's click; edit_listing only when it
+// would replace text the maker wrote.
+export const TOOL_APPROVAL: Record<
+  string,
+  ToolApprovalStatus | ((input: unknown) => ToolApprovalStatus | undefined)
+> = {
+  ...Object.fromEntries(
+    NEEDS_CLICK.map((name) => [name, "user-approval" as const]),
+  ),
+  edit_listing: (input) =>
+    (input as { overwriteMakerText?: unknown } | null)?.overwriteMakerText ===
+    true
+      ? "user-approval"
+      : undefined,
+};
 
 export class ToolRefused extends Error {}
 
@@ -62,20 +76,47 @@ function asStored({ data, images }: ToolOutput): StoredOutput {
   return images?.length ? { ...data, images } : data;
 }
 
-export function chatTools(ctx: ToolContext): ToolSet {
-  return Object.fromEntries(
-    TOOLS.filter((t) => !LEFT_OUT.has(t.name)).map((t) => [
-      t.name,
-      tool({
-        description: t.description,
-        inputSchema: t.input,
-        execute: async (input: unknown) => {
-          const answer = await callAndRecord(TOOLS, t.name, input, ctx);
-          if (!answer.ok) throw new ToolRefused(answer.error);
-          return asStored(answer.output);
-        },
-        toModelOutput: ({ output }) => modelOutput(output as StoredOutput),
-      }),
-    ]),
+// The general mode's way to point the maker at a specialist: it changes
+// nothing; the chat shows it as a button that switches the chip.
+export const suggestSpecialist = tool({
+  description:
+    "Suggest the specialist that does this task best: the maker sees a button that switches to it. It runs nothing. etsy: a listing's text, tags, the market brief and the shop's numbers. scenes: tuning a project's scenes and their takes.",
+  inputSchema: z.object({
+    specialist: SpecialistId.exclude(["kiln"]),
+    why: z.string().trim().min(1).max(200).describe("In a few words."),
+  }),
+  execute: async ({ specialist, why }) => ({ specialist, why }),
+});
+
+// The tools of one mode of the chat: every Kiln tool the chat offers, or the
+// specialist's own; the general mode can also suggest a specialist.
+export function chatTools(
+  ctx: ToolContext,
+  specialist: Pick<Specialist, "id" | "tools">,
+): ToolSet {
+  const offered = TOOLS.filter(
+    (t) =>
+      !LEFT_OUT.has(t.name) &&
+      (specialist.tools === null || specialist.tools.includes(t.name)),
   );
+  return {
+    ...Object.fromEntries(
+      offered.map((t) => [
+        t.name,
+        tool({
+          description: t.description,
+          inputSchema: t.input,
+          execute: async (input: unknown) => {
+            const answer = await callAndRecord(TOOLS, t.name, input, ctx);
+            if (!answer.ok) throw new ToolRefused(answer.error);
+            return asStored(answer.output);
+          },
+          toModelOutput: ({ output }) => modelOutput(output as StoredOutput),
+        }),
+      ]),
+    ),
+    ...(specialist.id === "kiln"
+      ? { suggest_specialist: suggestSpecialist }
+      : {}),
+  };
 }

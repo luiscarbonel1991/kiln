@@ -224,6 +224,57 @@ describe("the mock chat", () => {
     ).toEqual({ text: "2 frames: 1 approved, 1 draft." });
   });
 
+  it("plays the specialists: the general mode suggests Etsy; Etsy reads, then edits the listing; Scenes tunes", async () => {
+    const { mockReply } = await import("@/providers/mock/chat-model");
+    const general = {
+      role: "system" as const,
+      content: "Project id: p1\nYou are in Kiln's general mode.",
+    };
+    expect(mockReply([general, user("Mejorá el título")])).toMatchObject({
+      tool: "suggest_specialist",
+      input: { specialist: "etsy" },
+    });
+    expect(mockReply([system, user("Acortá el título")])).toEqual({
+      tool: "get_listing",
+      input: { project: "p1", destination: "etsy" },
+    });
+    const read: LanguageModelV4Prompt = [
+      system,
+      user("Acortá el título"),
+      {
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            toolCallId: "c1",
+            toolName: "get_listing",
+            output: {
+              type: "json",
+              value: {
+                title: {
+                  value:
+                    "Walnut cutting board engraved with your family name, a wedding gift for the kitchen",
+                },
+              },
+            },
+          },
+        ],
+      },
+    ];
+    expect(mockReply(read)).toEqual({
+      tool: "edit_listing",
+      input: {
+        project: "p1",
+        destination: "etsy",
+        title: "Walnut cutting board engraved with your family name, a",
+      },
+    });
+    expect(mockReply([system, user("El hero desde arriba")])).toEqual({
+      tool: "tune_frame",
+      input: { project: "p1", frame: "etsy.hero", knobs: { camera: "above" } },
+    });
+  });
+
   it("streams its answer, and answers as a provider that is down on KILN_MOCK_FAIL", async () => {
     vi.stubEnv("KILN_PROVIDERS", "mock");
     const { getChatModels } = await import("@/providers/registry");

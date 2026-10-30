@@ -1,8 +1,10 @@
+import type { Specialist } from "@/server/chat/specialists";
 import { projectFrames } from "@/server/project-frames";
 
 // What the chat's agent is told before each turn: who it works for, the
-// rules every agent in Kiln follows (ROADMAP "Agents"), and the project in a
-// few lines. The tools read everything else.
+// rules every agent in Kiln follows (ROADMAP "Agents"), the mode it is in
+// (specialists.ts), and the project in a few lines. The tools read
+// everything else.
 
 const RULES = `You are Kiln's assistant. Kiln is a studio where a maker prepares a product's listing photos, video and text before the sale. You work for the maker, inside Kiln, only through Kiln's tools.
 
@@ -17,9 +19,16 @@ Rules:
 
 export async function chatInstructions(
   projectId: string | null,
+  specialist: Pick<Specialist, "instructions">,
   now = new Date(),
 ): Promise<string> {
-  const lines = [RULES, "", `Today is ${now.toISOString().slice(0, 10)}.`];
+  const lines = [
+    RULES,
+    "",
+    specialist.instructions,
+    "",
+    `Today is ${now.toISOString().slice(0, 10)}.`,
+  ];
   if (!projectId) {
     lines.push(
       "This conversation is the maker's own, on no project: list_projects and list_products find what they mean.",

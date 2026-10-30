@@ -15,6 +15,7 @@ const enabled =
 
 const replies: LanguageModelV4StreamPart[][] = [];
 const prompts: unknown[] = [];
+const offered: string[][] = [];
 const generated: unknown[] = [];
 
 // Spend under the cap is the routed model's (routed-model.test.ts).
@@ -30,8 +31,9 @@ vi.mock("@/providers/registry", () => ({
   getChatModels: () => ({
     model: () =>
       new MockLanguageModelV4({
-        doStream: async ({ prompt }) => {
+        doStream: async ({ prompt, tools }) => {
           prompts.push(prompt);
+          offered.push((tools ?? []).map((t) => t.name));
           const chunks = replies.shift();
           if (!chunks) throw new Error("The script ran out of replies.");
           return { stream: simulateReadableStream({ chunks }) };
@@ -262,5 +264,27 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
     );
     await db.chatSession.deleteMany({ where: { projectId: project.id } });
     await db.project.delete({ where: { id: project.id } });
+  });
+
+  it("a specialist's turn offers only its tools, and says which it was", async () => {
+    const { id } = await session();
+    offered.length = 0;
+    replies.push(say("Tuned."));
+    const response = await runTurn({
+      sessionId: id,
+      message: user("u1", "lower the camera"),
+      specialist: "scenes",
+    });
+    await response.text();
+    for (let i = 0; i < 50 && (await repo.getChat(id))?.running; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(offered[0]).toEqual(["generate"]);
+    expect((await lastReply(id)).metadata).toMatchObject({
+      specialist: "scenes",
+    });
+    replies.push(say("Hi."));
+    await turn(id, user("u2", "hello"));
+    expect(offered[1]).toEqual(["peek", "generate", "suggest_specialist"]);
   });
 });

@@ -29,15 +29,16 @@ const CTX = {
 
 describe("the chat's tools", () => {
   it("are Kiln's tools, less a file import and the maker's own reads", () => {
-    const names = Object.keys(chatTools(CTX));
-    expect(names).toEqual(
-      TOOLS.map((t) => t.name).filter((n) => !LEFT_OUT.has(n)),
-    );
+    const names = Object.keys(chatTools(CTX, { id: "kiln", tools: null }));
+    expect(names).toEqual([
+      ...TOOLS.map((t) => t.name).filter((n) => !LEFT_OUT.has(n)),
+      "suggest_specialist",
+    ]);
     for (const name of NEEDS_CLICK) expect(names).toContain(name);
   });
 
   it("record each call with its session, and a refusal reaches the model in words", async () => {
-    const tools = chatTools(CTX);
+    const tools = chatTools(CTX, { id: "kiln", tools: null });
     const run = (name: string, input: unknown) =>
       tools[name].execute?.(input, { toolCallId: "c1", messages: [] } as never);
     await expect(run("list_projects", {})).resolves.toEqual({ ok: 1 });

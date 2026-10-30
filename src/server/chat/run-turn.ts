@@ -26,6 +26,7 @@ import {
 } from "@/server/chat/messages";
 import "@/server/chat/no-gateway";
 import { newLedger, routedChatModel } from "@/server/chat/routed-model";
+import { SPECIALISTS, type SpecialistId } from "@/server/chat/specialists";
 
 // One turn of the chat (ROADMAP "Agents", stage 2): one request, run inside
 // Kiln (Luis, 2026-10-30: no Vercel). It takes the session's lock, adds what
@@ -78,6 +79,7 @@ export async function runTurn(input: {
   sessionId: string;
   message: unknown;
   plan?: boolean;
+  specialist?: SpecialistId;
 }): Promise<Response> {
   const { sessionId } = input;
   const chat = await getChat(sessionId);
@@ -106,7 +108,8 @@ export async function runTurn(input: {
     const role = input.plan ? "deep" : "fast";
     const ledger = newLedger();
     const ctx = { tokenId: null, tokenName: "Chat", canSpend: true, sessionId };
-    const tools = chatTools(ctx);
+    const specialist = SPECIALISTS[input.specialist ?? "kiln"];
+    const tools = chatTools(ctx, specialist);
     const model = await routedChatModel(input.plan ? "chatPlan" : "chatTurn", {
       ...(chat.projectId ? { projectId: chat.projectId } : {}),
       ledger,
@@ -117,6 +120,7 @@ export async function runTurn(input: {
       last?.role === "assistant" ? (last.metadata?.costMicros ?? 0) : 0;
     const metadata = (): ChatMetadata => ({
       role,
+      specialist: specialist.id,
       models: ledger.models,
       ...(ledger.moves.length ? { moves: ledger.moves } : {}),
       costMicros: priorMicros + ledger.costMicros,
@@ -135,7 +139,7 @@ export async function runTurn(input: {
 
     const result = streamText({
       model,
-      instructions: await chatInstructions(chat.projectId),
+      instructions: await chatInstructions(chat.projectId, specialist),
       tools,
       toolApproval: TOOL_APPROVAL,
       messages: await convertToModelMessages(forModel(messages), {
