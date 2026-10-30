@@ -8,6 +8,8 @@ import type { ProjectPlan } from "@/domain/plan";
 const state = vi.hoisted(() => ({
   approvals: [] as unknown[][],
   tuned: [] as unknown[],
+  places: [] as unknown[],
+  switched: [] as unknown[][],
   approvedOutput: null as string | null,
 }));
 
@@ -80,6 +82,9 @@ vi.mock("@/server/project-repository", async () => {
       }
       state.approvals.push([project, ref, approved, checked]);
     },
+    setSlotOff: async (project: string, ref: unknown, off: boolean) => {
+      state.switched.push([project, ref, off]);
+    },
   };
 });
 vi.mock("@/server/slot-tuning", () => ({
@@ -90,6 +95,7 @@ vi.mock("@/server/slot-tuning", () => ({
   ) => {
     const next = tune(plan);
     state.tuned.push(next.destinations[0].slots[0].tuned);
+    state.places.push(next.destinations[0].slots[0].place);
     return { product: null, plan: next };
   },
 }));
@@ -104,6 +110,8 @@ const call = (name: string, args: Record<string, unknown>) =>
 afterEach(() => {
   state.approvals.length = 0;
   state.tuned.length = 0;
+  state.places.length = 0;
+  state.switched.length = 0;
   state.approvedOutput = null;
 });
 
@@ -218,5 +226,77 @@ describe("reject_frame", () => {
       error: expect.stringContaining("is not a scene"),
     });
     expect(state.tuned).toEqual([]);
+  });
+});
+
+describe("tune_frame", () => {
+  it("sets several knobs and a place at once, and answers the scene's knobs", async () => {
+    const answer = await call("tune_frame", {
+      project: "p1",
+      frame: "etsy.hero",
+      knobs: { props: "none", light: "default" },
+      place: "on a walnut desk",
+    });
+    expect(state.tuned).toEqual([{ props: "none" }]);
+    expect(state.places).toEqual(["on a walnut desk"]);
+    expect(answer).toMatchObject({
+      ok: true,
+      output: {
+        data: {
+          frame: "etsy.hero",
+          knobs: {
+            props: { stop: "none", by: "maker" },
+            light: { stop: "window", by: "default" },
+          },
+          place: "on a walnut desk",
+        },
+      },
+    });
+  });
+
+  it("refuses a knob the scene does not offer, nothing to set, and a frame that is not a scene", async () => {
+    expect(
+      await call("tune_frame", {
+        project: "p1",
+        frame: "etsy.hero",
+        knobs: { camera: "above" },
+      }),
+    ).toEqual({ ok: false, error: "this scene has no camera knob" });
+    expect(
+      await call("tune_frame", { project: "p1", frame: "etsy.hero" }),
+    ).toEqual({ ok: false, error: "Name a knob to set, or a place." });
+    expect(
+      await call("tune_frame", {
+        project: "p1",
+        frame: "etsy.size",
+        knobs: { props: "none" },
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("not a scene"),
+    });
+    expect(
+      await call("tune_frame", {
+        project: "p1",
+        frame: "etsy.hero",
+        knobs: { props: "glitter" },
+      }),
+    ).toMatchObject({ ok: false });
+  });
+});
+
+describe("switch_frame", () => {
+  it("switches a frame off and on", async () => {
+    await call("switch_frame", {
+      project: "p1",
+      frame: "etsy.hero",
+      on: false,
+    });
+    await call("switch_frame", { project: "p1", frame: "etsy.hero", on: true });
+    const ref = { destinationId: "etsy", slotKey: "hero" };
+    expect(state.switched).toEqual([
+      ["p1", ref, true],
+      ["p1", ref, false],
+    ]);
   });
 });

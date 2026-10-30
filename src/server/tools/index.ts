@@ -3,6 +3,8 @@ import {
   getFrames,
   listProjects,
   rejectFrame,
+  switchFrame,
+  tuneFrame,
   unapproveFrame,
   viewFrame,
 } from "@/server/tools/board";
@@ -41,6 +43,8 @@ export const TOOLS: readonly Tool[] = [
   approveFrame,
   unapproveFrame,
   rejectFrame,
+  tuneFrame,
+  switchFrame,
   quote,
   generate,
   writeListingTool,

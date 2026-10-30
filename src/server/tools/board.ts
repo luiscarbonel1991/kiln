@@ -1,17 +1,38 @@
 import { z } from "zod";
 import type { FrameView } from "@/domain/frame-view";
-import { parseSlotCardId, type SlotRef, withSlotTuning } from "@/domain/plan";
 import {
+  type PlanSlot,
+  type ProjectPlan,
+  parseSlotCardId,
+  type SlotRef,
+  withSlotPlace,
+  withSlotTuning,
+} from "@/domain/plan";
+import {
+  CameraStop,
+  DistanceStop,
   effectiveKnobs,
   KNOBS,
+  type KnobChoice,
+  KnobKey,
+  knobStops,
+  knobSummary,
+  LightStop,
+  PropsStop,
   REASONS,
   ReasonKey,
   reasonMove,
+  SettingStop,
+  ShadowStop,
 } from "@/domain/scene-knobs";
 import { kilnPick, threeQuarterFor } from "@/domain/scene-reference";
 import { fetchAsset } from "@/providers/asset-bytes";
 import { framedProjects, projectFrames } from "@/server/project-frames";
-import { loadProjectBoard, setSlotApproval } from "@/server/project-repository";
+import {
+  loadProjectBoard,
+  setSlotApproval,
+  setSlotOff,
+} from "@/server/project-repository";
 import { retuneSlot } from "@/server/slot-tuning";
 import { defineTool, ToolRefusal } from "@/server/tools/registry";
 
@@ -222,5 +243,158 @@ export const rejectFrame = defineTool({
         next: `The next take of ${frame} reads the change: quote it, then generate.`,
       },
     };
+  },
+});
+
+// A knob's stops for a client: each stop's key and what it does.
+const knobHelp = (knob: KnobKey) =>
+  `${KNOBS[knob].label}: ${knobStops(knob)
+    .map((stop) => {
+      const about = (KNOBS[knob].stops as Record<string, { label: string }>)[
+        stop
+      ];
+      return `${stop} (${about.label})`;
+    })
+    .join(", ")}; "default" returns it to the scene's own.`;
+
+const knob = <S extends z.ZodEnum>(stops: S, key: KnobKey) =>
+  stops.or(z.literal("default")).optional().describe(knobHelp(key));
+
+const KnobsInput = z
+  .object({
+    setting: knob(SettingStop, "setting"),
+    camera: knob(CameraStop, "camera"),
+    distance: knob(DistanceStop, "distance"),
+    light: knob(LightStop, "light"),
+    shadow: knob(ShadowStop, "shadow"),
+    props: knob(PropsStop, "props"),
+  })
+  .strict();
+
+// A slot's knobs as a tool answers them: each offered knob, its stop and who
+// set it, and the board's one-line summary.
+function knobsOf(
+  slot: PlanSlot,
+  plan: ProjectPlan,
+  master: string | undefined,
+) {
+  if (!slot.knobs) return null;
+  const knobs = effectiveKnobs(
+    slot.knobs,
+    slot.tuned,
+    kilnPick(slot.knobs, threeQuarterFor(plan.references, master)),
+  );
+  return {
+    summary: knobSummary(knobs),
+    knobs: Object.fromEntries(
+      knobs.offered.map((k) => {
+        const stop = knobs.stops[k] as string;
+        const about = (KNOBS[k].stops as Record<string, { label: string }>)[
+          stop
+        ];
+        return [
+          k,
+          {
+            stop,
+            label: about?.label ?? stop,
+            by: knobs.chosen.includes(k)
+              ? "maker"
+              : knobs.picked.includes(k)
+                ? "kiln"
+                : "default",
+          },
+        ];
+      }),
+    ),
+    ...(slot.place ? { place: slot.place } : {}),
+  };
+}
+
+const refusal = (error: unknown) =>
+  error instanceof ToolRefusal
+    ? error
+    : new ToolRefusal(
+        error instanceof Error ? error.message : "Kiln could not change it.",
+      );
+
+export const tuneFrame = defineTool({
+  name: "tune_frame",
+  title: "Tune a scene",
+  description:
+    "Set a scene's knobs (setting, camera, distance, light, shadow, props) and its place, as the board's Tune does: free, nothing is generated. Each knob takes one of its stops, or \"default\"; a knob the scene does not offer is refused. A place (\"on a walnut desk\") puts the scene there; null returns it to the product's places. The answer is the scene's knobs after the change. The next take reads it once you quote it and generate. A scene in the queue, or whose take is approved, is not tuned.",
+  input: FrameRef.extend({
+    knobs: KnobsInput.optional(),
+    place: z
+      .string()
+      .trim()
+      .min(1)
+      .max(160)
+      .nullable()
+      .optional()
+      .describe("Where the scene stands, in a few words; null clears it."),
+  }),
+  hints: { idempotent: true },
+  run: async ({ project, frame, knobs = {}, place }) => {
+    const view = await frameOf(project, frame);
+    if (view.fill !== "scene") {
+      throw new ToolRefusal(
+        `${frame} is not a scene (${view.fill}): only a scene has knobs.`,
+      );
+    }
+    const choices = KnobKey.options.flatMap((k): KnobChoice[] => {
+      const stop = knobs[k];
+      if (stop === undefined) return [];
+      return [
+        { knob: k, stop: stop === "default" ? null : stop } as KnobChoice,
+      ];
+    });
+    if (choices.length === 0 && place === undefined) {
+      throw new ToolRefusal("Name a knob to set, or a place.");
+    }
+    const ref = refOf(frame);
+    let tuned: Awaited<ReturnType<typeof retuneSlot>>;
+    try {
+      tuned = await retuneSlot(project, ref, (plan) =>
+        choices.reduce(
+          (p, choice) => withSlotTuning(p, ref, choice),
+          place === undefined ? plan : withSlotPlace(plan, ref, place),
+        ),
+      );
+    } catch (error) {
+      throw refusal(error);
+    }
+    const slot = tuned.plan.destinations
+      .find((d) => d.destinationId === ref.destinationId)
+      ?.slots.find((s) => s.key === ref.slotKey);
+    const loaded = await loadProjectBoard(project);
+    return {
+      data: {
+        frame,
+        ...(slot
+          ? knobsOf(slot, tuned.plan, loaded?.board.master?.assetUrl)
+          : {}),
+        next: `The next take of ${frame} reads this: quote it, then generate.`,
+      },
+    };
+  },
+});
+
+export const switchFrame = defineTool({
+  name: "switch_frame",
+  title: "Switch a frame on or off",
+  description:
+    "Switch a frame of the plan off (it is not generated or delivered) or back on, as the board's Switch off does: free. An approval survives the round trip. A frame in the queue is not switched.",
+  input: FrameRef.extend({
+    on: z.boolean().describe("true switches it on, false off."),
+  }),
+  hints: { idempotent: true },
+  run: async ({ project, frame, on }) => {
+    await frameOf(project, frame);
+    try {
+      await setSlotOff(project, refOf(frame), !on);
+    } catch (error) {
+      throw refusal(error);
+    }
+    return { data: { frame, on } };
   },
 });
