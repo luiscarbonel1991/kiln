@@ -18,8 +18,6 @@ import {
   type ProjectPlan,
   replan,
   SlotMove,
-  type SlotRef,
-  slotCardId,
   withSlotPlace,
   withSlotTuning,
   withThreeQuarter,
@@ -47,9 +45,9 @@ import {
   setSlotApproval,
   setSlotOff,
   setSlotOrder,
-  setSlotTuning,
   setVideoChoice,
 } from "@/server/project-repository";
+import { retuneSlot } from "@/server/slot-tuning";
 import { type Degraded, writeListing } from "@/server/text-calls";
 
 // Board mutations. Server Functions are POST-reachable: Zod is the trust
@@ -87,29 +85,6 @@ export async function setSlotOffAction(
     };
   }
   refresh();
-}
-
-// Tune one scene slot (free): the plan keeps the change and the slot's card
-// is written again from it, on its own destination only.
-function retuneSlot(
-  projectId: string,
-  ref: SlotRef,
-  tune: (plan: ProjectPlan) => ProjectPlan,
-) {
-  const cardId = slotCardId(ref.destinationId, ref.slotKey);
-  return setSlotTuning(projectId, ref, tune, ({ plan, master, product }) =>
-    slotCards(
-      {
-        ...plan,
-        destinations: plan.destinations.filter(
-          (d) => d.destinationId === ref.destinationId,
-        ),
-      },
-      master,
-      productUnderstanding(product),
-      product,
-    ).find((card) => card.id === cardId),
-  );
 }
 
 const KnobWrite = z.object({

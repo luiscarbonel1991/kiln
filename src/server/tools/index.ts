@@ -1,4 +1,11 @@
-import { getFrames, listProjects, viewFrame } from "@/server/tools/board";
+import {
+  approveFrame,
+  getFrames,
+  listProjects,
+  rejectFrame,
+  unapproveFrame,
+  viewFrame,
+} from "@/server/tools/board";
 import { listProductsTool } from "@/server/tools/products";
 import type { Tool } from "@/server/tools/registry";
 
@@ -8,4 +15,7 @@ export const TOOLS: readonly Tool[] = [
   listProjects,
   getFrames,
   viewFrame,
+  approveFrame,
+  unapproveFrame,
+  rejectFrame,
 ];
