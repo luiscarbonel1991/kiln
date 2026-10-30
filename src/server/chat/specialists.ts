@@ -9,7 +9,7 @@ import { CATALOG } from "@/lib/recipes";
 // agent of its own only if one agent stops coping. The know-how is written
 // from Kiln's own data (the knobs, the channel's rules), so it stays true.
 
-export const SpecialistId = z.enum(["kiln", "etsy", "scenes"]);
+export const SpecialistId = z.enum(["kiln", "etsy", "scenes", "svg"]);
 export type SpecialistId = z.infer<typeof SpecialistId>;
 
 export interface Specialist {
@@ -45,7 +45,7 @@ const KILN: Specialist = {
   label: "Kiln",
   about: "Everything Kiln does, with every tool.",
   tools: null,
-  instructions: `You are in Kiln's general mode. When the maker's task is mainly a listing's text, its tags or how a shop sells, call suggest_specialist with "etsy"; when it is mainly tuning a project's scenes, with "scenes". It shows the maker a button to switch; then help as well as you can in this turn.`,
+  instructions: `You are in Kiln's general mode. When the maker's task is mainly a listing's text, its tags or how a shop sells, call suggest_specialist with "etsy"; when it is mainly tuning a project's scenes, with "scenes"; when it is mainly a design's line art or its SVG, with "svg". It shows the maker a button to switch; then help as well as you can in this turn.`,
 };
 
 const ETSY: Specialist = {
@@ -104,10 +104,32 @@ ${knobLines}
 - A task outside the photos (the listing text, the shop) is the general mode's: say so in one line.`,
 };
 
+const SVG: Specialist = {
+  id: "svg",
+  label: "SVG",
+  about: "A design's line art and its vectors: draw, look, trace, clean up.",
+  tools: [
+    "list_designs",
+    "get_design",
+    "view_design",
+    "vectorize",
+    "quote",
+    "draw",
+  ],
+  instructions: `You are Kiln's SVG specialist: a design's line art and its vectors.
+- A design is an image the maker brought, drawn as line art in a few drawings (each with its own purpose), and each drawing traced into an SVG. list_designs finds them; get_design reads one. A new design starts in the studio, from the maker's image: say so.
+- Look before you judge: view_design shows a drawing's line art, or its vector rendered on white.
+- Drawing line art is paid: quote "draw" (every drawing without line art, or the cards named), then draw in the same turn (the maker clicks). Drawings land over the next minutes, and this chat hears when.
+- vectorize is free. mode "outline" for filled shapes (bold marks, badges, silhouettes), "centerline" for a drawing made of single strokes. detail "fine" keeps small marks, "balanced" is the studio's trace, "clean" drops specks and smooths curves: the clean-up. Look at the vector and compare its shapes before you recommend one; tracing again replaces it.
+- A vector is art: the maker makes it into a product in the product form (get_design's makeProduct link), with its size, material and colours. Kiln makes no production files.
+- A task outside the designs (a project's photos, a listing) is the general mode's: say so in one line.`,
+};
+
 export const SPECIALISTS: Record<SpecialistId, Specialist> = {
   kiln: KILN,
   etsy: ETSY,
   scenes: SCENES,
+  svg: SVG,
 };
 
 // What the chat's chip offers.

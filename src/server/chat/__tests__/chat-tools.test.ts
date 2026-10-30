@@ -93,3 +93,12 @@ describe("the chat's tools", () => {
     });
   });
 });
+
+describe("the chat's approval card", () => {
+  it("shows a quote's cost for every tool that spends", async () => {
+    const { PAID } = await import("@/components/chat/chat-parts");
+    expect([...PAID].sort()).toEqual(
+      NEEDS_CLICK.filter((t) => t !== "approve_frame" && t !== "deliver").sort(),
+    );
+  });
+});

@@ -16,6 +16,9 @@ import { mockDelay, mockOutage } from "@/providers/mode";
 // approves); "from above" tunes the Etsy hero's camera; "title" or "tags"
 // reads the Etsy listing, then shortens its title or adds the brief's tag
 // ideas (in the general mode it suggests the Etsy specialist instead);
+// "designs" lists the designs; on a design, "vectoriz" reads it and traces
+// its first drawn drawing, and "draw" or "dibuj" quotes its drawings, then
+// asks to draw them (the general mode suggests the SVG specialist);
 // anything else says how to try it. The project comes from the instructions
 // ("Project id: <id>"). KILN_MOCK_FAIL naming the provider makes it answer
 // as a provider that is down.
@@ -87,12 +90,43 @@ function summary(
     return { text: `${v.frame} now: ${v.summary}. Nothing was generated.` };
   }
   if (toolName === "suggest_specialist") {
+    const label = v.specialist === "svg" ? "SVG" : "Etsy";
     return {
-      text: "The Etsy specialist does this best: switch with the button.",
+      text: `The ${label} specialist does this best: switch with the button.`,
     };
   }
   if (toolName === "quote" && typeof v.quote === "string") {
-    return { tool: "generate", input: { quote: v.quote } };
+    return {
+      tool: v.action === "draw" ? "draw" : "generate",
+      input: { quote: v.quote },
+    };
+  }
+  if (toolName === "list_designs" && Array.isArray(v.designs)) {
+    return {
+      text: `${v.designs.length} designs: ${v.designs.map((d: { name?: string }) => d.name).join(", ") || "none yet"}.`,
+    };
+  }
+  if (toolName === "get_design" && Array.isArray(v.drawings)) {
+    const drawn = (v.drawings as { card: string; state: string }[]).find(
+      (d) => d.state === "drawn" || d.state === "vectorized",
+    );
+    if (/vectori[sz]/.test(asked) && drawn) {
+      return {
+        tool: "vectorize",
+        input: { project, card: drawn.card, mode: "outline", detail: "clean" },
+      };
+    }
+    return { text: `${v.drawings.length} drawings. ${String(v.next ?? "")}` };
+  }
+  if (toolName === "vectorize" && typeof v.vector === "string") {
+    return {
+      text: `Traced ${v.label}: ${v.shapes} shapes, kept as its vector.`,
+    };
+  }
+  if (toolName === "draw" && typeof v.queued === "number") {
+    return {
+      text: `Queued ${v.queued} drawings. This chat notes when they land.`,
+    };
   }
   if (toolName === "get_frames" && Array.isArray(v.frames)) {
     const counts = new Map<string, number>();
@@ -143,6 +177,24 @@ export function mockReply(prompt: LanguageModelV4Prompt): MockReply {
   const general = /You are in Kiln's general mode/.test(
     system ? textOf(system.content) : "",
   );
+  const wantsVector = /vectori[sz]|svg/.test(asked);
+  const wantsDrawing = /dibuj|\bdraw\b|line art/.test(asked);
+  if (/designs|dise[ñn]os/.test(asked) && !project) {
+    return { tool: "list_designs", input: {} };
+  }
+  if ((wantsVector || wantsDrawing) && general) {
+    return {
+      tool: "suggest_specialist",
+      input: { specialist: "svg", why: "It draws and traces designs." },
+    };
+  }
+  if ((wantsVector || wantsDrawing) && !project) {
+    return { text: "Open a design's chat to try that." };
+  }
+  if (wantsVector) return { tool: "get_design", input: { project } };
+  if (wantsDrawing) {
+    return { tool: "quote", input: { action: "draw", project } };
+  }
   const wantsListing = /t[ií]tulo|title|tags|etiquetas/.test(asked);
   const wantsAbove = /desde arriba|from above/.test(asked);
   if ((wantsListing || wantsAbove) && !project) {

@@ -275,6 +275,77 @@ describe("the mock chat", () => {
     });
   });
 
+  it("plays the SVG specialist: lists designs, traces the first drawn drawing, quotes the drawings", async () => {
+    const { mockReply } = await import("@/providers/mock/chat-model");
+    expect(mockReply([user("Which designs do I have?")])).toEqual({
+      tool: "list_designs",
+      input: {},
+    });
+    const general = {
+      role: "system" as const,
+      content: "Project id: d1\nYou are in Kiln's general mode.",
+    };
+    expect(mockReply([general, user("Vectorizá el dibujo")])).toMatchObject({
+      tool: "suggest_specialist",
+      input: { specialist: "svg" },
+    });
+    expect(mockReply([system, user("Vectorizá el dibujo")])).toEqual({
+      tool: "get_design",
+      input: { project: "p1" },
+    });
+    const read: LanguageModelV4Prompt = [
+      system,
+      user("Vectorizá el dibujo"),
+      {
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            toolCallId: "c1",
+            toolName: "get_design",
+            output: {
+              type: "json",
+              value: {
+                drawings: [
+                  { card: "recipe-line-art-0", state: "to-draw" },
+                  { card: "recipe-line-art-1", state: "drawn" },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    ];
+    expect(mockReply(read)).toEqual({
+      tool: "vectorize",
+      input: {
+        project: "p1",
+        card: "recipe-line-art-1",
+        mode: "outline",
+        detail: "clean",
+      },
+    });
+    expect(mockReply([system, user("Draw the line art")])).toEqual({
+      tool: "quote",
+      input: { action: "draw", project: "p1" },
+    });
+    const quoted: LanguageModelV4Prompt = [
+      system,
+      {
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            toolCallId: "c2",
+            toolName: "quote",
+            output: { type: "json", value: { quote: "q1", action: "draw" } },
+          },
+        ],
+      },
+    ];
+    expect(mockReply(quoted)).toEqual({ tool: "draw", input: { quote: "q1" } });
+  });
+
   it("streams its answer, and answers as a provider that is down on KILN_MOCK_FAIL", async () => {
     vi.stubEnv("KILN_PROVIDERS", "mock");
     const { getChatModels } = await import("@/providers/registry");

@@ -59,6 +59,32 @@ describe("the specialists", () => {
     );
   });
 
+  it("SVG sees the design tools, draws only on a quote and the maker's click, and knows every trace setting", async () => {
+    const svg = Object.keys(chatTools(CTX, SPECIALISTS.svg));
+    expect(svg).toEqual([
+      "list_designs",
+      "get_design",
+      "view_design",
+      "vectorize",
+      "quote",
+      "draw",
+    ]);
+    expect(TOOL_APPROVAL.draw).toBe("user-approval");
+    expect(TOOL_APPROVAL.vectorize).toBeUndefined();
+    const { VectorDetail, VectorMode } = await import("@/server/vectorize");
+    for (const option of [...VectorMode.options, ...VectorDetail.options]) {
+      expect(SPECIALISTS.svg.instructions).toContain(`"${option}"`);
+    }
+  });
+
+  it("a reply records any mode the chip offers", async () => {
+    const { ChatMetadata } = await import("@/server/chat/messages");
+    const { SpecialistId } = await import("@/server/chat/specialists");
+    expect(ChatMetadata.shape.specialist.unwrap().options).toEqual(
+      SpecialistId.options,
+    );
+  });
+
   it("edit_listing waits for the maker's click only to replace their text", () => {
     const rule = TOOL_APPROVAL.edit_listing as (input: unknown) => unknown;
     expect(rule({ title: "x" })).toBeUndefined();

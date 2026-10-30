@@ -47,7 +47,14 @@ export interface QuoteView {
   lines?: { model?: string; fallbacks?: string[] }[];
 }
 
-const PAID = new Set(["generate", "write_listing", "review_product"]);
+// The tools that spend (the server's NEEDS_CLICK, less approve_frame and
+// deliver): their card shows the quote's cost.
+export const PAID = new Set([
+  "generate",
+  "draw",
+  "write_listing",
+  "review_product",
+]);
 
 export function money(usd: number | null | undefined): string {
   if (usd === null || usd === undefined) return "no pinned price";

@@ -47,17 +47,22 @@ const SUGGESTIONS = {
     "Generate the waiting scenes",
     "Write the Etsy listing",
   ],
+  design: ["What does this design need?", "Vectorize the drawn line art"],
   maker: ["Which projects need me?", "List my products"],
 };
 
 type Pending = { text: string; plan: boolean; specialist: SpecialistId };
 
-// The mode the chip starts in: the one the last turn ran in.
-function lastSpecialist(messages: KilnMessage[]): SpecialistId {
+// The mode the chip starts in: the one the last turn ran in, else the
+// conversation's own (SVG on a design).
+function lastSpecialist(
+  messages: KilnMessage[],
+  first: SpecialistId,
+): SpecialistId {
   for (const message of [...messages].reverse()) {
     if (message.metadata?.specialist) return message.metadata.specialist;
   }
-  return "kiln";
+  return first;
 }
 
 export function ChatPanel({
@@ -77,7 +82,7 @@ export function ChatPanel({
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [specialist, setSpecialist] = useState<SpecialistId>(() =>
-    lastSpecialist(data.messages),
+    lastSpecialist(data.messages, data.firstSpecialist),
   );
   const [starting, startTransition] = useTransition();
   const fresh = sessionId === null;
@@ -171,7 +176,9 @@ export function ChatPanel({
               spends, approves or delivers.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
-              {SUGGESTIONS[projectId ? "project" : "maker"].map((s, i) => (
+              {SUGGESTIONS[
+                data.design ? "design" : projectId ? "project" : "maker"
+              ].map((s, i) => (
                 <button
                   key={s}
                   type="button"

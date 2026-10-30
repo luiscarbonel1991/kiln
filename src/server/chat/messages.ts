@@ -15,7 +15,7 @@ export type ChatRole = z.infer<typeof ChatRole>;
 // cost, and why it ended early.
 export const ChatMetadata = z.object({
   role: ChatRole.optional(),
-  specialist: z.enum(["kiln", "etsy", "scenes"]).optional(),
+  specialist: z.enum(["kiln", "etsy", "scenes", "svg"]).optional(),
   models: z.array(z.string()).optional(),
   moves: z
     .array(z.object({ from: z.string(), to: z.string(), reason: z.string() }))

@@ -103,6 +103,16 @@ async function batchEstimate(
 // Dynamic per request (no static params); a project of another maker or an
 // unknown id is a 404. `?chat=1` opens the project's chat beside the board
 // (full screen on a phone).
+// What a design's page says of its drawings (the studio's image cards).
+function designLine(
+  cards: { type: string; outputs: string[]; vectorUrl?: string }[],
+): string {
+  const drawings = cards.filter((c) => c.type === "image");
+  const drawn = drawings.filter((c) => c.outputs[0]);
+  const traced = drawn.filter((c) => c.vectorUrl).length;
+  return `A design: ${drawn.length} of ${drawings.length} drawings drawn, ${traced} traced. They live in the studio, and the chat's SVG specialist works on them too.`;
+}
+
 export default async function ProjectBoardPage({
   params,
   searchParams,
@@ -179,7 +189,9 @@ export default async function ProjectBoardPage({
           {board.name}
         </h1>
         <p className="font-sans text-sm text-on-surface-mid">
-          This project was made in the studio; it has no plan to show.
+          {board.type === "design"
+            ? designLine(board.cards)
+            : "This project was made in the studio; it has no plan to show."}
         </p>
         <Link
           href={`/projects/${board.id}/editor`}
@@ -187,6 +199,14 @@ export default async function ProjectBoardPage({
         >
           Open it in the editor
         </Link>
+        {board.type === "design" && !chatOpen ? (
+          <Link
+            href={`/projects/${board.id}?chat=1`}
+            className="font-sans text-sm font-semibold text-primary"
+          >
+            Ask the SVG specialist
+          </Link>
+        ) : null}
       </main>
     );
   return (

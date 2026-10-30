@@ -18,6 +18,7 @@ export const LEFT_OUT = new Set(["import_products", "save_read"]);
 
 export const NEEDS_CLICK = [
   "generate",
+  "draw",
   "write_listing",
   "review_product",
   "approve_frame",
@@ -80,7 +81,7 @@ function asStored({ data, images }: ToolOutput): StoredOutput {
 // nothing; the chat shows it as a button that switches the chip.
 export const suggestSpecialist = tool({
   description:
-    "Suggest the specialist that does this task best: the maker sees a button that switches to it. It runs nothing. etsy: a listing's text, tags, the market brief and the shop's numbers. scenes: tuning a project's scenes and their takes.",
+    "Suggest the specialist that does this task best: the maker sees a button that switches to it. It runs nothing. etsy: a listing's text, tags, the market brief and the shop's numbers. scenes: tuning a project's scenes and their takes. svg: a design's line art and its vectors.",
   inputSchema: z.object({
     specialist: SpecialistId.exclude(["kiln"]),
     why: z.string().trim().min(1).max(200).describe("In a few words."),

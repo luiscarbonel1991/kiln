@@ -1,7 +1,11 @@
 import { getChat, listChatSessions } from "@/server/chat/chat-repository";
 import type { KilnMessage } from "@/server/chat/messages";
 import { MAX_STEPS } from "@/server/chat/run-turn";
-import { SPECIALIST_CHOICES } from "@/server/chat/specialists";
+import {
+  SPECIALIST_CHOICES,
+  type SpecialistId,
+} from "@/server/chat/specialists";
+import { isDesign } from "@/server/designs";
 import { textRoute } from "@/server/text-calls";
 import { TOOLS } from "@/server/tools";
 
@@ -23,6 +27,9 @@ export interface ChatPanelData {
   estimates: { fast: ChatEstimate; deep: ChatEstimate };
   toolTitles: Record<string, string>;
   specialists: typeof SPECIALIST_CHOICES;
+  // The mode a new conversation starts in: SVG on a design.
+  firstSpecialist: SpecialistId;
+  design: boolean;
 }
 
 async function estimate(kind: "chatTurn" | "chatPlan"): Promise<ChatEstimate> {
@@ -45,6 +52,7 @@ export async function chatPanelData(target: {
         null)
       : null);
   const chat = sessionId ? await getChat(sessionId) : null;
+  const design = target.projectId ? await isDesign(target.projectId) : false;
   return {
     sessionId: chat?.id ?? null,
     messages: chat?.messages ?? [],
@@ -55,5 +63,7 @@ export async function chatPanelData(target: {
     },
     toolTitles: Object.fromEntries(TOOLS.map((t) => [t.name, t.title])),
     specialists: SPECIALIST_CHOICES,
+    firstSpecialist: design ? "svg" : "kiln",
+    design,
   };
 }
