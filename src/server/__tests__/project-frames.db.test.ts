@@ -63,7 +63,9 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
 
     // Nothing generated yet: every scene with a card waits for a batch, and
     // the hero takes no approval.
-    const waiting = await waitingProjectFrames(id);
+    const state = await waitingProjectFrames(id);
+    expect(state?.reference).toBe(true);
+    const waiting = state?.waiting;
     expect(waiting).toContain("etsy.hero");
     expect(
       waiting?.every((frame) =>

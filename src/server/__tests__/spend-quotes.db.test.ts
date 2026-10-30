@@ -135,7 +135,29 @@ describe.skipIf(!enabled)(
         tokenName: "Agent",
         tool: "spend_test",
         quotedMaxMicros: 350_000,
+        count: 1,
       });
+    });
+
+    it("folds the same call back to back into one row with its count", async () => {
+      const tool = defineTool({
+        name: "poll_test",
+        title: "Poll test",
+        description: "Answers the same thing each time.",
+        input: z.object({}),
+        hints: { readOnly: true },
+        run: async () => ({ data: {} }),
+      });
+      const ctx = {
+        tokenId: "tok-quotes",
+        tokenName: "Poller",
+        canSpend: false,
+      };
+      for (let i = 0; i < 3; i++) {
+        await calls.callAndRecord([tool], "poll_test", {}, ctx);
+      }
+      const [latest] = await calls.recentToolCalls();
+      expect(latest).toMatchObject({ tool: "poll_test", count: 3 });
     });
   },
 );

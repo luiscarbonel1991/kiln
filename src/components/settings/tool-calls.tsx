@@ -15,7 +15,8 @@ const money = (micros: number) =>
 
 // Settings → Access tokens: the latest tool calls agents made with the
 // maker's tokens (MCP, `kiln call`), newest first, each with how it ended and,
-// for a paid one, what its quote said at most.
+// for a paid one, what its quote said at most; a call repeated back to back
+// is one row with its count.
 export function ToolCalls({ calls }: { calls: ToolCallView[] }) {
   if (calls.length === 0) {
     return (
@@ -41,6 +42,12 @@ export function ToolCalls({ calls }: { calls: ToolCallView[] }) {
           </span>
           <span className="font-mono text-[0.75rem] font-semibold text-foreground">
             {c.tool}
+            {c.count > 1 ? (
+              <span className="font-normal text-on-surface-mid">
+                {" "}
+                ×{c.count}
+              </span>
+            ) : null}
           </span>
           <span className="font-sans text-[0.75rem] text-on-surface-mid">
             {c.tokenName}

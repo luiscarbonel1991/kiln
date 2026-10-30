@@ -45,12 +45,12 @@ const ReviewQuote = z.object({ product: z.string() });
 const ESTIMATE_ROSE = "The estimate rose since the quote: quote again.";
 
 function requestModel(request: GenerationRequest): string {
-  const quality =
-    request.model.quality ??
-    (request.kind === "image" && request.model.provider === "openai"
-      ? "medium"
-      : null);
-  return [modelLabel(request.model), quality].filter(Boolean).join(" ");
+  const detail =
+    request.kind === "video"
+      ? (request.model.resolution ?? null)
+      : (request.model.quality ??
+        (request.model.provider === "openai" ? "medium" : null));
+  return [modelLabel(request.model), detail].filter(Boolean).join(" ");
 }
 
 // A refusal of the queue's in an agent's words; anything else it threw while
@@ -75,11 +75,16 @@ async function priceGenerate(
   project: string,
   frames?: string[],
 ): Promise<Priced> {
-  const waiting = await waitingProjectFrames(project);
-  if (!waiting) {
+  const state = await waitingProjectFrames(project);
+  if (!state) {
     throw new ToolRefusal("No project of yours with frames has that id.");
   }
-  const asked = frames ?? waiting;
+  if (!state.reference) {
+    throw new ToolRefusal(
+      "This project has no reference image yet, and its scenes are made from one: the maker adds the product's photo on the board (Kiln could not draw one from the product for free).",
+    );
+  }
+  const asked = frames ?? state.waiting;
   if (asked.length === 0) {
     throw new ToolRefusal(
       "Nothing waits to be generated: every scene has a take, is in the queue, or waits for the scene it re-frames. Name frames to take again.",

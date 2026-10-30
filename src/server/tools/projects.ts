@@ -5,7 +5,7 @@ import { ProjectType } from "@/domain/project";
 import { CATALOG } from "@/lib/recipes";
 import { deliverDestination } from "@/server/deliver/deliver-destination";
 import { getProduct } from "@/server/product-repository";
-import { projectFrames } from "@/server/project-frames";
+import { projectFrames, waitingProjectFrames } from "@/server/project-frames";
 import { startingPlan, startProject } from "@/server/start-project";
 import { defineTool, ToolRefusal } from "@/server/tools/registry";
 
@@ -99,12 +99,16 @@ export const createProjectTool = defineTool({
     });
     if ("error" in started) throw new ToolRefusal(started.error);
     const frames = await projectFrames(started.id);
+    const state = await waitingProjectFrames(started.id);
     return {
       data: {
         project: started.id,
         name: frames?.project.name ?? null,
+        reference: state?.reference ?? false,
         frames: frames?.frames ?? [],
-        next: "quote generate for this project to take its scenes.",
+        next: state?.reference
+          ? "quote generate for this project to take its scenes."
+          : "Kiln could not draw a reference from the product for free: the maker adds the product's photo on the board, then quote generate.",
       },
     };
   },

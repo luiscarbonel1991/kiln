@@ -38,7 +38,7 @@ vi.mock("@/server/project-frames", () => ({
     project: { id, name: "Kit", type: "listing-kit", phase: "plan" },
     frames: [],
   }),
-  waitingProjectFrames: async () => [],
+  waitingProjectFrames: async () => ({ waiting: [], reference: false }),
 }));
 vi.mock("@/server/deliver/deliver-destination", () => ({
   deliverDestination: async (project: string) =>
@@ -100,7 +100,13 @@ describe("create_project", () => {
     });
     expect(answer).toMatchObject({
       ok: true,
-      output: { data: { project: "p9" } },
+      output: {
+        data: {
+          project: "p9",
+          reference: false,
+          next: expect.stringContaining("adds the product's photo"),
+        },
+      },
     });
     expect(s.started).toHaveLength(1);
   });

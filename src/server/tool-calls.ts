@@ -71,16 +71,22 @@ export interface ToolCallView {
   error: string | null;
   // What the quote it ran on or made said at most, in micros.
   quotedMaxMicros: number | null;
+  // The same call, back to back (an agent polling get_frames): one row.
+  count: number;
 }
 
-// The current maker's latest tool calls, newest first.
+// How far back the latest calls are read before runs are folded.
+const READ_BACK = 300;
+
+// The current maker's latest tool calls, newest first, a run of the same call
+// (tool, token, outcome) folded into one row with its count.
 export async function recentToolCalls(take = 20): Promise<ToolCallView[]> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
   const rows = await db.toolCall.findMany({
     where: { makerId: maker.id },
     orderBy: { at: "desc" },
-    take,
+    take: READ_BACK,
     select: {
       id: true,
       at: true,
@@ -91,7 +97,25 @@ export async function recentToolCalls(take = 20): Promise<ToolCallView[]> {
       quoteId: true,
     },
   });
-  const ids = rows.flatMap((r) => (r.quoteId ? [r.quoteId] : []));
+  const folded: ((typeof rows)[number] & { count: number })[] = [];
+  for (const row of rows) {
+    const last = folded.at(-1);
+    if (
+      last &&
+      !row.quoteId &&
+      !last.quoteId &&
+      last.tool === row.tool &&
+      last.tokenName === row.tokenName &&
+      last.ok === row.ok &&
+      last.error === row.error
+    ) {
+      last.count += 1;
+      continue;
+    }
+    if (folded.length === take) break;
+    folded.push({ ...row, count: 1 });
+  }
+  const ids = folded.flatMap((r) => (r.quoteId ? [r.quoteId] : []));
   const quotes = ids.length
     ? await db.spendQuote.findMany({
         where: { id: { in: ids }, makerId: maker.id },
@@ -99,7 +123,7 @@ export async function recentToolCalls(take = 20): Promise<ToolCallView[]> {
       })
     : [];
   const max = new Map(quotes.map((q) => [q.id, q.maxMicros]));
-  return rows.map(({ quoteId, at, ...r }) => ({
+  return folded.map(({ quoteId, at, ...r }) => ({
     ...r,
     at: at.toISOString(),
     quotedMaxMicros: quoteId ? (max.get(quoteId) ?? null) : null,

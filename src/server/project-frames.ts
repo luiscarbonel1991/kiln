@@ -28,7 +28,14 @@ async function loadFrames(projectId: string) {
   const maker = await getCurrentMaker();
   const project = await db.project.findFirst({
     where: { id: projectId, makerId: maker.id },
-    select: { id: true, name: true, type: true, phase: true, plan: true },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      phase: true,
+      plan: true,
+      master: { select: { assetUrl: true } },
+    },
   });
   const plan = project ? ProjectPlan.safeParse(project.plan) : null;
   if (!project || !plan?.success) return null;
@@ -38,8 +45,14 @@ async function loadFrames(projectId: string) {
     const parsed = CardState.safeParse(card);
     if (parsed.success) cards[id] = parsed.data;
   }
-  const { plan: _plan, ...summary } = project;
-  return { project: summary, plan: plan.data, cards, jobs: state.jobs };
+  const { plan: _plan, master, ...summary } = project;
+  return {
+    project: summary,
+    plan: plan.data,
+    cards,
+    jobs: state.jobs,
+    reference: master !== null,
+  };
 }
 
 export async function projectFrames(
@@ -52,13 +65,17 @@ export async function projectFrames(
 }
 
 // The scene frames a batch would generate now, as the board's Generate picks
-// them; null as projectFrames.
+// them, and whether the project has its reference image (no scene has a card
+// to generate from without it); null as projectFrames.
 export async function waitingProjectFrames(
   projectId: string,
-): Promise<string[] | null> {
+): Promise<{ waiting: string[]; reference: boolean } | null> {
   const loaded = await loadFrames(projectId);
   if (!loaded) return null;
-  return waitingFrames(frameSlots(loaded.plan, loaded.cards, loaded.jobs));
+  return {
+    waiting: waitingFrames(frameSlots(loaded.plan, loaded.cards, loaded.jobs)),
+    reference: loaded.reference,
+  };
 }
 
 // The current maker's projects that have frames (started from New project),

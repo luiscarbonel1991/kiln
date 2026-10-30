@@ -11,7 +11,7 @@ const s = vi.hoisted(() => ({
   >(),
   enqueued: [] as unknown[],
   textMax: 0.004,
-  waiting: ["etsy.hero", "etsy.lifestyle"] as string[] | null,
+  waiting: ["etsy.hero", "etsy.lifestyle"] as string[],
   wrote: [] as unknown[],
   reviewed: [] as unknown[],
   enqueueError: null as Error | null,
@@ -61,7 +61,12 @@ vi.mock("@/server/generation-repository", () => {
 vi.mock("@/server/project-frames", () => ({
   framedProjects: async () => [],
   projectFrames: async () => null,
-  waitingProjectFrames: async (id: string) => (id === "p1" ? s.waiting : null),
+  waitingProjectFrames: async (id: string) =>
+    id === "p1"
+      ? { waiting: s.waiting, reference: true }
+      : id === "bare"
+        ? { waiting: [], reference: false }
+        : null,
 }));
 const request = (provider: string, model: string) => ({
   kind: "image",
@@ -71,7 +76,17 @@ vi.mock("@/server/generation-queue", () => ({
   estimateProjectCards: async (_project: string, ids: string[]) => ({
     cards: ids.map((cardId) => ({
       cardId,
-      request: request("openai", "gpt-image-2"),
+      request: cardId.endsWith(".video")
+        ? {
+            kind: "video",
+            model: {
+              provider: "google",
+              model: "veo-3.1-fast-generate-preview",
+              quality: "medium",
+              resolution: "720p",
+            },
+          }
+        : request("openai", "gpt-image-2"),
       typicalMicros: 53_000,
       maxMicros: 70_000,
       next: [{ provider: "google", model: "gemini-3.1-flash-image" }],
@@ -155,6 +170,18 @@ describe("quote", () => {
     });
   });
 
+  it("names a video line by its resolution", async () => {
+    const answer = await call("quote", {
+      action: "generate",
+      project: "p1",
+      frames: ["etsy.video"],
+    });
+    expect(answer).toMatchObject({
+      ok: true,
+      output: { data: { lines: [{ model: "Veo 3.1 Fast 720p" }] } },
+    });
+  });
+
   it("refuses what it cannot price, in words", async () => {
     s.waiting = [];
     expect(
@@ -162,6 +189,12 @@ describe("quote", () => {
     ).toMatchObject({
       ok: false,
       error: expect.stringContaining("Nothing waits to be generated"),
+    });
+    expect(
+      await call("quote", { action: "generate", project: "bare" }),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("no reference image yet"),
     });
     expect(await call("quote", { action: "generate" })).toEqual({
       ok: false,
