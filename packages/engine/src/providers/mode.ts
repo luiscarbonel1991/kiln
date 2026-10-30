@@ -7,6 +7,12 @@ export function providerMode(): "live" | "mock" {
   return env.KILN_PROVIDERS;
 }
 
+// The chat's mode: KILN_CHAT_PROVIDERS when set (the agent's evaluation runs
+// a live text model on a mock run), else the process's.
+export function chatMode(): "live" | "mock" {
+  return env.KILN_CHAT_PROVIDERS ?? env.KILN_PROVIDERS;
+}
+
 export async function mockDelay(): Promise<void> {
   if (env.KILN_MOCK_DELAY_MS > 0) {
     await new Promise((resolve) => setTimeout(resolve, env.KILN_MOCK_DELAY_MS));

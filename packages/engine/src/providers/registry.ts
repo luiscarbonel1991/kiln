@@ -14,7 +14,7 @@ import type {
   VisionProvider,
 } from "@/providers/interfaces";
 import { mockChatModels } from "@/providers/mock/chat-model";
-import { providerMode } from "@/providers/mode";
+import { chatMode } from "@/providers/mode";
 import { openaiArtDirector } from "@/providers/openai/art-director";
 import { openaiChatModels } from "@/providers/openai/chat-model";
 import { openaiImageProvider } from "@/providers/openai/image";
@@ -76,14 +76,14 @@ export function getArtDirector(id: ProviderId): ArtDirector {
 }
 
 // The chat's models: the provider's own in a live run, the free rules in a
-// mock run.
+// mock run (chatMode).
 const CHAT_MODELS: Record<ProviderId, ChatModels> = {
   google: googleChatModels,
   openai: openaiChatModels,
 };
 
 export function getChatModels(id: ProviderId): ChatModels {
-  return providerMode() === "mock" ? mockChatModels(id) : CHAT_MODELS[id];
+  return chatMode() === "mock" ? mockChatModels(id) : CHAT_MODELS[id];
 }
 
 export { getStorageProvider } from "@/providers/storage";

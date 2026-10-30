@@ -28,6 +28,12 @@ const EnvSchema = z.object({
     blankAsUnset,
     z.enum(["openai", "google"]).optional(),
   ),
+  // The chat's own mode, over KILN_PROVIDERS: `pnpm eval:chat` runs the real
+  // text model on a mock run (mock images, the mock database).
+  KILN_CHAT_PROVIDERS: z.preprocess(
+    blankAsUnset,
+    z.enum(["live", "mock"]).optional(),
+  ),
 
   // Origins (besides Kiln's own storage and data: images) the server may fetch
   // asset bytes from, comma-separated — e.g. a maker's CDN that a product
