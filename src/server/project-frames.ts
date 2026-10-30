@@ -1,5 +1,10 @@
 import { Card } from "@/domain/card";
-import { type FrameView, frameViews } from "@/domain/frame-view";
+import {
+  type FrameView,
+  frameSlots,
+  frameViews,
+  waitingFrames,
+} from "@/domain/frame-view";
 import { type CardLike, ProjectPlan } from "@/domain/plan";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { projectGenerationState } from "@/server/generation-repository";
@@ -15,11 +20,10 @@ export interface ProjectFrames {
 
 const CardState = Card.pick({ status: true, outputs: true });
 
-// Null for a project the current maker does not have, or one with no plan
-// (a studio project: it has no frames).
-export async function projectFrames(
-  projectId: string,
-): Promise<ProjectFrames | null> {
+// A project's plan, cards and jobs, as its frames are read from them. Null
+// for a project the current maker does not have, or one with no plan (a
+// studio project: it has no frames).
+async function loadFrames(projectId: string) {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
   const project = await db.project.findFirst({
@@ -35,7 +39,26 @@ export async function projectFrames(
     if (parsed.success) cards[id] = parsed.data;
   }
   const { plan: _plan, ...summary } = project;
-  return { project: summary, frames: frameViews(plan.data, cards, state.jobs) };
+  return { project: summary, plan: plan.data, cards, jobs: state.jobs };
+}
+
+export async function projectFrames(
+  projectId: string,
+): Promise<ProjectFrames | null> {
+  const loaded = await loadFrames(projectId);
+  if (!loaded) return null;
+  const { project, plan, cards, jobs } = loaded;
+  return { project, frames: frameViews(plan, cards, jobs) };
+}
+
+// The scene frames a batch would generate now, as the board's Generate picks
+// them; null as projectFrames.
+export async function waitingProjectFrames(
+  projectId: string,
+): Promise<string[] | null> {
+  const loaded = await loadFrames(projectId);
+  if (!loaded) return null;
+  return waitingFrames(frameSlots(loaded.plan, loaded.cards, loaded.jobs));
 }
 
 // The current maker's projects that have frames (started from New project),

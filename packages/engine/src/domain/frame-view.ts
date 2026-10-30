@@ -1,8 +1,10 @@
 import {
   type CardLike,
   type JobLike,
+  type PlanSlot,
   type ProjectPlan,
   type SlotState,
+  type SlotView,
   slotCardId,
   slotState,
 } from "@/domain/plan";
@@ -77,4 +79,46 @@ export function frameViews(
       };
     }),
   );
+}
+
+// A slot with its card and state, as the board and the frames read it.
+export interface FrameSlot {
+  cardId: string;
+  slot: PlanSlot;
+  card?: CardLike;
+  view: SlotView;
+}
+
+export function frameSlots(
+  plan: ProjectPlan,
+  cards: Record<string, CardLike>,
+  jobs: Record<string, JobLike>,
+): FrameSlot[] {
+  return plan.destinations.flatMap((d) =>
+    d.slots.map((slot) => {
+      const cardId = slotCardId(d.destinationId, slot.key);
+      const card = cards[cardId];
+      return { cardId, slot, card, view: slotState(slot, card, jobs[cardId]) };
+    }),
+  );
+}
+
+// The scene frames a batch would generate (the board's Generate, the quote of
+// an agent's): a card exists, nothing is queued or running for it, and it has
+// no take yet (a failed one counts). A video is generated from its own slot,
+// never in the scene batch; a version waits until the scene it re-frames is
+// approved.
+export function waitingFrames(slots: readonly FrameSlot[]): string[] {
+  const byId = new Map(slots.map((s) => [s.cardId, s.slot]));
+  return slots
+    .filter(
+      (s) =>
+        s.slot.fill === "scene" &&
+        s.card &&
+        s.view.state === "queued" &&
+        !s.view.inBatch &&
+        (!s.slot.versionOf ||
+          Boolean(byId.get(s.slot.versionOf)?.approvedOutput)),
+    )
+    .map((s) => s.cardId);
 }

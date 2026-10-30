@@ -48,6 +48,7 @@ import {
   renderTextTemplate,
   textLayerColours,
 } from "@/domain/exact";
+import { waitingFrames } from "@/domain/frame-view";
 import { fromMicros } from "@/domain/generation-cost";
 import { checkListing, listingDraft } from "@/domain/listing";
 import { etsyListingId } from "@/domain/live-listing";
@@ -129,24 +130,9 @@ export function boardRows(
   }));
 }
 
-// The scene slots a batch would generate: a card exists, nothing is queued or
-// running for it, and it has no output yet (a failed one counts). A video is
-// generated from its own slot, never in the scene batch.
+// The scene slots a batch would generate (waitingFrames).
 export function waitingCardIds(rows: ReturnType<typeof boardRows>): string[] {
-  const all = rows.flatMap((r) => r.slots);
-  const byId = new Map(all.map((s) => [s.cardId, s.slot]));
-  return all
-    .filter(
-      (s) =>
-        s.slot.fill === "scene" &&
-        s.card &&
-        s.view.state === "queued" &&
-        !s.view.inBatch &&
-        // A version waits until the scene it re-frames is approved.
-        (!s.slot.versionOf ||
-          Boolean(byId.get(s.slot.versionOf)?.approvedOutput)),
-    )
-    .map((s) => s.cardId);
+  return waitingFrames(rows.flatMap((r) => r.slots));
 }
 
 // Cents, or a tenth of a cent for less than one (a text call is $0.004, not

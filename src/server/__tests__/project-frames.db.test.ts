@@ -9,7 +9,7 @@ const enabled =
 describe.skipIf(!enabled)("project frames (database)", async () => {
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
-  const { framedProjects, projectFrames } = await import(
+  const { framedProjects, projectFrames, waitingProjectFrames } = await import(
     "@/server/project-frames"
   );
   const { upsertProducts } = await import("@/server/product-repository");
@@ -61,7 +61,20 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
     created.push(id);
     const hero = { destinationId: "etsy", slotKey: "hero" };
 
-    // Nothing generated yet: the hero takes no approval.
+    // Nothing generated yet: every scene with a card waits for a batch, and
+    // the hero takes no approval.
+    const waiting = await waitingProjectFrames(id);
+    expect(waiting).toContain("etsy.hero");
+    expect(
+      waiting?.every((frame) =>
+        plan.destinations.some((d) =>
+          d.slots.some(
+            (s) =>
+              `${d.destinationId}.${s.key}` === frame && s.fill === "scene",
+          ),
+        ),
+      ),
+    ).toBe(true);
     let frames = await projectFrames(id);
     expect(frames?.project).toMatchObject({ id, type: "listing-kit" });
     expect(frames?.frames.find((f) => f.frame === "etsy.hero")).toMatchObject({
@@ -114,5 +127,6 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
     ).rejects.toMatchObject({ kind: "missing" });
     expect((await framedProjects()).map((p) => p.id)).toContain(id);
     expect(await projectFrames("no-such-project")).toBeNull();
+    expect(await waitingProjectFrames("no-such-project")).toBeNull();
   });
 });

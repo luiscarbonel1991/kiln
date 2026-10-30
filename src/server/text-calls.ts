@@ -383,19 +383,38 @@ export async function reviewProduct(
   }
 }
 
-// The most a text call of this kind can cost along its route: one charged
-// call at most, so the dearest model's (the price shown before asking).
+// What a text call of this kind would run on and cost, before asking: its
+// route's models that may run (the first always), what the first costs, and
+// the most it can cost, one charged call at most, so the dearest model's.
+// Null prices when a model has none pinned.
+export async function textRoute(kind: TextCallKind): Promise<{
+  labels: string[];
+  typical: number | null;
+  max: number | null;
+}> {
+  const candidates = (await textCandidates(kind)).filter(
+    (c, i) => i === 0 || runnable(kind)(c),
+  );
+  let worst: number | null = null;
+  for (const entry of candidates) {
+    const usd = textEstimate(entry, TEXT_CALL_BUDGETS[kind]);
+    if (usd === null) {
+      worst = null;
+      break;
+    }
+    worst = Math.max(worst ?? 0, usd);
+  }
+  return {
+    labels: candidates.map(modelLabel),
+    typical: textEstimate(candidates[0], TEXT_CALL_BUDGETS[kind]),
+    max: worst,
+  };
+}
+
+// The most a text call of this kind can cost along its route (the price
+// shown before asking).
 export async function textWorstCase(
   kind: TextCallKind,
 ): Promise<number | null> {
-  const candidates = await textCandidates(kind);
-  let worst: number | null = null;
-  for (const entry of candidates.filter(
-    (c, i) => i === 0 || runnable(kind)(c),
-  )) {
-    const usd = textEstimate(entry, TEXT_CALL_BUDGETS[kind]);
-    if (usd === null) return null;
-    worst = Math.max(worst ?? 0, usd);
-  }
-  return worst;
+  return (await textRoute(kind)).max;
 }

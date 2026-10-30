@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { frameViews } from "@/domain/frame-view";
+import { frameSlots, frameViews, waitingFrames } from "@/domain/frame-view";
 import { approveSlot, planProject } from "@/domain/plan";
 import { SEED_DESTINATIONS, SEED_SHOT_LISTS } from "@/domain/seed";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
@@ -93,5 +93,37 @@ describe("frameViews", () => {
     expect(frames.find((f) => f.frame === "etsy.size")).not.toHaveProperty(
       "ranOn",
     );
+  });
+});
+
+describe("waitingFrames", () => {
+  it("is the scenes with a card and no take, nothing queued for them", () => {
+    const plan = launch();
+    const scenes = plan.destinations.flatMap((d) =>
+      d.slots
+        .filter((s) => s.fill === "scene" && !s.versionOf)
+        .map((s) => `${d.destinationId}.${s.key}`),
+    );
+    const draft = { status: "draft" as const, outputs: [] };
+    const cards = Object.fromEntries(scenes.map((id) => [id, draft]));
+    const [first, second, third] = scenes;
+    const waiting = waitingFrames(
+      frameSlots(
+        plan,
+        {
+          ...cards,
+          [first]: take("https://x/a.png"),
+          [third]: { status: "error" as const, outputs: [] },
+        },
+        { [second]: { status: "queued", attempt: 0 } },
+      ),
+    );
+    // A take waits for a decision, not a batch; a failed one counts.
+    expect(waiting).not.toContain(first);
+    expect(waiting).not.toContain(second);
+    expect(waiting).toContain(third);
+    expect(waiting.every((id) => scenes.includes(id))).toBe(true);
+    // No card yet (not drafted): nothing to generate from.
+    expect(waitingFrames(frameSlots(plan, {}, {}))).toEqual([]);
   });
 });

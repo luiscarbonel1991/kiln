@@ -7,7 +7,7 @@ import {
   ACCEPTED_IMAGE_MIME,
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
-import { ListingText, listingDraft, withCopy } from "@/domain/listing";
+import { ListingText } from "@/domain/listing";
 import {
   ImageQuality,
   ProviderId,
@@ -30,6 +30,7 @@ import { refreshCards } from "@/lib/project-refresh";
 import { slotCards, videoSlotCard } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { getStorageProvider } from "@/providers/registry";
+import { writeProjectListing } from "@/server/listing-write";
 import { getMakerModels, rememberHeroSetting } from "@/server/maker-repository";
 import {
   productReference,
@@ -48,7 +49,7 @@ import {
   setVideoChoice,
 } from "@/server/project-repository";
 import { retuneSlot } from "@/server/slot-tuning";
-import { type Degraded, writeListing } from "@/server/text-calls";
+import type { Degraded } from "@/server/text-calls";
 
 // Board mutations. Server Functions are POST-reachable: Zod is the trust
 // boundary, and every write is scoped to the current maker by the repository.
@@ -288,33 +289,10 @@ export async function writeListingAction(
 ): Promise<{ degraded?: Degraded; ranOn?: RanOn; error?: string }> {
   const parsed = ListingWrite.safeParse(input);
   if (!parsed.success) return { error: "Nothing to write for." };
-  const { projectId, destinationId } = parsed.data;
-  const loaded = await loadProjectBoard(projectId);
-  const plan = loaded?.board.plan?.destinations.find(
-    (d) => d.destinationId === destinationId,
-  );
-  const destination = CATALOG.destinations.find((d) => d.id === destinationId);
-  if (!loaded?.product || !plan || !destination?.text) {
-    return { error: "This destination has no listing text." };
-  }
-  const current =
-    plan.listing ?? listingDraft(loaded.product, destination.text);
-  const result = await writeListing(
-    {
-      channel: destination.name,
-      product: loaded.product,
-      rules: destination.text,
-      draft: current,
-    },
-    parsed.data.model,
-    projectId,
-  );
-  if (!result.copy) return { degraded: result.degraded };
-  try {
-    await setListing(projectId, destinationId, withCopy(current, result.copy));
-  } catch (error) {
-    return { error: (error as Error).message };
-  }
+  const { projectId, destinationId, model } = parsed.data;
+  const result = await writeProjectListing(projectId, destinationId, model);
+  if ("error" in result) return { error: result.error };
+  if ("degraded" in result) return { degraded: result.degraded };
   refresh();
   return result.ranOn ? { ranOn: result.ranOn } : {};
 }

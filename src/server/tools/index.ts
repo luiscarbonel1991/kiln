@@ -6,6 +6,12 @@ import {
   unapproveFrame,
   viewFrame,
 } from "@/server/tools/board";
+import {
+  generate,
+  quote,
+  reviewProductTool,
+  writeListingTool,
+} from "@/server/tools/paid";
 import { listProductsTool } from "@/server/tools/products";
 import type { Tool } from "@/server/tools/registry";
 
@@ -18,4 +24,8 @@ export const TOOLS: readonly Tool[] = [
   approveFrame,
   unapproveFrame,
   rejectFrame,
+  quote,
+  generate,
+  writeListingTool,
+  reviewProductTool,
 ];
