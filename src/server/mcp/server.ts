@@ -19,7 +19,8 @@ import {
 const INSTRUCTIONS = `Kiln prepares a maker's products for sale: each project is a board of frames (photos, video, exact renders) for its destinations.
 Import products with import_products; see a project's frames before starting it with plan_project, then create_project (free).
 Read with list_products, list_projects and get_frames; look at a take with view_frame before deciding on it, then approve_frame or reject_frame with a reason, naming the take you looked at.
-Paid work takes two calls: quote prices it (free) and answers an id; generate, write_listing or review_product take only that id and run what was quoted, once, within the month's cap, and only for a token the maker lets spend. Tell the person what a quote costs before running it.
+Designs (an image drawn as line art, then traced into SVG): list_designs and get_design read them, view_design shows a drawing or its vector, vectorize traces one (free); a vector becomes a product in the maker's product form.
+Paid work takes two calls: quote prices it (free) and answers an id; generate, draw, write_listing or review_product take only that id and run what was quoted, once, within the month's cap, and only for a token the maker lets spend. Tell the person what a quote costs before running it.
 Selling: save_brief keeps a destination's market brief; list_results and save_read follow a delivered listing's numbers; best_sellers, watched_shops, find_shops and shop_favourites read Etsy's API (never a page).
 Exact frames are drawn from the product at delivery and cost nothing. deliver exports a destination's approved frames as a zip; publishing is the maker's: no tool publishes.`;
 
