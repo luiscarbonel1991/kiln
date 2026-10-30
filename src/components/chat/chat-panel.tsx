@@ -333,6 +333,7 @@ function Conversation({
                   </span>
                   <button
                     type="button"
+                    data-testid="chat-error-dismiss"
                     className="font-sans text-[0.72rem] font-semibold text-on-surface-mid hover:text-foreground"
                     onClick={clearError}
                   >
@@ -342,7 +343,7 @@ function Conversation({
               ) : null}
             </MessageScrollerContent>
           </MessageScrollerViewport>
-          <MessageScrollerButton />
+          <MessageScrollerButton data-testid="chat-scroll-end" />
         </MessageScroller>
       </MessageScrollerProvider>
       <Composer

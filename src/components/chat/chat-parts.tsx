@@ -219,7 +219,10 @@ function ToolLine({
       className="flex flex-col gap-1.5"
       data-testid={`chat-tool-${name}`}
     >
-      <CollapsibleTrigger className="group flex items-center gap-1.5 self-start rounded-pill bg-secondary px-2.5 py-1 font-sans text-[0.72rem] font-semibold text-on-surface-mid transition-colors hover:text-foreground">
+      <CollapsibleTrigger
+        data-testid={`chat-tool-open-${name}`}
+        className="group flex items-center gap-1.5 self-start rounded-pill bg-secondary px-2.5 py-1 font-sans text-[0.72rem] font-semibold text-on-surface-mid transition-colors hover:text-foreground"
+      >
         {icon}
         {title}
         {status ? (
