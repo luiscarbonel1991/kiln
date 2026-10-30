@@ -51,7 +51,9 @@ function grade(task: Task, reply: KilnMessage | undefined): string[] {
       failures.push(`ran ${name}`);
     }
   }
-  if (task.language === "es" && !SPANISH.test(text)) {
+  // A reply that only waits for the maker's click (its card says the cost)
+  // has no text to be in the wrong language.
+  if (task.language === "es" && text.trim() && !SPANISH.test(text)) {
     failures.push("did not answer in Spanish");
   }
   if (
@@ -140,12 +142,12 @@ describe("the chat agent's fixed tasks", async () => {
     const passed = results.filter((r) => r.failures.length === 0).length;
     const spent = results.reduce((t, r) => t + r.costMicros, 0) / 1_000_000;
     for (const r of results) {
-      console.log(
-        `[eval] ${r.failures.length ? "FAIL" : "pass"} ${r.id}${r.failures.length ? `: ${r.failures.join("; ")}` : ""}`,
+      process.stdout.write(
+        `[eval] ${r.failures.length ? "FAIL" : "pass"} ${r.id}${r.failures.length ? `: ${r.failures.join("; ")}` : ""}\n`,
       );
     }
-    console.log(
-      `[eval] ${passed} of ${results.length} passed, $${spent.toFixed(4)} of text.`,
+    process.stdout.write(
+      `[eval] ${passed} of ${results.length} passed, $${spent.toFixed(4)} of text.\n`,
     );
   });
 
