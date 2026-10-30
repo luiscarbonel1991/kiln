@@ -12,12 +12,20 @@ import {
   reviewProductTool,
   writeListingTool,
 } from "@/server/tools/paid";
-import { listProductsTool } from "@/server/tools/products";
+import { importProductsTool, listProductsTool } from "@/server/tools/products";
+import {
+  createProjectTool,
+  deliverTool,
+  planProjectTool,
+} from "@/server/tools/projects";
 import type { Tool } from "@/server/tools/registry";
 
 // Every tool Kiln serves, in the order a client lists them.
 export const TOOLS: readonly Tool[] = [
   listProductsTool,
+  importProductsTool,
+  planProjectTool,
+  createProjectTool,
   listProjects,
   getFrames,
   viewFrame,
@@ -28,4 +36,5 @@ export const TOOLS: readonly Tool[] = [
   generate,
   writeListingTool,
   reviewProductTool,
+  deliverTool,
 ];

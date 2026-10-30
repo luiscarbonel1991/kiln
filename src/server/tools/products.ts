@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { importPackage, importSummary } from "@/server/product-import";
 import { listProducts } from "@/server/product-repository";
-import { defineTool } from "@/server/tools/registry";
+import { defineTool, ToolRefusal } from "@/server/tools/registry";
 
 // The maker's products as tools.
 
@@ -29,4 +30,22 @@ export const listProductsTool = defineTool({
       })),
     },
   }),
+});
+
+export const importProductsTool = defineTool({
+  name: "import_products",
+  title: "Import products",
+  description:
+    "Import a product package (JSON; `kiln schema` prints its JSON Schema), as New project's Import a catalog does: each product created or updated by its sku. Answers what was imported, updated, unchanged and set aside, with the reason for each set aside. Images inline (data:) are stored; other addresses must be in Kiln's allowlist.",
+  input: z.object({
+    package: z
+      .record(z.string(), z.unknown())
+      .describe("The product package itself: { version, products: [...] }."),
+  }),
+  hints: { idempotent: true },
+  run: async ({ package: pkg }) => {
+    const result = await importPackage(pkg);
+    if ("error" in result) throw new ToolRefusal(result.error);
+    return { data: { ...importSummary(result) } };
+  },
 });
