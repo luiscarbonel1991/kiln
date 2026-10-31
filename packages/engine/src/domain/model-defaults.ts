@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Effort } from "@/domain/effort";
 
 // The models Kiln generates with, by kind and provider (Luis, 2026-10-06:
 // several models from both providers, not one provider). Pure and client-safe:
@@ -36,12 +37,30 @@ export interface ModelEntry {
   qualities?: readonly ImageQuality[];
   // Video: the lengths it renders at each resolution it offers.
   seconds?: Partial<Record<VideoResolution, readonly number[]>>;
+  // Text: the effort levels it offers (domain/effort.ts), the most it writes
+  // in one call (thinking included), and whether it reads images.
+  efforts?: readonly Effort[];
+  maxOutput?: number;
+  sees?: boolean;
 }
 
 const QUALITIES: readonly ImageQuality[] = ["low", "medium", "high"];
 // Veo 3.1 (all three): 4, 6 or 8 s at 720p; 1080p only at 8 s
 // (ai.google.dev/gemini-api/docs/veo, 2026-10-06).
 const VEO_SECONDS = { "720p": [4, 6, 8], "1080p": [8] } as const;
+// Text, from each model's page (2026-10-31): OpenAI's reasoning effort takes
+// every level, up to 128,000 output tokens; Gemini thinks at low, medium or
+// high, up to 65,536. Every one reads images.
+const OPENAI_TEXT = {
+  efforts: ["low", "medium", "high", "xhigh", "max"],
+  maxOutput: 128_000,
+  sees: true,
+} as const;
+const GEMINI_TEXT = {
+  efforts: ["low", "medium", "high"],
+  maxOutput: 65_536,
+  sees: true,
+} as const;
 
 export const MODEL_CATALOG: readonly ModelEntry[] = [
   {
@@ -122,19 +141,33 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     retired: "2026-09-24",
     seconds: { "720p": [4, 8, 12] },
   },
-  { kind: "text", provider: "openai", id: "gpt-6.1-sol", label: "GPT-6.1 Sol" },
-  { kind: "text", provider: "openai", id: "gpt-6-luna", label: "GPT-6 Luna" },
+  {
+    kind: "text",
+    provider: "openai",
+    id: "gpt-6.1-sol",
+    label: "GPT-6.1 Sol",
+    ...OPENAI_TEXT,
+  },
+  {
+    kind: "text",
+    provider: "openai",
+    id: "gpt-6-luna",
+    label: "GPT-6 Luna",
+    ...OPENAI_TEXT,
+  },
   {
     kind: "text",
     provider: "google",
     id: "gemini-3.5-flash",
     label: "Gemini 3.5 Flash",
+    ...GEMINI_TEXT,
   },
   {
     kind: "text",
     provider: "google",
     id: "gemini-3.8-flash",
     label: "Gemini 3.8 Flash",
+    ...GEMINI_TEXT,
   },
 ];
 

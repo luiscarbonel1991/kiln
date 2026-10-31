@@ -1,4 +1,10 @@
 import {
+  DEFAULT_EFFORT,
+  type Effort,
+  effortOn,
+  effortScale,
+} from "@/domain/effort";
+import {
   DEFAULT_IMAGE_QUALITY,
   DEFAULT_VIDEO_RESOLUTION,
   type ImageQuality,
@@ -329,6 +335,25 @@ export const TEXT_CALL_BUDGETS = {
   chatPlan: { inputTokens: 20_000, outputTokens: 4_000 },
 } as const;
 export type TextCallKind = keyof typeof TEXT_CALL_BUDGETS;
+
+// A text call's allowance on a model at an effort: the output (thinking
+// included) grows with the level the model runs at, up to the most it writes.
+// At low it is the budget above.
+export function textBudget(
+  kind: TextCallKind,
+  model: { provider: string; model: string },
+  effort: Effort = DEFAULT_EFFORT,
+): { inputTokens: number; outputTokens: number } {
+  const base = TEXT_CALL_BUDGETS[kind];
+  const most = modelEntry(model)?.maxOutput ?? Number.POSITIVE_INFINITY;
+  return {
+    inputTokens: base.inputTokens,
+    outputTokens: Math.min(
+      base.outputTokens * effortScale(effortOn(model, effort)),
+      most,
+    ),
+  };
+}
 
 // The most a text call (vision, art direction) can cost: its input allowance
 // and the output cap it is sent with (`max_output_tokens`, thinking included).
