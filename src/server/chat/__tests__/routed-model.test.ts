@@ -6,9 +6,14 @@ import type {
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  ARGON_FREE_TIER,
+  fromChat,
+} from "@/domain/__tests__/fixtures/google-quota";
 
 const LUNA = { provider: "openai" as const, model: "gpt-6-luna" };
 const FLASH = { provider: "google" as const, model: "gemini-3.8-flash" };
+const ARGON = { provider: "google" as const, model: "gemini-4-argon" };
 
 const ROUTE = { candidates: [LUNA, FLASH], effort: "low" as const };
 const asked: { id: string; effort: unknown }[] = [];
@@ -184,6 +189,30 @@ describe("the chat's routed model", () => {
     expect(ledger.moves).toEqual([
       expect.objectContaining({ from: "GPT-6 Luna", to: "Gemini 3.8 Flash" }),
     ]);
+  });
+
+  it("a route's last refusal reaches the turn in Kiln's words", async () => {
+    models.set(
+      ARGON.model,
+      new MockLanguageModelV4({
+        doStream: async () => {
+          throw fromChat(ARGON_FREE_TIER);
+        },
+      }),
+    );
+    const model = routedChatModel("chatTurn", {
+      candidates: [ARGON],
+      effort: "high",
+      ledger: newLedger(),
+    });
+    await expect(model.doStream(CALL)).rejects.toMatchObject({
+      status: 429,
+      message:
+        "Gemini 4 Argon is not on Google's free tier, and this key's project is on it — link a billing account to the project in AI Studio, or pick another model.",
+    });
+    expect(opened[0].failed).toHaveBeenCalledWith(
+      expect.objectContaining({ message: ARGON_FREE_TIER.error.message }),
+    );
   });
 
   it("a step with no answer is never sent to another model", async () => {

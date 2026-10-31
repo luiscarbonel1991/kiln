@@ -11,12 +11,13 @@ import {
   textBudget,
   toMicros,
 } from "@/domain/generation-cost";
-import { modelLabel } from "@/domain/model-defaults";
+import { modelLabel, type ProviderId } from "@/domain/model-defaults";
 import {
   fallbackAfter,
   pickNext,
   type RouteEntry,
 } from "@/domain/model-routing";
+import { describeProviderError, hadResponse } from "@/domain/queue";
 import { getChatModels } from "@/providers/registry";
 import {
   type DirectCall,
@@ -36,6 +37,17 @@ import { textRunnable } from "@/server/text-calls";
 // and what the steps cost.
 
 export type ChatKind = "chatTurn" | "chatPlan";
+
+// The last refusal of a route in the words the studio uses (a spend cap, a
+// model with no quota, a rejected key), for the turn to show; an error with
+// no answer stays as it was.
+function inWords(provider: ProviderId, error: unknown): unknown {
+  if (!hadResponse(error)) return error;
+  return Object.assign(
+    new Error(describeProviderError(provider, error), { cause: error }),
+    { status: (error as { status: number }).status },
+  );
+}
 
 export interface TurnLedger {
   models: string[];
@@ -157,7 +169,7 @@ export function routedChatModel(
         await direct.failed(error);
         const failure = fallbackAfter(entry.provider, error, { callStarted });
         const picked = pickNext(rest, entry, failure, textRunnable(kind));
-        if (!picked) throw error;
+        if (!picked) throw inWords(entry.provider, error);
         console.warn(
           `[kiln] the chat moved from ${entry.model} to ${picked.entry.model}: ${failure.reason}`,
         );
