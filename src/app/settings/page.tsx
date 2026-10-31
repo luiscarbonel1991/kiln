@@ -12,6 +12,7 @@ import { proposeRoutes } from "@/domain/model-routing";
 import { hasDatabase } from "@/lib/db";
 import { providerMode } from "@/providers/mode";
 import { listAccessTokens } from "@/server/access-tokens";
+import { SPECIALIST_CHOICES } from "@/server/chat/specialists";
 import { budget } from "@/server/generation-repository";
 import { listLessons } from "@/server/lessons";
 import { getCurrentMaker, getMakerModelSetup } from "@/server/maker-repository";
@@ -78,13 +79,17 @@ export default async function SettingsPage() {
           </h2>
           <p className="mt-1 mb-5 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
             Each kind of work runs on a route: the model it starts on and, when
-            you turn fallback on, the ones it may move to if a provider fails.
-            Nothing outside a route ever runs; the estimate before spending
-            counts the dearest model, and every take names the model it ran on.
-            A card or slot can still pick its own model.
+            you turn fallback on, the ones it may move to if a provider fails. A
+            text route also has an effort: more thinking, more output and more
+            time, and the estimate before spending grows with it. Nothing
+            outside a route ever runs; the estimate counts the dearest model,
+            and every take names the model it ran on. A card or slot can still
+            pick its own model, and each agent of the chat can have its own.
           </p>
           <RoutesForm
             initial={setup.routes ?? proposeRoutes(setup.models, keys)}
+            initialAgents={setup.agents}
+            agentChoices={SPECIALIST_CHOICES}
             saved={setup.routes !== null}
             notes={health}
             mock={mode === "mock"}
