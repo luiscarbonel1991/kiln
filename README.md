@@ -329,6 +329,7 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 | Designs | `list_designs`, `get_design` (each drawing's state, line art and vector, and the link where the maker makes a vector into a product), `view_design` (a drawing's line art, or its vector rendered), `vectorize` (free: outline or centerline, detail fine, balanced or clean; kept as the drawing's vector) |
 | Paid work | `quote`, then `generate`, `draw` (a design's line art, through the queue), `write_listing` or `review_product` with its id |
 | Selling | `get_listing` (the listing's fields, who wrote each, its problems and tag ideas), `edit_listing` (free; a field the maker wrote only with `overwriteMakerText`, after asking), `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only) |
+| Lessons | `list_lessons` (the maker's kept lessons, for a family and every family, by topic), `propose_lesson` (one sentence; it counts once the maker keeps it) |
 
 - **Paid work takes two calls.** `quote` (free) prices a task: the models each line
   runs on and may fall back to, typical and at most, what is left of the month's cap,
@@ -369,7 +370,8 @@ the MCP server's tools, on the same server functions as the board.
   `generate`, `draw`, `write_listing` and `review_product` (after a `quote`), `approve_frame`
   and `deliver` wait for the maker's click on an approval card that shows the quote
   (typical, at most, the models) or the take; "Not now" runs nothing. It never
-  publishes, and it writes nothing into the maker's knowledge yet (stage 4).
+  publishes, and it writes nothing into the maker's knowledge: it proposes a lesson, which counts
+  only once the maker keeps it.
 - **Models: the roles' routes.** A turn runs on `fast`, one with "Plan first" on
   `deep` (Settings → Models), through Kiln's adapters (`@ai-sdk/openai` and
   `@ai-sdk/google`, each only in its adapter folder); a model named by a string is
@@ -389,12 +391,23 @@ the MCP server's tools, on the same server functions as the board.
   task), written from Kiln's own data. The general mode suggests one with a button;
   a reply names the mode it ran in. An agent edit never replaces text the maker
   wrote without their click.
+- **Lessons** (stage 4): what Kiln learned of the maker's taste, per product family.
+  Kiln proposes one, free, when two of the maker's choices on a frame's knob agree (a
+  "What's off?" reason on the board or `reject_frame`, or a take approved with a knob
+  they set; one vote per project and stop), and when a listing's after-read has enough
+  visits to tell ("after the new Hero (a little above · …), the first 30 days showed
+  …"). An agent proposes one the maker states ("always…"). The maker keeps it or not in
+  Settings → Lessons, or on the chat's card; a proposal says so in the project's chat.
+  Kept, every agent is told the lessons of the conversation's family on its mode's
+  topics, and a scene's lesson starts that knob in new projects of the family (over
+  Kiln's pick, under the maker's own choice; Tune says "from a lesson you kept"). A
+  lesson the maker set aside stays aside unless their choices move to another stop.
 - **Kiln's notices.** A batch that finishes says so in its project's latest
   conversation ("All 5 frames of the last batch landed", or a design's drawings); the agent reads it with
   the maker's next message and does not act on it alone.
 - **Recorded** like a token's calls: Settings → Recent tool calls shows them as
   "Chat".
-- **Measured before it ships**: `pnpm eval:chat` runs twenty fixed tasks with the real
+- **Measured before it ships**: `pnpm eval:chat` runs twenty-two fixed tasks with the real
   text model on a mock run (images and the database are the mock's), printing what it
   may cost first; it runs only with `KILN_EVAL_YES=1`. A mock run's chat
   (`pnpm dev:mock`) answers with a few rules, for free.
