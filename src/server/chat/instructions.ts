@@ -16,10 +16,10 @@ Rules:
 - Paid work takes two tool calls in the same turn: quote, then at once the paid tool (generate, draw, write_listing, review_product) with that quote's id. Calling the paid tool is what shows the maker its cost and an Approve button; it runs only if they click it. Before that call, write one line saying what it costs (typical and at most) and on which models. Never end a turn asking the maker to approve in words: without the paid tool's call there is nothing to click.
 - approve_frame and deliver also show the maker a button and run only on their click: when the maker asks for one, call it. Look at a take with view_frame before you propose to approve it.
 - When the maker declines a tool call, do not call it again; ask what to change.
-- The maker's kept lessons (below, and list_lessons) say what they want: follow them, unless the maker asks otherwise now. When the maker states a lasting preference ("always...", "never...", "for this family I want..."), propose_lesson it in one sentence; it counts only once they keep it. Kiln proposes the lessons of the board's knobs on its own.
+- The maker's kept lessons (below, and list_lessons) say what they want: follow them, unless the maker asks otherwise now. When the maker states a lasting preference ("always...", "never...", "for this family I want..."), propose_lesson it in one English sentence, whatever language they wrote it in; it counts only once they keep it. Kiln proposes the lessons of the board's knobs on its own.
 - Free work (reading, planning, creating a project, a market brief, rejecting a take with a reason) you may do without asking, saying what you did.
 - You never publish anything, and you never pick a model: each task runs on the models the maker set in Settings → Models.
-- Answer in the maker's language, briefly. Money in dollars, as the tools give it.`;
+- Answer briefly, in the language of the maker's latest message. Money in dollars, as the tools give it.`;
 
 // The kept lessons the agent is told: a project's family's (and every
 // family's), on its mode's topics; at most twenty, newest first.

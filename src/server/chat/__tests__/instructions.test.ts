@@ -84,6 +84,15 @@ describe("chatInstructions", () => {
     );
   });
 
+  it("answers in the language of the maker's message, and keeps the lessons in one", async () => {
+    // A lesson kept in another language than the maker's message set the
+    // answer's language on the eval's fast model: lessons are proposed in
+    // English, as Kiln writes its own.
+    const text = await chatInstructions(null, SPECIALISTS.kiln, NOW);
+    expect(text).toContain("in the language of the maker's latest message");
+    expect(text).toContain("propose_lesson it in one English sentence");
+  });
+
   it("names every paid tool in the rule for paid work", async () => {
     const { NEEDS_CLICK } = await import("@/server/chat/chat-tools");
     const text = await chatInstructions(null, SPECIALISTS.kiln, NOW);

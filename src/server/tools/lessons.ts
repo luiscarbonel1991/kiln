@@ -41,7 +41,7 @@ export const proposeLessonTool = defineTool({
   name: "propose_lesson",
   title: "Propose a lesson",
   description:
-    "Propose a lesson for the maker to keep: a lasting preference they stated, or one you saw repeat (a reason they keep giving, a choice they keep making). One sentence, in the maker's terms, for a product family or every family. It counts only once the maker keeps it; Kiln proposes the lessons of the board's knobs on its own, so propose what Kiln cannot see.",
+    "Propose a lesson for the maker to keep: a lasting preference they stated, or one you saw repeat (a reason they keep giving, a choice they keep making). One sentence in English, whatever language the maker wrote in (Kiln's lessons are all in English, so the agents reading them answer in the maker's language), in the maker's terms, for a product family or every family. It counts only once the maker keeps it; Kiln proposes the lessons of the board's knobs on its own, so propose what Kiln cannot see.",
   input: z
     .object({
       topic: LessonTopic,
