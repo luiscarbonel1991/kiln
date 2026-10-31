@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import type { BatchEstimate } from "@/components/projects/generation-panel";
+import { GenerationPoller } from "@/components/projects/generation-poller";
 import {
   boardRows,
   ProjectBoard,
@@ -207,6 +208,12 @@ export default async function ProjectBoardPage({
             Ask the SVG specialist
           </Link>
         ) : null}
+        {/* Drawings the chat queued: the page (and the chat's notice) follow the batch. */}
+        <GenerationPoller
+          projectId={board.id}
+          version={generation.version}
+          active={generation.batch !== null}
+        />
       </main>
     );
   return (
