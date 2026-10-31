@@ -21,6 +21,9 @@ interface Task {
   // Starts from a long Etsy title, written as the model's: an earlier run
   // may have shortened it, and then there is nothing left to do.
   longTitle?: boolean;
+  // Starts with this frame switched on ("etsy.gift"): an earlier run may
+  // have switched it off.
+  frameOn?: string;
   message: string;
   calls?: string[];
   waits?: string[];
@@ -185,7 +188,9 @@ describe("the chat agent's fixed tasks", async () => {
   }
   projects.design = await designForEval(candidates.map((c) => c.id));
   const { listingTarget } = await import("@/server/listing-write");
-  const { setListing } = await import("@/server/project-repository");
+  const { setListing, setSlotOff } = await import(
+    "@/server/project-repository"
+  );
   const { listingDraft } = await import("@/domain/listing");
   async function lengthenTitle(projectId: string) {
     const target = await listingTarget(projectId, "etsy");
@@ -221,6 +226,10 @@ describe("the chat agent's fixed tasks", async () => {
         throw new Error(`The mock has no project for "${task.on}".`);
       }
       if (task.longTitle && projectId) await lengthenTitle(projectId);
+      if (task.frameOn && projectId) {
+        const [destinationId, slotKey] = task.frameOn.split(".");
+        await setSlotOff(projectId, { destinationId, slotKey }, false);
+      }
       const { id } = await chats.createChatSession(projectId);
       const response = await runTurn({
         sessionId: id,

@@ -114,6 +114,7 @@
     "id": "scenes-switch-off",
     "on": "waiting",
     "specialist": "scenes",
+    "frameOn": "etsy.gift",
     "message": "Apagá la foto de regalo (gift) de Etsy.",
     "calls": ["switch_frame"],
     "never": ["generate"],

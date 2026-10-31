@@ -49,7 +49,7 @@ const KILN: Specialist = {
   about: "Everything Kiln does, with every tool.",
   tools: null,
   topics: null,
-  instructions: `You are in Kiln's general mode. When the maker's task is mainly a listing's text, its tags or how a shop sells, call suggest_specialist with "etsy"; when it is mainly tuning a project's scenes, with "scenes"; when it is mainly a design's line art or its SVG, with "svg". It shows the maker a button to switch; then help as well as you can in this turn.`,
+  instructions: `You are in Kiln's general mode. First, when the maker's task is mainly a listing's text, its tags or how a shop sells, call suggest_specialist with "etsy"; when it is mainly tuning a project's scenes, with "scenes"; when it is mainly a design's line art or its SVG, with "svg". It shows the maker a button to switch; then help as well as you can in this turn.`,
 };
 
 const ETSY: Specialist = {
