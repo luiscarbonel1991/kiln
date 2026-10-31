@@ -18,6 +18,7 @@ import {
 } from "react";
 import { createChatAction } from "@/app/actions/chat";
 import { ChatMessage, money } from "@/components/chat/chat-parts";
+import { sentMessage } from "@/components/chat/chat-request";
 import { Button } from "@/components/ui/button";
 import {
   MessageScroller,
@@ -253,7 +254,7 @@ function Conversation({
           return {
             body: {
               sessionId: id,
-              message: last,
+              message: last && sentMessage(last),
               plan: plan.current,
               specialist:
                 last?.role === "assistant"
