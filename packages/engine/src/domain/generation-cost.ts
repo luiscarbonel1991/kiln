@@ -59,9 +59,9 @@ interface Prices {
   textOut: number;
   imageOut: number;
 }
-// A price the provider has dated: `then` applies from its day (UTC) on.
+// A price the provider has dated: `later` applies from its day (UTC) on.
 interface TokenPrices extends Prices {
-  then?: Prices & { from: string };
+  later?: Prices & { from: string };
 }
 
 const TOKEN_PRICES: Record<string, TokenPrices> = {
@@ -106,7 +106,7 @@ const TOKEN_PRICES: Record<string, TokenPrices> = {
     imageIn: 0.75,
     textOut: 3.75,
     imageOut: 0,
-    then: {
+    later: {
       from: "2027-01-01",
       textIn: 1.5,
       imageIn: 1.5,
@@ -119,7 +119,7 @@ const TOKEN_PRICES: Record<string, TokenPrices> = {
     imageIn: 2,
     textOut: 10,
     imageOut: 0,
-    then: {
+    later: {
       from: "2026-12-01",
       textIn: 4,
       imageIn: 4,
@@ -132,7 +132,7 @@ const TOKEN_PRICES: Record<string, TokenPrices> = {
     imageIn: 0.75,
     textOut: 3.75,
     imageOut: 0,
-    then: {
+    later: {
       from: "2027-01-01",
       textIn: 1.5,
       imageIn: 1.5,
@@ -157,7 +157,7 @@ function tokenPrices(
   at: Date = new Date(),
 ): Prices | undefined {
   const p = TOKEN_PRICES[key(model)];
-  if (p?.then && at.toISOString().slice(0, 10) >= p.then.from) return p.then;
+  if (p?.later && at.toISOString().slice(0, 10) >= p.later.from) return p.later;
   return p;
 }
 
