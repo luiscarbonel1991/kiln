@@ -14,6 +14,7 @@ import {
   vectorizeTool,
   viewDesign,
 } from "@/server/tools/designs";
+import { listLessonsTool, proposeLessonTool } from "@/server/tools/lessons";
 import {
   bestSellersTool,
   editListingTool,
@@ -73,4 +74,6 @@ export const TOOLS: readonly Tool[] = [
   watchedShopsTool,
   findShopsTool,
   shopFavouritesTool,
+  listLessonsTool,
+  proposeLessonTool,
 ];

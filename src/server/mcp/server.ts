@@ -17,6 +17,7 @@ import {
 // MCP SDK is imported (a test holds it here).
 
 const INSTRUCTIONS = `Kiln prepares a maker's products for sale: each project is a board of frames (photos, video, exact renders) for its destinations.
+The maker's lessons say what they want: read them first with list_lessons (for the product's family) and follow them; propose_lesson proposes one they stated, which counts once they keep it.
 Import products with import_products; see a project's frames before starting it with plan_project, then create_project (free).
 Read with list_products, list_projects and get_frames; look at a take with view_frame before deciding on it, then approve_frame or reject_frame with a reason, naming the take you looked at.
 Designs (an image drawn as line art, then traced into SVG): list_designs and get_design read them, view_design shows a drawing or its vector, vectorize traces one (free); a vector becomes a product in the maker's product form.
