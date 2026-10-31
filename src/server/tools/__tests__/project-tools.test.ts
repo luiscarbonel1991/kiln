@@ -28,6 +28,7 @@ vi.mock("@/server/project-repository", () => ({
     return "p9";
   },
 }));
+vi.mock("@/server/lessons", () => ({ keptMoves: async () => [] }));
 vi.mock("@/server/product-reference", () => ({
   productReference: async () => null,
   threeQuarterReference: async () => null,
