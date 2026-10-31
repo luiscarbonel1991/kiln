@@ -23,13 +23,14 @@ import {
   withThreeQuarter,
 } from "@/domain/plan";
 import { productUnderstanding } from "@/domain/product-understanding";
-import { KnobChoice } from "@/domain/scene-knobs";
+import { KnobChoice, ReasonKey } from "@/domain/scene-knobs";
 import { threeQuarterFor } from "@/domain/scene-reference";
 import { VideoChoice } from "@/domain/video";
 import { refreshCards } from "@/lib/project-refresh";
 import { slotCards, videoSlotCard } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { getStorageProvider } from "@/providers/registry";
+import { noteApproval, noteReason } from "@/server/lessons";
 import { writeProjectListing } from "@/server/listing-write";
 import { getMakerModels, rememberHeroSetting } from "@/server/maker-repository";
 import {
@@ -64,6 +65,7 @@ const Approval = z.object({
 export async function setSlotApprovalAction(input: unknown): Promise<void> {
   const { projectId, destinationId, slotKey, approved } = Approval.parse(input);
   await setSlotApproval(projectId, { destinationId, slotKey }, approved);
+  if (approved) await noteApproval(projectId, { destinationId, slotKey });
   refresh();
 }
 
@@ -93,18 +95,22 @@ const KnobWrite = z.object({
   destinationId: z.string().min(1),
   slotKey: z.string().min(1),
   choice: KnobChoice,
+  // The "What's off?" chip that moved it, a vote for the family's lessons.
+  reason: ReasonKey.optional(),
 });
 
 // Turn one of a scene's knobs.
 export async function setSlotKnobAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
-  const { projectId, destinationId, slotKey, choice } = KnobWrite.parse(input);
+  const { projectId, destinationId, slotKey, choice, reason } =
+    KnobWrite.parse(input);
   const ref = { destinationId, slotKey };
   try {
     const { product } = await retuneSlot(projectId, ref, (plan) =>
       withSlotTuning(plan, ref, choice),
     );
+    if (reason) await noteReason(projectId, ref, reason, choice);
     // A hero's setting chosen on the board is proposed next time for this
     // family on this destination.
     if (

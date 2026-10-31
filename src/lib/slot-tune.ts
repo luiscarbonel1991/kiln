@@ -33,8 +33,11 @@ export interface TuneKnob {
   key: KnobKey;
   label: string;
   stop: string;
-  // The maker set it (else it is Kiln's pick or the scene's default).
+  // The maker set it (else it is a kept lesson's, Kiln's pick or the
+  // scene's default).
   chosen: boolean;
+  // A lesson the maker kept for the family set it.
+  learned: boolean;
   // Kiln set it over the scene's default (a little above, once the view
   // from above exists).
   picked: boolean;
@@ -100,6 +103,7 @@ export function tuneView(input: {
     slot.knobs,
     slot.tuned,
     kilnPick(slot.knobs, above),
+    slot.learned,
   );
   const locked =
     view.inBatch || view.state === "generating" || view.state === "retrying"
@@ -121,6 +125,7 @@ export function tuneView(input: {
         label: KNOBS[key].label,
         stop: knobs.stops[key] ?? "any",
         chosen: knobs.chosen.includes(key),
+        learned: knobs.learned.includes(key),
         picked: knobs.picked.includes(key),
         stops: (knobStops(key) as string[]).map((s) => ({
           key: s,

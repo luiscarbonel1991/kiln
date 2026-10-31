@@ -37,6 +37,15 @@ vi.mock("@/server/maker-repository", () => ({
   getMakerPreferences: async () => ({ heroSetting: remembered }),
   rememberHeroSetting,
 }));
+const kept: {
+  destinationId: string;
+  slotKey: string;
+  knob: string;
+  stop: string;
+}[] = [];
+vi.mock("@/server/lessons", () => ({
+  keptMoves: async (family: string) => (family === board.family ? kept : []),
+}));
 const briefs: Record<string, { brief: MarketBrief; projectName: string }> = {};
 vi.mock("@/server/project-repository", () => ({
   createProject: async (input: { plan: ProjectPlan }) => {
@@ -207,6 +216,22 @@ describe("createProjectAction: the hero's setting", () => {
     delete remembered[`etsy:${board.family.toLowerCase()}`];
     await start();
     expect(heroOf()).toBe("sweep");
+  });
+
+  it("starts a frame's knob from a lesson the maker kept for the family", async () => {
+    kept.push({
+      destinationId: "etsy",
+      slotKey: "hero",
+      knob: "camera",
+      stop: "above",
+    });
+    await start();
+    kept.length = 0;
+    const hero = created[0].plan.destinations[0].slots.find(
+      (s) => s.key === "hero",
+    );
+    expect(hero?.learned).toEqual({ camera: "above" });
+    expect(hero?.tuned).toBeUndefined();
   });
 
   it("refuses a setting it does not know", async () => {

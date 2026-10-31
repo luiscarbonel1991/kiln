@@ -27,6 +27,7 @@ import {
 } from "@/domain/scene-knobs";
 import { kilnPick, threeQuarterFor } from "@/domain/scene-reference";
 import { fetchAsset } from "@/providers/asset-bytes";
+import { noteApproval, noteReason } from "@/server/lessons";
 import { framedProjects, projectFrames } from "@/server/project-frames";
 import {
   loadProjectBoard,
@@ -157,6 +158,7 @@ export const approveFrame = defineTool({
   run: async ({ project, frame, take }) => {
     await frameOf(project, frame);
     await setSlotApproval(project, refOf(frame), true, take);
+    await noteApproval(project, refOf(frame));
     return { data: { frame: await frameOf(project, frame) } };
   },
 });
@@ -217,7 +219,12 @@ export const rejectFrame = defineTool({
     );
     const move = reasonMove(
       reason,
-      effectiveKnobs(slot.knobs, slot.tuned, kilnPick(slot.knobs, above)),
+      effectiveKnobs(
+        slot.knobs,
+        slot.tuned,
+        kilnPick(slot.knobs, above),
+        slot.learned,
+      ),
     );
     if (!move) {
       throw new ToolRefusal(
@@ -227,6 +234,7 @@ export const rejectFrame = defineTool({
     const unapproved = view.approvedOutput === take;
     if (unapproved) await setSlotApproval(project, ref, false);
     await retuneSlot(project, ref, (plan) => withSlotTuning(plan, ref, move));
+    await noteReason(project, ref, reason, move);
     const stops = KNOBS[move.knob].stops as Record<string, { label: string }>;
     return {
       data: {
@@ -283,6 +291,7 @@ function knobsOf(
     slot.knobs,
     slot.tuned,
     kilnPick(slot.knobs, threeQuarterFor(plan.references, master)),
+    slot.learned,
   );
   return {
     summary: knobSummary(knobs),
@@ -299,9 +308,11 @@ function knobsOf(
             label: about?.label ?? stop,
             by: knobs.chosen.includes(k)
               ? "maker"
-              : knobs.picked.includes(k)
-                ? "kiln"
-                : "default",
+              : knobs.learned.includes(k)
+                ? "lesson"
+                : knobs.picked.includes(k)
+                  ? "kiln"
+                  : "default",
           },
         ];
       }),

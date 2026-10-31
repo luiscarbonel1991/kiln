@@ -43,6 +43,8 @@ model Maker {
   accessTokens    AccessToken[]
   shopConnections ShopConnection[]
   chatSessions    ChatSession[]
+  lessons         Lesson[]
+  tasteSignals    TasteSignal[]
 }
 
 // A personal access token for Kiln's HTTP API (/api/import, a colour's
@@ -145,6 +147,56 @@ model ChatMessage {
 
   @@unique([sessionId, messageId])
   @@index([sessionId, seq])
+}
+
+// What Kiln learned of the maker's taste (ROADMAP "Agents", stage 4): proposed
+// from what the maker did (reasons given for a take, the knobs of takes they
+// approved, a listing's 30-day read) or by an agent, and counted only once the
+// maker keeps it. `key` names what it is about, so more evidence for the same
+// thing grows one lesson. `family` is the product family, case-folded (null:
+// every family); `topic` says which agents read it (scenes, listing, designs,
+// general); `move` is a scene lesson's knob, which a new project of the family
+// starts its frame with (domain LessonMove).
+model Lesson {
+  id        String    @id @default(cuid())
+  makerId   String
+  maker     Maker     @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  key       String
+  family    String?
+  topic     String
+  text      String
+  move      Json?
+  source    String
+  evidence  Json      @default("[]")
+  status    String    @default("proposed")
+  decidedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@unique([makerId, key])
+  @@index([makerId, status])
+}
+
+// One thing the maker did on the board that says where a scene's knob belongs:
+// a reason given for a take (the stop it moved the knob to) or a take approved
+// with a knob the maker set. Scene lessons are proposed from these. The
+// project is named, not linked: the taste outlives the project.
+model TasteSignal {
+  id            String   @id @default(cuid())
+  makerId       String
+  maker         Maker    @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  projectId     String
+  family        String
+  destinationId String
+  slotKey       String
+  slotLabel     String
+  kind          String
+  reason        String?
+  knob          String
+  stop          String
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([makerId, family, destinationId, slotKey, knob, createdAt])
 }
 
 // A shop the maker connected to Kiln through its platform's OAuth (Etsy,

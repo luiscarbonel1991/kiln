@@ -258,27 +258,36 @@ export interface EffectiveKnobs {
   stops: SceneKnobs;
   // The knobs the maker set.
   chosen: KnobKey[];
-  // The knobs Kiln set over the slot's default (the maker has not).
+  // The knobs a lesson the maker kept set (the maker has not, this time).
+  learned: KnobKey[];
+  // The knobs Kiln set over the slot's default (neither has).
   picked: KnobKey[];
 }
 
 // The slot's defaults, Kiln's pick over them (a little above, once a view
-// from above exists: scene-reference.ts), and the maker's own choices over
-// both.
+// from above exists: scene-reference.ts), a kept lesson over that (the
+// maker's taste for the family), and the maker's own choices over all.
 export function effectiveKnobs(
   defaults: SceneKnobs,
   tuned: SceneKnobs = {},
   pick: SceneKnobs = {},
+  lessons: SceneKnobs = {},
 ): EffectiveKnobs {
   const offered = KnobKey.options.filter((k) => defaults[k] !== undefined);
   const chosen = offered.filter((k) => tuned[k] !== undefined);
+  const learned = offered.filter(
+    (k) => tuned[k] === undefined && lessons[k] !== undefined,
+  );
   const picked = offered.filter(
-    (k) => tuned[k] === undefined && pick[k] !== undefined,
+    (k) =>
+      tuned[k] === undefined &&
+      lessons[k] === undefined &&
+      pick[k] !== undefined,
   );
   const stops: StopMap = Object.fromEntries(
-    offered.map((k) => [k, tuned[k] ?? pick[k] ?? defaults[k]]),
+    offered.map((k) => [k, tuned[k] ?? lessons[k] ?? pick[k] ?? defaults[k]]),
   );
-  return { offered, stops: stops as SceneKnobs, chosen, picked };
+  return { offered, stops: stops as SceneKnobs, chosen, learned, picked };
 }
 
 function stopOf(knob: KnobKey, stops: SceneKnobs): Stop | null {

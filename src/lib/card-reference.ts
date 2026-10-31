@@ -12,7 +12,7 @@ import {
 } from "@/domain/scene-reference";
 
 // The camera a scene slot applies: its default, Kiln's pick (a little above,
-// once a view from above applies), or the maker's own stop.
+// once a view from above applies), a kept lesson's, or the maker's own stop.
 export function slotCamera(
   plan: ProjectPlan,
   slot: PlanSlot,
@@ -20,8 +20,12 @@ export function slotCamera(
 ): CameraStop | undefined {
   if (!slot.knobs) return undefined;
   const view = threeQuarterFor(plan.references, masterUrl);
-  return effectiveKnobs(slot.knobs, slot.tuned, kilnPick(slot.knobs, view))
-    .stops.camera;
+  return effectiveKnobs(
+    slot.knobs,
+    slot.tuned,
+    kilnPick(slot.knobs, view),
+    slot.learned,
+  ).stops.camera;
 }
 
 // The reference a scene card edits: Kiln's view from above when its slot's

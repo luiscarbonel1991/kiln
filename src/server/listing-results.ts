@@ -5,6 +5,7 @@ import { ProjectPlan, withRead } from "@/domain/plan";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { CATALOG } from "@/lib/recipes";
 import { localDate, type ResultsView, resultsView } from "@/lib/results-view";
+import { noteRead } from "@/server/lessons";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { changePlan, loadProjectBoard } from "@/server/project-repository";
 import { resultsConnector } from "@/server/shop-connector";
@@ -109,6 +110,10 @@ export async function saveRead(input: {
     return withRead(plan, input.destinationId, input.key, parsed.data);
   });
   if (!saved) throw new Error("the read was not saved");
+  // An after-read may say which frames moved the numbers: a lesson.
+  if (input.key !== "before") {
+    await noteRead(input.projectId, input.destinationId);
+  }
   return saved;
 }
 

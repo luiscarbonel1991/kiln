@@ -5,6 +5,7 @@ import {
   heroSettingsOf,
   withHeroSettings,
 } from "@/domain/hero-setting";
+import { withLearned } from "@/domain/lesson";
 import { ListingUrl, LivePhoto, MAX_LIVE_PHOTOS } from "@/domain/live-listing";
 import {
   type ProjectPlan,
@@ -20,6 +21,7 @@ import { ProjectType } from "@/domain/project";
 import { startEditorState } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { isAllowedAssetUrl } from "@/providers/asset-bytes";
+import { keptMoves } from "@/server/lessons";
 import {
   getMakerModels,
   getMakerPreferences,
@@ -80,6 +82,9 @@ export async function startingPlan(
         })
       : planProject({ product, type, destinationIds, catalog: CATALOG }),
   );
+  // The frames start with the knobs the maker's kept lessons set for the
+  // family.
+  const learned = withLearned(planned, await keptMoves(product.family));
   const { heroSetting: remembered } = await getMakerPreferences();
   const proposed = (id: string) =>
     heroProposal(product, id, remembered).setting;
@@ -94,7 +99,7 @@ export async function startingPlan(
             carriedFrom: projectName.slice(0, 120),
           })
         : p,
-    withHeroSettings(planned, (id) => heroSettings[id] ?? proposed(id)),
+    withHeroSettings(learned, (id) => heroSettings[id] ?? proposed(id)),
   );
   return { plan, proposed };
 }

@@ -84,8 +84,8 @@ export function slotCards(
       recipe.style === "line-art"
         ? undefined
         : sceneVariants(
-            // Each slot applies its knobs: its defaults, Kiln's pick, then
-            // the maker's own choices.
+            // Each slot applies its knobs: its defaults, Kiln's pick, the
+            // maker's kept lessons, then the maker's own choices.
             scenes.map((s) =>
               s.knobs
                 ? {
@@ -94,6 +94,7 @@ export function slotCards(
                       s.knobs,
                       s.tuned,
                       kilnPick(s.knobs, view),
+                      s.learned,
                     ).stops,
                   }
                 : s,

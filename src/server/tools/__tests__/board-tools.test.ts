@@ -2,14 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProjectPlan } from "@/domain/plan";
 
 // approve_frame, unapprove_frame and reject_frame on stubbed repositories
-// (their DB suites cover the writes): what each checks first, and what a
-// reason moves.
+// (their DB suites cover the writes): what each checks first, what a reason
+// moves, and that each tells the maker's lessons (lessons.db.test.ts).
 
 const state = vi.hoisted(() => ({
   approvals: [] as unknown[][],
   tuned: [] as unknown[],
   places: [] as unknown[],
   switched: [] as unknown[][],
+  noted: [] as unknown[][],
   approvedOutput: null as string | null,
 }));
 
@@ -100,6 +101,14 @@ vi.mock("@/server/slot-tuning", () => ({
   },
 }));
 vi.mock("@/providers/asset-bytes", () => ({ fetchAsset: vi.fn() }));
+vi.mock("@/server/lessons", () => ({
+  noteApproval: async (...args: unknown[]) => {
+    state.noted.push(["approval", ...args]);
+  },
+  noteReason: async (...args: unknown[]) => {
+    state.noted.push(["reason", ...args]);
+  },
+}));
 
 const { TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
@@ -112,6 +121,7 @@ afterEach(() => {
   state.tuned.length = 0;
   state.places.length = 0;
   state.switched.length = 0;
+  state.noted.length = 0;
   state.approvedOutput = null;
 });
 
@@ -123,6 +133,9 @@ describe("approve_frame", () => {
     ).toMatchObject({ ok: true });
     expect(state.approvals).toEqual([
       ["p1", { destinationId: "etsy", slotKey: "hero" }, true, take],
+    ]);
+    expect(state.noted).toEqual([
+      ["approval", "p1", { destinationId: "etsy", slotKey: "hero" }],
     ]);
     expect(
       await call("approve_frame", { project: "p1", frame: "etsy.hero" }),
@@ -175,6 +188,15 @@ describe("reject_frame", () => {
     });
     expect(state.tuned).toEqual([{ props: "few" }]);
     expect(state.approvals).toEqual([]);
+    expect(state.noted).toEqual([
+      [
+        "reason",
+        "p1",
+        { destinationId: "etsy", slotKey: "hero" },
+        "busy",
+        { knob: "props", stop: "few" },
+      ],
+    ]);
   });
 
   it("withdraws the approval of the take it rejects", async () => {

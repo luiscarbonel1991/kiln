@@ -39,13 +39,15 @@ export function SlotTune({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const set = (choice: KnobChoice) =>
+  // A reason chip names what was off, so Kiln can learn the maker's taste.
+  const set = (choice: KnobChoice, reason?: string) =>
     startTransition(async () => {
       const result = await setSlotKnobAction({
         projectId,
         destinationId,
         slotKey,
         choice,
+        ...(reason ? { reason } : {}),
       });
       setError(result?.error ?? null);
     });
@@ -163,6 +165,8 @@ export function SlotTune({
                           Reset
                         </button>
                       </>
+                    ) : knob.learned ? (
+                      "from a lesson you kept"
                     ) : knob.picked ? (
                       "Kiln's pick, for the view from above"
                     ) : (
@@ -222,7 +226,7 @@ export function SlotTune({
                       type="button"
                       data-testid={`tune-${destinationId}-${slotKey}-reason-${reason.key}`}
                       disabled={disabled}
-                      onClick={() => set(reason.move)}
+                      onClick={() => set(reason.move, reason.key)}
                       className="rounded-pill border border-border-soft bg-secondary px-3 py-1 font-sans text-xs text-on-surface-mid transition-colors hover:border-primary disabled:opacity-60"
                     >
                       {reason.label}

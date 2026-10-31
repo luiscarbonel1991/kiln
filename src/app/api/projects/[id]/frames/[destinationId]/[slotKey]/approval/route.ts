@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SlotRefusal } from "@/domain/plan";
 import { apiError, apiJson, authorize, readBody } from "@/server/http-api";
+import { noteApproval } from "@/server/lessons";
 import { projectFrames } from "@/server/project-frames";
 import { setSlotApproval } from "@/server/project-repository";
 
@@ -55,6 +56,7 @@ async function decide(
   const { id, destinationId, slotKey } = await params;
   try {
     await setSlotApproval(id, { destinationId, slotKey }, approved, checked);
+    if (approved) await noteApproval(id, { destinationId, slotKey });
   } catch (error) {
     if (error instanceof Error && error.message === "project not found") {
       return apiError(404, "No project of yours has that id.");

@@ -56,6 +56,10 @@ export const PlanSlot = ShotSlotFields.extend({
   // as unset instead of breaking the plan.
   knobs: SavedKnobs.optional(),
   tuned: SavedKnobs.optional(),
+  // The stops the maker's kept lessons set for this frame of the product's
+  // family when the plan was made (lesson.ts): over Kiln's pick, under the
+  // maker's own choices.
+  learned: SavedKnobs.optional(),
   // A scene slot's own place of use, chosen by the maker (from the product's
   // places, the market brief, or typed): it stands there instead of taking
   // the product's next place.
