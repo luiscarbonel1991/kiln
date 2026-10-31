@@ -10,7 +10,7 @@ import { StudioHeader } from "@/components/studio/studio-header";
 import { UploadPhase } from "@/components/studio/upload-phase";
 import type { MakerModels } from "@/domain/model-defaults";
 import { NO_TAKE_ROUTES, type TakeRoutes } from "@/domain/model-routing";
-import { useProject } from "@/store/project";
+import { type PhotoRead, useProject } from "@/store/project";
 import { useGenerationSync } from "@/store/use-generation-sync";
 import { useProjectPersistence } from "@/store/use-project-persistence";
 
@@ -23,6 +23,7 @@ export function StudioShell({
   focusCardId,
   makerModels,
   takeRoutes = NO_TAKE_ROUTES,
+  photoRead,
 }: {
   fresh?: boolean;
   projectId?: string;
@@ -32,11 +33,15 @@ export function StudioShell({
   makerModels: MakerModels;
   // A planned project's routes: its cards' takes are priced along them.
   takeRoutes?: TakeRoutes;
+  // What reading an uploaded photo costs at most, at the route's effort.
+  photoRead: PhotoRead;
 }) {
   const setMakerModels = useProject((s) => s.setMakerModels);
   useEffect(() => setMakerModels(makerModels), [makerModels, setMakerModels]);
   const setTakeRoutes = useProject((s) => s.setTakeRoutes);
   useEffect(() => setTakeRoutes(takeRoutes), [takeRoutes, setTakeRoutes]);
+  const setPhotoRead = useProject((s) => s.setPhotoRead);
+  useEffect(() => setPhotoRead(photoRead), [photoRead, setPhotoRead]);
   const phase = useProject((s) => s.phase);
   const master = useProject((s) => s.master);
   const loadedId = useProject((s) => s.projectId);

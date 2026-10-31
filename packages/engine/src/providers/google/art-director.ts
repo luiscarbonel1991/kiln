@@ -1,10 +1,9 @@
-import { ThinkingLevel, Type } from "@google/genai";
-import { TEXT_CALL_BUDGETS } from "@/domain/generation-cost";
+import { Type } from "@google/genai";
 import { assertModel } from "@/domain/model-defaults";
 import { ProviderKeyMissing } from "@/providers/errors";
 import { getGenAI, hasGoogleKey } from "@/providers/google/client";
 import { textUsage } from "@/providers/google/usage";
-import { TEXT_TIMEOUT_MS } from "@/providers/google/vision";
+import { geminiTextConfig } from "@/providers/google/vision";
 import type { ArtDirector } from "@/providers/interfaces";
 import {
   fallbackVariants,
@@ -110,9 +109,7 @@ export const googleArtDirector: ArtDirector = {
       config: {
         responseMimeType: "application/json",
         responseSchema: PRODUCT_REVIEW_SCHEMA,
-        maxOutputTokens: TEXT_CALL_BUDGETS.productReview.outputTokens,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        httpOptions: { timeout: TEXT_TIMEOUT_MS },
+        ...geminiTextConfig("productReview", model, options.effort),
       },
     });
     return {
@@ -140,9 +137,7 @@ export const googleArtDirector: ArtDirector = {
       config: {
         responseMimeType: "application/json",
         responseSchema: LISTING_COPY_SCHEMA,
-        maxOutputTokens: TEXT_CALL_BUDGETS.listingCopy.outputTokens,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        httpOptions: { timeout: TEXT_TIMEOUT_MS },
+        ...geminiTextConfig("listingCopy", model, options.effort),
       },
     });
     return {
@@ -172,9 +167,7 @@ export const googleArtDirector: ArtDirector = {
       config: {
         responseMimeType: "application/json",
         responseSchema: DIRECTIONS_SCHEMA,
-        maxOutputTokens: TEXT_CALL_BUDGETS.artDirection.outputTokens,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        httpOptions: { timeout: TEXT_TIMEOUT_MS },
+        ...geminiTextConfig("artDirection", model, options.effort),
       },
     });
     const answer = DirectionsAnswer.parse(JSON.parse(res.text ?? "{}"));

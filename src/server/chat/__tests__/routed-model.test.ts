@@ -10,7 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const LUNA = { provider: "openai" as const, model: "gpt-6-luna" };
 const FLASH = { provider: "google" as const, model: "gemini-3.8-flash" };
 
-const candidates = vi.fn(async () => [LUNA, FLASH]);
+const ROUTE = { candidates: [LUNA, FLASH], effort: "low" as const };
+const asked: { id: string; effort: unknown }[] = [];
 const opened: {
   model: string;
   beforeCall: ReturnType<typeof vi.fn>;
@@ -30,7 +31,6 @@ const openDirectCall = vi.fn(async (priced: { model: string }) => {
 const models = new Map<string, LanguageModelV4>();
 
 vi.mock("@/server/text-calls", () => ({
-  textCandidates: candidates,
   textRunnable: () => () => true,
 }));
 vi.mock("@/server/direct-spend", async (importOriginal) => ({
@@ -39,7 +39,8 @@ vi.mock("@/server/direct-spend", async (importOriginal) => ({
 }));
 vi.mock("@/providers/registry", () => ({
   getChatModels: () => ({
-    model: (id: string) => {
+    model: (id: string, effort: unknown) => {
+      asked.push({ id, effort });
       const model = models.get(id);
       if (!model) throw new Error(`no fake for ${id}`);
       return model;
@@ -53,6 +54,7 @@ const { newLedger, routedChatModel } = await import(
 
 afterEach(() => {
   opened.length = 0;
+  asked.length = 0;
   models.clear();
   vi.clearAllMocks();
 });
@@ -108,7 +110,8 @@ describe("the chat's routed model", () => {
     const seen: LanguageModelV4CallOptions[] = [];
     models.set(LUNA.model, streaming(answer("Hola."), seen));
     const ledger = newLedger();
-    const model = await routedChatModel("chatTurn", {
+    const model = routedChatModel("chatTurn", {
+      ...ROUTE,
       projectId: "p1",
       ledger,
     });
@@ -133,6 +136,30 @@ describe("the chat's routed model", () => {
     });
   });
 
+  it("runs at the route's effort: the model is told, the step may write more, and its reservation counts it", async () => {
+    // Gemini's price is dated: read it before Google's change.
+    vi.useFakeTimers({
+      now: new Date("2026-10-31T12:00:00Z"),
+      toFake: ["Date"],
+    });
+    const seen: LanguageModelV4CallOptions[] = [];
+    models.set(FLASH.model, streaming(answer("Hola."), seen));
+    const model = routedChatModel("chatTurn", {
+      candidates: [FLASH],
+      effort: "max",
+      ledger: newLedger(),
+    });
+    await read((await model.doStream(CALL)).stream);
+    expect(asked).toEqual([{ id: FLASH.model, effort: "max" }]);
+    // Gemini thinks at most at high: 2,000 x 4.
+    expect(seen[0].maxOutputTokens).toBe(8_000);
+    // 20,000 in at $0.75 and 8,000 out at $3.75 per 1M.
+    expect(openDirectCall.mock.calls[0][0]).toMatchObject({
+      estimateMax: 0.045,
+    });
+    vi.useRealTimers();
+  });
+
   it("a step the provider refused moves down the route, said so", async () => {
     models.set(
       LUNA.model,
@@ -144,7 +171,7 @@ describe("the chat's routed model", () => {
     );
     models.set(FLASH.model, streaming(answer("Hola.")));
     const ledger = newLedger();
-    const model = await routedChatModel("chatTurn", { ledger });
+    const model = routedChatModel("chatTurn", { ...ROUTE, ledger });
     await read((await model.doStream(CALL)).stream);
     expect(opened.map((o) => o.model)).toEqual([LUNA.model, FLASH.model]);
     expect(opened[0].failed).toHaveBeenCalledWith(
@@ -168,7 +195,10 @@ describe("the chat's routed model", () => {
         },
       }),
     );
-    const model = await routedChatModel("chatTurn", { ledger: newLedger() });
+    const model = routedChatModel("chatTurn", {
+      ...ROUTE,
+      ledger: newLedger(),
+    });
     await expect(model.doStream(CALL)).rejects.toThrow("timed out");
     expect(opened).toHaveLength(1);
   });
@@ -181,7 +211,10 @@ describe("the chat's routed model", () => {
     );
     const doStream = vi.fn();
     models.set(LUNA.model, new MockLanguageModelV4({ doStream }));
-    const model = await routedChatModel("chatTurn", { ledger: newLedger() });
+    const model = routedChatModel("chatTurn", {
+      ...ROUTE,
+      ledger: newLedger(),
+    });
     await expect(model.doStream(CALL)).rejects.toThrow("cap is reached");
     expect(doStream).not.toHaveBeenCalled();
   });
@@ -199,7 +232,10 @@ describe("the chat's routed model", () => {
         }),
       }),
     );
-    const model = await routedChatModel("chatTurn", { ledger: newLedger() });
+    const model = routedChatModel("chatTurn", {
+      ...ROUTE,
+      ledger: newLedger(),
+    });
     const { stream } = await model.doStream(CALL);
     const reader = stream.getReader();
     await reader.read();

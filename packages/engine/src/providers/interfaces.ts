@@ -1,6 +1,7 @@
 import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type { BrandProfile } from "@/domain/brand";
 import type { DestinationText } from "@/domain/destination";
+import type { Effort } from "@/domain/effort";
 import type { ListingText } from "@/domain/listing";
 import type { ProviderId, VideoResolution } from "@/domain/model-defaults";
 import type { PlateRequest, PlateResult, Product } from "@/domain/product";
@@ -25,10 +26,12 @@ import type {
 export type { ProviderId };
 
 // A text call (vision, art direction): the provider's text model to run (from
-// the catalog) and `beforeCall`, run right before the one paid request, like
-// the image and video calls. The answer carries the usage it reported.
+// the catalog), its effort (low when missing) and `beforeCall`, run right
+// before the one paid request, like the image and video calls. The answer
+// carries the usage it reported.
 export interface TextCallOptions {
   model: string;
+  effort?: Effort;
   beforeCall?: () => Promise<void>;
 }
 
@@ -93,7 +96,7 @@ export interface DirectCallOptions {
 // language model the chat's loop drives, step by step. An error the provider
 // answered carries its HTTP `status` (hadResponse), like every adapter's.
 export interface ChatModels {
-  model(id: string): LanguageModelV4;
+  model(id: string, effort?: Effort): LanguageModelV4;
 }
 
 // (c) Image executor.

@@ -1,6 +1,13 @@
 import { zodTextFormat } from "openai/helpers/zod";
+import type { Reasoning } from "openai/resources/shared";
 import type { z } from "zod";
-import { TEXT_CALL_BUDGETS, type TextCallKind } from "@/domain/generation-cost";
+import {
+  DEFAULT_EFFORT,
+  type Effort,
+  effortOn,
+  textTimeoutMs,
+} from "@/domain/effort";
+import { type TextCallKind, textBudget } from "@/domain/generation-cost";
 import { assertModel } from "@/domain/model-defaults";
 import { ProviderKeyMissing } from "@/providers/errors";
 import { mockOutage, providerMode } from "@/providers/mode";
@@ -9,9 +16,8 @@ import type { GenerationUsage } from "@/providers/types";
 
 // OpenAI's text models (Responses API) for vision and art direction, under the
 // money rules of every paid call: one request, never retried by the SDK,
-// marked by `beforeCall`, bounded in time and output, reasoning kept low.
-
-export const TEXT_TIMEOUT_MS = 60_000;
+// marked by `beforeCall`, bounded in time and output by its effort, which is
+// sent as the reasoning effort.
 
 // The answer's usage: input (an image is billed as input tokens) and output,
 // reasoning included.
@@ -47,19 +53,23 @@ export async function askOpenAI<T>(input: {
   content: InputContent[];
   schema: z.ZodType<T>;
   name: string;
+  effort?: Effort;
   beforeCall?: () => Promise<void>;
 }): Promise<{ value: T; usage?: GenerationUsage }> {
   const client = getOpenAI();
+  const model = { provider: "openai", model: input.model };
+  const effort = effortOn(model, input.effort ?? DEFAULT_EFFORT);
   await input.beforeCall?.();
   const res = await client.responses.parse(
     {
       model: input.model,
       input: [{ role: "user", content: input.content }],
       text: { format: zodTextFormat(input.schema, input.name) },
-      max_output_tokens: TEXT_CALL_BUDGETS[input.kind].outputTokens,
-      reasoning: { effort: "low" },
+      max_output_tokens: textBudget(input.kind, model, effort).outputTokens,
+      // The SDK's type predates "max", which the API takes (each model's page).
+      reasoning: { effort: effort as Reasoning["effort"] },
     },
-    { maxRetries: 0, timeout: TEXT_TIMEOUT_MS },
+    { maxRetries: 0, timeout: textTimeoutMs(effort) },
   );
   const usage = textUsageOf(res.usage);
   if (!res.output_parsed) {

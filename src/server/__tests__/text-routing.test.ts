@@ -13,7 +13,8 @@ const withStatus = (status: number) =>
 let routes: MakerRoutes | null = null;
 const keys = { openai: true, google: true };
 const answers = new Map<string, unknown>();
-const priced: { model: string; route?: unknown }[] = [];
+const priced: { model: string; route?: unknown; estimateMax?: unknown }[] = [];
+const sent: { model: string; effort?: string }[] = [];
 
 vi.mock("@/server/maker-repository", () => ({
   getMakerModelSetup: async () => ({ models: DEFAULT_MAKER_MODELS, routes }),
@@ -25,10 +26,14 @@ vi.mock("@/providers/mode", () => ({ providerMode: () => "live" }));
 vi.mock("@/server/direct-spend", async (original) => ({
   ...(await original<typeof import("@/server/direct-spend")>()),
   withDirectSpend: async (
-    call: { model: string; route?: unknown },
+    call: { model: string; route?: unknown; estimateMax?: unknown },
     run: (beforeCall: () => Promise<void>) => Promise<unknown>,
   ) => {
-    priced.push({ model: call.model, route: call.route });
+    priced.push({
+      model: call.model,
+      route: call.route,
+      estimateMax: call.estimateMax,
+    });
     return run(async () => {});
   },
 }));
@@ -36,8 +41,13 @@ vi.mock("@/providers/registry", () => {
   const director = (provider: string) => ({
     reviewProduct: async (
       _input: unknown,
-      options: { model: string; beforeCall: () => Promise<void> },
+      options: {
+        model: string;
+        effort?: string;
+        beforeCall: () => Promise<void>;
+      },
     ) => {
+      sent.push({ model: options.model, effort: options.effort });
       await options.beforeCall();
       const answer = answers.get(`${provider}/${options.model}`);
       if (answer instanceof Error) throw answer;
@@ -64,6 +74,7 @@ beforeEach(() => {
 afterEach(() => {
   answers.clear();
   priced.length = 0;
+  sent.length = 0;
   keys.openai = true;
   keys.google = true;
 });
@@ -159,5 +170,18 @@ describe("text calls on a route", () => {
     });
     expect(result.degraded).toBeDefined();
     expect(priced.map((p) => p.model)).toEqual(["gemini-3.8-flash"]);
+  });
+
+  it("runs at its role's effort, a model asked for by name too, and reserves what it buys", async () => {
+    if (!routes) throw new Error("no routes");
+    routes = { ...routes, fast: { ...routes.fast, effort: "high" } };
+    await reviewProduct(fields);
+    await reviewProduct(fields, { provider: "openai", model: "gpt-6.1-sol" });
+    expect(sent).toEqual([
+      { model: "gpt-6-luna", effort: "high" },
+      { model: "gpt-6.1-sol", effort: "high" },
+    ]);
+    // GPT-6 Luna: 3,000 in at $0.10 and 2,000 x 4 out at $0.50 per 1M.
+    expect(priced[0].estimateMax).toBe(0.0043);
   });
 });

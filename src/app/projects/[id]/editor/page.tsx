@@ -3,6 +3,7 @@ import { enabledModules } from "@/modules/enabled";
 import { ModulesProvider } from "@/modules/modules-context";
 import { getMakerModels } from "@/server/maker-repository";
 import { takeRoutes } from "@/server/take-routes";
+import { photoRead } from "@/server/text-calls";
 
 // The card editor as the advanced view of a planned project's slots
 // (ROADMAP "Experience design"): the studio bound to this project, opened on
@@ -23,6 +24,7 @@ export default async function ProjectEditorPage({
         focusCardId={typeof card === "string" ? card : undefined}
         makerModels={await getMakerModels()}
         takeRoutes={await takeRoutes()}
+        photoRead={await photoRead()}
       />
     </ModulesProvider>
   );

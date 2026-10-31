@@ -134,6 +134,10 @@ describe("the providers' chat models", () => {
       reasoningEffort: "low",
       store: false,
     });
+    await openaiChatModels.model("gpt-6-astra", "max").doStream(CALL);
+    expect(seen[1].providerOptions?.openai).toMatchObject({
+      reasoningEffort: "max",
+    });
     expect(() => openaiChatModels.model("gpt-image-2")).toThrow();
   });
 
@@ -167,6 +171,10 @@ describe("the providers' chat models", () => {
     expect(made).toEqual([{ apiKey: "g-test" }]);
     expect(seen[0].providerOptions?.google).toEqual({
       thinkingConfig: { thinkingLevel: "low" },
+    });
+    await googleChatModels.model("gemini-4-argon", "max").doStream(CALL);
+    expect(seen[1].providerOptions?.google).toEqual({
+      thinkingConfig: { thinkingLevel: "high" },
     });
   });
 });

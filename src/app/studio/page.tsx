@@ -2,6 +2,7 @@ import { StudioShell } from "@/components/studio/studio-shell";
 import { enabledModules } from "@/modules/enabled";
 import { ModulesProvider } from "@/modules/modules-context";
 import { getMakerModelSetup } from "@/server/maker-repository";
+import { photoRead } from "@/server/text-calls";
 
 // The studio: image first, for a design or a photo without a product. It
 // restores the latest studio project; `?open=<id>` opens one (from Home) and
@@ -21,6 +22,7 @@ export default async function StudioPage({
         fresh={fresh === "1"}
         openId={typeof open === "string" ? open : undefined}
         makerModels={{ ...models, image: draft }}
+        photoRead={await photoRead()}
       />
     </ModulesProvider>
   );

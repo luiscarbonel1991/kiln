@@ -69,6 +69,30 @@ describe("Gemini text calls", () => {
     expect(call.config.responseSchema.required).toContain("treatment");
   });
 
+  it("thinks at the route's effort, at most at high, with the output and time it buys", async () => {
+    generateContent.mockResolvedValue({
+      text: JSON.stringify({
+        name: "x",
+        whatItIs: "x",
+        material: "x",
+        treatment: "engraved",
+        colours: [],
+        wording: [],
+        useContext: "x",
+      }),
+      usageMetadata,
+    });
+    await googleVisionProvider.draftProduct(
+      { assetUrl: "https://store/slate.png" },
+      { model: "gemini-4-argon", effort: "xhigh" },
+    );
+    expect(generateContent.mock.calls[0][0].config).toMatchObject({
+      maxOutputTokens: 8_000,
+      thinkingConfig: { thinkingLevel: "HIGH" },
+      httpOptions: { timeout: 150_000 },
+    });
+  });
+
   it("an answer outside the shape throws after the call (never invented)", async () => {
     generateContent.mockResolvedValue({
       text: JSON.stringify({ name: "x", treatment: "laser" }),

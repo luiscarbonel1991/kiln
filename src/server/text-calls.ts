@@ -1,8 +1,9 @@
 import type { BrandProfile } from "@/domain/brand";
 import type { DestinationText } from "@/domain/destination";
+import { DEFAULT_EFFORT, type Effort } from "@/domain/effort";
 import {
-  TEXT_CALL_BUDGETS,
   type TextCallKind,
+  textBudget,
   textEstimate,
 } from "@/domain/generation-cost";
 import type { ListingText } from "@/domain/listing";
@@ -20,6 +21,7 @@ import {
   type RouteEntry,
   roleRoute,
   routeCandidates,
+  routeEffort,
   TEXT_CALL_ROLES,
 } from "@/domain/model-routing";
 import type { Product } from "@/domain/product";
@@ -31,7 +33,7 @@ import {
   neutralUnderstanding,
 } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
-import type { TextResult } from "@/providers/interfaces";
+import type { TextCallOptions, TextResult } from "@/providers/interfaces";
 import { hasProviderKey } from "@/providers/keys";
 import { fallbackVariants } from "@/providers/mock/art-director";
 import { providerMode } from "@/providers/mode";
@@ -46,7 +48,8 @@ import { textCall, withDirectSpend } from "@/server/direct-spend";
 import { getMakerModelSetup } from "@/server/maker-repository";
 
 // Vision, the art director and the product and listing text, on their role's
-// route (TEXT_CALL_ROLES), under the monthly cap like every paid call. A
+// route (TEXT_CALL_ROLES) at its effort, under the monthly cap like every
+// paid call. A
 // failure another model can fix moves down the route the maker saved, each
 // attempt reserved and recorded on its own; the answer then says which model
 // answered and why (`ranOn`). When the route fails, the flow is never blocked:
@@ -74,6 +77,7 @@ function degraded(
   kind: TextCallKind,
   error: unknown,
   tried: readonly TextModel[],
+  effort: Effort,
 ): Degraded {
   const cap = (error as { reason?: unknown } | null)?.reason === "cap";
   const other = catalogFor("text").find(
@@ -92,7 +96,11 @@ function degraded(
             label: other.label,
             usd: textEstimate(
               { provider: other.provider, model: other.id },
-              TEXT_CALL_BUDGETS[kind],
+              textBudget(
+                kind,
+                { provider: other.provider, model: other.id },
+                effort,
+              ),
             ),
           },
   };
@@ -103,28 +111,39 @@ class RouteFailed extends Error {
     readonly last: TextModel,
     readonly tried: TextModel[],
     readonly cause: unknown,
+    readonly effort: Effort,
   ) {
     super(errorMessage(cause));
     this.name = "RouteFailed";
   }
 }
 
-// The models a call may run on: the one asked for by name alone, else its
-// role's route (the default text model alone until the maker saves routes).
+// The models a call may run on and the effort it runs at: the one asked for
+// by name alone, else its role's route (the default text model alone until
+// the maker saves routes); the role's effort either way.
 export async function textCandidates(
   kind: TextCallKind,
   asked?: TextModel,
-): Promise<RouteEntry[]> {
-  if (asked) return [{ provider: asked.provider, model: asked.model }];
+): Promise<{ candidates: RouteEntry[]; effort: Effort }> {
   const { models, routes } = await getMakerModelSetup();
   const route = roleRoute(routes, TEXT_CALL_ROLES[kind]);
-  return routeCandidates(route, route?.models[0] ?? models.text);
+  const effort = routeEffort(route);
+  if (asked) {
+    return {
+      candidates: [{ provider: asked.provider, model: asked.model }],
+      effort,
+    };
+  }
+  return {
+    candidates: routeCandidates(route, route?.models[0] ?? models.text),
+    effort,
+  };
 }
 
 // Whether a model of the route may take a call of this kind now: a pinned
 // price, and its key in a live run.
 export const textRunnable = (kind: TextCallKind) => (entry: RouteEntry) =>
-  textEstimate(entry, TEXT_CALL_BUDGETS[kind]) !== null &&
+  textEstimate(entry, textBudget(kind, entry)) !== null &&
   (providerMode() === "mock" || hasProviderKey(entry.provider));
 
 // Run one text call along its candidates. Each attempt is its own direct call
@@ -133,13 +152,10 @@ export const textRunnable = (kind: TextCallKind) => (entry: RouteEntry) =>
 async function runText<T>(
   kind: TextCallKind,
   asked: TextModel | undefined,
-  call: (
-    model: TextModel,
-    beforeCall: () => Promise<void>,
-  ) => Promise<TextResult<T>>,
+  call: (model: TextModel, options: TextCallOptions) => Promise<TextResult<T>>,
   projectId?: string,
 ): Promise<{ value: T; label: string; ranOn?: RanOn }> {
-  const candidates = await textCandidates(kind, asked);
+  const { candidates, effort } = await textCandidates(kind, asked);
   let [current] = candidates;
   let rest = candidates.slice(1);
   const tried: TextModel[] = [];
@@ -153,7 +169,7 @@ async function runText<T>(
       assertModel(model, "text");
       const result = await withDirectSpend(
         {
-          ...textCall<T>(model, kind),
+          ...textCall<T>(model, kind, effort),
           ...(projectId ? { projectId } : {}),
           ...(move
             ? {
@@ -172,9 +188,13 @@ async function runText<T>(
             : {}),
         },
         (beforeCall) =>
-          call(model, async () => {
-            await beforeCall();
-            callStarted = true;
+          call(model, {
+            model: model.model,
+            effort,
+            beforeCall: async () => {
+              await beforeCall();
+              callStarted = true;
+            },
           }),
       );
       return {
@@ -193,7 +213,7 @@ async function runText<T>(
     } catch (error) {
       const failure = fallbackAfter(model.provider, error, { callStarted });
       const picked = pickNext(rest, model, failure, textRunnable(kind));
-      if (!picked) throw new RouteFailed(model, tried, error);
+      if (!picked) throw new RouteFailed(model, tried, error, effort);
       console.warn(
         `[kiln] ${kind} moved from ${model.model} to ${picked.entry.model}: ${failure.reason}`,
       );
@@ -211,10 +231,10 @@ function routeDegraded(
   asked: TextModel | undefined,
 ): Degraded {
   if (error instanceof RouteFailed) {
-    return degraded(error.last, kind, error.cause, error.tried);
+    return degraded(error.last, kind, error.cause, error.tried, error.effort);
   }
   const model = asked ?? DEFAULT_MAKER_MODELS.text;
-  return degraded(model, kind, error, [model]);
+  return degraded(model, kind, error, [model], DEFAULT_EFFORT);
 }
 
 export async function readProduct(
@@ -229,11 +249,8 @@ export async function readProduct(
     const { value, ranOn } = await runText<BaseUnderstanding>(
       "vision",
       model,
-      (m, beforeCall) =>
-        getVisionProvider(m.provider).analyze(
-          { assetUrl },
-          { model: m.model, beforeCall },
-        ),
+      (m, options) =>
+        getVisionProvider(m.provider).analyze({ assetUrl }, options),
     );
     return { understanding: value, ...(ranOn ? { ranOn } : {}) };
   } catch (error) {
@@ -262,11 +279,8 @@ export async function directScenes(
     const { value, ranOn } = await runText<VariantDirection[]>(
       "artDirection",
       model,
-      (m, beforeCall) =>
-        getArtDirector(m.provider).proposeDirections(input, {
-          model: m.model,
-          beforeCall,
-        }),
+      (m, options) =>
+        getArtDirector(m.provider).proposeDirections(input, options),
     );
     return { variants: value, ...(ranOn ? { ranOn } : {}) };
   } catch (error) {
@@ -289,11 +303,8 @@ export async function draftProduct(
     const { value: draft, ranOn } = await runText<ProductDraft>(
       "productDraft",
       model,
-      (m, beforeCall) =>
-        getVisionProvider(m.provider).draftProduct(
-          { assetUrl },
-          { model: m.model, beforeCall },
-        ),
+      (m, options) =>
+        getVisionProvider(m.provider).draftProduct({ assetUrl }, options),
     );
     return {
       draft: {
@@ -331,11 +342,7 @@ export async function writeListing(
     const { value, ranOn } = await runText<ListingCopy>(
       "listingCopy",
       model,
-      (m, beforeCall) =>
-        getArtDirector(m.provider).writeListing(input, {
-          model: m.model,
-          beforeCall,
-        }),
+      (m, options) => getArtDirector(m.provider).writeListing(input, options),
       projectId,
     );
     const clean = (list: string[]) => list.map((x) => x.trim()).filter(Boolean);
@@ -372,11 +379,8 @@ export async function reviewProduct(
     const { value, label, ranOn } = await runText<ProductReview>(
       "productReview",
       model,
-      (m, beforeCall) =>
-        getArtDirector(m.provider).reviewProduct(
-          { fields },
-          { model: m.model, beforeCall },
-        ),
+      (m, options) =>
+        getArtDirector(m.provider).reviewProduct({ fields }, options),
     );
     return { review: value, label, ...(ranOn ? { ranOn } : {}) };
   } catch (error) {
@@ -386,31 +390,54 @@ export async function reviewProduct(
 }
 
 // What a text call of this kind would run on and cost, before asking: its
-// route's models that may run (the first always), what the first costs, and
-// the most it can cost, one charged call at most, so the dearest model's.
-// Null prices when a model has none pinned.
-export async function textRoute(kind: TextCallKind): Promise<{
+// route's models that may run (the first always) at its effort, what the
+// first costs, and the most it can cost, one charged call at most, so the
+// dearest model's. Null prices when a model has none pinned.
+export async function textRoute(kind: TextCallKind): Promise<TextRouteView> {
+  const { candidates, effort } = await textCandidates(kind);
+  return routeView(kind, candidates, effort);
+}
+
+export interface TextRouteView {
   labels: string[];
+  effort: Effort;
   typical: number | null;
   max: number | null;
-}> {
-  const candidates = (await textCandidates(kind)).filter(
-    (c, i) => i === 0 || textRunnable(kind)(c),
-  );
+}
+
+export function routeView(
+  kind: TextCallKind,
+  route: RouteEntry[],
+  effort: Effort,
+): TextRouteView {
+  const candidates = route.filter((c, i) => i === 0 || textRunnable(kind)(c));
+  const usd = (entry: RouteEntry) =>
+    textEstimate(entry, textBudget(kind, entry, effort));
   let worst: number | null = null;
   for (const entry of candidates) {
-    const usd = textEstimate(entry, TEXT_CALL_BUDGETS[kind]);
-    if (usd === null) {
+    const each = usd(entry);
+    if (each === null) {
       worst = null;
       break;
     }
-    worst = Math.max(worst ?? 0, usd);
+    worst = Math.max(worst ?? 0, each);
   }
   return {
     labels: candidates.map(modelLabel),
-    typical: textEstimate(candidates[0], TEXT_CALL_BUDGETS[kind]),
+    effort,
+    typical: usd(candidates[0]),
     max: worst,
   };
+}
+
+// What reading an uploaded photo runs on and costs at most (the studio's
+// upload says it before the paid read).
+export async function photoRead(): Promise<{
+  label: string;
+  usd: number | null;
+}> {
+  const route = await textRoute("vision");
+  return { label: route.labels[0], usd: route.max };
 }
 
 // The most a text call of this kind can cost along its route (the price

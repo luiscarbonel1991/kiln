@@ -209,6 +209,7 @@ export {
   roleRoute,
   routeCandidates,
   routedRequest,
+  routeEffort,
   routeEntry,
   routeHeads,
   sameModel,

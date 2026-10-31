@@ -1,9 +1,10 @@
+import { DEFAULT_EFFORT, type Effort } from "@/domain/effort";
 import {
   costFromUsage,
   estimateGeneration,
   estimateVideo,
-  TEXT_CALL_BUDGETS,
   type TextCallKind,
+  textBudget,
   textEstimate,
   toMicros,
   videoCost,
@@ -82,16 +83,17 @@ export function videoCall(
   };
 }
 
-// A text call (vision, art direction): bounded by its budget, measured from
-// the usage it reports.
+// A text call (vision, art direction): bounded by its budget at its effort,
+// measured from the usage it reports.
 export function textCall<T>(
   model: { provider: string; model: string },
   kind: TextCallKind,
+  effort: Effort = DEFAULT_EFFORT,
 ): PricedCall<TextResult<T>> {
   return {
     provider: model.provider,
     model: model.model,
-    estimateMax: textEstimate(model, TEXT_CALL_BUDGETS[kind]),
+    estimateMax: textEstimate(model, textBudget(kind, model, effort)),
     costOf: (result) =>
       result.usage ? costFromUsage(model, result.usage) : null,
   };

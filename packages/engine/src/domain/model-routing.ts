@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PROVIDER_CAPABILITIES } from "@/domain/capabilities";
+import { DEFAULT_EFFORT, Effort } from "@/domain/effort";
 import {
   estimateGeneration,
   estimateVideo,
@@ -74,8 +75,14 @@ export const Route = z.object({
   // Whether a failure moves to the next model. Off for images and video until
   // the maker turns it on: another model changes the look.
   fallback: z.boolean(),
+  // A text route's effort (domain/effort.ts), on every model of the route;
+  // low when missing. Never on an image or video route.
+  effort: Effort.optional(),
 });
 export type Route = z.infer<typeof Route>;
+
+export const routeEffort = (route: Route | null | undefined): Effort =>
+  route?.effort ?? DEFAULT_EFFORT;
 
 export const sameModel = (
   a: { provider: string; model: string },
@@ -115,6 +122,13 @@ const ROUTES_SHAPE = Object.fromEntries(
 export const MakerRoutes = z.object(ROUTES_SHAPE).superRefine((routes, ctx) => {
   for (const role of ModelRole.options) {
     const kind = ROLE_KIND[role];
+    if (kind !== "text" && routes[role].effort) {
+      ctx.addIssue({
+        code: "custom",
+        path: [role, "effort"],
+        message: `An effort is for text; the ${role} route has none.`,
+      });
+    }
     routes[role].models.forEach((entry, i) => {
       const problem = entryProblem(entry, kind);
       if (problem) {
@@ -153,6 +167,11 @@ export function readRoutes(
     const parsed = z
       .object({ models: z.array(z.unknown()), fallback: z.boolean() })
       .safeParse(saved[role]);
+    const effort = Effort.safeParse(
+      (saved[role] as { effort?: unknown } | null)?.effort,
+    );
+    const effortOf =
+      kind === "text" && effort.success ? { effort: effort.data } : {};
     const models: RouteEntry[] = [];
     for (const item of parsed.success ? parsed.data.models : []) {
       const entry = RouteEntry.safeParse(item);
@@ -161,11 +180,12 @@ export function readRoutes(
       models.push(routeEntry(entry.data, kind));
     }
     if (models.length === 0) {
-      return { models: [headOf(defaults, kind)], fallback: false };
+      return { models: [headOf(defaults, kind)], fallback: false, ...effortOf };
     }
     return {
       models: models.slice(0, MAX_ROUTE),
       fallback: parsed.success ? parsed.data.fallback : false,
+      ...effortOf,
     };
   };
   return Object.fromEntries(

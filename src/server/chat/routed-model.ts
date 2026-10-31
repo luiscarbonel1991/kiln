@@ -4,10 +4,11 @@ import type {
   LanguageModelV4StreamPart,
   LanguageModelV4Usage,
 } from "@ai-sdk/provider";
+import type { Effort } from "@/domain/effort";
 import {
   costFromUsage,
   type GenerationUsage,
-  TEXT_CALL_BUDGETS,
+  textBudget,
   toMicros,
 } from "@/domain/generation-cost";
 import { modelLabel } from "@/domain/model-defaults";
@@ -22,11 +23,12 @@ import {
   openDirectCall,
   textCall,
 } from "@/server/direct-spend";
-import { textCandidates, textRunnable } from "@/server/text-calls";
+import { textRunnable } from "@/server/text-calls";
 
-// The chat's model: its role's route behind one language model. Each step of
-// a turn is one direct call under the monthly cap, its estimate reserved
-// first and its measured cost recorded when its stream ends. A step the
+// The chat's model: a route behind one language model, every model at the
+// route's effort. Each step of a turn is one direct call under the monthly
+// cap, its estimate (the step's budget at that effort) reserved first and its
+// measured cost recorded when its stream ends. A step the
 // provider refused (an HTTP error, before anything streamed) moves down the
 // route the maker saved, as fallbackAfter allows; a step with no answer (a
 // timeout, a dropped connection) or one that failed midway ends the turn,
@@ -99,13 +101,16 @@ function metered(
   });
 }
 
-export async function routedChatModel(
+export function routedChatModel(
   kind: ChatKind,
-  options: { projectId?: string; ledger: TurnLedger },
-): Promise<LanguageModelV4> {
-  const candidates = await textCandidates(kind);
-  const budget = TEXT_CALL_BUDGETS[kind];
-  const { ledger, projectId } = options;
+  options: {
+    candidates: RouteEntry[];
+    effort: Effort;
+    projectId?: string;
+    ledger: TurnLedger;
+  },
+): LanguageModelV4 {
+  const { candidates, effort, ledger, projectId } = options;
 
   async function attempt<R>(
     run: (model: LanguageModelV4, entry: RouteEntry) => Promise<R>,
@@ -121,7 +126,7 @@ export async function routedChatModel(
     for (;;) {
       const entry = current;
       const direct = await openDirectCall({
-        ...textCall<undefined>(entry, kind),
+        ...textCall<undefined>(entry, kind, effort),
         ...(projectId ? { projectId } : {}),
         ...(move
           ? {
@@ -141,7 +146,7 @@ export async function routedChatModel(
       });
       let callStarted = false;
       try {
-        const model = getChatModels(entry.provider).model(entry.model);
+        const model = getChatModels(entry.provider).model(entry.model, effort);
         await direct.beforeCall();
         callStarted = true;
         const result = await run(model, entry);
@@ -168,13 +173,13 @@ export async function routedChatModel(
     }
   }
 
-  const bounded = (call: LanguageModelV4CallOptions) => ({
-    ...call,
-    maxOutputTokens: Math.min(
-      call.maxOutputTokens ?? budget.outputTokens,
-      budget.outputTokens,
-    ),
-  });
+  const bounded = (call: LanguageModelV4CallOptions, entry: RouteEntry) => {
+    const most = textBudget(kind, entry, effort).outputTokens;
+    return {
+      ...call,
+      maxOutputTokens: Math.min(call.maxOutputTokens ?? most, most),
+    };
+  };
 
   return {
     specificationVersion: "v4",
@@ -183,7 +188,7 @@ export async function routedChatModel(
     supportedUrls: {},
     doGenerate: (call) =>
       attempt(
-        async (model) => model.doGenerate(bounded(call)),
+        async (model, entry) => model.doGenerate(bounded(call, entry)),
         async (result, entry, direct) => {
           const usage = usageOf(result.usage);
           await direct.done({ usage });
@@ -194,7 +199,7 @@ export async function routedChatModel(
       ),
     doStream: (call) =>
       attempt(
-        async (model) => model.doStream(bounded(call)),
+        async (model, entry) => model.doStream(bounded(call, entry)),
         async (result, entry, direct) => ({
           ...result,
           stream: metered(result.stream, entry, direct, ledger),

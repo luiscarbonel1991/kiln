@@ -33,6 +33,7 @@ export const openaiVisionProvider: VisionProvider = {
           detail: "high",
         },
       ],
+      effort: options.effort,
       beforeCall: options.beforeCall,
     });
     return {
@@ -58,6 +59,7 @@ export const openaiVisionProvider: VisionProvider = {
           detail: "high",
         },
       ],
+      effort: options.effort,
       beforeCall: options.beforeCall,
     });
     return { value: answer.value, model: model.id, usage: answer.usage };

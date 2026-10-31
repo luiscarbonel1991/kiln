@@ -1,12 +1,19 @@
 import { ThinkingLevel, Type } from "@google/genai";
-import { TEXT_CALL_BUDGETS } from "@/domain/generation-cost";
+import {
+  DEFAULT_EFFORT,
+  type Effort,
+  effortOn,
+  googleThinking,
+  textTimeoutMs,
+} from "@/domain/effort";
+import { type TextCallKind, textBudget } from "@/domain/generation-cost";
 import { assertModel } from "@/domain/model-defaults";
 import { BaseUnderstanding } from "@/domain/understanding";
 import { fetchAsset } from "@/providers/asset-bytes";
 import { ProviderKeyMissing } from "@/providers/errors";
 import { getGenAI, hasGoogleKey } from "@/providers/google/client";
 import { textUsage } from "@/providers/google/usage";
-import type { VisionProvider } from "@/providers/interfaces";
+import type { TextCallOptions, VisionProvider } from "@/providers/interfaces";
 import {
   MOCK_PRODUCT_DRAFT,
   MOCK_UNDERSTANDING,
@@ -19,8 +26,27 @@ import {
   VisionAnswer,
 } from "@/providers/text-prompts";
 
-// A text call's bound (it reads one photo and writes a short JSON).
-export const TEXT_TIMEOUT_MS = 60_000;
+const THINKING = {
+  low: ThinkingLevel.LOW,
+  medium: ThinkingLevel.MEDIUM,
+  high: ThinkingLevel.HIGH,
+} as const;
+
+// What a Gemini text call is sent for its effort: the thinking level, the
+// output cap (thinking included) and the time it may take.
+export function geminiTextConfig(
+  kind: TextCallKind,
+  model: string,
+  asked: Effort = DEFAULT_EFFORT,
+) {
+  const entry = { provider: "google", model };
+  const effort = effortOn(entry, asked);
+  return {
+    maxOutputTokens: textBudget(kind, entry, effort).outputTokens,
+    thinkingConfig: { thinkingLevel: THINKING[googleThinking(effort)] },
+    httpOptions: { timeout: textTimeoutMs(effort) },
+  };
+}
 
 // The answer shape in Gemini's schema dialect (the same fields as VisionAnswer).
 export const VISION_SCHEMA = {
@@ -93,14 +119,14 @@ export const PRODUCT_DRAFT_SCHEMA = {
 };
 
 // One photo, one paid request (no SDK retry), marked by `beforeCall`, bounded
-// in time and output, thinking kept low; the JSON answer parsed by `answer`.
+// in time and output by its effort; the JSON answer parsed by `answer`.
 async function askGemini<T>(
   assetUrl: string,
-  options: { model: string; beforeCall?: () => Promise<void> },
+  options: TextCallOptions,
   ask: {
+    kind: TextCallKind;
     prompt: string;
     schema: object;
-    outputTokens: number;
     parse: (json: unknown) => T;
   },
 ) {
@@ -115,9 +141,7 @@ async function askGemini<T>(
     config: {
       responseMimeType: "application/json",
       responseSchema: ask.schema,
-      maxOutputTokens: ask.outputTokens,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-      httpOptions: { timeout: TEXT_TIMEOUT_MS },
+      ...geminiTextConfig(ask.kind, options.model, options.effort),
     },
   });
   return {
@@ -132,7 +156,7 @@ const geminiTextModel = (model: string) =>
 
 // Gemini multimodal: reads the photo and returns a structured BaseUnderstanding.
 // One paid request (no SDK retry), marked by `beforeCall`, bounded in time and
-// output, thinking kept low; a failure throws (the caller says it degraded).
+// output by its effort; a failure throws (the caller says it degraded).
 export const googleVisionProvider: VisionProvider = {
   async analyze(input, options) {
     const model = geminiTextModel(options.model);
@@ -147,9 +171,9 @@ export const googleVisionProvider: VisionProvider = {
       input.assetUrl,
       { ...options, model },
       {
+        kind: "vision",
         prompt: VISION_PROMPT,
         schema: VISION_SCHEMA,
-        outputTokens: TEXT_CALL_BUDGETS.vision.outputTokens,
         parse: (json) => BaseUnderstanding.parse(VisionAnswer.parse(json)),
       },
     );
@@ -167,9 +191,9 @@ export const googleVisionProvider: VisionProvider = {
       input.assetUrl,
       { ...options, model },
       {
+        kind: "productDraft",
         prompt: PRODUCT_DRAFT_PROMPT,
         schema: PRODUCT_DRAFT_SCHEMA,
-        outputTokens: TEXT_CALL_BUDGETS.productDraft.outputTokens,
         parse: (json) => ProductDraft.parse(json),
       },
     );

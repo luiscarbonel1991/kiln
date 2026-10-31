@@ -17,6 +17,7 @@ import {
   readRoutes,
   routeCandidates,
   routedRequest,
+  routeEffort,
   takeEstimate,
   videoTakeEstimate,
   worstCase,
@@ -141,6 +142,37 @@ describe("MakerRoutes and readRoutes", () => {
         "video.models.0",
       ]),
     );
+  });
+
+  it("keeps a text route's effort, low when missing, never on images or video", () => {
+    expect(routeEffort(routes.fast)).toBe("low");
+    expect(routeEffort(null)).toBe("low");
+    expect(
+      MakerRoutes.safeParse({
+        ...routes,
+        deep: { ...routes.deep, effort: "max" },
+      }).success,
+    ).toBe(true);
+    const onImages = MakerRoutes.safeParse({
+      ...routes,
+      final: { ...routes.final, effort: "high" },
+    });
+    expect(onImages.error?.issues.map((i) => i.path.join("."))).toEqual([
+      "final.effort",
+    ]);
+    const read = readRoutes(
+      {
+        ...routes,
+        deep: { ...routes.deep, effort: "xhigh" },
+        fast: { ...routes.fast, effort: "enormous" },
+        final: { ...routes.final, effort: "high" },
+      },
+      DEFAULT_MAKER_MODELS,
+    );
+    expect(read?.deep.effort).toBe("xhigh");
+    expect(read?.fast.effort).toBeUndefined();
+    expect(routeEffort(read?.fast)).toBe("low");
+    expect(read?.final.effort).toBeUndefined();
   });
 
   it("is null when no route was ever saved", () => {

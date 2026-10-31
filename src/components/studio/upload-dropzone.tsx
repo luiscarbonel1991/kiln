@@ -7,8 +7,6 @@ import {
   ACCEPTED_IMAGE_MIME,
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
-import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
-import { defaultTextModel, modelLabel } from "@/domain/model-defaults";
 import { masterAssetFromUpload } from "@/lib/master-asset";
 import { cn } from "@/lib/utils";
 import { useProject } from "@/store/project";
@@ -28,8 +26,7 @@ function validateFile(file: File): string | null {
 export function UploadDropzone() {
   const setMaster = useProject((s) => s.setMaster);
   // The upload starts a paid read of the photo, so its price shows first.
-  const textModel = defaultTextModel(useProject((s) => s.makerModels));
-  const visionUsd = textEstimate(textModel, TEXT_CALL_BUDGETS.vision);
+  const read = useProject((s) => s.photoRead);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -99,9 +96,9 @@ export function UploadDropzone() {
               className="mt-1 block font-mono text-[0.65rem] text-on-surface-mid"
               data-testid="vision-price"
             >
-              {visionUsd === null
-                ? `${modelLabel(textModel)} reads it: no pinned price`
-                : `${modelLabel(textModel)} reads it · ≤ $${visionUsd.toFixed(3)}`}
+              {read.usd === null
+                ? `${read.label} reads it: no pinned price`
+                : `${read.label} reads it · ≤ $${read.usd.toFixed(3)}`}
             </span>
           )}
         </span>

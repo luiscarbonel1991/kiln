@@ -8,6 +8,7 @@ import {
   type FieldKey,
   type PlanningFields,
 } from "@/domain/cascade";
+import { TEXT_CALL_BUDGETS, textEstimate } from "@/domain/generation-cost";
 import type { MasterAsset } from "@/domain/master-asset";
 import type { ModelConfig } from "@/domain/model-config";
 import {
@@ -15,6 +16,7 @@ import {
   defaultImageModel,
   defaultVideoModel,
   type MakerModels,
+  modelLabel,
 } from "@/domain/model-defaults";
 import {
   NO_TAKE_ROUTES,
@@ -39,6 +41,13 @@ export type Phase = "upload" | "analysis" | "planning" | "generation";
 // per-card generation trigger (bumped on each re-roll). vectorUrl lives on the
 // domain Card now (persisted), so StudioCard only adds the render seed.
 export type StudioCard = Card & { renderSeed: number };
+
+// What reading an uploaded photo runs on and costs at most, on the vision
+// route at its effort (from the server; text-calls.ts textRoute).
+export interface PhotoRead {
+  label: string;
+  usd: number | null;
+}
 
 // What the server reports about a planned project's generations (polled):
 // each card's latest job, and the cards' server-owned state.
@@ -70,6 +79,8 @@ interface ProjectState {
   // The routes a planned project's take is priced along (Settings → Models).
   takeRoutes: TakeRoutes;
   setTakeRoutes: (routes: TakeRoutes) => void;
+  photoRead: PhotoRead;
+  setPhotoRead: (read: PhotoRead) => void;
   setMaster: (master: MasterAsset) => void;
   setUnderstanding: (understanding: BaseUnderstanding) => void;
   editUnderstandingField: (
@@ -117,6 +128,11 @@ export const useProject = create<ProjectState>((set, get) => ({
   setMakerModels: (makerModels) => set({ makerModels }),
   takeRoutes: NO_TAKE_ROUTES,
   setTakeRoutes: (takeRoutes) => set({ takeRoutes }),
+  photoRead: {
+    label: modelLabel(DEFAULT_MAKER_MODELS.text),
+    usd: textEstimate(DEFAULT_MAKER_MODELS.text, TEXT_CALL_BUDGETS.vision),
+  },
+  setPhotoRead: (photoRead) => set({ photoRead }),
   // Re-capturing clears everything downstream of the new master.
   setMaster: (master) =>
     set({

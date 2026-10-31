@@ -30,6 +30,7 @@ export const openaiArtDirector: ArtDirector = {
       name: "review",
       schema: ProductReview,
       content: [{ type: "input_text", text: productReviewPrompt(fields) }],
+      effort: options.effort,
       beforeCall: options.beforeCall,
     });
     return { value: answer.value, model: model.id, usage: answer.usage };
@@ -45,6 +46,7 @@ export const openaiArtDirector: ArtDirector = {
       name: "listing",
       schema: ListingCopy,
       content: [{ type: "input_text", text: listingCopyPrompt(input) }],
+      effort: options.effort,
       beforeCall: options.beforeCall,
     });
     return { value: answer.value, model: model.id, usage: answer.usage };
@@ -65,6 +67,7 @@ export const openaiArtDirector: ArtDirector = {
           text: artDirectionPrompt(understanding, brand, slots),
         },
       ],
+      effort: options.effort,
       beforeCall: options.beforeCall,
     });
     return {

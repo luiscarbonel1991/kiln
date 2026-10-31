@@ -6,6 +6,7 @@ import {
   streamText,
   toUIMessageStream,
 } from "ai";
+import { turnMs } from "@/domain/effort";
 import { errorMessage } from "@/domain/queue";
 import {
   appendChatEvent,
@@ -27,16 +28,17 @@ import {
 import "@/server/chat/no-gateway";
 import { newLedger, routedChatModel } from "@/server/chat/routed-model";
 import { SPECIALISTS, type SpecialistId } from "@/server/chat/specialists";
+import { textCandidates } from "@/server/text-calls";
 
 // One turn of the chat (ROADMAP "Agents", stage 2): one request, run inside
 // Kiln (Luis, 2026-10-30: no Vercel). It takes the session's lock, adds what
 // the maker did to the stored conversation, and streams the agent's reply
 // while it runs Kiln's tools on its role's route, at most MAX_STEPS model
-// calls and TURN_MS long. Each step is stored as it ends, so a closed tab or
-// a reload loses nothing; Stop ends the turn from another request.
+// calls and as long as the route's effort allows (turnMs). Each step is
+// stored as it ends, so a closed tab or a reload loses nothing; Stop ends the
+// turn from another request.
 
 export const MAX_STEPS = 12;
-export const TURN_MS = 4 * 60_000;
 
 export class TurnRefusal extends Error {
   constructor(
@@ -60,13 +62,13 @@ export function stopTurn(sessionId: string): boolean {
   return turn !== undefined;
 }
 
-function wordsFor(error: unknown, signal: AbortSignal): string {
+function wordsFor(error: unknown, signal: AbortSignal, ms: number): string {
   if (signal.aborted) {
     const reason = signal.reason as
       | { name?: string; message?: string }
       | undefined;
     return reason?.name === "TimeoutError"
-      ? `The turn ran out of time (${TURN_MS / 60_000} minutes).`
+      ? `The turn ran out of time (${ms / 60_000} minutes).`
       : (reason?.message ?? "Stopped.");
   }
   return errorMessage(error);
@@ -110,10 +112,15 @@ export async function runTurn(input: {
     const ctx = { tokenId: null, tokenName: "Chat", canSpend: true, sessionId };
     const specialist = SPECIALISTS[input.specialist ?? "kiln"];
     const tools = chatTools(ctx, specialist);
-    const model = await routedChatModel(input.plan ? "chatPlan" : "chatTurn", {
+    const kind = input.plan ? "chatPlan" : "chatTurn";
+    const { candidates, effort } = await textCandidates(kind);
+    const model = routedChatModel(kind, {
+      candidates,
+      effort,
       ...(chat.projectId ? { projectId: chat.projectId } : {}),
       ledger,
     });
+    const ms = turnMs(effort);
     const visible = messages.filter((m) => !isEvent(m));
     const last = visible.at(-1);
     const priorMicros =
@@ -128,7 +135,7 @@ export async function runTurn(input: {
 
     const stop = new AbortController();
     running.set(sessionId, stop);
-    const signal = AbortSignal.any([stop.signal, AbortSignal.timeout(TURN_MS)]);
+    const signal = AbortSignal.any([stop.signal, AbortSignal.timeout(ms)]);
     let ended = false;
     const end = async () => {
       if (ended) return;
@@ -177,7 +184,9 @@ export async function runTurn(input: {
                   ...m,
                   metadata: {
                     ...metadata(),
-                    ...(isAborted ? { stopped: wordsFor(null, signal) } : {}),
+                    ...(isAborted
+                      ? { stopped: wordsFor(null, signal, ms) }
+                      : {}),
                   },
                 }
               : m,
@@ -189,7 +198,7 @@ export async function runTurn(input: {
           await end();
         }
       },
-      onError: (error) => wordsFor(error, signal),
+      onError: (error) => wordsFor(error, signal, ms),
     });
     return createUIMessageStreamResponse({
       stream,

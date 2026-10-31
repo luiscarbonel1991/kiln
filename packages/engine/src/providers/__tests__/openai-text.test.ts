@@ -74,6 +74,24 @@ describe("OpenAI vision", () => {
     });
   });
 
+  it("sends the route's effort: that reasoning, more output and more time", async () => {
+    parse.mockResolvedValue({
+      output_parsed: answer,
+      usage: { input_tokens: 1500, output_tokens: 400 },
+    });
+    await openaiVisionProvider.analyze(
+      { assetUrl: "https://store/plaque.png" },
+      { model: "gpt-6-astra", effort: "max" },
+    );
+    const [body, options] = parse.mock.calls[0];
+    expect(options).toEqual({ maxRetries: 0, timeout: 300_000 });
+    expect(body).toMatchObject({
+      model: "gpt-6-astra",
+      max_output_tokens: 48_000,
+      reasoning: { effort: "max" },
+    });
+  });
+
   it("an answer it could not finish throws after the call (it was paid)", async () => {
     parse.mockResolvedValue({
       output_parsed: null,
