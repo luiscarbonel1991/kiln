@@ -162,5 +162,22 @@
     "calls": ["suggest_specialist"],
     "never": ["draw"],
     "language": "en"
+  },
+  {
+    "id": "lesson-propose",
+    "on": "review",
+    "specialist": "scenes",
+    "message": "From now on, always show this kind of product from a little above in the hero. Remember that.",
+    "calls": ["propose_lesson"],
+    "never": ["generate"],
+    "language": "en"
+  },
+  {
+    "id": "lesson-read",
+    "on": "maker",
+    "specialist": "kiln",
+    "message": "¿Qué lecciones me guardaste hasta ahora?",
+    "calls": ["list_lessons"],
+    "language": "es"
   }
 ]
