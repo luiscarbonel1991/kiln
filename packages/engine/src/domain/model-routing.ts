@@ -220,11 +220,11 @@ type Pair = Record<ProviderId, RouteEntry>;
 
 const DEEP: Pair = {
   openai: { provider: "openai", model: "gpt-6.1-sol" },
-  google: { provider: "google", model: "gemini-3.5-flash" },
+  google: { provider: "google", model: "gemini-3.8-flash" },
 };
 const FAST: Pair = {
   openai: { provider: "openai", model: "gpt-6-luna" },
-  google: { provider: "google", model: "gemini-3.8-flash" },
+  google: { provider: "google", model: "gemini-3.5-flash-lite" },
 };
 const FINAL: Pair = {
   openai: { provider: "openai", model: "gpt-image-2", quality: "medium" },

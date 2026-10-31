@@ -81,20 +81,20 @@ describe("text calls on a route", () => {
     const result = await reviewProduct(fields);
     expect(result.review).toBeDefined();
     expect(result.ranOn).toEqual({
-      label: "Gemini 3.8 Flash",
+      label: "Gemini 3.5 Flash-Lite",
       from: "GPT-6 Luna",
       reason: "OpenAI answered 503",
     });
     expect(priced.map((p) => p.model)).toEqual([
       "gpt-6-luna",
-      "gemini-3.8-flash",
+      "gemini-3.5-flash-lite",
     ]);
     expect(priced[0].route).toBeUndefined();
     expect(priced[1].route).toMatchObject({
       switched: [
         {
           from: { provider: "openai", model: "gpt-6-luna" },
-          to: { provider: "google", model: "gemini-3.8-flash" },
+          to: { provider: "google", model: "gemini-3.5-flash-lite" },
           reason: "OpenAI answered 503",
         },
       ],
@@ -123,10 +123,10 @@ describe("text calls on a route", () => {
 
   it("offers no other provider when every provider was tried", async () => {
     answers.set("openai/gpt-6-luna", withStatus(503));
-    answers.set("google/gemini-3.8-flash", withStatus(500));
+    answers.set("google/gemini-3.5-flash-lite", withStatus(500));
     const result = await reviewProduct(fields);
     expect(result.degraded).toMatchObject({
-      model: "gemini-3.8-flash",
+      model: "gemini-3.5-flash-lite",
       alternative: null,
     });
     expect(priced).toHaveLength(2);
@@ -152,12 +152,12 @@ describe("text calls on a route", () => {
   });
 
   it("runs a model asked for by name alone", async () => {
-    answers.set("google/gemini-3.5-flash", withStatus(503));
+    answers.set("google/gemini-3.8-flash", withStatus(503));
     const result = await reviewProduct(fields, {
       provider: "google",
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
     });
     expect(result.degraded).toBeDefined();
-    expect(priced.map((p) => p.model)).toEqual(["gemini-3.5-flash"]);
+    expect(priced.map((p) => p.model)).toEqual(["gemini-3.8-flash"]);
   });
 });

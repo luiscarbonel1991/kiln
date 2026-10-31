@@ -36,6 +36,33 @@ describe("model catalog", () => {
     );
   });
 
+  it("offers each provider's most capable text model, verified 2026-10-31", () => {
+    const text = catalogFor("text").map((m) => m.id);
+    expect(text).toEqual([
+      "gpt-6.1-sol",
+      "gpt-6-astra",
+      "gpt-6.1-terra",
+      "gpt-6-luna",
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash-lite",
+    ]);
+  });
+
+  it("refuses Gemini 3.5 Flash and names what Google answers it with", () => {
+    expect(modelLabel({ provider: "google", model: "gemini-3.5-flash" })).toBe(
+      "Gemini 3.5 Flash (retired)",
+    );
+    const check = checkModel(
+      { provider: "google", model: "gemini-3.5-flash" },
+      "text",
+    );
+    expect(check.ok ? "" : check.message).toBe(
+      "Gemini 3.5 Flash was retired on 2026-10-08: Google answers it with Gemini 3.6 Flash — pick that or another text model.",
+    );
+  });
+
   it("refuses a model it does not offer, or offered for another kind", () => {
     expect(
       checkModel({ provider: "google", model: "made-up" }, "image"),

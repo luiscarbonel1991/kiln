@@ -21,7 +21,7 @@ describe("art director without a key", () => {
       "@/providers/google/art-director"
     );
     const { value } = await googleArtDirector.proposeDirections(input, {
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
     });
     expect(value.map((v) => v.direction)).toEqual(
       SEED_RECIPE.directions.map((d) => d.label),
@@ -41,7 +41,7 @@ describe("art director without a key", () => {
       "@/providers/openai/art-director"
     );
     await expect(
-      googleArtDirector.proposeDirections(input, { model: "gemini-3.5-flash" }),
+      googleArtDirector.proposeDirections(input, { model: "gemini-3.8-flash" }),
     ).rejects.toMatchObject({ name: "ProviderKeyMissing" });
     await expect(
       openaiArtDirector.proposeDirections(input, { model: "gpt-6.1-sol" }),

@@ -77,7 +77,7 @@ describe("Gemini text calls", () => {
     await expect(
       googleVisionProvider.draftProduct(
         { assetUrl: "https://store/x.png" },
-        { model: "gemini-3.5-flash" },
+        { model: "gemini-3.8-flash" },
       ),
     ).rejects.toThrow();
   });

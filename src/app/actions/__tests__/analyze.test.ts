@@ -1,7 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { analyzeMaster } from "@/app/actions/analyze";
 
 describe("analyzeMaster", () => {
+  // The offer's price is dated: read it before Google's change.
+  beforeEach(() => {
+    vi.useFakeTimers({
+      now: new Date("2026-10-31T12:00:00Z"),
+      toFake: ["Date"],
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("says it degraded when the text model cannot run (no key), and offers the other provider", async () => {
     const { understanding, degraded } = await analyzeMaster({
       assetUrl: "https://stub.local/x.png",
@@ -17,9 +28,9 @@ describe("analyzeMaster", () => {
       message: "OpenAI has no API key (OPENAI_API_KEY is not set).",
       alternative: {
         provider: "google",
-        model: "gemini-3.5-flash",
-        label: "Gemini 3.5 Flash",
-        usd: 0.033,
+        model: "gemini-3.8-flash",
+        label: "Gemini 3.8 Flash",
+        usd: 0.0143,
       },
     });
   });

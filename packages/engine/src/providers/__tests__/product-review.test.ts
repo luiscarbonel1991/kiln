@@ -50,7 +50,7 @@ describe("the product review's question", () => {
       TEXT_CALL_BUDGETS.productReview,
     );
     const flash = textEstimate(
-      { provider: "google", model: "gemini-3.5-flash" },
+      { provider: "google", model: "gemini-3.8-flash" },
       TEXT_CALL_BUDGETS.productReview,
     );
     expect(sol).toBeLessThanOrEqual(0.03);

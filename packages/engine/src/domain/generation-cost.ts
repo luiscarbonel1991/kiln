@@ -21,8 +21,10 @@ import {
 //   (official). Images: one price per 1K image whatever the aspect (1,120
 //   output tokens); text and thinking beside the image at the text rate. Veo:
 //   per second by resolution, audio included. Text: per 1M tokens, thinking
-//   billed as output.
-// - OpenAI, checked 2026-10-04 (images) and 2026-10-06 (text): the output cost
+//   billed as output; text checked again 2026-10-31, with the prices Google
+//   has dated (Gemini 4 Argon from 2026-12-01, the Flash models from
+//   2027-01-01).
+// - OpenAI, checked 2026-10-04 (images) and 2026-10-31 (text): the output cost
 //   per image by quality and size from the image generation guide's cost table
 //   (https://developers.openai.com/api/docs/guides/image-generation,
 //   "Calculating costs"), and https://developers.openai.com/api/docs/pricing
@@ -51,11 +53,15 @@ export const PRICES_AS_OF = "2026-10-06";
 // $ per 1M tokens. An image model's main output is the image (`imageOut`);
 // text and thinking beside it bill at `textOut`. A text model's output,
 // thinking included, bills at `textOut`.
-interface TokenPrices {
+interface Prices {
   textIn: number;
   imageIn: number;
   textOut: number;
   imageOut: number;
+}
+// A price the provider has dated: `then` applies from its day (UTC) on.
+interface TokenPrices extends Prices {
+  then?: Prices & { from: string };
 }
 
 const TOKEN_PRICES: Record<string, TokenPrices> = {
@@ -86,6 +92,8 @@ const TOKEN_PRICES: Record<string, TokenPrices> = {
     imageOut: 120,
   },
   "openai/gpt-6.1-sol": { textIn: 2, imageIn: 2, textOut: 10, imageOut: 0 },
+  "openai/gpt-6-astra": { textIn: 10, imageIn: 10, textOut: 50, imageOut: 0 },
+  "openai/gpt-6.1-terra": { textIn: 1, imageIn: 1, textOut: 5, imageOut: 0 },
   "openai/gpt-6-luna": { textIn: 0.1, imageIn: 0.1, textOut: 0.5, imageOut: 0 },
   "google/gemini-3.5-flash": {
     textIn: 1.5,
@@ -98,11 +106,60 @@ const TOKEN_PRICES: Record<string, TokenPrices> = {
     imageIn: 0.75,
     textOut: 3.75,
     imageOut: 0,
+    then: {
+      from: "2027-01-01",
+      textIn: 1.5,
+      imageIn: 1.5,
+      textOut: 7.5,
+      imageOut: 0,
+    },
+  },
+  "google/gemini-4-argon": {
+    textIn: 2,
+    imageIn: 2,
+    textOut: 10,
+    imageOut: 0,
+    then: {
+      from: "2026-12-01",
+      textIn: 4,
+      imageIn: 4,
+      textOut: 20,
+      imageOut: 0,
+    },
+  },
+  "google/gemini-3.6-flash": {
+    textIn: 0.75,
+    imageIn: 0.75,
+    textOut: 3.75,
+    imageOut: 0,
+    then: {
+      from: "2027-01-01",
+      textIn: 1.5,
+      imageIn: 1.5,
+      textOut: 7.5,
+      imageOut: 0,
+    },
+  },
+  "google/gemini-3.5-flash-lite": {
+    textIn: 0.3,
+    imageIn: 0.3,
+    textOut: 2.5,
+    imageOut: 0,
   },
 };
 
 const key = (model: { provider: string; model: string }) =>
   `${model.provider}/${model.model}`;
+
+// A model's token prices today (or on `at`).
+function tokenPrices(
+  model: { provider: string; model: string },
+  at: Date = new Date(),
+): Prices | undefined {
+  const p = TOKEN_PRICES[key(model)];
+  if (p?.then && at.toISOString().slice(0, 10) >= p.then.from) return p.then;
+  return p;
+}
 
 // $ per image output: [square, non-square] for each quality.
 const OPENAI_OUTPUT: Record<string, Record<ImageQuality, [number, number]>> = {
@@ -159,7 +216,7 @@ export function imagePrice(model: {
   }
   if (model.provider === "google") {
     const perImage = GOOGLE_PER_IMAGE[model.model];
-    const tokens = TOKEN_PRICES[key(model)];
+    const tokens = tokenPrices(model);
     if (perImage === undefined || !tokens) return undefined;
     return {
       provider: "google",
@@ -215,7 +272,7 @@ export function estimateGeneration(
             typical:
               (GOOGLE_TOKENS_PER_REFERENCE *
                 references *
-                (TOKEN_PRICES[key(model)]?.imageIn ?? 0)) /
+                (tokenPrices(model)?.imageIn ?? 0)) /
               1e6,
             max: 0,
           };
@@ -302,7 +359,7 @@ export function costFromUsage(
   model: { provider: string; model: string },
   usage: GenerationUsage,
 ): number | null {
-  const p = TOKEN_PRICES[key(model)];
+  const p = tokenPrices(model);
   if (!p) return null;
   const isText = modelEntry(model)?.kind === "text";
   const input =
@@ -362,7 +419,7 @@ export function textEstimate(
   budget: { inputTokens: number; outputTokens: number },
 ): number | null {
   if (modelEntry(model)?.kind !== "text") return null;
-  const p = TOKEN_PRICES[key(model)];
+  const p = tokenPrices(model);
   if (!p) return null;
   return round(
     (budget.inputTokens * Math.max(p.textIn, p.imageIn) +

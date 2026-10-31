@@ -342,6 +342,11 @@ describe("draftProductAction", () => {
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
   it("says why it could not fill the form, and offers the other provider with its price", async () => {
+    // The offer's price is dated: read it before Google's change.
+    vi.useFakeTimers({
+      now: new Date("2026-10-31T12:00:00Z"),
+      toFake: ["Date"],
+    });
     const { draftProductAction } = await import("@/app/actions/products");
     expect(await draftProductAction({ assetUrl: photo })).toMatchObject({
       degraded: {
@@ -350,11 +355,12 @@ describe("draftProductAction", () => {
         message: "OpenAI has no API key (OPENAI_API_KEY is not set).",
         alternative: {
           provider: "google",
-          model: "gemini-3.5-flash",
-          usd: 0.024,
+          model: "gemini-3.8-flash",
+          usd: 0.0105,
         },
       },
     });
+    vi.useRealTimers();
   });
 
   it("needs a photo in Kiln's storage", async () => {

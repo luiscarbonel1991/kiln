@@ -55,11 +55,11 @@ describe("proposeRoutes", () => {
     const routes = proposeRoutes(DEFAULT_MAKER_MODELS, BOTH);
     expect(routes.deep.models).toEqual([
       { provider: "openai", model: "gpt-6.1-sol" },
-      { provider: "google", model: "gemini-3.5-flash" },
+      { provider: "google", model: "gemini-3.8-flash" },
     ]);
     expect(routes.fast.models.map((m) => m.model)).toEqual([
       "gpt-6-luna",
-      "gemini-3.8-flash",
+      "gemini-3.5-flash-lite",
     ]);
     expect(routes.final.models).toEqual([GPT_IMAGE, FLASH_IMAGE]);
     expect(routes.draft.models).toEqual([

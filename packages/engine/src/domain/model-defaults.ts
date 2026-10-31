@@ -33,6 +33,8 @@ export interface ModelEntry {
   retires?: string;
   // Shut down: only labels the outputs it made, never offered or run.
   retired?: string;
+  // Retired: the model its provider answers it with now.
+  replacedBy?: string;
   // Image: the qualities the request may be sent with.
   qualities?: readonly ImageQuality[];
   // Video: the lengths it renders at each resolution it offers.
@@ -141,11 +143,27 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     retired: "2026-09-24",
     seconds: { "720p": [4, 8, 12] },
   },
+  // Text, ids verified 2026-10-31 (GET /v1/models, GET v1beta/models). Each
+  // provider's default first: the other provider's offer when a call fails.
   {
     kind: "text",
     provider: "openai",
     id: "gpt-6.1-sol",
     label: "GPT-6.1 Sol",
+    ...OPENAI_TEXT,
+  },
+  {
+    kind: "text",
+    provider: "openai",
+    id: "gpt-6-astra",
+    label: "GPT-6 Astra",
+    ...OPENAI_TEXT,
+  },
+  {
+    kind: "text",
+    provider: "openai",
+    id: "gpt-6.1-terra",
+    label: "GPT-6.1 Terra",
     ...OPENAI_TEXT,
   },
   {
@@ -158,15 +176,40 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
   {
     kind: "text",
     provider: "google",
-    id: "gemini-3.5-flash",
-    label: "Gemini 3.5 Flash",
+    id: "gemini-3.8-flash",
+    label: "Gemini 3.8 Flash",
     ...GEMINI_TEXT,
   },
   {
     kind: "text",
     provider: "google",
-    id: "gemini-3.8-flash",
-    label: "Gemini 3.8 Flash",
+    id: "gemini-4-argon",
+    label: "Gemini 4 Argon",
+    ...GEMINI_TEXT,
+  },
+  {
+    kind: "text",
+    provider: "google",
+    id: "gemini-3.6-flash",
+    label: "Gemini 3.6 Flash",
+    ...GEMINI_TEXT,
+  },
+  {
+    kind: "text",
+    provider: "google",
+    id: "gemini-3.5-flash-lite",
+    label: "Gemini 3.5 Flash-Lite",
+    ...GEMINI_TEXT,
+  },
+  // Deprecated by Google on 2026-10-08 with no shutdown: its requests are
+  // answered by Gemini 3.6 Flash, at a price Google does not state.
+  {
+    kind: "text",
+    provider: "google",
+    id: "gemini-3.5-flash",
+    label: "Gemini 3.5 Flash",
+    retired: "2026-10-08",
+    replacedBy: "gemini-3.6-flash",
     ...GEMINI_TEXT,
   },
 ];
@@ -212,10 +255,15 @@ export function checkModel(
     };
   }
   if (entry.retired) {
+    const after = entry.replacedBy
+      ? modelEntry({ provider: entry.provider, model: entry.replacedBy })
+      : undefined;
     return {
       ok: false,
       reason: "retired",
-      message: `${entry.label} was shut down on ${entry.retired} — pick another ${kind} model.`,
+      message: after
+        ? `${entry.label} was retired on ${entry.retired}: ${PROVIDER_LABELS[entry.provider]} answers it with ${after.label} — pick that or another ${kind} model.`
+        : `${entry.label} was shut down on ${entry.retired} — pick another ${kind} model.`,
     };
   }
   return { ok: true, entry };

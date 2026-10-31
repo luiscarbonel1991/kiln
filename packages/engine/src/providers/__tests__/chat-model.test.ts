@@ -145,7 +145,7 @@ describe("the providers' chat models", () => {
     expect(() => openaiChatModels.model("gpt-6-luna")).toThrow(
       /OpenAI has no API key/,
     );
-    expect(() => googleChatModels.model("gemini-3.5-flash")).toThrow(
+    expect(() => googleChatModels.model("gemini-3.8-flash")).toThrow(
       /Google has no API key/,
     );
   });
@@ -163,7 +163,7 @@ describe("the providers' chat models", () => {
       },
     }));
     const { googleChatModels } = await import("@/providers/google/chat-model");
-    await googleChatModels.model("gemini-3.5-flash").doStream(CALL);
+    await googleChatModels.model("gemini-3.8-flash").doStream(CALL);
     expect(made).toEqual([{ apiKey: "g-test" }]);
     expect(seen[0].providerOptions?.google).toEqual({
       thinkingConfig: { thinkingLevel: "low" },

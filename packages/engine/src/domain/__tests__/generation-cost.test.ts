@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   canAfford,
   costFromUsage,
@@ -67,6 +67,14 @@ describe("video cost", () => {
 });
 
 describe("text cost", () => {
+  // Some text prices are dated: read them on a day before any change.
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date("2026-10-31T12:00:00Z") });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("prices every text model the catalog offers", () => {
     for (const m of catalogFor("text")) {
       expect(
@@ -88,16 +96,39 @@ describe("text cost", () => {
     ).toBe(0.028);
     expect(
       textEstimate(
-        { provider: "google", model: "gemini-3.5-flash" },
+        { provider: "google", model: "gemini-3.8-flash" },
         { inputTokens: 4000, outputTokens: 2000 },
       ),
-    ).toBe(0.024);
+    ).toBe(0.0105);
     expect(
       textEstimate(
         { provider: "google", model: "gemini-3.1-flash-image" },
         { inputTokens: 1, outputTokens: 1 },
       ),
     ).toBeNull();
+  });
+
+  it("reads the price a provider dated from its day on", () => {
+    const call = { inputTokens: 10_000, outputTokens: 10_000 };
+    const argon = { provider: "google", model: "gemini-4-argon" };
+    const flash = { provider: "google", model: "gemini-3.8-flash" };
+    // $2 in, $10 out per 1M through November; $4 and $20 from December 1.
+    expect(textEstimate(argon, call)).toBe(0.12);
+    vi.setSystemTime(new Date("2026-11-30T23:59:00Z"));
+    expect(textEstimate(argon, call)).toBe(0.12);
+    vi.setSystemTime(new Date("2026-12-01T00:00:00Z"));
+    expect(textEstimate(argon, call)).toBe(0.24);
+    expect(textEstimate(flash, call)).toBe(0.045);
+    // The Flash models double on 2027-01-01, and so does what a call costs.
+    vi.setSystemTime(new Date("2027-01-01T00:00:00Z"));
+    expect(textEstimate(flash, call)).toBe(0.09);
+    expect(
+      costFromUsage(flash, {
+        inputTextTokens: 10_000,
+        inputImageTokens: 0,
+        outputTokens: 10_000,
+      }),
+    ).toBe(0.09);
   });
 
   it("measures a text call from its usage, thinking billed as output", () => {
