@@ -329,7 +329,7 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 | Designs | `list_designs`, `get_design` (each drawing's state, line art and vector, and the link where the maker makes a vector into a product), `view_design` (a drawing's line art, or its vector rendered), `vectorize` (free: outline or centerline, detail fine, balanced or clean; kept as the drawing's vector) |
 | Paid work | `quote`, then `generate`, `draw` (a design's line art, through the queue), `write_listing` or `review_product` with its id |
 | Selling | `get_listing` (the listing's fields, who wrote each, its problems and tag ideas), `edit_listing` (free; a field the maker wrote only with `overwriteMakerText`, after asking), `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only) |
-| Lessons | `list_lessons` (the maker's kept lessons, for a family and every family, by topic), `propose_lesson` (one sentence; it counts once the maker keeps it) |
+| Lessons | `list_lessons` (the maker's kept lessons, for a family and every family, by topic), `propose_lesson` (one English sentence; it counts once the maker keeps it) |
 
 - **Paid work takes two calls.** `quote` (free) prices a task: the models each line
   runs on and may fall back to, typical and at most, what is left of the month's cap,
