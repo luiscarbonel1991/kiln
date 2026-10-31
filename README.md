@@ -372,13 +372,15 @@ the MCP server's tools, on the same server functions as the board.
   (typical, at most, the models) or the take; "Not now" runs nothing. It never
   publishes, and it writes nothing into the maker's knowledge: it proposes a lesson, which counts
   only once the maker keeps it.
-- **Models: the roles' routes.** A turn runs on `fast`, one with "Plan first" on
-  `deep` (Settings → Models), through Kiln's adapters (`@ai-sdk/openai` and
+- **Models: the agent's route.** An agent with a model of its own (Settings →
+  Models → Agents) runs every turn on it at its own effort, "Plan first" included;
+  the others run on `fast`, or `deep` with "Plan first". The calls go through Kiln's adapters (`@ai-sdk/openai` and
   `@ai-sdk/google`, each only in its adapter folder); a model named by a string is
   refused, so nothing goes through Vercel's gateway. Each step is one call under the
   monthly cap, its measured cost recorded; a refused step moves down a saved route, a
   step with no answer never retries or moves. The composer shows what a step costs
-  and the most a turn can; each reply shows the models it ran on and its cost.
+  and the most a turn can, for the agent on the chip at its effort; each reply shows
+  the models it ran on, each with its effort ("GPT-6 Astra · max"), and its cost.
 - **Specialists** (stage 3): a chip in the composer picks who works on a message.
   **Kiln** has every tool; **Etsy** has the listing's fields, the paid rewrite, the
   brief, results and the shop's numbers, and knows Etsy's title and tag rules;
@@ -471,12 +473,15 @@ Kiln generates with several models from two providers, OpenAI and Google:
 | --- | --- |
 | Images | gpt-image-2, gpt-image-1.5, gpt-image-1-mini (the last two retire 2026-12-01), Gemini 3 Pro Image, Gemini 3.1 Flash Image, Gemini 3.1 Flash-Lite Image |
 | Video | Veo 3.1, Veo 3.1 Fast, Veo 3.1 Lite (4, 6 or 8 s at 720p; 8 s at 1080p) |
-| Text (vision, art direction) | GPT-6.1 Sol, GPT-6 Luna, Gemini 3.5 Flash, Gemini 3.8 Flash |
+| Text (vision, art direction, the chat) | GPT-6.1 Sol, GPT-6 Astra, GPT-6.1 Terra, GPT-6 Luna, Gemini 3.8 Flash, Gemini 4 Argon, Gemini 3.6 Flash, Gemini 3.5 Flash-Lite |
 
 The catalog is `packages/engine/src/domain/model-defaults.ts`. Each model's
-pinned price, with its date and source, is in `generation-cost.ts`. A model
-without a price cannot be queued. OpenAI shut Sora down on 2026-09-24; its old
-outputs keep their label.
+pinned price, with its date and source, is in `generation-cost.ts`; a price the
+provider has dated (Gemini 4 Argon doubles on 2026-12-01, the Gemini Flash models
+on 2027-01-01) is read on the day of the call. A model without a price cannot be
+queued. OpenAI shut Sora down on 2026-09-24, and Google retired Gemini 3.5 Flash
+on 2026-10-08 (it answers it with Gemini 3.6 Flash); their old outputs keep their
+label.
 
 ### Routes
 
@@ -513,6 +518,20 @@ only catalog models with a pinned price, at most four.
 
 Nothing else switches a model: a retired or unknown model is refused with the
 reason, and a live job whose provider has no key is refused.
+
+### Effort and the agents' models
+
+- **Effort.** A text route has an effort, Low · Medium · High · X-high · Max (Kiln's
+  scale is OpenAI's reasoning effort; Gemini thinks at most at high, and a level a
+  model lacks runs at the highest it has). It is sent on every call of the route,
+  and it buys more thinking, so more output and more time: a call's output cap is
+  x1, x2, x4, x8 or x16 its low budget, up to what the model writes, and a chat turn
+  may run 4, 6, 10, 15 or 20 minutes. The estimate before spending and the cap's
+  reservation count that budget. Low, the default, is what Kiln always sent.
+- **The agents' models.** Each chat agent (Kiln, Etsy, Scenes, SVG) follows Text ·
+  fast until the maker gives it a route of its own, any text models at its own
+  effort. It then runs its turns and its plans on it. An agent whose tools show it
+  images (`view_frame`, `view_design`) takes only models that read images.
 
 Settings → Providers shows each key and the provider's last calls (the last
 error, the last call that worked). It reads them from the job ledger, so it
