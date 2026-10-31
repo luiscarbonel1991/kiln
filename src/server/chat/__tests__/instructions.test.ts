@@ -1,8 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
-// What the agent is told: the rules, its mode's know-how, and the
+// What the agent is told: the rules, its mode's know-how, the
 // conversation's project in a line — a project's frames, or a design's
-// drawings.
+// drawings — and the maker's kept lessons for its family and mode.
+
+const asked: unknown[][] = [];
+vi.mock("@/server/lessons", () => ({
+  keptLessons: async (family: string | null, topics: string[] | null) => {
+    asked.push([family, topics]);
+    return family === "Kitchen"
+      ? [{ text: "Kitchen, Etsy's Hero: the camera a little above." }]
+      : [];
+  },
+}));
+vi.mock("@/server/project-repository", () => ({
+  loadProjectBoard: async (id: string) =>
+    id === "p1" ? { product: { family: "Kitchen" } } : null,
+}));
 
 vi.mock("@/server/project-frames", () => ({
   projectFrames: async (id: string) =>
@@ -42,6 +56,7 @@ describe("chatInstructions", () => {
   it("names a project's frames, a design's drawings, or the maker's own conversation", async () => {
     const project = await chatInstructions("p1", SPECIALISTS.kiln, NOW);
     expect(project).toContain('the project "Planter" (Project id: p1;');
+    expect(project).toContain("a Kitchen product");
     expect(project).toContain("1 to-review, 1 approved");
     const design = await chatInstructions("d1", SPECIALISTS.svg, NOW);
     expect(design).toContain(
@@ -51,6 +66,22 @@ describe("chatInstructions", () => {
     const maker = await chatInstructions(null, SPECIALISTS.kiln, NOW);
     expect(maker).toContain("on no project");
     expect(maker).toContain("Today is 2026-10-30.");
+  });
+
+  it("tells the maker's kept lessons for the project's family, on the mode's topics", async () => {
+    asked.length = 0;
+    const scenes = await chatInstructions("p1", SPECIALISTS.scenes, NOW);
+    expect(scenes).toContain(
+      "The maker's kept lessons (for Kitchen and every family):\n- Kitchen, Etsy's Hero: the camera a little above.",
+    );
+    await chatInstructions("d1", SPECIALISTS.svg, NOW);
+    expect(asked).toEqual([
+      ["Kitchen", ["scenes", "general"]],
+      [null, ["designs", "general"]],
+    ]);
+    expect(await chatInstructions(null, SPECIALISTS.kiln, NOW)).not.toContain(
+      "The maker's kept lessons:",
+    );
   });
 
   it("names every paid tool in the rule for paid work", async () => {

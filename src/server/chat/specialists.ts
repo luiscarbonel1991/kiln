@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { LessonTopic } from "@/domain/lesson";
 import { KNOBS, KnobKey, knobStops, REASONS } from "@/domain/scene-knobs";
 import { CATALOG } from "@/lib/recipes";
 
@@ -19,6 +20,8 @@ export interface Specialist {
   about: string;
   // The tools it may call; null is every chat tool.
   tools: readonly string[] | null;
+  // The kept lessons it is told (by topic); null is every topic.
+  topics: readonly LessonTopic[] | null;
   instructions: string;
 }
 
@@ -45,6 +48,7 @@ const KILN: Specialist = {
   label: "Kiln",
   about: "Everything Kiln does, with every tool.",
   tools: null,
+  topics: null,
   instructions: `You are in Kiln's general mode. When the maker's task is mainly a listing's text, its tags or how a shop sells, call suggest_specialist with "etsy"; when it is mainly tuning a project's scenes, with "scenes"; when it is mainly a design's line art or its SVG, with "svg". It shows the maker a button to switch; then help as well as you can in this turn.`,
 };
 
@@ -65,7 +69,10 @@ const ETSY: Specialist = {
     "watched_shops",
     "find_shops",
     "shop_favourites",
+    "list_lessons",
+    "propose_lesson",
   ],
+  topics: ["listing", "general"],
   instructions: `You are Kiln's Etsy specialist: a listing's text, its tags, and what sells.
 - Read the listing with get_listing before you change it. After each edit_listing, read the issues it answers and fix the errors before you stop.
 - The title: at most ${etsy?.title.maxChars ?? 140} characters${etsy?.title.adviseMaxWords ? `, best under ${etsy.title.adviseMaxWords} words` : ""}. Lead with what the item is and the search the brief leads with; no repeated words, no capitals for shouting.
@@ -92,7 +99,10 @@ const SCENES: Specialist = {
     "unapprove_frame",
     "quote",
     "generate",
+    "list_lessons",
+    "propose_lesson",
   ],
+  topics: ["scenes", "general"],
   instructions: `You are Kiln's scenes specialist: a project's photos.
 - Look before you judge: get_frames, then view_frame on the take.
 - tune_frame sets a scene's knobs and its place (free). A scene offers only some knobs; get_frames and tune_frame's answer say which. The knobs and their stops:
@@ -115,7 +125,10 @@ const SVG: Specialist = {
     "vectorize",
     "quote",
     "draw",
+    "list_lessons",
+    "propose_lesson",
   ],
+  topics: ["designs", "general"],
   instructions: `You are Kiln's SVG specialist: a design's line art and its vectors.
 - A design is an image the maker brought, drawn as line art in a few drawings (each with its own purpose), and each drawing traced into an SVG. list_designs finds them; get_design reads one. A new design starts in the studio, from the maker's image: say so.
 - Look before you judge: view_design shows a drawing's line art, or its vector rendered on white.

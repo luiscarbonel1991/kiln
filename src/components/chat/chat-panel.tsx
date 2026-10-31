@@ -161,6 +161,7 @@ export function ChatPanel({
           specialists={data.specialists}
           specialist={specialist}
           onSpecialist={setSpecialist}
+          lessons={data.lessons}
         />
       ) : (
         <>
@@ -223,6 +224,7 @@ function Conversation({
   specialists,
   specialist,
   onSpecialist,
+  lessons,
 }: {
   sessionId: string;
   initial: KilnMessage[];
@@ -235,6 +237,7 @@ function Conversation({
   specialists: ChatPanelData["specialists"];
   specialist: SpecialistId;
   onSpecialist: (id: SpecialistId) => void;
+  lessons: ChatPanelData["lessons"];
 }) {
   const router = useRouter();
   const plan = useRef(false);
@@ -362,6 +365,7 @@ function Conversation({
                     busy={busy}
                     specialists={specialists}
                     specialist={specialist}
+                    lessons={lessons}
                     onSwitch={onSpecialist}
                     onAnswer={(id, approved) => {
                       plan.current = false;

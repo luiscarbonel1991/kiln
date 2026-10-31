@@ -346,6 +346,20 @@ describe("the mock chat", () => {
     expect(mockReply(quoted)).toEqual({ tool: "draw", input: { quote: "q1" } });
   });
 
+  it("proposes a lasting preference as a lesson, and reads the kept ones", async () => {
+    const { mockReply } = await import("@/providers/mock/chat-model");
+    expect(mockReply([user("¿Qué lecciones me guardaste?")])).toEqual({
+      tool: "list_lessons",
+      input: {},
+    });
+    expect(
+      mockReply([system, user("Siempre fondo claro para los heroes")]),
+    ).toEqual({
+      tool: "propose_lesson",
+      input: { topic: "general", text: "Siempre fondo claro para los heroes" },
+    });
+  });
+
   it("streams its answer, and answers as a provider that is down on KILN_MOCK_FAIL", async () => {
     vi.stubEnv("KILN_PROVIDERS", "mock");
     const { getChatModels } = await import("@/providers/registry");

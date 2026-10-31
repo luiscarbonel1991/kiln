@@ -8,7 +8,9 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
+import { useState, useTransition } from "react";
 import { Streamdown } from "streamdown";
+import { decideLessonAction } from "@/app/actions/lessons";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -315,6 +317,69 @@ function Suggestion({
   );
 }
 
+// A lesson an agent proposed, with the maker's Keep or Not this; it counts
+// only once kept. Its status is the server's when the chat opened, then the
+// maker's click.
+function LessonProposal({ tool, known }: { tool: ToolPart; known?: string }) {
+  const lesson = tool.output?.lesson as
+    | { id?: string; text?: string; status?: string }
+    | undefined;
+  const [status, setStatus] = useState(known ?? lesson?.status ?? "proposed");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  if (!lesson?.id || !lesson.text) return null;
+  const id = lesson.id;
+  const decide = (next: "kept" | "dismissed") =>
+    startTransition(async () => {
+      const result = await decideLessonAction({ id, status: next });
+      if ("error" in result) setError(result.error);
+      else setStatus(result.status);
+    });
+  return (
+    <div
+      className="flex flex-col gap-1.5 self-start rounded-field bg-secondary px-3 py-2"
+      data-testid="chat-lesson"
+    >
+      <span className="font-mono text-[0.62rem] text-on-surface-dim">
+        A lesson to keep?
+      </span>
+      <span className="font-sans text-[0.78rem] text-foreground">
+        {lesson.text}
+      </span>
+      {status === "proposed" ? (
+        <div className="flex items-center gap-2">
+          <Button
+            size="xs"
+            disabled={pending}
+            data-testid="chat-lesson-keep"
+            onClick={() => decide("kept")}
+          >
+            Keep
+          </Button>
+          <Button
+            size="xs"
+            variant="ghost"
+            disabled={pending}
+            data-testid="chat-lesson-dismiss"
+            onClick={() => decide("dismissed")}
+          >
+            Not this
+          </Button>
+        </div>
+      ) : (
+        <span className="font-mono text-[0.62rem] text-prov-recipe">
+          {status === "kept" ? "kept: every agent follows it" : "set aside"}
+        </span>
+      )}
+      {error ? (
+        <span className="font-mono text-[0.62rem] text-prov-local">
+          {error}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function ChatMessage({
   message,
   messages,
@@ -322,6 +387,7 @@ export function ChatMessage({
   busy,
   specialists,
   specialist,
+  lessons,
   onSwitch,
   onAnswer,
 }: {
@@ -331,6 +397,8 @@ export function ChatMessage({
   busy: boolean;
   specialists: { id: SpecialistId; label: string; about: string }[];
   specialist: SpecialistId;
+  // Each proposed lesson's status when the chat opened, by id.
+  lessons: Record<string, string>;
   onSwitch: (id: SpecialistId) => void;
   onAnswer: (approvalId: string, approved: boolean) => void;
 }) {
@@ -389,6 +457,16 @@ export function ChatMessage({
                 specialists={specialists}
                 specialist={specialist}
                 onSwitch={onSwitch}
+              />
+            );
+          }
+          if (name === "propose_lesson" && tool.state === "output-available") {
+            const id = (tool.output?.lesson as { id?: string } | undefined)?.id;
+            return (
+              <LessonProposal
+                key={key}
+                tool={tool}
+                known={id ? lessons[id] : undefined}
               />
             );
           }

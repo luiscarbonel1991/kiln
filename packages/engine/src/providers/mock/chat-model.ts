@@ -19,6 +19,8 @@ import { mockDelay, mockOutage } from "@/providers/mode";
 // "designs" lists the designs; on a design, "vectoriz" reads it and traces
 // its first drawn drawing, and "draw" or "dibuj" quotes its drawings, then
 // asks to draw them (the general mode suggests the SVG specialist);
+// "always" or "siempre" (a lasting preference) proposes it as a lesson,
+// and "lessons" or "lecciones" reads the kept ones;
 // anything else says how to try it. The project comes from the instructions
 // ("Project id: <id>"). KILN_MOCK_FAIL naming the provider makes it answer
 // as a provider that is down.
@@ -123,6 +125,12 @@ function summary(
       text: `Traced ${v.label}: ${v.shapes} shapes, kept as its vector.`,
     };
   }
+  if (toolName === "list_lessons" && Array.isArray(v.lessons)) {
+    return { text: `${v.lessons.length} lessons kept.` };
+  }
+  if (toolName === "propose_lesson") {
+    return { text: "I proposed it as a lesson: keep it to make it count." };
+  }
   if (toolName === "draw" && typeof v.queued === "number") {
     return {
       text: `Queued ${v.queued} drawings. This chat notes when they land.`,
@@ -177,6 +185,16 @@ export function mockReply(prompt: LanguageModelV4Prompt): MockReply {
   const general = /You are in Kiln's general mode/.test(
     system ? textOf(system.content) : "",
   );
+  if (/\b(always|never|siempre|nunca)\b/.test(asked)) {
+    const said = last?.role === "user" ? textOf(last.content).trim() : "";
+    return {
+      tool: "propose_lesson",
+      input: { topic: "general", text: said.slice(0, 240) },
+    };
+  }
+  if (/lecci[oó]n|lessons?\b/.test(asked)) {
+    return { tool: "list_lessons", input: {} };
+  }
   const wantsVector = /vectori[sz]|svg/.test(asked);
   const wantsDrawing = /dibuj|\bdraw\b|line art/.test(asked);
   if (/designs|dise[ñn]os/.test(asked) && !project) {

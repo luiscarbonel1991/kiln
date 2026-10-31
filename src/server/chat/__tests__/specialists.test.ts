@@ -68,6 +68,8 @@ describe("the specialists", () => {
       "vectorize",
       "quote",
       "draw",
+      "list_lessons",
+      "propose_lesson",
     ]);
     expect(TOOL_APPROVAL.draw).toBe("user-approval");
     expect(TOOL_APPROVAL.vectorize).toBeUndefined();

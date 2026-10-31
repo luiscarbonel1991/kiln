@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { AccessTokens } from "@/components/settings/access-tokens";
 import { KeyCheck } from "@/components/settings/key-check";
+import { Lessons } from "@/components/settings/lessons";
 import { RoutesForm } from "@/components/settings/routes-form";
 import { ToolCalls } from "@/components/settings/tool-calls";
 import { EtsyConnection } from "@/components/shops/etsy-connection";
@@ -12,6 +13,7 @@ import { hasDatabase } from "@/lib/db";
 import { providerMode } from "@/providers/mode";
 import { listAccessTokens } from "@/server/access-tokens";
 import { budget } from "@/server/generation-repository";
+import { listLessons } from "@/server/lessons";
 import { getCurrentMaker, getMakerModelSetup } from "@/server/maker-repository";
 import { providerHealth } from "@/server/provider-health";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
@@ -31,19 +33,24 @@ const when = (iso: string) =>
 // health). Models: a route per role, Kiln's proposal until saved. Providers: each key and its last
 // calls, read for free, and a free key check on a click (the provider lists
 // its models; no paid call). The month's cap, read only.
-// Shops: the Etsy connection. Access tokens: for the HTTP API (README "HTTP
-// API").
+// Lessons: what Kiln proposes it learned of the maker's taste, and what they
+// kept. Shops: the Etsy connection. Access tokens: for the HTTP API (README
+// "HTTP API").
 export default async function SettingsPage() {
   await connection();
   const maker = hasDatabase() ? await getCurrentMaker() : null;
-  const [setup, health, month, tokens, shop, calls] = await Promise.all([
-    getMakerModelSetup(),
-    providerHealth(maker?.id ?? null),
-    maker ? budget(maker.id) : Promise.resolve(null),
-    maker ? listAccessTokens() : Promise.resolve(null),
-    maker ? shopConnection() : Promise.resolve(null),
-    maker ? recentToolCalls() : Promise.resolve([]),
-  ]);
+  const [setup, health, month, tokens, shop, calls, lessons] =
+    await Promise.all([
+      getMakerModelSetup(),
+      providerHealth(maker?.id ?? null),
+      maker ? budget(maker.id) : Promise.resolve(null),
+      maker ? listAccessTokens() : Promise.resolve(null),
+      maker ? shopConnection() : Promise.resolve(null),
+      maker ? recentToolCalls() : Promise.resolve([]),
+      maker
+        ? listLessons({ status: ["proposed", "kept"] })
+        : Promise.resolve(null),
+    ]);
   const mode = providerMode();
   // A mock run calls nothing, so every provider counts as keyed.
   const keys = {
@@ -83,6 +90,29 @@ export default async function SettingsPage() {
             mock={mode === "mock"}
           />
         </section>
+
+        {lessons ? (
+          <section
+            id="lessons"
+            className="rounded-card bg-card p-6 shadow-card"
+          >
+            <h2
+              className="font-serif text-xl italic text-foreground"
+              style={{ fontVariationSettings: "'opsz' 40" }}
+            >
+              Lessons
+            </h2>
+            <p className="mt-1 mb-5 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
+              What Kiln learned of your taste, per product family: from the
+              reasons you give for a take, the knobs of the takes you approve
+              and a listing&apos;s numbers after its photos changed. A lesson
+              counts only once you keep it: then every agent follows it, and a
+              scene&apos;s lesson starts that knob in your next projects of the
+              family.
+            </p>
+            <Lessons lessons={lessons} />
+          </section>
+        ) : null}
 
         <section className="rounded-card bg-card p-6 shadow-card">
           <h2

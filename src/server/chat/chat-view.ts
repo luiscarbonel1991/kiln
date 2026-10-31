@@ -6,6 +6,7 @@ import {
   type SpecialistId,
 } from "@/server/chat/specialists";
 import { isDesign } from "@/server/designs";
+import { lessonStatuses } from "@/server/lessons";
 import { textRoute } from "@/server/text-calls";
 import { TOOLS } from "@/server/tools";
 
@@ -30,6 +31,8 @@ export interface ChatPanelData {
   // The mode a new conversation starts in: SVG on a design.
   firstSpecialist: SpecialistId;
   design: boolean;
+  // The status of each lesson an agent proposed in it, by id.
+  lessons: Record<string, string>;
 }
 
 async function estimate(kind: "chatTurn" | "chatPlan"): Promise<ChatEstimate> {
@@ -53,6 +56,15 @@ export async function chatPanelData(target: {
       : null);
   const chat = sessionId ? await getChat(sessionId) : null;
   const design = target.projectId ? await isDesign(target.projectId) : false;
+  const proposed = (chat?.messages ?? []).flatMap((m) =>
+    m.parts.flatMap((p) => {
+      const id =
+        p.type === "tool-propose_lesson"
+          ? (p as { output?: { lesson?: { id?: unknown } } }).output?.lesson?.id
+          : undefined;
+      return typeof id === "string" ? [id] : [];
+    }),
+  );
   return {
     sessionId: chat?.id ?? null,
     messages: chat?.messages ?? [],
@@ -65,5 +77,6 @@ export async function chatPanelData(target: {
     specialists: SPECIALIST_CHOICES,
     firstSpecialist: design ? "svg" : "kiln",
     design,
+    lessons: await lessonStatuses(proposed),
   };
 }
