@@ -6,7 +6,8 @@ import type {
   LanguageModelV4ToolResultOutput,
 } from "@ai-sdk/provider";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { hadResponse } from "@/domain/queue";
+import { ARGON_FREE_TIER } from "@/domain/__tests__/fixtures/google-quota";
+import { hadResponse, quotaOut } from "@/domain/queue";
 import { answeredError, chatModel } from "@/providers/chat-model";
 
 afterEach(() => {
@@ -72,6 +73,19 @@ describe("answeredError", () => {
     expect(read.status).toBe(429);
     expect(read.message).toBe("You exceeded your current quota");
     expect(hadResponse(read)).toBe(true);
+  });
+
+  it("keeps the body on the cause, so a Google 429 still says what ran out", () => {
+    const read = answeredError({
+      statusCode: 429,
+      message: "Too Many Requests",
+      responseBody: JSON.stringify(ARGON_FREE_TIER),
+    });
+    expect(quotaOut(read)).toEqual({
+      kind: "model",
+      model: "gemini-4-argon",
+      why: "free-tier",
+    });
   });
 
   it("leaves an error with no answer (a timeout, an abort) as it was", () => {

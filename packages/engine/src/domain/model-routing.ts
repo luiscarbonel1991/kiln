@@ -25,6 +25,8 @@ import {
   hadResponse,
   isKeyRejected,
   isOutOfCredit,
+  noQuotaReason,
+  quotaOut,
   type RanOn,
 } from "@/domain/queue";
 
@@ -390,7 +392,9 @@ export type Failure =
 export function failureWords(provider: ProviderId, error: unknown): string {
   const label = PROVIDER_LABELS[provider];
   const status = (error as { status?: unknown } | null)?.status;
-  if (isOutOfCredit(error)) return `${label} is out of credit`;
+  const quota = quotaOut(error);
+  if (quota?.kind === "credit") return `${label} is out of credit`;
+  if (quota?.kind === "model") return noQuotaReason(provider, quota);
   if (isKeyRejected(error)) return `${label} rejected the API key`;
   if (status === 429) return `${label} is rate-limiting`;
   if (typeof status === "number") return `${label} answered ${status}`;
@@ -428,6 +432,8 @@ export function fallbackAfter(
   ) {
     return { move: "provider", reason };
   }
+  // The provider's other models have quota of their own.
+  if (quotaOut(error)?.kind === "model") return { move: "next", reason };
   if (e?.name === "CapabilityError") return { move: "next", reason };
   if (!hadResponse(error)) return { move: "stop", reason };
   return classifyGenerationError(error) === "transient"

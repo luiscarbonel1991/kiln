@@ -25,6 +25,14 @@ import {
   videoTakeEstimate,
   worstCase,
 } from "@/domain/model-routing";
+import {
+  ARGON_FREE_TIER,
+  ARGON_PAID_NONE,
+  FLASH_PER_DAY,
+  FLASH_PER_MINUTE,
+  fromChat,
+  fromGoogleSdk,
+} from "./fixtures/google-quota";
 
 const withStatus = (status: number, message = `HTTP ${status}`) =>
   Object.assign(new Error(message), { status });
@@ -348,6 +356,33 @@ describe("fallbackAfter", () => {
     expect(fallbackAfter("google", missing, { callStarted: false }).move).toBe(
       "provider",
     );
+  });
+
+  it("a model with no quota moves to the next model, Google's others included", () => {
+    const argon = fromChat(ARGON_FREE_TIER);
+    const failure = fallbackAfter("google", argon, answered);
+    expect(failure).toEqual({
+      move: "next",
+      reason: "Gemini 4 Argon is not on Google's free tier",
+    });
+    const flash: RouteEntry = { provider: "google", model: "gemini-3.6-flash" };
+    const sol: RouteEntry = { provider: "openai", model: "gpt-6.1-sol" };
+    expect(
+      pickNext([flash, sol], { provider: "google" }, failure, () => true)
+        ?.entry,
+    ).toEqual(flash);
+    expect(
+      fallbackAfter("google", fromGoogleSdk(FLASH_PER_DAY), answered),
+    ).toEqual({
+      move: "next",
+      reason: "Gemini 3.6 Flash used up today's quota",
+    });
+    expect(
+      fallbackAfter("google", fromChat(ARGON_PAID_NONE), answered).reason,
+    ).toBe("Google gives Gemini 4 Argon no quota");
+    expect(
+      fallbackAfter("google", fromChat(FLASH_PER_MINUTE), answered),
+    ).toEqual({ move: "next", reason: "Google is rate-limiting" });
   });
 
   it("a call with no answer stays final: it may have been charged", () => {

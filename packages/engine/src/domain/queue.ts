@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { modelLabel } from "@/domain/model-defaults";
 
 // The background generation queue's vocabulary (ROADMAP "Experience design":
 // cost before spend, one approval per batch, work while away). Pure: the
@@ -53,8 +54,10 @@ export function classifyGenerationError(
     issues?: unknown;
   } | null;
   if (e && typeof e.status === "number") {
-    // An exhausted spend cap or quota does not clear in 30 s.
-    if (isOutOfCredit(error)) return "permanent";
+    // An exhausted spend cap, or a model with no quota left, does not clear
+    // in 30 s.
+    const quota = quotaOut(error);
+    if (quota && quota.kind !== "rate") return "permanent";
     if (e.status === 408 || e.status === 409 || e.status === 429) {
       return "transient";
     }
@@ -105,13 +108,97 @@ export function errorMessage(error: unknown): string {
 const PROVIDER_LABEL = { google: "Google", openai: "OpenAI" } as const;
 const PROVIDER_KEY = { google: "GOOGLE_API_KEY", openai: "OPENAI_API_KEY" };
 
-// A 429 that is not a rate limit: the provider's spend cap or quota is used up
-// (Google: "spending cap ... ai.studio/spend"; OpenAI: "insufficient_quota").
-export function isOutOfCredit(error: unknown): boolean {
-  const e = error as { status?: unknown; code?: unknown } | null;
-  if (e?.status !== 429) return false;
-  const text = `${errorMessage(error)} ${typeof e.code === "string" ? e.code : ""}`;
-  return /spend|spending cap|quota|billing/i.test(text);
+// All an error says: its message and code, and the response body behind it
+// (the AI SDK keeps the body on the error or its cause; Google's SDK puts the
+// whole body in the message).
+function allSaid(error: unknown): string {
+  const parts: string[] = [];
+  let e = error as {
+    message?: unknown;
+    code?: unknown;
+    responseBody?: unknown;
+    cause?: unknown;
+  } | null;
+  for (let depth = 0; e && depth < 3; depth++) {
+    for (const value of [e.message, e.code, e.responseBody]) {
+      if (typeof value === "string") parts.push(value);
+    }
+    e = e.cause as typeof e;
+  }
+  return parts.join("\n");
+}
+
+// What ran out behind a 429. OpenAI's insufficient_quota and Google's spend
+// cap are the account's credit: none of the provider's models can run. Google
+// words every other 429 "You exceeded your current quota" as well, and names
+// what was exceeded: a per-minute limit clears in a minute; a model the
+// project has no quota for (limit 0: Gemini 4 Argon on the free tier) or whose
+// day is used up does not, though the provider's other models may run.
+export type QuotaOut =
+  | { kind: "credit" }
+  | { kind: "rate" }
+  | { kind: "model"; model: string | null; why: "free-tier" | "none" | "day" };
+
+const GOOGLE_QUOTA =
+  /RESOURCE_EXHAUSTED|Quota exceeded for metric|ai\.google\.dev|generativelanguage\.googleapis/;
+
+export function quotaOut(error: unknown): QuotaOut | null {
+  if ((error as { status?: unknown } | null)?.status !== 429) return null;
+  const said = allSaid(error);
+  if (/spending cap|ai\.studio\/spend/i.test(said)) return { kind: "credit" };
+  if (!GOOGLE_QUOTA.test(said)) {
+    return /insufficient_quota|exceeded your current quota|billing/i.test(said)
+      ? { kind: "credit" }
+      : { kind: "rate" };
+  }
+  const model =
+    /, model: ([\w.-]+)/.exec(said)?.[1] ??
+    /"model"\s*:\s*"([\w.-]+)"/.exec(said)?.[1] ??
+    null;
+  if (/limit: 0\b|"quotaValue"\s*:\s*"0"/.test(said)) {
+    const free = /free_tier|FreeTier/.test(said);
+    return { kind: "model", model, why: free ? "free-tier" : "none" };
+  }
+  if (/"quotaId"\s*:\s*"[^"]*PerDay/.test(said)) {
+    return { kind: "model", model, why: "day" };
+  }
+  return { kind: "rate" };
+}
+
+export const isOutOfCredit = (error: unknown): boolean =>
+  quotaOut(error)?.kind === "credit";
+
+// A model the provider gives no quota left, in words the maker can act on.
+function noQuotaWords(
+  provider: "google" | "openai",
+  quota: Extract<QuotaOut, { kind: "model" }>,
+): string {
+  const name = quota.model
+    ? modelLabel({ provider, model: quota.model })
+    : "this model";
+  const Name = name.charAt(0).toUpperCase() + name.slice(1);
+  if (quota.why === "free-tier") {
+    return `${Name} is not on Google's free tier, and this key's project is on it — link a billing account to the project in AI Studio, or pick another model.`;
+  }
+  if (quota.why === "day") {
+    return `${Name} used up today's quota on this key's Google project — it resets at midnight Pacific time; pick another model meanwhile.`;
+  }
+  return `This key's Google project has no quota for ${name} — check its rate limits in AI Studio, or pick another model.`;
+}
+
+// The same, in a few words, for the record of a fallback.
+export function noQuotaReason(
+  provider: "google" | "openai",
+  quota: Extract<QuotaOut, { kind: "model" }>,
+): string {
+  const name = quota.model
+    ? modelLabel({ provider, model: quota.model })
+    : "the model";
+  const label = PROVIDER_LABEL[provider];
+  if (quota.why === "free-tier")
+    return `${name} is not on ${label}'s free tier`;
+  if (quota.why === "day") return `${name} used up today's quota`;
+  return `${label} gives ${name} no quota`;
 }
 
 // Google answers a bad key with a 400, not a 401.
@@ -164,11 +251,13 @@ export function describeProviderError(
   const status = (error as { status?: unknown } | null)?.status;
   const label = PROVIDER_LABEL[provider];
   const other = PROVIDER_LABEL[provider === "google" ? "openai" : "google"];
-  if (isOutOfCredit(error)) {
+  const quota = quotaOut(error);
+  if (quota?.kind === "credit") {
     return provider === "google"
       ? "Google is at its spend cap — raise it at ai.studio/spend or use OpenAI."
       : "OpenAI is out of quota — check billing at platform.openai.com or use Google.";
   }
+  if (quota?.kind === "model") return noQuotaWords(provider, quota);
   if (status === 429) {
     return `${label} is rate-limiting requests — try again in a minute or use ${other}.`;
   }

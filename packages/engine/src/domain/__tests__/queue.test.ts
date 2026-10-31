@@ -4,9 +4,18 @@ import {
   describeProviderError,
   hadResponse,
   providerWords,
+  quotaOut,
   readableFailure,
   retryDecision,
 } from "@/domain/queue";
+import {
+  ARGON_FREE_TIER,
+  ARGON_PAID_NONE,
+  FLASH_PER_DAY,
+  FLASH_PER_MINUTE,
+  fromChat,
+  fromGoogleSdk,
+} from "./fixtures/google-quota";
 
 const withStatus = (status: number) =>
   Object.assign(new Error(`HTTP ${status}`), { status });
@@ -166,11 +175,83 @@ describe("provider errors in plain words", () => {
     );
   });
 
+  it("OpenAI out of quota read through the chat, its code gone, is still credit", () => {
+    const chat = withStatus(429);
+    chat.message =
+      "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.";
+    expect(quotaOut(chat)).toEqual({ kind: "credit" });
+    expect(describeProviderError("openai", chat)).toMatch(
+      /^OpenAI is out of quota/,
+    );
+  });
+
   it("a missing key or a model Kiln does not offer is permanent", () => {
     for (const name of ["ProviderKeyMissing", "ModelRefused"]) {
       expect(
         classifyGenerationError(Object.assign(new Error("x"), { name })),
       ).toBe("permanent");
     }
+  });
+});
+
+describe("Google's 429s", () => {
+  it("a model the key's project has no quota for: not credit, not retried, in words", () => {
+    for (const error of [
+      fromGoogleSdk(ARGON_FREE_TIER),
+      fromChat(ARGON_FREE_TIER),
+    ]) {
+      expect(quotaOut(error)).toEqual({
+        kind: "model",
+        model: "gemini-4-argon",
+        why: "free-tier",
+      });
+      expect(classifyGenerationError(error)).toBe("permanent");
+      expect(describeProviderError("google", error)).toBe(
+        "Gemini 4 Argon is not on Google's free tier, and this key's project is on it — link a billing account to the project in AI Studio, or pick another model.",
+      );
+    }
+    expect(describeProviderError("google", fromChat(ARGON_PAID_NONE))).toBe(
+      "This key's Google project has no quota for Gemini 4 Argon — check its rate limits in AI Studio, or pick another model.",
+    );
+  });
+
+  it("reads the message alone, with no body behind it", () => {
+    const words = withStatus(429);
+    words.message = ARGON_FREE_TIER.error.message;
+    expect(quotaOut(words)).toMatchObject({ kind: "model", why: "free-tier" });
+  });
+
+  it("a day's quota used up waits for midnight, not 30 s", () => {
+    const error = fromGoogleSdk(FLASH_PER_DAY);
+    expect(quotaOut(error)).toEqual({
+      kind: "model",
+      model: "gemini-3.6-flash",
+      why: "day",
+    });
+    expect(classifyGenerationError(error)).toBe("permanent");
+    expect(describeProviderError("google", error)).toBe(
+      "Gemini 3.6 Flash used up today's quota on this key's Google project — it resets at midnight Pacific time; pick another model meanwhile.",
+    );
+  });
+
+  it("a per-minute limit is a rate limit, retried, though it says quota", () => {
+    for (const error of [
+      fromGoogleSdk(FLASH_PER_MINUTE),
+      fromChat(FLASH_PER_MINUTE),
+    ]) {
+      expect(quotaOut(error)).toEqual({ kind: "rate" });
+      expect(classifyGenerationError(error)).toBe("transient");
+      expect(describeProviderError("google", error)).toBe(
+        "Google is rate-limiting requests — try again in a minute or use OpenAI.",
+      );
+    }
+  });
+
+  it("only a 429 has run out of anything", () => {
+    const body = JSON.stringify(ARGON_FREE_TIER);
+    expect(
+      quotaOut(Object.assign(new Error(body), { status: 400 })),
+    ).toBeNull();
+    expect(quotaOut(new Error(body))).toBeNull();
   });
 });
