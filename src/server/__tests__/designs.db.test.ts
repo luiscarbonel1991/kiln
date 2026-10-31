@@ -218,15 +218,41 @@ describe.skipIf(!enabled)("a design (database)", async () => {
   });
 
   it("is drawn through the queue, and a studio project that is not a design is not", async () => {
-    const { enqueueProjectCards } = await import("@/server/generation-queue");
+    const { enqueueProjectCards, estimateProjectCards } = await import(
+      "@/server/generation-queue"
+    );
+    const { enqueueBatch } = await import("@/server/generation-repository");
+    // Refused before any worker starts.
     await expect(
       enqueueProjectCards({ projectId: other, cardIds: ["recipe-line-art-0"] }),
     ).rejects.toThrow("Only a planned project or a design");
-    const queued = await enqueueProjectCards({
+    // The queue's own steps, in a mode no worker claims (enqueueProjectCards
+    // would start this process's worker, which takes other tests' rows).
+    const maker = await getCurrentMaker();
+    const { cards, model } = await estimateProjectCards(id, [
+      "recipe-line-art-1",
+    ]);
+    const queued = await enqueueBatch({
+      makerId: maker.id,
       projectId: id,
-      cardIds: ["recipe-line-art-1"],
+      mode: "design-test" as never,
+      model,
+      jobs: cards.map((c) => ({
+        cardId: c.cardId,
+        request: c.request,
+        estimateMicros: c.maxMicros,
+      })),
     });
     expect(queued.queued).toBe(1);
+    await expect(
+      enqueueBatch({
+        makerId: maker.id,
+        projectId: id,
+        mode: "design-test" as never,
+        model,
+        jobs: [{ ...cards[0], cardId: "not-a-drawing", estimateMicros: 1 }],
+      }),
+    ).rejects.toThrow("Only the design's drawings can be drawn.");
     const job = await db.generationJob.findFirstOrThrow({
       where: { projectId: id, cardId: "recipe-line-art-1" },
     });
