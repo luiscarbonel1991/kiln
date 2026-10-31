@@ -8,6 +8,7 @@ import {
 } from "ai";
 import { turnMs } from "@/domain/effort";
 import { errorMessage } from "@/domain/queue";
+import { agentRoute } from "@/server/chat/agent-route";
 import {
   appendChatEvent,
   getChat,
@@ -28,13 +29,13 @@ import {
 import "@/server/chat/no-gateway";
 import { newLedger, routedChatModel } from "@/server/chat/routed-model";
 import { SPECIALISTS, type SpecialistId } from "@/server/chat/specialists";
-import { textCandidates } from "@/server/text-calls";
 
 // One turn of the chat (ROADMAP "Agents", stage 2): one request, run inside
 // Kiln (Luis, 2026-10-30: no Vercel). It takes the session's lock, adds what
 // the maker did to the stored conversation, and streams the agent's reply
-// while it runs Kiln's tools on its role's route, at most MAX_STEPS model
-// calls and as long as the route's effort allows (turnMs). Each step is
+// while it runs Kiln's tools on the agent's route (its own, else its role's),
+// at most MAX_STEPS model calls and as long as the route's effort allows
+// (turnMs). Each step is
 // stored as it ends, so a closed tab or a reload loses nothing; Stop ends the
 // turn from another request.
 
@@ -113,7 +114,7 @@ export async function runTurn(input: {
     const specialist = SPECIALISTS[input.specialist ?? "kiln"];
     const tools = chatTools(ctx, specialist);
     const kind = input.plan ? "chatPlan" : "chatTurn";
-    const { candidates, effort } = await textCandidates(kind);
+    const { candidates, effort } = await agentRoute(specialist.id, kind);
     const model = routedChatModel(kind, {
       candidates,
       effort,
@@ -128,6 +129,7 @@ export async function runTurn(input: {
     const metadata = (): ChatMetadata => ({
       role,
       specialist: specialist.id,
+      effort,
       models: ledger.models,
       ...(ledger.moves.length ? { moves: ledger.moves } : {}),
       costMicros: priorMicros + ledger.costMicros,

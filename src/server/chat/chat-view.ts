@@ -1,31 +1,41 @@
+import type { Effort } from "@/domain/effort";
+import { agentRouteIn } from "@/server/chat/agent-route";
 import { getChat, listChatSessions } from "@/server/chat/chat-repository";
 import type { KilnMessage } from "@/server/chat/messages";
 import { MAX_STEPS } from "@/server/chat/run-turn";
-import {
-  SPECIALIST_CHOICES,
-  type SpecialistId,
-} from "@/server/chat/specialists";
+import { SPECIALIST_CHOICES, SpecialistId } from "@/server/chat/specialists";
 import { isDesign } from "@/server/designs";
 import { lessonStatuses } from "@/server/lessons";
-import { textRoute } from "@/server/text-calls";
+import { getMakerModelSetup } from "@/server/maker-repository";
+import { routeView } from "@/server/text-calls";
 import { TOOLS } from "@/server/tools";
 
 // What the chat panel needs to open: the conversation (a project's latest,
 // or the one asked for), whether a turn runs in it, the tools' titles, and
-// what a turn costs before the maker sends one: a step on its role's route
-// and the most a turn can cost (MAX_STEPS steps on the dearest model).
+// what a turn costs before the maker sends one, for each agent: a step on
+// its route at its effort and the most a turn can cost (MAX_STEPS steps on
+// the dearest model).
 
 export interface ChatEstimate {
   step: number | null;
   turn: number | null;
   models: string[];
+  effort: Effort;
+}
+
+// An agent's turn and its turn planned first; `own` when it runs on a route
+// of its own.
+export interface AgentEstimate {
+  turn: ChatEstimate;
+  plan: ChatEstimate;
+  own: boolean;
 }
 
 export interface ChatPanelData {
   sessionId: string | null;
   messages: KilnMessage[];
   running: boolean;
-  estimates: { fast: ChatEstimate; deep: ChatEstimate };
+  estimates: Record<SpecialistId, AgentEstimate>;
   toolTitles: Record<string, string>;
   specialists: typeof SPECIALIST_CHOICES;
   // The mode a new conversation starts in: SVG on a design.
@@ -35,13 +45,29 @@ export interface ChatPanelData {
   lessons: Record<string, string>;
 }
 
-async function estimate(kind: "chatTurn" | "chatPlan"): Promise<ChatEstimate> {
-  const route = await textRoute(kind);
-  return {
-    step: route.typical,
-    turn: route.max === null ? null : route.max * MAX_STEPS,
-    models: route.labels,
+async function estimates(): Promise<Record<SpecialistId, AgentEstimate>> {
+  const setup = await getMakerModelSetup();
+  const estimate = (
+    id: SpecialistId,
+    kind: "chatTurn" | "chatPlan",
+  ): ChatEstimate & { own: boolean } => {
+    const route = agentRouteIn(setup, id, kind);
+    const view = routeView(kind, route.candidates, route.effort);
+    return {
+      step: view.typical,
+      turn: view.max === null ? null : view.max * MAX_STEPS,
+      models: view.labels,
+      effort: view.effort,
+      own: route.own,
+    };
   };
+  return Object.fromEntries(
+    SpecialistId.options.map((id) => {
+      const { own, ...turn } = estimate(id, "chatTurn");
+      const { own: _, ...plan } = estimate(id, "chatPlan");
+      return [id, { turn, plan, own }];
+    }),
+  ) as Record<SpecialistId, AgentEstimate>;
 }
 
 export async function chatPanelData(target: {
@@ -69,10 +95,7 @@ export async function chatPanelData(target: {
     sessionId: chat?.id ?? null,
     messages: chat?.messages ?? [],
     running: chat?.running ?? false,
-    estimates: {
-      fast: await estimate("chatTurn"),
-      deep: await estimate("chatPlan"),
-    },
+    estimates: await estimates(),
     toolTitles: Object.fromEntries(TOOLS.map((t) => [t.name, t.title])),
     specialists: SPECIALIST_CHOICES,
     firstSpecialist: design ? "svg" : "kiln",

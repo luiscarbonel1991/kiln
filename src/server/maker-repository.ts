@@ -9,11 +9,14 @@ import { SearchColumns } from "@/domain/market-brief";
 import {
   DEFAULT_MAKER_MODELS,
   type MakerModels,
+  type ModelKind,
 } from "@/domain/model-defaults";
 import {
+  AgentRoutes,
   MakerRoutes,
   ModelRole,
   ROLE_KIND,
+  type Route,
   readMakerModels,
   routeEntry,
   routeHeads,
@@ -75,15 +78,19 @@ export async function saveMakerBrand(brand: BrandKit): Promise<void> {
   });
 }
 
-// The maker's default model per kind and routes per role (Settings →
-// Models), read leniently: a kind never saved, or saved on a model Kiln no
-// longer offers, reads as Kiln's default; with routes saved, the defaults are
-// their heads. Without a database (tests, demos) Kiln's defaults, no routes.
+// The maker's default model per kind, routes per role and the agents' own
+// routes (Settings → Models), read leniently: a kind never saved, or saved on
+// a model Kiln no longer offers, reads as Kiln's default; with routes saved,
+// the defaults are their heads. Without a database (tests, demos) Kiln's
+// defaults, no routes.
 export async function getMakerModelSetup(): Promise<{
   models: MakerModels;
   routes: MakerRoutes | null;
+  agents: AgentRoutes;
 }> {
-  if (!hasDatabase()) return { models: DEFAULT_MAKER_MODELS, routes: null };
+  if (!hasDatabase()) {
+    return { models: DEFAULT_MAKER_MODELS, routes: null, agents: {} };
+  }
   const maker = await getCurrentMaker();
   const row = await db.maker.findUnique({
     where: { id: maker.id },
@@ -231,20 +238,32 @@ export async function leaveOutListing(
   return changed;
 }
 
-// Save the routes: every model one Kiln offers for its role's kind, with a
-// pinned price, once per route (MakerRoutes). The heads are saved as the
+// Save the routes and the agents' own routes: every model one Kiln offers
+// for the route's kind, with a pinned price, once per route (MakerRoutes,
+// AgentRoutes), and a text route's effort. The heads are saved as the
 // defaults in the same write, so a default and a route never disagree.
-export async function saveMakerRoutes(input: MakerRoutes): Promise<void> {
+export async function saveMakerRoutes(
+  input: MakerRoutes,
+  agentsInput: AgentRoutes = {},
+): Promise<void> {
   const parsed = MakerRoutes.parse(input);
+  const kept = (route: Route, kind: ModelKind): Route => ({
+    models: route.models.map((m) => routeEntry(m, kind)),
+    fallback: route.fallback,
+    ...(kind === "text" && route.effort ? { effort: route.effort } : {}),
+  });
   const routes = Object.fromEntries(
     ModelRole.options.map((role) => [
       role,
-      {
-        models: parsed[role].models.map((m) => routeEntry(m, ROLE_KIND[role])),
-        fallback: parsed[role].fallback,
-      },
+      kept(parsed[role], ROLE_KIND[role]),
     ]),
   ) as MakerRoutes;
+  const agents = Object.fromEntries(
+    Object.entries(AgentRoutes.parse(agentsInput)).map(([id, route]) => [
+      id,
+      kept(route, "text"),
+    ]),
+  );
   const maker = await getCurrentMaker();
   await db.maker.update({
     where: { id: maker.id },
@@ -252,6 +271,7 @@ export async function saveMakerRoutes(input: MakerRoutes): Promise<void> {
       models: {
         ...routeHeads(routes),
         routes,
+        agents,
       } as unknown as Prisma.InputJsonValue,
     },
   });

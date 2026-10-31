@@ -117,7 +117,7 @@ export const viewFrame = defineTool({
   description:
     "The take a frame shows now, as an image to look at before approving or rejecting it, with the output to pass back to approve_frame or reject_frame.",
   input: FrameRef,
-  hints: { readOnly: true },
+  hints: { readOnly: true, showsImages: true },
   run: async ({ project, frame }) => {
     const view = await frameOf(project, frame);
     if (!view.output) {

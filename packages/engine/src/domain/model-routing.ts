@@ -14,6 +14,7 @@ import {
   type MakerModels,
   type ModelKind,
   makerModels,
+  modelEntry,
   modelLabel,
   PROVIDER_LABELS,
   ProviderId,
@@ -119,43 +120,84 @@ const ROUTES_SHAPE = Object.fromEntries(
   ModelRole.options.map((role) => [role, Route]),
 ) as Record<ModelRole, typeof Route>;
 
+// What is wrong with one route of a kind, each issue at its path.
+function routeIssues(
+  route: Route,
+  kind: ModelKind,
+  name: string,
+  issue: (path: (string | number)[], message: string) => void,
+): void {
+  if (kind !== "text" && route.effort) {
+    issue(["effort"], `An effort is for text; the ${name} route has none.`);
+  }
+  route.models.forEach((entry, i) => {
+    const problem = entryProblem(entry, kind);
+    if (problem) issue(["models", i], problem);
+    if (route.models.findIndex((m) => sameModel(m, entry)) !== i) {
+      issue(
+        ["models", i],
+        `${modelLabel(entry)} is in the ${name} route twice.`,
+      );
+    }
+  });
+}
+
 export const MakerRoutes = z.object(ROUTES_SHAPE).superRefine((routes, ctx) => {
   for (const role of ModelRole.options) {
-    const kind = ROLE_KIND[role];
-    if (kind !== "text" && routes[role].effort) {
-      ctx.addIssue({
-        code: "custom",
-        path: [role, "effort"],
-        message: `An effort is for text; the ${role} route has none.`,
-      });
-    }
-    routes[role].models.forEach((entry, i) => {
-      const problem = entryProblem(entry, kind);
-      if (problem) {
-        ctx.addIssue({
-          code: "custom",
-          path: [role, "models", i],
-          message: problem,
-        });
-      }
-      if (routes[role].models.findIndex((m) => sameModel(m, entry)) !== i) {
-        ctx.addIssue({
-          code: "custom",
-          path: [role, "models", i],
-          message: `${modelLabel(entry)} is in the ${role} route twice.`,
-        });
-      }
-    });
+    routeIssues(routes[role], ROLE_KIND[role], role, (path, message) =>
+      ctx.addIssue({ code: "custom", path: [role, ...path], message }),
+    );
   }
 });
 export type MakerRoutes = z.infer<typeof MakerRoutes>;
 
+// Each chat agent's own text route, by the agent's id (Luis, 2026-10-31:
+// every agent may run on any text model, at its own effort). An agent with
+// none follows the fast route, or deep when the maker plans first.
+export const AgentRoutes = z
+  .record(z.string().min(1), Route)
+  .superRefine((agents, ctx) => {
+    for (const [id, route] of Object.entries(agents)) {
+      routeIssues(route, "text", id, (path, message) =>
+        ctx.addIssue({ code: "custom", path: [id, ...path], message }),
+      );
+    }
+  });
+export type AgentRoutes = z.infer<typeof AgentRoutes>;
+
+// Whether every model of a route reads images (an agent that looks at takes
+// needs it).
+export const routeSees = (route: Route): boolean =>
+  route.models.every((m) => modelEntry(m)?.sees === true);
+
 const headOf = (models: MakerModels, kind: ModelKind): RouteEntry =>
   routeEntry(models[kind], kind);
 
-// A saved route, read leniently: an entry Kiln no longer offers or prices is
-// dropped, a repeat is dropped, and a role left with nothing reads as its
-// kind's default alone, with no fallback. null when no route was ever saved.
+// One saved route, read leniently: an entry Kiln no longer offers or prices
+// is dropped, and so is a repeat; null when nothing is left.
+function readRoute(raw: unknown, kind: ModelKind): Route | null {
+  const parsed = z
+    .object({ models: z.array(z.unknown()), fallback: z.boolean() })
+    .safeParse(raw);
+  const effort = Effort.safeParse((raw as { effort?: unknown } | null)?.effort);
+  const models: RouteEntry[] = [];
+  for (const item of parsed.success ? parsed.data.models : []) {
+    const entry = RouteEntry.safeParse(item);
+    if (!entry.success || entryProblem(entry.data, kind)) continue;
+    if (models.some((m) => sameModel(m, entry.data))) continue;
+    models.push(routeEntry(entry.data, kind));
+  }
+  if (models.length === 0) return null;
+  return {
+    models: models.slice(0, MAX_ROUTE),
+    fallback: parsed.success ? parsed.data.fallback : false,
+    ...(kind === "text" && effort.success ? { effort: effort.data } : {}),
+  };
+}
+
+// The saved routes, each read leniently; a role left with nothing reads as
+// its kind's default alone, with no fallback (a text role keeps its effort).
+// null when no route was ever saved.
 export function readRoutes(
   raw: unknown,
   defaults: MakerModels,
@@ -164,33 +206,32 @@ export function readRoutes(
   const saved = raw as Record<string, unknown>;
   const read = (role: ModelRole): Route => {
     const kind = ROLE_KIND[role];
-    const parsed = z
-      .object({ models: z.array(z.unknown()), fallback: z.boolean() })
-      .safeParse(saved[role]);
+    const route = readRoute(saved[role], kind);
+    if (route) return route;
     const effort = Effort.safeParse(
       (saved[role] as { effort?: unknown } | null)?.effort,
     );
-    const effortOf =
-      kind === "text" && effort.success ? { effort: effort.data } : {};
-    const models: RouteEntry[] = [];
-    for (const item of parsed.success ? parsed.data.models : []) {
-      const entry = RouteEntry.safeParse(item);
-      if (!entry.success || entryProblem(entry.data, kind)) continue;
-      if (models.some((m) => sameModel(m, entry.data))) continue;
-      models.push(routeEntry(entry.data, kind));
-    }
-    if (models.length === 0) {
-      return { models: [headOf(defaults, kind)], fallback: false, ...effortOf };
-    }
     return {
-      models: models.slice(0, MAX_ROUTE),
-      fallback: parsed.success ? parsed.data.fallback : false,
-      ...effortOf,
+      models: [headOf(defaults, kind)],
+      fallback: false,
+      ...(kind === "text" && effort.success ? { effort: effort.data } : {}),
     };
   };
   return Object.fromEntries(
     ModelRole.options.map((role) => [role, read(role)]),
   ) as MakerRoutes;
+}
+
+// The agents' own routes, each read leniently; an agent left with nothing
+// follows the fast route again.
+export function readAgentRoutes(raw: unknown): AgentRoutes {
+  if (!raw || typeof raw !== "object") return {};
+  const agents: AgentRoutes = {};
+  for (const [id, saved] of Object.entries(raw)) {
+    const route = readRoute(saved, "text");
+    if (route) agents[id] = route;
+  }
+  return agents;
 }
 
 // The defaults a saved route implies: what a new card starts on and what a
@@ -215,16 +256,22 @@ export function routeHeads(routes: MakerRoutes): MakerModels {
   };
 }
 
-// A maker's stored models: the defaults per kind and the routes, when saved
-// (`routes` beside the defaults in the same blob). With routes, the defaults
-// are their heads.
+// A maker's stored models: the defaults per kind, the routes when saved and
+// the agents' own routes (`routes` and `agents` beside the defaults in the
+// same blob). With routes, the defaults are their heads.
 export function readMakerModels(raw: unknown): {
   models: MakerModels;
   routes: MakerRoutes | null;
+  agents: AgentRoutes;
 } {
   const base = makerModels(raw);
-  const routes = readRoutes((raw as { routes?: unknown } | null)?.routes, base);
-  return { models: routes ? routeHeads(routes) : base, routes };
+  const saved = raw as { routes?: unknown; agents?: unknown } | null;
+  const routes = readRoutes(saved?.routes, base);
+  return {
+    models: routes ? routeHeads(routes) : base,
+    routes,
+    agents: readAgentRoutes(saved?.agents),
+  };
 }
 
 // The route a role runs on; null when the maker never saved routes (then a

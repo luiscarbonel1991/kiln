@@ -1,5 +1,6 @@
 import type { UIMessage } from "ai";
 import { z } from "zod";
+import { Effort } from "@/domain/effort";
 
 // A chat's messages as the chat shows them (the AI SDK's UIMessage), and the
 // two rules that keep the conversation Kiln's: the browser sends only what
@@ -16,6 +17,9 @@ export type ChatRole = z.infer<typeof ChatRole>;
 export const ChatMetadata = z.object({
   role: ChatRole.optional(),
   specialist: z.enum(["kiln", "etsy", "scenes", "svg"]).optional(),
+  // The effort the turn asked for; each model in `models` names the level it
+  // ran at ("Gemini 3.8 Flash · high").
+  effort: Effort.optional(),
   models: z.array(z.string()).optional(),
   moves: z
     .array(z.object({ from: z.string(), to: z.string(), reason: z.string() }))

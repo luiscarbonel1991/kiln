@@ -116,6 +116,7 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
     expect(await repo.getMakerModelSetup()).toEqual({
       models: DEFAULT_MAKER_MODELS,
       routes: null,
+      agents: {},
     });
   });
 
@@ -151,6 +152,32 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
       video: routes.video.models[0],
       text: flash,
     });
+  });
+
+  it("keeps a text route's effort and the agents' own routes", async () => {
+    const routes = proposeRoutes(DEFAULT_MAKER_MODELS, {
+      openai: true,
+      google: true,
+    });
+    const astra = { provider: "openai" as const, model: "gpt-6-astra" };
+    await repo.saveMakerRoutes(
+      { ...routes, deep: { ...routes.deep, effort: "xhigh" } },
+      { etsy: { models: [astra], fallback: false, effort: "max" } },
+    );
+    const setup = await repo.getMakerModelSetup();
+    expect(setup.routes?.deep.effort).toBe("xhigh");
+    expect(setup.routes?.fast.effort).toBeUndefined();
+    expect(setup.agents).toEqual({
+      etsy: { models: [astra], fallback: false, effort: "max" },
+    });
+    await expect(
+      repo.saveMakerRoutes(routes, {
+        etsy: {
+          models: [{ provider: "openai", model: "gpt-image-2" }],
+          fallback: false,
+        },
+      }),
+    ).rejects.toThrow(/not a text model/);
   });
 
   it("refuses a retired model or a repeat, and reads a stale saved kind as the default", async () => {

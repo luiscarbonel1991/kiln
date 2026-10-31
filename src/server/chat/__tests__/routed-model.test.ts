@@ -130,7 +130,7 @@ describe("the chat's routed model", () => {
     });
     expect(seen[0].maxOutputTokens).toBe(2_000);
     expect(ledger).toEqual({
-      models: ["GPT-6 Luna"],
+      models: ["GPT-6 Luna · low"],
       moves: [],
       costMicros: 1_500,
     });
@@ -180,7 +180,7 @@ describe("the chat's routed model", () => {
     expect(openDirectCall.mock.calls[1][0]).toMatchObject({
       route: { switched: [{ from: LUNA, to: FLASH }] },
     });
-    expect(ledger.models).toEqual(["Gemini 3.8 Flash"]);
+    expect(ledger.models).toEqual(["Gemini 3.8 Flash · low"]);
     expect(ledger.moves).toEqual([
       expect.objectContaining({ from: "GPT-6 Luna", to: "Gemini 3.8 Flash" }),
     ]);

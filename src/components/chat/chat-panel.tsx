@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/message-scroller";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { EFFORT_LABELS } from "@/domain/effort";
 import { cn } from "@/lib/utils";
 import type { ChatEstimate, ChatPanelData } from "@/server/chat/chat-view";
 import type { KilnMessage } from "@/server/chat/messages";
@@ -421,7 +422,9 @@ function costLine(estimate: ChatEstimate): string {
   if (estimate.step === null || estimate.turn === null) {
     return "no pinned price on this route";
   }
-  return `a step ≈ ${money(estimate.step)} · a turn at most ${money(estimate.turn)}`;
+  const effort =
+    estimate.effort === "low" ? "" : `${EFFORT_LABELS[estimate.effort]} · `;
+  return `${effort}a step ≈ ${money(estimate.step)} · a turn at most ${money(estimate.turn)}`;
 }
 
 function Composer({
@@ -443,7 +446,8 @@ function Composer({
 }) {
   const [text, setText] = useState("");
   const [plan, setPlan] = useState(false);
-  const estimate = plan ? estimates.deep : estimates.fast;
+  const agent = estimates[specialist];
+  const estimate = plan ? agent.plan : agent.turn;
   const send = () => {
     const message = text.trim();
     if (!message || busy) return;
@@ -506,7 +510,11 @@ function Composer({
           onChange={setPlan}
           disabled={busy}
           testId="chat-plan"
-          label="Plan first, on the deep route"
+          label={
+            agent.own
+              ? "Plan first, on this agent's model"
+              : "Plan first, on the deep route"
+          }
         >
           Plan first
         </Switch>

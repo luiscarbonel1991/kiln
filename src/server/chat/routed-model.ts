@@ -4,7 +4,7 @@ import type {
   LanguageModelV4StreamPart,
   LanguageModelV4Usage,
 } from "@ai-sdk/provider";
-import type { Effort } from "@/domain/effort";
+import { type Effort, effortOn } from "@/domain/effort";
 import {
   costFromUsage,
   type GenerationUsage,
@@ -150,7 +150,7 @@ export function routedChatModel(
         await direct.beforeCall();
         callStarted = true;
         const result = await run(model, entry);
-        const label = modelLabel(entry);
+        const label = `${modelLabel(entry)} · ${effortOn(entry, effort)}`;
         if (!ledger.models.includes(label)) ledger.models.push(label);
         return await settle(result, entry, direct);
       } catch (error) {

@@ -41,6 +41,9 @@ export interface ToolHints {
   idempotent?: boolean;
   // It reaches outside Kiln (a shop's API).
   openWorld?: boolean;
+  // It answers images for the agent to look at, so the agent's model must
+  // read images.
+  showsImages?: boolean;
 }
 
 export interface Tool {

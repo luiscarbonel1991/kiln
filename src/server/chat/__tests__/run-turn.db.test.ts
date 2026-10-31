@@ -17,6 +17,9 @@ const replies: LanguageModelV4StreamPart[][] = [];
 const prompts: unknown[] = [];
 const offered: string[][] = [];
 const generated: unknown[] = [];
+const ran: { id: string; effort: unknown }[] = [];
+// The maker's agents' routes, read instead of the stored ones.
+const setup = vi.hoisted(() => ({ agents: {} as Record<string, unknown> }));
 
 // Spend under the cap is the routed model's (routed-model.test.ts).
 vi.mock("@/server/direct-spend", async (importOriginal) => ({
@@ -27,10 +30,23 @@ vi.mock("@/server/direct-spend", async (importOriginal) => ({
     failed: async () => {},
   }),
 }));
+vi.mock("@/server/maker-repository", async (importOriginal) => {
+  const real =
+    await importOriginal<typeof import("@/server/maker-repository")>();
+  return {
+    ...real,
+    getMakerModelSetup: async () => ({
+      ...(await real.getMakerModelSetup()),
+      routes: null,
+      agents: setup.agents,
+    }),
+  };
+});
 vi.mock("@/providers/registry", () => ({
   getChatModels: () => ({
-    model: () =>
-      new MockLanguageModelV4({
+    model: (id: string, effort: unknown) => {
+      ran.push({ id, effort });
+      return new MockLanguageModelV4({
         doStream: async ({ prompt, tools }) => {
           prompts.push(prompt);
           offered.push((tools ?? []).map((t) => t.name));
@@ -38,7 +54,8 @@ vi.mock("@/providers/registry", () => ({
           if (!chunks) throw new Error("The script ran out of replies.");
           return { stream: simulateReadableStream({ chunks }) };
         },
-      }),
+      });
+    },
   }),
 }));
 vi.mock("@/server/tools", async () => {
@@ -164,7 +181,8 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
     ).toBe(true);
     expect(reply.metadata).toMatchObject({
       role: "fast",
-      models: ["GPT-6.1 Sol"],
+      effort: "low",
+      models: ["GPT-6.1 Sol · low"],
     });
     const recorded = await db.toolCall.findMany({ where: { sessionId: id } });
     expect(recorded).toEqual([
@@ -286,5 +304,48 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
     replies.push(say("Hi."));
     await turn(id, user("u2", "hello"));
     expect(offered[1]).toEqual(["peek", "generate", "suggest_specialist"]);
+  });
+
+  it("an agent with its own model runs on it at its effort, planning too; the others on the fast route", async () => {
+    setup.agents = {
+      etsy: {
+        models: [{ provider: "openai", model: "gpt-6-astra" }],
+        fallback: false,
+        effort: "max",
+      },
+    };
+    const { id } = await session();
+    ran.length = 0;
+    replies.push(say("Shorter."), say("Planned."), say("Hi."));
+    for (const [n, plan, specialist] of [
+      [1, false, "etsy"],
+      [2, true, "etsy"],
+      [3, false, "kiln"],
+    ] as const) {
+      const response = await runTurn({
+        sessionId: id,
+        message: user(`u${n}`, "the title"),
+        specialist,
+        plan,
+      });
+      await response.text();
+      for (let i = 0; i < 50 && (await repo.getChat(id))?.running; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+      }
+    }
+    expect(ran).toEqual([
+      { id: "gpt-6-astra", effort: "max" },
+      { id: "gpt-6-astra", effort: "max" },
+      { id: "gpt-6.1-sol", effort: "low" },
+    ]);
+    const replies_ = (await repo.getChat(id))?.messages.filter(
+      (m) => m.role === "assistant",
+    ) as KilnMessage[];
+    expect(replies_.map((m) => m.metadata)).toMatchObject([
+      { role: "fast", effort: "max", models: ["GPT-6 Astra · max"] },
+      { role: "deep", effort: "max", models: ["GPT-6 Astra · max"] },
+      { role: "fast", effort: "low", models: ["GPT-6.1 Sol · low"] },
+    ]);
+    setup.agents = {};
   });
 });

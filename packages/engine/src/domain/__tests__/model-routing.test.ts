@@ -6,6 +6,7 @@ import type {
 } from "@/domain/generation-request";
 import { DEFAULT_MAKER_MODELS } from "@/domain/model-defaults";
 import {
+  AgentRoutes,
   canRunRequest,
   fallbackAfter,
   MakerRoutes,
@@ -13,11 +14,13 @@ import {
   proposeRoutes,
   type RouteEntry,
   ranOn,
+  readAgentRoutes,
   readMakerModels,
   readRoutes,
   routeCandidates,
   routedRequest,
   routeEffort,
+  routeSees,
   takeEstimate,
   videoTakeEstimate,
   worstCase,
@@ -228,7 +231,57 @@ describe("MakerRoutes and readRoutes", () => {
     expect(readMakerModels(DEFAULT_MAKER_MODELS)).toEqual({
       models: DEFAULT_MAKER_MODELS,
       routes: null,
+      agents: {},
     });
+  });
+});
+
+describe("AgentRoutes and readAgentRoutes", () => {
+  const ASTRA = { provider: "openai" as const, model: "gpt-6-astra" };
+  const ARGON = { provider: "google" as const, model: "gemini-4-argon" };
+
+  it("takes any text model Kiln offers, once, at an effort", () => {
+    expect(
+      AgentRoutes.safeParse({
+        etsy: { models: [ASTRA, ARGON], fallback: true, effort: "max" },
+      }).success,
+    ).toBe(true);
+    const bad = AgentRoutes.safeParse({
+      scenes: { models: [GPT_IMAGE], fallback: false },
+      svg: { models: [ASTRA, ASTRA], fallback: false },
+      kiln: {
+        models: [{ provider: "google", model: "gemini-3.5-flash" }],
+        fallback: false,
+      },
+    });
+    expect(bad.error?.issues.map((i) => i.path.join("."))).toEqual([
+      "scenes.models.0",
+      "svg.models.1",
+      "kiln.models.0",
+    ]);
+  });
+
+  it("reads leniently: drops what cannot run, and an agent left with nothing", () => {
+    const { agents } = readMakerModels({
+      ...DEFAULT_MAKER_MODELS,
+      agents: {
+        etsy: {
+          models: [{ provider: "openai", model: "gone" }, ASTRA, ASTRA],
+          fallback: false,
+          effort: "xhigh",
+        },
+        scenes: { models: [GPT_IMAGE], fallback: false },
+        svg: "nonsense",
+      },
+    });
+    expect(agents).toEqual({
+      etsy: { models: [ASTRA], fallback: false, effort: "xhigh" },
+    });
+    expect(readAgentRoutes(null)).toEqual({});
+  });
+
+  it("says whether every model of a route reads images", () => {
+    expect(routeSees({ models: [ASTRA, ARGON], fallback: true })).toBe(true);
   });
 });
 

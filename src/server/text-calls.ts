@@ -11,11 +11,13 @@ import {
   assertModel,
   catalogFor,
   DEFAULT_MAKER_MODELS,
+  type MakerModels,
   modelLabel,
   type ProviderId,
 } from "@/domain/model-defaults";
 import {
   fallbackAfter,
+  type MakerRoutes,
   pickNext,
   type RanOn,
   type RouteEntry,
@@ -125,7 +127,15 @@ export async function textCandidates(
   kind: TextCallKind,
   asked?: TextModel,
 ): Promise<{ candidates: RouteEntry[]; effort: Effort }> {
-  const { models, routes } = await getMakerModelSetup();
+  return roleCandidates(await getMakerModelSetup(), kind, asked);
+}
+
+export function roleCandidates(
+  setup: { models: MakerModels; routes: MakerRoutes | null },
+  kind: TextCallKind,
+  asked?: TextModel,
+): { candidates: RouteEntry[]; effort: Effort } {
+  const { models, routes } = setup;
   const route = roleRoute(routes, TEXT_CALL_ROLES[kind]);
   const effort = routeEffort(route);
   if (asked) {

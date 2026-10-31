@@ -185,6 +185,7 @@ export {
   VideoResolution,
 } from "@/domain/model-defaults";
 export {
+  AgentRoutes,
   canRunRequest,
   entryProblem,
   type Failure,
@@ -203,6 +204,7 @@ export {
   RouteEntry,
   RouteSwitch,
   ranOn,
+  readAgentRoutes,
   readJobRoute,
   readMakerModels,
   readRoutes,
@@ -212,6 +214,7 @@ export {
   routeEffort,
   routeEntry,
   routeHeads,
+  routeSees,
   sameModel,
   type TakeRoutes,
   TEXT_CALL_ROLES,

@@ -88,7 +88,7 @@ export const viewDesign = defineTool({
   input: DrawingRef.extend({
     show: z.enum(["line-art", "vector"]).default("line-art"),
   }).strict(),
-  hints: { readOnly: true },
+  hints: { readOnly: true, showsImages: true },
   run: async ({ project, card, show }) => {
     const drawing = await drawingOf(project, card);
     const url = show === "vector" ? drawing.vector : drawing.lineArt;
