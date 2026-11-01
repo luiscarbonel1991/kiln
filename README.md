@@ -471,17 +471,25 @@ Kiln generates with several models from two providers, OpenAI and Google:
 
 | Kind | Models |
 | --- | --- |
-| Images | gpt-image-2, gpt-image-1.5, gpt-image-1-mini (the last two retire 2026-12-01), Gemini 3 Pro Image, Gemini 3.1 Flash Image, Gemini 3.1 Flash-Lite Image |
-| Video | Veo 3.1, Veo 3.1 Fast, Veo 3.1 Lite (4, 6 or 8 s at 720p; 8 s at 1080p) |
+| Images | gpt-image-2, gpt-image-1.5, gpt-image-1-mini (the last two retire 2026-12-01), Gemini Nano Banana 2.1, Gemini 3 Pro Image, Gemini 3.1 Flash Image (Nano Banana 2, deprecated by Google on 2026-10-06), Gemini 3.1 Flash-Lite Image |
+| Video | Gemini Omni Flash (3 to 10 s at 720p, vertical 9:16 or landscape 16:9, with sound) |
 | Text (vision, art direction, the chat) | GPT-6.1 Sol, GPT-6 Astra, GPT-6.1 Terra, GPT-6 Luna, Gemini 3.8 Flash, Gemini 4 Argon, Gemini 3.6 Flash, Gemini 3.5 Flash-Lite |
 
 The catalog is `packages/engine/src/domain/model-defaults.ts`. Each model's
 pinned price, with its date and source, is in `generation-cost.ts`; a price the
 provider has dated (Gemini 4 Argon doubles on 2026-12-01, the Gemini Flash models
 on 2027-01-01) is read on the day of the call. A model without a price cannot be
-queued. OpenAI shut Sora down on 2026-09-24, and Google retired Gemini 3.5 Flash
-on 2026-10-08 (it answers it with Gemini 3.6 Flash); their old outputs keep their
-label.
+queued. OpenAI shut Sora down on 2026-09-24, Google retired Gemini 3.5 Flash
+on 2026-10-08 (it answers it with Gemini 3.6 Flash) and shut Veo 3.1 down on
+2026-10-22; their old outputs keep their label. A deprecated model with no
+shutdown announced (Nano Banana 2) is still offered and runs; its picker says
+so.
+
+Gemini Omni Flash runs through Google's Interactions API, in the background:
+Kiln polls for the clip, stores it, and deletes the stored interaction and the
+clip's file at Google. It is priced by the second ($0.1014 at 720p, plus $0.01
+a clip for its input and thinking) and a finished clip records the tokens Google
+reports.
 
 ### Routes
 
@@ -494,8 +502,8 @@ model" is on, the models it may move to if a provider fails. A route holds
 only catalog models with a pinned price, at most four.
 
 - Until the maker saves, Settings shows Kiln's proposal and every task runs its
-  one default model with no fallback (images on gpt-image-2 medium, video on Veo
-  3.1 Fast 720p, text on GPT-6.1 Sol). The proposal starts each route on that
+  one default model with no fallback (images on gpt-image-2 medium, video on
+  Gemini Omni Flash 720p, text on GPT-6.1 Sol). The proposal starts each route on that
   default and adds the other provider's counterpart when it has a key.
 - Text falls back by default; images and video do not until the maker turns it
   on, since another model changes the look. A batch stays on one model: when a
@@ -552,7 +560,7 @@ month's budget), a scene's "New take", the slot editor's Generate and Re-roll
 `src/instrumentation.ts`). Every paid call counts against the maker's monthly
 cap (`Maker.monthlyCapCents`, $25 by default), one cap for both providers;
 vision and art direction count too. A video animates a scene the maker
-approved (Veo, priced by the second: 8 s on Veo 3.1 Fast 720p = $0.80); its
+approved (Gemini Omni Flash, priced by the second: 8 s at 720p = $0.82); its
 prompt comes from the product's spec. It defaults to a static camera with a light
 change, which keeps the product exact; the push-in is a choice. The same rules hold on both providers:
 
