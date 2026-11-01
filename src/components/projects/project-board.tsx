@@ -12,6 +12,10 @@ import {
   SlotOrder,
   SlotSwitch,
 } from "@/components/projects/board-actions";
+import {
+  BoardColours,
+  UNVERIFIED_TITLE,
+} from "@/components/projects/board-colours";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import {
   type BatchEstimate,
@@ -73,7 +77,7 @@ import {
 import {
   buyerSizeLabel,
   colourOf,
-  defaultSwatch,
+  lookVerified,
   type Product,
 } from "@/domain/product";
 import type { FrameCost, ProjectCost } from "@/domain/project-cost";
@@ -278,15 +282,10 @@ export function ProjectBoard({
   // the plate it was drawn beside.
   const above = threeQuarterFor(board.plan.references, board.master?.assetUrl);
   const waiting = waitingCardIds(rows);
-  // The material sample scenes are made with (the default colour's).
-  const swatchUrl = defaultSwatch(product);
-  const sample =
-    swatchUrl && isRenderableUrl(swatchUrl)
-      ? {
-          url: swatchUrl,
-          name: colourOf(product, product.defaultColour).name,
-        }
-      : null;
+  // Scenes show the default colour: nothing real backs a look without a
+  // material photo or a supplier page.
+  const sceneColour = colourOf(product, product.defaultColour);
+  const unverified = lookVerified(sceneColour) ? null : sceneColour.name;
   const labelOf = new Map(
     rows.flatMap((r) => r.slots.map((s) => [s.cardId, s.slot.label] as const)),
   );
@@ -461,6 +460,7 @@ export function ProjectBoard({
                             route: takeRoutes.final,
                           })}
                           hasReference={board.master !== null}
+                          unverified={unverified}
                           model={card ? (card.model as ModelValue) : null}
                           notes={notes}
                           video={
@@ -663,26 +663,7 @@ export function ProjectBoard({
               </p>
             </div>
           ) : null}
-          {sample ? (
-            <div className="flex items-center gap-3 border-t border-border-soft pt-3">
-              <div className="size-14 flex-shrink-0 overflow-hidden rounded-thumb bg-surface-soft shadow-render">
-                {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
-                <img
-                  src={sample.url}
-                  alt={`${sample.name} material sample`}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <p className="font-sans text-[0.75rem] leading-snug text-on-surface-mid">
-                <span className="font-semibold text-foreground">
-                  Material sample · {sample.name}
-                </span>
-                <br />
-                Every scene reads it after the reference: compare each scene's
-                surfaces with it.
-              </p>
-            </div>
-          ) : null}
+          <BoardColours product={product} />
         </div>
 
         {board.master ? (
@@ -908,6 +889,7 @@ function SlotActions({
   onView,
   tune,
   hasReference,
+  unverified,
   order,
   video,
   model,
@@ -922,6 +904,8 @@ function SlotActions({
   // The scene's knobs (a slot planned with them), else null.
   tune: TuneView | null;
   hasReference: boolean;
+  // The colour scenes show, when nothing real backs its look; else null.
+  unverified: string | null;
   order: { place: number; last: number; firstLabel: string } | null;
   video: {
     settings: VideoSettings;
@@ -1071,6 +1055,17 @@ function SlotActions({
               view.state === "retrying"
             }
           />
+        ) : null,
+      )}
+      {keep(
+        unverified ? (
+          <span
+            title={UNVERIFIED_TITLE}
+            data-testid="unverified-look"
+            className="font-mono text-[0.6rem] text-prov-local"
+          >
+            unverified look · {unverified}
+          </span>
         ) : null,
       )}
       {keep(
