@@ -380,7 +380,15 @@ the MCP server's tools, on the same server functions as the board.
   monthly cap, its measured cost recorded; a refused step moves down a saved route, a
   step with no answer never retries or moves. The composer shows what a step costs
   and the most a turn can, for the agent on the chip at its effort; each reply shows
-  the models it ran on, each with its effort ("GPT-6 Astra · max"), and its cost.
+  the models it ran on, each with its effort ("GPT-6 Astra · max"), and its text's cost.
+- **What a conversation spent, as it goes.** Under the estimate, the composer says
+  what the conversation has spent so far: its replies' text plus the work its paid
+  tools ran (frames, drawings, video, the listing text, a review), and what that
+  work still holds while it runs ("spent here $0.58 · $0.52 queued"; the split on
+  hover). Each job a paid tool starts from the chat names its conversation
+  (`GenerationJob.sessionId`), counted by the budget's rule: its measured cost, else
+  its estimate once its call went out. The chat reads it again while a turn or its
+  queued work runs (`GET /api/chat/:id/spend`). A mock run says nothing is paid.
 - **Specialists** (stage 3): a chip in the composer picks who works on a message.
   **Kiln** has every tool; **Etsy** has the listing's fields, the paid rewrite, the
   brief, results and the shop's numbers, and knows Etsy's title and tag rules;
