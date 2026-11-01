@@ -9,7 +9,13 @@ import {
   toMicros,
   videoCost,
 } from "@/domain/generation-cost";
-import type { ImageQuality, VideoResolution } from "@/domain/model-defaults";
+import {
+  type ImageQuality,
+  modelLabel,
+  PROVIDER_LABELS,
+  ProviderId,
+  type VideoResolution,
+} from "@/domain/model-defaults";
 import type { JobRoute } from "@/domain/model-routing";
 import { describeProviderError, hadResponse } from "@/domain/queue";
 import { hasDatabase } from "@/lib/db";
@@ -19,6 +25,7 @@ import type { GenerationResult } from "@/providers/types";
 import {
   closeDirectCall,
   markDirectCall,
+  readUnlisted,
   reserveDirectCall,
 } from "@/server/generation-repository";
 import { getCurrentMaker } from "@/server/maker-repository";
@@ -122,7 +129,9 @@ const UNCOUNTED: DirectCall<never> = {
 // The estimated max is reserved first, under the maker lock, so parallel
 // calls cannot pass the cap together; the row then carries the measured cost.
 // An error the provider answered counts nothing, a call with no answer counts
-// at its estimate, and a call never made (a stub) records nothing.
+// at its estimate, and a call never made (a stub) records nothing. A model its
+// provider's last key check no longer lists is refused before anything, as a
+// model that cannot run (a route moves past it).
 export async function openDirectCall<T extends { usage?: unknown }>(
   priced: PricedCall<T>,
 ): Promise<DirectCall<T>> {
@@ -133,6 +142,19 @@ export async function openDirectCall<T extends { usage?: unknown }>(
     );
   }
   const maker = await getCurrentMaker();
+  const provider = ProviderId.safeParse(priced.provider);
+  if (provider.success) {
+    const gone = (await readUnlisted(maker.id))[provider.data];
+    if (gone?.models.includes(priced.model)) {
+      const model = { provider: provider.data, model: priced.model };
+      throw Object.assign(
+        new Error(
+          `${PROVIDER_LABELS[provider.data]} no longer offers ${modelLabel(model)} (its model list, checked ${gone.at.slice(0, 10)}) — pick another model.`,
+        ),
+        { name: "CapabilityError" },
+      );
+    }
+  }
   const id = await reserveDirectCall({
     makerId: maker.id,
     provider: priced.provider,

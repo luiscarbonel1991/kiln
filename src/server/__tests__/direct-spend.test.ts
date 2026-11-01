@@ -4,6 +4,9 @@ import type { GenerationResult } from "@/providers/types";
 const reserveDirectCall = vi.fn(async () => "row-1");
 const markDirectCall = vi.fn(async () => {});
 const closeDirectCall = vi.fn(async () => {});
+const unlisted = vi.hoisted(() => ({
+  found: {} as Record<string, { models: string[]; at: string }>,
+}));
 
 vi.mock("@/lib/db", () => ({ hasDatabase: () => true }));
 vi.mock("@/providers/mode", () => ({ providerMode: () => "live" }));
@@ -11,6 +14,7 @@ vi.mock("@/server/generation-repository", () => ({
   reserveDirectCall,
   markDirectCall,
   closeDirectCall,
+  readUnlisted: async () => unlisted.found,
 }));
 vi.mock("@/server/maker-repository", () => ({
   getCurrentMaker: async () => ({ id: "maker-1" }),
@@ -69,6 +73,23 @@ describe("direct spend", () => {
       usage,
       actualMicros: 511_818,
     });
+  });
+
+  it("a model its provider no longer lists is refused before anything is reserved", async () => {
+    unlisted.found = {
+      google: { models: [OMNI.model], at: "2026-10-31T23:00:00.000Z" },
+    };
+    const call = vi.fn();
+    await expect(
+      withDirectSpend(videoCall(OMNI, 8), call),
+    ).rejects.toMatchObject({
+      name: "CapabilityError",
+      message:
+        "Google no longer offers Gemini Omni Flash (its model list, checked 2026-10-31) — pick another model.",
+    });
+    expect(reserveDirectCall).not.toHaveBeenCalled();
+    expect(call).not.toHaveBeenCalled();
+    unlisted.found = {};
   });
 
   it("a length the model does not render has no price, so nothing is reserved", async () => {
