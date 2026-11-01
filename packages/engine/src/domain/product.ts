@@ -81,7 +81,8 @@ export type ProductView = z.infer<typeof ProductView>;
 
 // One sellable finish. `face` is what the camera sees; `inlay` is the contrast
 // colour of the lettering or marks on that face (white on dark, black on
-// light); `inlayName` names it for prompts ("white"), else the nearest plain
+// light), and in a layered build (`reveal`) the base layer that shows through
+// the cuts; `inlayName` names it for prompts ("white"), else the nearest plain
 // colour word is used. `swatchUrl` is a sample of the material in this colour
 // — a close photo or a tileable texture, even light, no text — that travels
 // with the reference to the image model: a flat colour fill reads as paper or
@@ -113,12 +114,16 @@ export const Typography = z.object({
 });
 export type Typography = z.infer<typeof Typography>;
 
+// How the marks are made. `reveal` is a layered build: the marks are cut
+// through a top layer (the colour's face) down to a base of another colour
+// (its inlay), the relief being the top layer's thickness.
 export const Treatment = z.enum([
   "raised",
   "inlaid",
   "engraved",
   "printed",
   "cut",
+  "reveal",
 ]);
 export type Treatment = z.infer<typeof Treatment>;
 

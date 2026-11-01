@@ -66,6 +66,24 @@ describe("the treatment drives the prompt", () => {
     expect(u.avoid).toBe("raised lettering, shadows under the lettering");
   });
 
+  it("a layered build shows its base through every cut, never paint", () => {
+    const layered = { ...plate, treatment: "reveal" as const };
+    const u = productUnderstanding(layered);
+    expect(u.materials).toContain(
+      "a two-layer build: the design cut cleanly through the top layer (1/8 in thick), so every mark shows the white base layer beneath, the marks recessed below the face with crisp vertical cut walls, nothing painted or printed",
+    );
+    expect(u.avoid).toBe(
+      "painted lettering, printed lettering, raised lettering",
+    );
+    expect(u.palette).toEqual(["#1A1A1A", "#FFFFFF"]);
+    // A package without the base's colour still says it contrasts.
+    const unknown = productUnderstanding({
+      ...layered,
+      colours: [{ ...plate.colours[0], inlay: undefined }],
+    });
+    expect(unknown.materials).toContain("shows the contrasting base layer");
+  });
+
   it("the negative prompt carries what the treatment must never look like", () => {
     const { negative } = assemblePrompt(
       undefined,

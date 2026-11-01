@@ -31,6 +31,8 @@ const TREATMENT_DETAIL: Record<
   printed: (ink) =>
     `a printed design${ink ? ` in ${ink}` : ""}, flat on the face, no relief`,
   cut: () => "a cut-out silhouette",
+  reveal: (ink, relief) =>
+    `a two-layer build: the design cut cleanly through the top layer${relief ? ` (${relief} thick)` : ""}, so every mark shows the ${ink ? `${ink} ` : "contrasting "}base layer beneath, the marks recessed below the face with crisp vertical cut walls, nothing painted or printed`,
 };
 
 // What each treatment must never be rendered as: its opposite.
@@ -40,6 +42,7 @@ const TREATMENT_AVOID: Record<Treatment, string> = {
   engraved: "raised lettering, shadows under the lettering",
   printed: "raised lettering, engraved lettering",
   cut: "",
+  reveal: "painted lettering, printed lettering, raised lettering",
 };
 
 function reliefOf(dimensions: Dimensions): string | null {

@@ -355,6 +355,9 @@ describe("{surface}", () => {
     expect(surfaceCue(CUTTING_BOARD)).toContain(
       "the engraving flush with the face",
     );
+    expect(surfaceCue({ ...CUTTING_BOARD, treatment: "reveal" })).toContain(
+      "the cut walls of the top layer show and the base colour lies at the bottom of every mark",
+    );
     const [detail] = sceneVariants([macro], {}, understanding, [], {
       inPlace: () => [],
       surface: surfaceCue({ ...CUTTING_BOARD, treatment: "raised" }),

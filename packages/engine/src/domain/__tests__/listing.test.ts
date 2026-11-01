@@ -277,3 +277,18 @@ describe("withCopy", () => {
     expect(next.personalization).toEqual(stored.personalization);
   });
 });
+
+describe("a layered product's listing", () => {
+  it("names its finish as a buyer searches for it", () => {
+    const layered = {
+      ...CUTTING_BOARD,
+      name: "Name coaster",
+      shape: "coaster",
+      treatment: "reveal" as const,
+    };
+    const draft = listingDraft(layered, rules);
+    expect(draft.description.value).toContain("Layered finish");
+    expect(draft.tags.value.some((t) => t.startsWith("layered "))).toBe(true);
+    expect(draft.tags.value.some((t) => t.startsWith("reveal "))).toBe(false);
+  });
+});

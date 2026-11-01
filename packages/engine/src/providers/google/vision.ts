@@ -8,6 +8,7 @@ import {
 } from "@/domain/effort";
 import { type TextCallKind, textBudget } from "@/domain/generation-cost";
 import { assertModel } from "@/domain/model-defaults";
+import { Treatment } from "@/domain/product";
 import { BaseUnderstanding } from "@/domain/understanding";
 import { fetchAsset } from "@/providers/asset-bytes";
 import { ProviderKeyMissing } from "@/providers/errors";
@@ -84,7 +85,7 @@ export const PRODUCT_DRAFT_SCHEMA = {
     material: { type: Type.STRING },
     treatment: {
       type: Type.STRING,
-      enum: ["raised", "inlaid", "engraved", "printed", "cut"],
+      enum: [...Treatment.options],
     },
     colours: {
       type: Type.ARRAY,

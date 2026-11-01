@@ -50,7 +50,7 @@ describe("parseProductPackage", () => {
       label: '"CB-01"',
       errors: [
         "name: is missing",
-        "treatment: should be one of raised, inlaid, engraved, printed, cut",
+        "treatment: should be one of raised, inlaid, engraved, printed, cut, reveal",
       ],
     });
     expect(rejected[1].label).toBe("product #2");

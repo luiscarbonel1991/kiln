@@ -20,6 +20,7 @@ export const TREATMENT_LABEL: Record<Treatment, string> = {
   engraved: "Engraved",
   printed: "Printed",
   cut: "Cut-out",
+  reveal: "Layered",
 };
 
 // The call to action when the product names none: invite personalization only

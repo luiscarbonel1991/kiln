@@ -183,6 +183,8 @@ export function surfaceCue(product: Product): string {
       return "seen nearly straight on, the print flat on the face";
     case "cut":
       return "the cut edges sharp and in focus";
+    case "reveal":
+      return "seen at a slight angle, so the cut walls of the top layer show and the base colour lies at the bottom of every mark";
   }
 }
 

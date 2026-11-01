@@ -1,7 +1,12 @@
 import { z } from "zod";
 import type { DestinationText } from "@/domain/destination";
 import { TREATMENT_LABEL } from "@/domain/exact";
-import { dimensionsLabel, type Product, partLabel } from "@/domain/product";
+import {
+  dimensionsLabel,
+  type Product,
+  partLabel,
+  type Treatment,
+} from "@/domain/product";
 
 // A listing's text on a sale destination (ROADMAP Phases 16-17): what the
 // maker pastes into the channel's editor beside the photos. Kiln drafts every
@@ -195,6 +200,9 @@ function heads(product: Product): string[] {
   );
 }
 
+// A treatment as a buyer searches for it.
+const TAG_WORD: Partial<Record<Treatment, string>> = { reveal: "layered" };
+
 // Phrases from the spec that fit a tag; the text model writes better ones.
 function draftTags(product: Product, rules?: DestinationText): string[] {
   const items = heads(product);
@@ -202,7 +210,7 @@ function draftTags(product: Product, rules?: DestinationText): string[] {
     ...items,
     lower(product.family),
     ...items.flatMap((item) => [
-      `${product.treatment} ${item}`,
+      `${TAG_WORD[product.treatment] ?? product.treatment} ${item}`,
       ...(product.wording.length > 0
         ? [`custom ${item}`, `personalized ${item}`]
         : []),

@@ -108,7 +108,7 @@ export const PRODUCT_DRAFT_PROMPT = [
   "- name: a short product name a shop would list it under, e.g. 'Engraved walnut cutting board'.",
   "- whatItIs: a short noun phrase for the object itself, e.g. 'cutting board', 'round coaster', 'wall print'.",
   "- material: what it is made of, as a buyer would say it, e.g. 'solid walnut', 'glazed stoneware'.",
-  "- treatment: how its marks or design are made — engraved (cut into the surface), raised (standing out from the face), inlaid (filled with a second material or colour), printed (flat print or paint), or cut (the shape itself is cut through).",
+  "- treatment: how its marks or design are made — engraved (cut into the surface), raised (standing out from the face), inlaid (filled with a second material or colour), printed (flat print or paint), cut (the shape itself is cut through), or reveal (a top layer cut through to show a base of another colour beneath).",
   "- colours: the finish colours of the product itself (not the background), 1-4, each with a plain name and a hex like #5B3A29.",
   "- wording: any text on the product a buyer would personalize (a name, a date), at most 3 lines, each with a short label and the example shown; an empty list if there is none.",
   "- useContext: where it is used in real life, one short phrase, e.g. 'a kitchen counter'.",
