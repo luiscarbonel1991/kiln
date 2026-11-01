@@ -546,7 +546,11 @@ error, the last call that worked). It reads them from the job ledger, so it
 costs nothing. "Check the key" asks the provider for the list of models the
 key reaches: free, nothing is generated, and the answer is kept as the
 provider's latest call, so a key replaced in `.env` (then a restart) clears
-the error the old one left.
+the error the old one left. The list is also compared with the catalog: a model
+Kiln offers that the provider no longer lists is named on the provider's card
+and in every model picker ("no longer offered by Google"), and the queue refuses
+a card on it before any paid call. The catalog's `retired` always wins over the
+list.
 
 Keys: `OPENAI_API_KEY` and `GOOGLE_API_KEY` (`.env`). Tests drop both before
 any test runs (`vitest.setup.ts`), so a test never makes a paid call.
