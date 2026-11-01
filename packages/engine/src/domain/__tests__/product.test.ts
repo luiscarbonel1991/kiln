@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  ColourOption,
+  lookVerified,
   PlateRequest,
   PlateResult,
   Product,
+  safeLink,
   validateWording,
 } from "@/domain/product";
 
@@ -115,5 +118,42 @@ describe("PlateRequest / PlateResult", () => {
     });
     expect(res.mime).toBe("image/png");
     expect(res.pieces[0].expectedText).toEqual(["HOME", "AMB"]);
+  });
+});
+
+describe("lookVerified", () => {
+  const colour = (more: Partial<ColourOption>) =>
+    ColourOption.parse({ key: "oak", name: "Oak", face: "#C8A165", ...more });
+
+  it("needs a material photo or the supplier's page", () => {
+    expect(lookVerified(colour({}))).toBe(false);
+    expect(
+      lookVerified(colour({ swatchUrl: "https://stub.local/oak.jpg" })),
+    ).toBe(true);
+    expect(
+      lookVerified(colour({ supplierUrl: "https://supplier.example/oak" })),
+    ).toBe(true);
+  });
+
+  it("does not count a link that is not http or https", () => {
+    expect(lookVerified(colour({ supplierUrl: "javascript:alert(1)" }))).toBe(
+      false,
+    );
+    expect(lookVerified(colour({ supplierUrl: "oak board" }))).toBe(false);
+  });
+});
+
+describe("safeLink", () => {
+  it("draws http and https only", () => {
+    expect(safeLink("https://supplier.example/oak")).toBe(
+      "https://supplier.example/oak",
+    );
+    expect(safeLink("http://supplier.example/oak")).toBe(
+      "http://supplier.example/oak",
+    );
+    expect(safeLink("javascript:alert(1)")).toBeNull();
+    expect(safeLink("data:text/html,hi")).toBeNull();
+    expect(safeLink("not a url")).toBeNull();
+    expect(safeLink(undefined)).toBeNull();
   });
 });

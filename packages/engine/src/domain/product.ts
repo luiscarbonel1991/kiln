@@ -87,6 +87,8 @@ export type ProductView = z.infer<typeof ProductView>;
 // — a close photo or a tileable texture, even light, no text — that travels
 // with the reference to the image model: a flat colour fill reads as paper or
 // plastic, and a real photo carries the grain better than a drawn texture.
+// `supplierUrl` is the supplier's page for this colour; with a sample, it is
+// what makes the colour's look verified (`lookVerified`).
 export const ColourOption = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
@@ -101,7 +103,12 @@ export const ColourOption = z.object({
       "A close photo of the material in this colour (PNG, JPEG or WebP; even light, no text): a data: image, Kiln's storage or an origin in KILN_ASSET_ORIGINS. It travels with the reference to the image model.",
     )
     .optional(),
-  supplierUrl: z.string().optional(),
+  supplierUrl: z
+    .string()
+    .describe(
+      "The supplier's page for this colour (http or https). Kiln never opens it: the maker does, to compare it with the scenes.",
+    )
+    .optional(),
   inStock: z.boolean().default(true),
 });
 export type ColourOption = z.infer<typeof ColourOption>;
@@ -347,6 +354,24 @@ export function colourOf(product: Product, key: string): ColourOption {
 // scenes show the product in its default colour. null without one.
 export function defaultSwatch(product: Product): string | null {
   return colourOf(product, product.defaultColour).swatchUrl ?? null;
+}
+
+// A colour's look is checked against something real: a photo of its material,
+// or its supplier's page. Without either, a scene draws it from its hex alone.
+export function lookVerified(colour: ColourOption): boolean {
+  return Boolean(colour.swatchUrl || safeLink(colour.supplierUrl));
+}
+
+// A link that is safe to draw: http or https only, so an imported
+// `javascript:` never becomes a link. null otherwise.
+export function safeLink(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "http:" || protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface ProductImage {
