@@ -297,7 +297,7 @@ const FAST: Pair = {
 };
 const FINAL: Pair = {
   openai: { provider: "openai", model: "gpt-image-2", quality: "medium" },
-  google: { provider: "google", model: "gemini-3.1-flash-image" },
+  google: { provider: "google", model: "gemini-nano-banana-2.1" },
 };
 const DRAFT: Pair = {
   openai: { provider: "openai", model: "gpt-image-2", quality: "low" },

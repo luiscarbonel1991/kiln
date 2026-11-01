@@ -53,6 +53,22 @@ describe("model catalog", () => {
     ).toBe("Veo 3.1 (retired)");
   });
 
+  it("offers Nano Banana 2.1; Nano Banana 2 is deprecated, still offered and run", () => {
+    const images = catalogFor("image");
+    expect(images.some((m) => m.id === "gemini-nano-banana-2.1")).toBe(true);
+    const nb2 = images.find((m) => m.id === "gemini-3.1-flash-image");
+    expect(nb2?.deprecated).toBe("2026-10-06");
+    expect(
+      checkModel(
+        { provider: "google", model: "gemini-3.1-flash-image" },
+        "image",
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      modelLabel({ provider: "google", model: "gemini-3.1-flash-image" }),
+    ).toBe("Gemini 3.1 Flash Image");
+  });
+
   it("offers each provider's most capable text model, verified 2026-10-31", () => {
     const text = catalogFor("text").map((m) => m.id);
     expect(text).toEqual([

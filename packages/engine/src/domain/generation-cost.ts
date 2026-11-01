@@ -23,7 +23,8 @@ import {
 //   per second by resolution, audio included. Text: per 1M tokens, thinking
 //   billed as output; text checked again 2026-10-31, with the prices Google
 //   has dated (Gemini 4 Argon from 2026-12-01, the Flash models from
-//   2027-01-01).
+//   2027-01-01). Checked again 2026-10-31 for Gemini Omni Flash (video tokens)
+//   and Gemini Nano Banana 2.1.
 // - OpenAI, checked 2026-10-04 (images) and 2026-10-31 (text): the output cost
 //   per image by quality and size from the image generation guide's cost table
 //   (https://developers.openai.com/api/docs/guides/image-generation,
@@ -73,6 +74,12 @@ const TOKEN_PRICES: Record<string, TokenPrices> = {
     imageIn: 2.5,
     textOut: 0,
     imageOut: 8,
+  },
+  "google/gemini-nano-banana-2.1": {
+    textIn: 1.5,
+    imageIn: 1.5,
+    textOut: 7.5,
+    imageOut: 30,
   },
   "google/gemini-3.1-flash-image": {
     textIn: 0.5,
@@ -190,6 +197,7 @@ const OPENAI_OUTPUT: Record<string, Record<ImageQuality, [number, number]>> = {
 
 // $ per 1K image (1,120 output tokens at the image rate).
 const GOOGLE_PER_IMAGE: Record<string, number> = {
+  "gemini-nano-banana-2.1": 0.0336,
   "gemini-3.1-flash-image": 0.067,
   "gemini-3.1-flash-lite-image": 0.0336,
   "gemini-3-pro-image": 0.134,

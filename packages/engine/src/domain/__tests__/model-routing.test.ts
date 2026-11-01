@@ -73,7 +73,11 @@ describe("proposeRoutes", () => {
       "gpt-6-luna",
       "gemini-3.5-flash-lite",
     ]);
-    expect(routes.final.models).toEqual([GPT_IMAGE, FLASH_IMAGE]);
+    // Google's final pick is Nano Banana 2.1, Nano Banana 2's update.
+    expect(routes.final.models).toEqual([
+      GPT_IMAGE,
+      { provider: "google", model: "gemini-nano-banana-2.1" },
+    ]);
     expect(routes.draft.models).toEqual([
       { provider: "openai", model: "gpt-image-2", quality: "low" },
       { provider: "google", model: "gemini-3.1-flash-lite-image" },

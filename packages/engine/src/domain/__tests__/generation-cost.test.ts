@@ -254,6 +254,23 @@ describe("actual cost and the monthly cap", () => {
     ).toBeCloseTo((1400 * 0.5 + 1120 * 60 + 200 * 3) / 1e6, 9);
   });
 
+  it("prices Nano Banana 2.1 from Google's page (2026-10-31): $0.0336 a 1K image", () => {
+    const nb21 = { provider: "google", model: "gemini-nano-banana-2.1" };
+    expect(imagePrice(nb21)?.output).toEqual({
+      square: 0.0336,
+      nonSquare: 0.0336,
+    });
+    // $1.50 in, $30 image out, $7.50 text and thinking out per 1M.
+    expect(
+      costFromUsage(nb21, {
+        inputTextTokens: 300,
+        inputImageTokens: 1100,
+        outputTokens: 1120,
+        outputTextTokens: 200,
+      }),
+    ).toBeCloseTo((1400 * 1.5 + 1120 * 30 + 200 * 7.5) / 1e6, 9);
+  });
+
   it("estimates a Gemini image at its 1K price plus its input allowance", () => {
     expect(
       estimateGeneration(

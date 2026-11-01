@@ -31,6 +31,9 @@ export interface ModelEntry {
   label: string;
   // An announced shutdown: still offered, marked with the date.
   retires?: string;
+  // Deprecated by its provider with no shutdown announced: still offered and
+  // run, marked with the date.
+  deprecated?: string;
   // Shut down: only labels the outputs it made, never offered or run.
   retired?: string;
   // Retired: the model its provider answers it with now.
@@ -91,6 +94,14 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     retires: "2026-12-01",
     qualities: QUALITIES,
   },
+  // Nano Banana 2.1, verified 2026-10-31 (GET v1beta/models): Nano Banana 2's
+  // update, with better text rendering, at half its price.
+  {
+    kind: "image",
+    provider: "google",
+    id: "gemini-nano-banana-2.1",
+    label: "Gemini Nano Banana 2.1",
+  },
   {
     kind: "image",
     provider: "google",
@@ -102,6 +113,7 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     provider: "google",
     id: "gemini-3.1-flash-image",
     label: "Gemini 3.1 Flash Image",
+    deprecated: "2026-10-06",
   },
   {
     kind: "image",

@@ -121,7 +121,12 @@ export function ModelChoice({
                 );
                 return (
                   <option key={m.id} value={`${m.provider}/${m.id}`}>
-                    {[m.label, price, m.retires ? `retires ${m.retires}` : null]
+                    {[
+                      m.label,
+                      price,
+                      m.retires ? `retires ${m.retires}` : null,
+                      m.deprecated ? `deprecated ${m.deprecated}` : null,
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </option>
