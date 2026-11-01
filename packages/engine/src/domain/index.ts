@@ -62,6 +62,7 @@ export {
   textEstimate,
   toMicros,
   videoCost,
+  videoRate,
 } from "@/domain/generation-cost";
 export {
   buildGenerationRequest,

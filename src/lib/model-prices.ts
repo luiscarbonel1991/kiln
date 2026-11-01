@@ -3,6 +3,7 @@ import {
   TEXT_CALL_BUDGETS,
   textEstimate,
   videoCost,
+  videoRate,
 } from "@/domain/generation-cost";
 import type {
   ImageQuality,
@@ -31,10 +32,11 @@ export function priceHint(
     return e ? `≈ ${money(e.typical)}/image` : null;
   }
   if (kind === "video") {
-    const perSecond = videoCost(model, 1);
-    return perSecond === null
+    const perSecond = videoRate(model);
+    const eight = videoCost(model, 8);
+    return perSecond === null || eight === null
       ? null
-      : `${money(perSecond)}/s · 8 s ${money(perSecond * 8)}`;
+      : `${money(perSecond)}/s · 8 s ${money(eight)}`;
   }
   const read = textEstimate(model, TEXT_CALL_BUDGETS.vision);
   return read === null ? null : `≤ ${money(read)}/photo read`;

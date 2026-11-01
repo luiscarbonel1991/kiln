@@ -196,8 +196,8 @@ export function VideoControls({
           </dd>
           <dt className="text-on-surface-mid">Estimated</dt>
           <dd className="text-foreground">
-            {usd === null ? "no pinned price" : money(usd)} (billed by the
-            second)
+            {usd === null ? "no pinned price" : money(usd)} (priced by the
+            second; Kiln records what the clip used)
           </dd>
           <dt className="text-on-surface-mid">This month</dt>
           <dd className="text-foreground">{budgetLine}</dd>

@@ -344,6 +344,17 @@ const VIDEO_PER_CLIP: Record<string, number> = {
   "google/gemini-omni-1.1-flash": 0.01,
 };
 
+// A video model's price per second at its resolution, for a picker; null
+// when it has no pinned price there.
+export function videoRate(model: {
+  provider: string;
+  model: string;
+  resolution?: VideoResolution;
+}): number | null {
+  const resolution = model.resolution ?? DEFAULT_VIDEO_RESOLUTION;
+  return VIDEO_PER_SECOND[key(model)]?.[resolution] ?? null;
+}
+
 // What `seconds` of video cost on this model at its resolution; null when it
 // has no pinned price there.
 export function videoCost(
