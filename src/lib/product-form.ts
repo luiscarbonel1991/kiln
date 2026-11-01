@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { colourWord } from "@/domain/colour-words";
 import {
+  type ColourOption,
   DEFAULT_FORBIDDEN,
   Hex,
   Product,
@@ -38,6 +39,11 @@ export const FINISHES: { value: Treatment; label: string; hint: string }[] = [
     hint: "Printed or painted on, flat",
   },
   { value: "cut", label: "Cut out", hint: "The shape itself is cut through" },
+  {
+    value: "reveal",
+    label: "Layered",
+    hint: "A top layer cut through, showing a base of another colour",
+  },
 ];
 
 export const ProductFile = z.discriminatedUnion("kind", [
@@ -111,6 +117,9 @@ export function productFormSchema(limits: FormLimits = FORM_LIMITS) {
             // A photo of the material in this colour, uploaded to Kiln's
             // storage.
             swatchUrl: z.string().min(1).optional(),
+            // A layered finish: the base layer's colour, which shows through
+            // the cuts (the colour's inlay).
+            base: Hex.optional(),
           }),
         )
         .min(1, "Add at least one colour.")
@@ -180,7 +189,19 @@ export function productFormSchema(limits: FormLimits = FORM_LIMITS) {
         path: ["defaultColour"],
         message: "The default colour must be one of its colours.",
       },
-    );
+    )
+    .superRefine((f, ctx) => {
+      if (f.treatment !== "reveal") return;
+      f.colours.forEach((c, i) => {
+        if (!c.base) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["colours", i, "base"],
+            message: "Pick the colour that shows through the cuts.",
+          });
+        }
+      });
+    });
 }
 
 export const ProductForm = productFormSchema();
@@ -293,6 +314,7 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
       key: keys[i],
       name: c.name,
       face: c.hex.toUpperCase(),
+      ...(c.base ? { inlay: c.base.toUpperCase() } : {}),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
     })),
     defaultColour: keys[form.defaultColour] ?? keys[0],
@@ -394,6 +416,7 @@ export function formFromProduct(product: Product): ProductForm {
       key: c.key,
       name: c.name,
       hex: c.face,
+      ...(c.inlay ? { base: c.inlay } : {}),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
     })),
     defaultColour: Math.max(
@@ -430,7 +453,8 @@ function freshKey(name: string, taken: Set<string>): string {
 // The form laid over the stored product: what the form shows is replaced
 // (an optional field left empty is removed), everything else is kept as it
 // was — the sku (even when renamed), typography, parts, icons,
-// variants, things to avoid, and each kept colour's edge, inlay and stock.
+// variants, things to avoid, and each kept colour's edge, inlay and stock (a
+// layered finish's base is the inlay the form edits).
 // Opening and saving without a change gives the same product.
 export function mergeForm(
   stored: Product,
@@ -453,15 +477,26 @@ export function mergeForm(
   );
   const colours = form.colours.map((c) => {
     const kept = c.key ? before.get(c.key) : undefined;
-    const { swatchUrl: _swatch, ...rest } = kept ?? {};
+    const {
+      swatchUrl: _swatch,
+      inlayName,
+      ...rest
+    }: Partial<ColourOption> = kept ?? {};
+    // A new base colour: the old one's name no longer fits it.
+    const base =
+      c.base && kept?.inlay?.toUpperCase() !== c.base.toUpperCase()
+        ? c.base.toUpperCase()
+        : undefined;
     return {
       ...rest,
+      ...(inlayName && !base ? { inlayName } : {}),
       key: kept?.key ?? freshKey(c.name, taken),
       name: c.name,
       face:
         kept && kept.face.toUpperCase() === c.hex.toUpperCase()
           ? kept.face
           : c.hex.toUpperCase(),
+      ...(base ? { inlay: base } : {}),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
     };
   });
@@ -531,7 +566,11 @@ export function mergeForm(
 // kept as it is ("2 parts (plate, base)", "variants (Size)").
 export function keptWords(product: Product): string[] {
   const parts = product.parts ?? [];
-  const extras = product.colours.some((c) => c.edge || c.inlay || c.inlayName);
+  // A layered finish's base is the inlay the form shows.
+  const layered = product.treatment === "reveal";
+  const extras = product.colours.some(
+    (c) => c.edge || (!layered && (c.inlay || c.inlayName)),
+  );
   return [
     ...(parts.length > 0
       ? [`${parts.length} parts (${parts.map((p) => p.name).join(", ")})`]
@@ -543,7 +582,9 @@ export function keptWords(product: Product): string[] {
     ...(product.forbidden.join("|") !== DEFAULT_FORBIDDEN.join("|")
       ? [`${product.forbidden.length} things to avoid`]
       : []),
-    ...(extras ? ["each colour's edge and inlay"] : []),
+    ...(extras
+      ? [layered ? "each colour's edge" : "each colour's edge and inlay"]
+      : []),
     `typeface ${product.typography.family}`,
   ];
 }

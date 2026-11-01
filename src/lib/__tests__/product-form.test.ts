@@ -109,6 +109,28 @@ describe("product form", () => {
     expect(productFromForm(form, "7k2")).not.toHaveProperty("price");
   });
 
+  it("a layered finish needs each colour's base, kept as its inlay", () => {
+    const layered = { ...form, treatment: "reveal" as const };
+    const missing = ProductForm.safeParse(layered);
+    expect(missing.success).toBe(false);
+    expect(missing.error?.issues[0]).toMatchObject({
+      path: ["colours", 0, "base"],
+      message: "Pick the colour that shows through the cuts.",
+    });
+    const product = productFromForm(
+      {
+        ...layered,
+        colours: [
+          { ...form.colours[0], base: "#1f1f1f" },
+          { ...form.colours[1], base: "#ffffff" },
+        ],
+      },
+      "7k2",
+    );
+    expect(product.treatment).toBe("reveal");
+    expect(product.colours.map((c) => c.inlay)).toEqual(["#1F1F1F", "#FFFFFF"]);
+  });
+
   it("keeps a colour's material photo", () => {
     const product = productFromForm(
       {

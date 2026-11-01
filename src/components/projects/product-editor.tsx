@@ -39,6 +39,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FilePick } from "@/components/ui/file-pick";
 import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
+import { contrastInk } from "@/domain/exact";
 import type { RanOn } from "@/domain/model-routing";
 import {
   type Product,
@@ -122,7 +123,12 @@ interface Colour {
   // A photo of the material in this colour: it travels with the reference
   // to the image model.
   swatchUrl?: string;
+  // A layered finish: the base that shows through the cuts.
+  base?: string;
 }
+
+// A layered colour's base until the maker picks one: readable on its face.
+const baseOf = (c: Colour) => c.base ?? contrastInk(c.hex).toUpperCase();
 
 export type SavedProduct = Extract<
   Awaited<ReturnType<typeof updateProductAction>>,
@@ -385,7 +391,10 @@ export function ProductEditor({
       unit,
       material,
       treatment,
-      colours,
+      colours:
+        treatment === "reveal"
+          ? colours.map((c) => ({ ...c, base: baseOf(c) }))
+          : colours,
       wording: wording
         .filter((w) => w.label.trim() || w.example.trim())
         .map((w) => ({
@@ -995,6 +1004,27 @@ export function ProductEditor({
                   </Button>
                 ) : null}
               </div>
+              {treatment === "reveal" ? (
+                <label className="flex items-center gap-2 pl-11 font-sans text-[0.75rem] text-on-surface-mid">
+                  <input
+                    type="color"
+                    aria-label={`Colour ${i + 1} base`}
+                    data-testid={`colour-${i + 1}-base`}
+                    value={baseOf(c)}
+                    onChange={(e) =>
+                      setColours((all) =>
+                        all.map((x, j) =>
+                          j === i
+                            ? { ...x, base: e.target.value.toUpperCase() }
+                            : x,
+                        ),
+                      )
+                    }
+                    className="size-7 flex-shrink-0 cursor-pointer rounded-swatch border border-border bg-transparent"
+                  />
+                  Base that shows through the cuts
+                </label>
+              ) : null}
               {note(`colours.${i}.name`)}
             </div>
           ))}

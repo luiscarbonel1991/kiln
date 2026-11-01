@@ -140,4 +140,32 @@ describe("editing a product", () => {
     expect(keptWords(PLATE_ON_BASE)).toContain("2 parts (plate, base)");
     expect(keptWords(formMade)).toEqual(["typeface Hanken Grotesk"]);
   });
+
+  it("edits a layered colour's base as its inlay; a new base drops the old name", () => {
+    const layered = Product.parse({
+      ...formMade,
+      treatment: "reveal",
+      colours: formMade.colours.map((c) => ({
+        ...c,
+        inlay: "#FFFFFF",
+        inlayName: "white",
+      })),
+    });
+    expect(formFromProduct(layered).colours[0].base).toBe("#FFFFFF");
+    expect(canonicalJson(merged(layered))).toBe(canonicalJson(layered));
+    const form = formFromProduct(layered);
+    const edited = merged(layered, {
+      colours: form.colours.map((c, i) =>
+        i === 0 ? { ...c, base: "#1f1f1f" } : c,
+      ),
+    });
+    expect(edited.colours[0]).toMatchObject({ inlay: "#1F1F1F" });
+    expect(edited.colours[0]).not.toHaveProperty("inlayName");
+    expect(edited.colours[1]).toMatchObject({
+      inlay: "#FFFFFF",
+      inlayName: "white",
+    });
+    // The form shows the base, so it is not named as kept.
+    expect(keptWords(layered)).toEqual(["typeface Hanken Grotesk"]);
+  });
 });
