@@ -8,7 +8,7 @@ import {
 } from "@/components/studio/constants";
 import { ProviderId } from "@/domain/model-defaults";
 import type { RanOn } from "@/domain/model-routing";
-import type { Product } from "@/domain/product";
+import { Hex, type Product } from "@/domain/product";
 import {
   editLimits,
   FORM_LIMITS,
@@ -26,6 +26,11 @@ import {
 } from "@/lib/product-review";
 import { assertAllowedAssetUrl } from "@/providers/asset-bytes";
 import type { ProductDraft } from "@/providers/text-prompts";
+import {
+  correctSample,
+  readSample,
+  type SampleCheck,
+} from "@/server/material-photo";
 import {
   ProductFileRefused,
   type StoredProductFile,
@@ -100,6 +105,31 @@ export async function uploadProductFileAction(
     throw error;
   }
   return { error: "Use a photo (PNG, JPEG, WebP) or an SVG design." };
+}
+
+const SampleUrl = z.string().min(1).max(4096);
+const Fraction = z.number().min(0).max(1);
+const SampleFix = z.union([
+  z.object({ url: SampleUrl, white: z.object({ x: Fraction, y: Fraction }) }),
+  z.object({ url: SampleUrl, swatch: Hex }),
+]);
+
+// A colour's material photo, checked against its swatch in the form: its main
+// colour, then corrected on the maker's word (src/server/material-photo.ts),
+// free. A corrected photo is a new stored file; the product changes on Save.
+export async function checkSampleAction(input: unknown): Promise<SampleCheck> {
+  const parsed = z.object({ url: SampleUrl }).safeParse(input);
+  if (!parsed.success) return { error: "No material photo to check." };
+  return readSample(parsed.data.url);
+}
+
+export async function correctSampleAction(
+  input: unknown,
+): Promise<SampleCheck> {
+  const parsed = SampleFix.safeParse(input);
+  if (!parsed.success) return { error: "That correction could not be read." };
+  const { url, ...how } = parsed.data;
+  return correctSample(url, how);
 }
 
 // Save the product the form describes, through the same checks as an import
