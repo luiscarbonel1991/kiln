@@ -22,11 +22,13 @@ export interface ModelValue {
   resolution?: VideoResolution;
 }
 
-// What the picker needs to know of each provider's health (free to read).
+// What the picker needs to know of each provider's health (free to read),
+// and the offered models its latest key check found it no longer lists.
 export interface ProviderNote {
   provider: ProviderId;
   keyPresent: boolean;
   lastError: { message: string } | null;
+  unlisted?: { models: string[] } | null;
 }
 
 const SELECT =
@@ -126,6 +128,9 @@ export function ModelChoice({
                       price,
                       m.retires ? `retires ${m.retires}` : null,
                       m.deprecated ? `deprecated ${m.deprecated}` : null,
+                      note?.unlisted?.models.includes(m.id)
+                        ? `no longer offered by ${PROVIDER_LABELS[provider]}`
+                        : null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}

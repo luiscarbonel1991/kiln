@@ -10,7 +10,19 @@ vi.mock("@/server/maker-repository", () => ({
   },
 }));
 
-const { saveMakerRoutesAction } = await import("@/app/actions/settings");
+const checked = vi.hoisted(() => ({
+  result: { ok: true, called: true, models: [], unlisted: [] } as Record<
+    string,
+    unknown
+  >,
+}));
+vi.mock("@/server/provider-health", () => ({
+  checkKey: async () => checked.result,
+}));
+
+const { checkProviderKeyAction, saveMakerRoutesAction } = await import(
+  "@/app/actions/settings"
+);
 
 const routes = proposeRoutes(DEFAULT_MAKER_MODELS, {
   openai: true,
@@ -57,5 +69,31 @@ describe("saveMakerRoutesAction", () => {
         '"gpt-image-2" is not a text model Kiln offers — pick one in the model picker.',
     });
     expect(saved).toEqual([]);
+  });
+});
+
+describe("checkProviderKeyAction", () => {
+  it("names the offered models the provider no longer lists", async () => {
+    checked.result = { ok: true, called: true, models: [], unlisted: [] };
+    expect(await checkProviderKeyAction("google")).toEqual({
+      ok: true,
+      message: "Google accepts the key.",
+    });
+    checked.result = {
+      ok: true,
+      called: true,
+      models: [],
+      unlisted: ["gemini-3-pro-image"],
+    };
+    expect(await checkProviderKeyAction("google")).toEqual({
+      ok: true,
+      message:
+        "Google accepts the key, but no longer lists Gemini 3 Pro Image: Kiln will not run it.",
+    });
+    checked.result = { ok: false, called: true, message: "rejected" };
+    expect(await checkProviderKeyAction("google")).toEqual({
+      ok: false,
+      message: "rejected",
+    });
   });
 });

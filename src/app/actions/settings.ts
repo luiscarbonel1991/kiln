@@ -2,7 +2,11 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { PROVIDER_LABELS, ProviderId } from "@/domain/model-defaults";
+import {
+  modelLabel,
+  PROVIDER_LABELS,
+  ProviderId,
+} from "@/domain/model-defaults";
 import { AgentRoutes, MakerRoutes } from "@/domain/model-routing";
 import { agentRoutesProblem } from "@/server/chat/agent-route";
 import { saveMakerRoutes } from "@/server/maker-repository";
@@ -43,7 +47,15 @@ export async function checkProviderKeyAction(
   if (!parsed.success) return { ok: false, message: "Which provider?" };
   const result = await checkKey(parsed.data);
   if (result.called) refresh();
-  return result.ok
-    ? { ok: true, message: `${PROVIDER_LABELS[parsed.data]} accepts the key.` }
-    : { ok: false, message: result.message };
+  if (!result.ok) return { ok: false, message: result.message };
+  const label = PROVIDER_LABELS[parsed.data];
+  const gone = (result.unlisted ?? []).map((model) =>
+    modelLabel({ provider: parsed.data, model }),
+  );
+  return {
+    ok: true,
+    message: gone.length
+      ? `${label} accepts the key, but no longer lists ${gone.join(", ")}: Kiln will not run ${gone.length === 1 ? "it" : "them"}.`
+      : `${label} accepts the key.`,
+  };
 }

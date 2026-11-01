@@ -8,6 +8,7 @@ import { RoutesForm } from "@/components/settings/routes-form";
 import { ToolCalls } from "@/components/settings/tool-calls";
 import { EtsyConnection } from "@/components/shops/etsy-connection";
 import { fromMicros } from "@/domain/generation-cost";
+import { modelLabel } from "@/domain/model-defaults";
 import { proposeRoutes } from "@/domain/model-routing";
 import { hasDatabase } from "@/lib/db";
 import { providerMode } from "@/providers/mode";
@@ -163,6 +164,27 @@ export default async function SettingsPage() {
                     ? `Last call that worked: ${when(h.lastOkAt)}`
                     : "No call that worked yet"}
                 </div>
+                {h.unlisted ? (
+                  <div
+                    className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
+                    data-testid={`provider-${h.provider}-unlisted`}
+                  >
+                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-prov-local" />
+                    <span className="min-w-0 [overflow-wrap:anywhere]">
+                      No longer offered by {h.label}:{" "}
+                      {h.unlisted.models
+                        .map((model) =>
+                          modelLabel({ provider: h.provider, model }),
+                        )
+                        .join(", ")}
+                      . Kiln will not run{" "}
+                      {h.unlisted.models.length === 1 ? "it" : "them"}.{" "}
+                      <span className="font-mono text-[0.65rem] text-on-surface-dim">
+                        {when(h.unlisted.at)}
+                      </span>
+                    </span>
+                  </div>
+                ) : null}
                 {h.keyPresent && mode !== "mock" ? (
                   <KeyCheck provider={h.provider} label={h.label} />
                 ) : null}
