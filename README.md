@@ -81,7 +81,9 @@ A project starts from a product. New project's step 1 picks one, adds a new one,
 imports a catalog:
 
 - **New product** is a short form: name, what it is, size, material, finish, colours, the
-  text a buyer personalizes, and where it is used. An optional photo becomes the reference
+  text a buyer personalizes, and where it is used. A **Layered** finish (a top layer cut
+  through to a base of another colour) asks each colour for its base, the colour that
+  shows through the cuts, and the scenes draw the marks recessed in that colour. An optional photo becomes the reference
   every scene starts from. An optional design file (SVG) is drawn to scale, and its height
   follows its proportions. "Fill from the photo" drafts the form with the text model
   (priced, on a click).
