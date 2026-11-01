@@ -1,6 +1,7 @@
 import { rasterType } from "@/domain/image-type";
 import { colourName } from "@/lib/product-form";
 import { storeAsset } from "@/providers/asset-bytes";
+import { balanceWhite, matchSwatch, type Spot } from "@/server/material-photo";
 import { photoColours } from "@/server/product-files";
 import {
   findProduct,
@@ -13,7 +14,11 @@ import { productHash } from "@/server/product-version";
 // form: the HTTP API's POST / DELETE /api/products/:id/colours/:key/swatch.
 // The photo is stored by its bytes, so sending the same photo again changes
 // nothing. The colour's swatch hex is the maker's and stays: the photo's own
-// colour comes back as a suggestion (DOGFOOD #40, #50).
+// colour comes back as a suggestion (DOGFOOD #40, #50). The photo may be
+// corrected first, as in the product form: its light balanced from a white or
+// grey spot, or its colour brought to the swatch.
+
+export type SwatchFix = { white: Spot } | { match: "swatch" };
 
 export type SwatchOutcome =
   | {
@@ -33,12 +38,13 @@ export type SwatchOutcome =
       // The photo's main colour, never applied to the swatch.
       photoColour?: { name: string; hex: string };
     }
-  | { ok: false; status: 404 | 409 | 415; error: string };
+  | { ok: false; status: 404 | 409 | 415 | 422; error: string };
 
 export async function setColourSwatch(
   ref: string,
   key: string,
   photo: Uint8Array | null,
+  fix?: SwatchFix,
 ): Promise<SwatchOutcome> {
   const product = await findProduct(ref);
   if (!product) {
@@ -68,7 +74,8 @@ export async function setColourSwatch(
   let swatchUrl: string | null = null;
   let photoColour: { name: string; hex: string } | undefined;
   if (photo) {
-    const mime = rasterType(photo);
+    let bytes = photo;
+    let mime: string | null = rasterType(photo);
     if (!mime) {
       return {
         ok: false,
@@ -77,8 +84,19 @@ export async function setColourSwatch(
           "A material photo must be a PNG, JPEG or WebP image: a close photo of the material, even light, no text.",
       };
     }
-    swatchUrl = await storeAsset(photo, mime, "products", { byContent: true });
-    const [hex] = await photoColours(photo, 1);
+    if (fix) {
+      const fixed =
+        "white" in fix
+          ? await balanceWhite(photo, fix.white)
+          : await matchSwatch(photo, colour.face);
+      if ("refused" in fixed) {
+        return { ok: false, status: 422, error: fixed.refused };
+      }
+      bytes = fixed.bytes;
+      mime = fixed.mime;
+    }
+    swatchUrl = await storeAsset(bytes, mime, "products", { byContent: true });
+    const [hex] = await photoColours(bytes, 1);
     if (hex) photoColour = { name: colourName(hex), hex };
   }
 

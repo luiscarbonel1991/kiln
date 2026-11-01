@@ -9,15 +9,21 @@ vi.mock("@/server/access-tokens", async (original) => ({
     auth.ok ? { tokenId: "t1", makerId: "m1" } : null,
 }));
 const swatch = vi.hoisted(() => ({
-  calls: [] as { ref: string; key: string; photo: Uint8Array | null }[],
+  calls: [] as {
+    ref: string;
+    key: string;
+    photo: Uint8Array | null;
+    fix?: unknown;
+  }[],
 }));
 vi.mock("@/server/product-swatch", () => ({
   setColourSwatch: async (
     ref: string,
     key: string,
     photo: Uint8Array | null,
+    fix?: unknown,
   ) => {
-    swatch.calls.push({ ref, key, photo });
+    swatch.calls.push({ ref, key, photo, ...(fix ? { fix } : {}) });
     if (key === "nope") {
       return { ok: false, status: 404, error: `no colour "${key}"` };
     }
@@ -160,6 +166,36 @@ describe("POST /api/products/:id/colours/:key/swatch", () => {
     );
     expect(res.status).toBe(200);
     expect(Buffer.from(swatch.calls[0].photo ?? []).equals(PNG)).toBe(true);
+  });
+
+  it("passes a correction on: white=x,y or match=swatch; 400 for one it cannot read", async () => {
+    swatch.calls.length = 0;
+    const send = (query: string) =>
+      swatchRoute.POST(
+        post(
+          `/api/products/p1/colours/oak/swatch${query}`,
+          PNG,
+          authed({ "Content-Type": "image/png" }),
+        ),
+        ctx("p1", "oak"),
+      );
+    expect((await send("?white=0.42,0.61")).status).toBe(200);
+    expect((await send("?match=swatch")).status).toBe(200);
+    expect(swatch.calls.map((c) => c.fix)).toEqual([
+      { white: { x: 0.42, y: 0.61 } },
+      { match: "swatch" },
+    ]);
+    for (const bad of [
+      "?white=1.2,0.5",
+      "?white=0.5",
+      "?white=a,b",
+      "?match=photo",
+      "?white=0.5,0.5&match=swatch",
+    ]) {
+      const res = await send(bad);
+      expect(res.status, bad).toBe(400);
+    }
+    expect(swatch.calls).toHaveLength(2);
   });
 
   it("400 for no photo; the service's refusal keeps its status and words; DELETE removes", async () => {

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -68,10 +69,10 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
         body,
       }),
     );
-  const photo = (key: string, body: BodyInit, ref = sku) =>
+  const photo = (key: string, body: BodyInit, ref = sku, query = "") =>
     swatch.POST(
       new Request(
-        `http://kiln.test/api/products/${ref}/colours/${key}/swatch`,
+        `http://kiln.test/api/products/${ref}/colours/${key}/swatch${query}`,
         {
           method: "POST",
           headers: { ...auth(), "Content-Type": "image/png" },
@@ -169,6 +170,30 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
       colour: { key: "oak", swatchUrl: null },
     });
     expect((await findProduct(sku))?.colours[0].swatchUrl).toBeUndefined();
+  });
+
+  it("tints a photo to the swatch on ?match=swatch, and refuses a coloured white spot (422) without storing it", async () => {
+    const { colourDifference } = await import("@/lib/material-check");
+    const warm = execFileSync("magick", [
+      "-size",
+      "64x64",
+      "xc:#B48A5C",
+      "png:-",
+    ]);
+    const before = (await findProduct(sku))?.colours[1].swatchUrl;
+    const refused = await photo("maple", warm, sku, "?white=0.5,0.5");
+    expect(refused.status).toBe(422);
+    expect((await refused.json()).error).toMatch(/has colour/);
+    expect((await findProduct(sku))?.colours[1].swatchUrl).toBe(before);
+
+    const res = await photo("maple", warm, sku, "?match=swatch");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.colour.face).toBe("#E3C99A");
+    expect(colourDifference(body.photoColour.hex, "#E3C99A")).toBeLessThan(3);
+    expect((await findProduct(sku))?.colours[1].swatchUrl).toBe(
+      body.colour.swatchUrl,
+    );
   });
 
   it("photos sent at once for two colours both land, and an import at the same moment keeps them", async () => {

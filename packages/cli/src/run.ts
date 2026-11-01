@@ -13,6 +13,7 @@ import type {
 //   kiln validate <package.json>             the import's own checks, offline
 //   kiln import <package.json>               check, then POST /api/import
 //   kiln swatch <product> <colour> <photo>   a colour's material photo
+//     [--white=x,y | --match-swatch]         corrected first (P2-8)
 //   kiln swatch <product> <colour> --remove
 //   kiln schema                              the package's JSON Schema
 //   kiln projects                            the projects with frames
@@ -50,6 +51,10 @@ landed since. <json> is the tool's arguments ('{"project":"..."}'), or
 @file.json. A paid tool takes a quote's id, and runs only for a token the
 maker lets spend. --json prints Kiln's answer as JSON.
 
+A material photo may be corrected as it is set, free: --white=x,y balances
+its light from a white or grey spot (from the photo's top left, each from 0
+to 1), --match-swatch tints it to the colour's swatch, the grain kept.
+
 Environment: KILN_URL (where Kiln runs, e.g. http://localhost:3009) and
 KILN_TOKEN (a personal access token: Settings → Access tokens).
 
@@ -85,6 +90,9 @@ interface Flags {
   json: boolean;
   remove: boolean;
   strict: boolean;
+  // A material photo's correction: the white spot ("x,y"), or the swatch.
+  white?: string;
+  matchSwatch: boolean;
 }
 
 const RASTER = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -370,9 +378,21 @@ async function swatch(
     io.err(USAGE);
     return 2;
   }
+  if (flags.white !== undefined && flags.matchSwatch) {
+    io.err("Use --white=x,y or --match-swatch, not both.");
+    return 2;
+  }
   const conn = connection(io);
   if (!conn) return 2;
-  const path = `/api/products/${encodeURIComponent(product)}/colours/${encodeURIComponent(colour)}/swatch`;
+  const fix =
+    flags.remove || !photo
+      ? ""
+      : flags.white !== undefined
+        ? `?white=${encodeURIComponent(flags.white)}`
+        : flags.matchSwatch
+          ? "?match=swatch"
+          : "";
+  const path = `/api/products/${encodeURIComponent(product)}/colours/${encodeURIComponent(colour)}/swatch${fix}`;
   let init: RequestInit & { headers: Record<string, string> } = {
     method: "DELETE",
     headers: {},
@@ -420,7 +440,7 @@ async function swatch(
     r.photoColour.hex.toLowerCase() !== r.colour.face.toLowerCase()
   ) {
     io.out(
-      `The photo reads ${r.photoColour.hex} (${r.photoColour.name}); the swatch stays ${r.colour.face}. If the photo is the truth, change the swatch on the product page.`,
+      `The photo reads ${r.photoColour.hex} (${r.photoColour.name}); the swatch stays ${r.colour.face}. If the photo is the truth, change the swatch on the product page; if the swatch is, send the photo again with --match-swatch.`,
     );
   }
   if (r.behind.length > 0) {
@@ -730,6 +750,8 @@ export async function run(argv: string[], io: Io): Promise<number> {
     json: argv.includes("--json"),
     remove: argv.includes("--remove"),
     strict: argv.includes("--strict"),
+    white: argv.find((a) => a.startsWith("--white="))?.slice("--white=".length),
+    matchSwatch: argv.includes("--match-swatch"),
   };
   const [command, ...args] = argv.filter((a) => !a.startsWith("--"));
   const file = args[0] ? resolve(io.cwd, args[0]) : null;

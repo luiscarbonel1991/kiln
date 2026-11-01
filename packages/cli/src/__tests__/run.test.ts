@@ -247,7 +247,7 @@ describe("kiln swatch", () => {
     });
     expect(c.out).toEqual([
       'Maple of "CB-01" Board: material photo set · https://storage/x.png',
-      "The photo reads #BE956A (Tan); the swatch stays #E3C99A. If the photo is the truth, change the swatch on the product page.",
+      "The photo reads #BE956A (Tan); the swatch stays #E3C99A. If the photo is the truth, change the swatch on the product page; if the swatch is, send the photo again with --match-swatch.",
       'Following an earlier version: Board — Launch. "Update the project" on each board.',
     ]);
   });
@@ -267,6 +267,39 @@ describe("kiln swatch", () => {
     expect(await c.run("swatch", "CB-01", "maple", "--remove")).toBe(0);
     expect(c.sent[0].method).toBe("DELETE");
     expect(c.out).toEqual(['Maple of "CB-01" Board: material photo removed.']);
+  });
+
+  it("asks Kiln to correct the photo: its light from a white spot, or its colour to the swatch", async () => {
+    const c = cli({ "/work/maple.jpg": PNG }, () => ({
+      status: 200,
+      body: { ...set, photoColour: { name: "Tan", hex: "#E3C99A" } },
+    }));
+    expect(
+      await c.run("swatch", "CB-01", "maple", "maple.jpg", "--white=0.42,0.61"),
+    ).toBe(0);
+    expect(c.sent[0].url).toBe(
+      "http://kiln.test/api/products/CB-01/colours/maple/swatch?white=0.42%2C0.61",
+    );
+    expect(
+      await c.run("swatch", "CB-01", "maple", "maple.jpg", "--match-swatch"),
+    ).toBe(0);
+    expect(c.sent[1].url).toBe(
+      "http://kiln.test/api/products/CB-01/colours/maple/swatch?match=swatch",
+    );
+    expect(c.out.some((line) => line.startsWith("The photo reads"))).toBe(
+      false,
+    );
+    expect(
+      await c.run(
+        "swatch",
+        "CB-01",
+        "maple",
+        "maple.jpg",
+        "--white=0.5,0.5",
+        "--match-swatch",
+      ),
+    ).toBe(2);
+    expect(c.sent).toHaveLength(2);
   });
 
   it("passes Kiln's refusal on (exit 1)", async () => {
