@@ -52,9 +52,11 @@ import {
   fallBackJob,
   markCallStarted,
   QueueRefusal,
+  readUnlisted,
   recordCost,
   renewLease,
   requeueExpired,
+  type UnlistedModels,
 } from "@/server/generation-repository";
 import { createWorker, type Worker } from "@/server/generation-worker";
 import { getCurrentMaker, getMakerRoutes } from "@/server/maker-repository";
@@ -91,18 +93,34 @@ export interface BatchFallback {
   count: number;
 }
 
+const NONE_UNLISTED: UnlistedModels = {};
+
+// The day a provider's key check found it no longer lists this model; null
+// when it still does (or was never checked).
+function unlistedSince(
+  unlisted: UnlistedModels,
+  model: { provider: ProviderId; model: string },
+): string | null {
+  const found = unlisted[model.provider];
+  return found?.models.includes(model.model) ? found.at.slice(0, 10) : null;
+}
+
 // Whether a model of a route may run this request now: one Kiln offers for the
 // request's kind, priced for it and able to take it, its provider keyed in a
-// live run (and, for a video, able to render).
+// live run (and, for a video, able to render), and still listed by its
+// provider when the key was last checked.
 export function runnableEntry(
   entry: RouteEntry,
   request: GenerationRequest,
+  unlisted: UnlistedModels = NONE_UNLISTED,
 ): boolean {
   return (
     checkModel(entry, request.kind).ok &&
     canRunRequest(entry, request) &&
     (providerMode() === "mock" || hasProviderKey(entry.provider)) &&
-    (request.kind === "image" || getVideoProvider(entry.provider) !== undefined)
+    (request.kind === "image" ||
+      getVideoProvider(entry.provider) !== undefined) &&
+    unlistedSince(unlisted, entry) === null
   );
 }
 
@@ -111,6 +129,7 @@ export function runnableEntry(
 export function cardRoute(
   request: GenerationRequest,
   routes: Awaited<ReturnType<typeof getMakerRoutes>>,
+  unlisted: UnlistedModels = NONE_UNLISTED,
 ): { next: RouteEntry[]; maxMicros: number | null } {
   const { provider, model, quality, resolution } = request.model;
   const start: RouteEntry = {
@@ -122,7 +141,7 @@ export function cardRoute(
   const role = request.kind === "video" ? "video" : "final";
   const next = routeCandidates(roleRoute(routes, role), start)
     .slice(1)
-    .filter((entry) => runnableEntry(entry, request));
+    .filter((entry) => runnableEntry(entry, request, unlisted));
   const worst = worstCase(request, [start, ...next]);
   return { next, maxMicros: worst === null ? null : toMicros(worst) };
 }
@@ -131,16 +150,25 @@ export function cardRoute(
 const batchLabel = (m: BatchModel) =>
   [m.provider, m.model, m.quality, m.resolution].filter(Boolean).join(" ");
 
-// A card's model must be one Kiln offers for its kind, and in a live run its
-// provider needs a key: refused with the reason, never swapped for another.
+// A card's model must be one Kiln offers for its kind, still listed by its
+// provider when the key was last checked, and in a live run its provider
+// needs a key: refused with the reason, never swapped for another.
 function assertRunnable(
   model: { provider: ProviderId; model: string },
   kind: ModelKind,
   cardId: string,
+  unlisted: UnlistedModels,
 ): void {
   const check = checkModel(model, kind);
   if (!check.ok) {
     throw new QueueRefusal("model", `${cardId}: ${check.message}`);
+  }
+  const since = unlistedSince(unlisted, model);
+  if (since) {
+    throw new QueueRefusal(
+      "model",
+      `${cardId}: ${PROVIDER_LABELS[model.provider]} no longer offers ${check.entry.label} (its model list, checked ${since}) — pick another model.`,
+    );
   }
   if (providerMode() === "live" && !hasProviderKey(model.provider)) {
     const key =
@@ -168,6 +196,11 @@ export async function estimateProjectCards(
 }> {
   const project = await loadProject(projectId);
   const routes = await getMakerRoutes();
+  // What the providers' latest key checks found they no longer list.
+  const unlisted =
+    providerMode() === "live" && hasDatabase()
+      ? await readUnlisted((await getCurrentMaker()).id)
+      : NONE_UNLISTED;
   if (!project?.master || !project.understanding) {
     throw new Error("The project needs a reference image first.");
   }
@@ -186,7 +219,7 @@ export async function estimateProjectCards(
     if (!board?.product || !destination || slot?.fill !== "video") {
       throw new Error(`"${card.id}" is not a video slot of this project.`);
     }
-    assertRunnable(card.model, "video", card.id);
+    assertRunnable(card.model, "video", card.id, unlisted);
     const settings = videoSettings(
       destination,
       slot,
@@ -218,7 +251,7 @@ export async function estimateProjectCards(
         `No pinned price for ${modelLabel(request.model)} at ${request.durationSec} s.`,
       );
     }
-    const route = cardRoute(request, routes);
+    const route = cardRoute(request, routes, unlisted);
     return {
       cardId: card.id,
       request,
@@ -237,7 +270,7 @@ export async function estimateProjectCards(
     if (!card || card.type !== "image") {
       throw new Error(`"${id}" is not an image card of this project.`);
     }
-    assertRunnable(card.model, "image", card.id);
+    assertRunnable(card.model, "image", card.id, unlisted);
     // A scene looking down edits Kiln's view from above, when there is one.
     board ??= await loadProjectBoard(projectId);
     const plan = board?.board.plan;
@@ -281,7 +314,7 @@ export async function estimateProjectCards(
         `No pinned price for ${modelLabel(request.model)}.`,
       );
     }
-    const route = cardRoute(request, routes);
+    const route = cardRoute(request, routes, unlisted);
     cards.push({
       cardId: id,
       request,

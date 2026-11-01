@@ -67,4 +67,18 @@ describe("cardRoute", () => {
     });
     keys.google = true;
   });
+
+  it("leaves out a model its provider's last key check no longer lists", () => {
+    const on = {
+      ...routes,
+      final: { models: [routes.final.models[0], PRO], fallback: true },
+    };
+    const unlisted = {
+      google: { models: [PRO.model], at: "2026-10-31T23:00:00.000Z" },
+    };
+    expect(cardRoute(request, on, unlisted)).toEqual({
+      next: [],
+      maxMicros: max(request.model),
+    });
+  });
 });

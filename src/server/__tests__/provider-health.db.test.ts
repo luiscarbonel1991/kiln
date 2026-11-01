@@ -9,7 +9,7 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
   const { db } = await import("@/lib/db");
   const { providerHealth } = await import("@/server/provider-health");
   const { CAP_REACHED } = await import("@/server/generation-worker");
-  const { recordKeyCheck, budget } = await import(
+  const { recordKeyCheck, budget, readUnlisted } = await import(
     "@/server/generation-repository"
   );
   const slug = `health-${Date.now()}`;
@@ -144,5 +144,39 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
     const [o, g] = await providerHealth(makerId);
     expect(o.lastError?.message).toBe("OpenAI answered 503");
     expect(g.lastError).toBeNull();
+  });
+  it("keeps what a key check found its provider no longer lists; the latest check wins", async () => {
+    expect(await readUnlisted(makerId)).toEqual({});
+    await new Promise((r) => setTimeout(r, 5));
+    await recordKeyCheck({
+      makerId,
+      provider: "google",
+      error: null,
+      // A model Kiln has retired since is left out: it is refused anyway.
+      unlisted: [
+        "gemini-3.1-flash-lite-image",
+        "veo-3.1-fast-generate-preview",
+      ],
+    });
+    const found = await readUnlisted(makerId);
+    expect(found.google?.models).toEqual(["gemini-3.1-flash-lite-image"]);
+    expect(found.openai).toBeUndefined();
+    const [, g] = await providerHealth(makerId);
+    expect(g.unlisted?.models).toEqual(["gemini-3.1-flash-lite-image"]);
+    // A refused check lists nothing, so it leaves the last list in place.
+    await new Promise((r) => setTimeout(r, 5));
+    await recordKeyCheck({ makerId, provider: "google", error: "rejected" });
+    expect((await readUnlisted(makerId)).google?.models).toEqual([
+      "gemini-3.1-flash-lite-image",
+    ]);
+    // A later check that lists every offered model clears it.
+    await new Promise((r) => setTimeout(r, 5));
+    await recordKeyCheck({
+      makerId,
+      provider: "google",
+      error: null,
+      unlisted: [],
+    });
+    expect(await readUnlisted(makerId)).toEqual({});
   });
 });

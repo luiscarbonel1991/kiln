@@ -521,6 +521,56 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     await db.generationBatch.delete({ where: { id: batchId } });
   });
 
+  it("refuses a scene on a model its provider's last key check no longer lists, before any call", async () => {
+    const { estimateProjectCards } = await import("@/server/generation-queue");
+    const queueRepo = await import("@/server/generation-repository");
+    const { getCurrentMaker } = await import("@/server/maker-repository");
+    const [saved] = await upsertProducts([product]);
+    const id = await repo.createProject({
+      type: "launch",
+      product: saved,
+      plan,
+      editor,
+    });
+    created.push(id);
+    // A model no other suite queues, so the shared maker's check is harmless.
+    await repo.setCardModel(id, "etsy.hero", {
+      provider: "google",
+      model: "gemini-3-pro-image",
+    });
+    const maker = await getCurrentMaker();
+    await queueRepo.recordKeyCheck({
+      makerId: maker.id,
+      provider: "google",
+      error: null,
+      unlisted: ["gemini-3-pro-image"],
+    });
+    try {
+      await expect(
+        estimateProjectCards(id, ["etsy.hero"]),
+      ).rejects.toMatchObject({
+        reason: "model",
+        message: expect.stringMatching(
+          /^etsy\.hero: Google no longer offers Gemini 3 Pro Image \(its model list, checked \d{4}-\d{2}-\d{2}\) — pick another model\.$/,
+        ),
+      });
+    } finally {
+      await db.generationJob.deleteMany({
+        where: {
+          makerId: maker.id,
+          cardId: "key-check",
+          request: {
+            path: ["unlisted"],
+            array_contains: ["gemini-3-pro-image"],
+          },
+        },
+      });
+    }
+    expect((await estimateProjectCards(id, ["etsy.hero"])).cards).toHaveLength(
+      1,
+    );
+  });
+
   it("a video is queued from an approved scene, at its pinned price; never without one", async () => {
     const { estimateProjectCards } = await import("@/server/generation-queue");
     const queueRepo = await import("@/server/generation-repository");

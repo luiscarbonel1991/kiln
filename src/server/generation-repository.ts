@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import { GenerationRequest } from "@/domain/generation-request";
-import { modelLabel } from "@/domain/model-defaults";
+import {
+  modelEntry,
+  modelLabel,
+  type ProviderId,
+} from "@/domain/model-defaults";
 import {
   type JobRoute,
   type RouteEntry,
@@ -673,6 +677,8 @@ export async function recordKeyCheck(input: {
   makerId: string;
   provider: string;
   error: string | null;
+  // The offered models the provider no longer lists (domain unlistedModels).
+  unlisted?: string[];
 }): Promise<void> {
   assertDatabaseUrl();
   const now = new Date();
@@ -690,12 +696,50 @@ export async function recordKeyCheck(input: {
         kind: "key-check",
         provider: input.provider,
         model: "models list",
+        ...(input.unlisted ? { unlisted: input.unlisted } : {}),
       },
       error: input.error,
       startedAt: now,
       finishedAt: now,
     },
   });
+}
+
+export type UnlistedModels = Partial<
+  Record<ProviderId, { models: string[]; at: string }>
+>;
+
+// What each provider's latest key check that listed its models found missing:
+// the offered models it no longer names, with the day it was checked. A model
+// Kiln has retired since is left out (it is refused anyway).
+export async function readUnlisted(makerId: string): Promise<UnlistedModels> {
+  const rows = await db.$queryRaw<
+    { provider: string; unlisted: unknown; at: Date }[]
+  >`
+    SELECT DISTINCT ON ("request" ->> 'provider')
+           "request" ->> 'provider' AS "provider",
+           "request" -> 'unlisted' AS "unlisted",
+           "finishedAt" AS "at"
+    FROM "GenerationJob"
+    WHERE "makerId" = ${makerId}
+      AND "mode" = 'live'
+      AND "status" = 'done'
+      AND "request" ->> 'kind' = 'key-check'
+      AND "request" ? 'unlisted'
+    ORDER BY "request" ->> 'provider', "finishedAt" DESC`;
+  const found: UnlistedModels = {};
+  for (const row of rows) {
+    if (row.provider !== "openai" && row.provider !== "google") continue;
+    const provider = row.provider;
+    const models = (Array.isArray(row.unlisted) ? row.unlisted : []).filter(
+      (id): id is string =>
+        typeof id === "string" && !modelEntry({ provider, model: id })?.retired,
+    );
+    if (models.length > 0) {
+      found[provider] = { models, at: row.at.toISOString() };
+    }
+  }
+  return found;
 }
 
 // The direct call's request is going out.

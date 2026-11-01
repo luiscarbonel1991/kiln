@@ -1,9 +1,13 @@
-import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
+import {
+  PROVIDER_LABELS,
+  type ProviderId,
+  unlistedModels,
+} from "@/domain/model-defaults";
 import { readableFailure } from "@/domain/queue";
 import { db, hasDatabase } from "@/lib/db";
 import { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 import { hasProviderKey } from "@/providers/keys";
-import { recordKeyCheck } from "@/server/generation-repository";
+import { readUnlisted, recordKeyCheck } from "@/server/generation-repository";
 import { CAP_REACHED, NOT_STARTED } from "@/server/generation-worker";
 import { getCurrentMaker } from "@/server/maker-repository";
 
@@ -20,6 +24,8 @@ export interface ProviderHealth {
   keyPresent: boolean;
   lastError: { at: string; message: string } | null;
   lastOkAt: string | null;
+  // The offered models its latest key check found it no longer lists.
+  unlisted: { models: string[]; at: string } | null;
 }
 
 const PROVIDERS: ProviderId[] = ["openai", "google"];
@@ -29,6 +35,7 @@ export async function providerHealth(
 ): Promise<ProviderHealth[]> {
   const ok = new Map<string, Date>();
   const failed = new Map<string, { at: Date; message: string }>();
+  const unlisted = makerId && hasDatabase() ? await readUnlisted(makerId) : {};
   if (makerId && hasDatabase()) {
     const rows = await db.$queryRaw<
       {
@@ -81,22 +88,29 @@ export async function providerHealth(
             }
           : null,
       lastOkAt: lastOk?.toISOString() ?? null,
+      unlisted: unlisted[provider] ?? null,
     };
   });
 }
 
 // Check a provider's key now, for free, and keep the answer as the provider's
 // latest call: a key replaced in .env clears the error it left, and a key the
-// provider rejects says so before any paid call.
-export async function checkKey(provider: ProviderId): Promise<KeyCheck> {
+// provider rejects says so before any paid call. The models it lists are
+// compared with the catalog: an offered model it no longer names is kept with
+// the answer, so Settings names it and the queue refuses it before paying.
+export async function checkKey(
+  provider: ProviderId,
+): Promise<KeyCheck & { unlisted?: string[] }> {
   const result = await checkProviderKey(provider);
+  const unlisted = result.ok ? unlistedModels(provider, result.models) : [];
   if (result.called && hasDatabase()) {
     const maker = await getCurrentMaker();
     await recordKeyCheck({
       makerId: maker.id,
       provider,
       error: result.ok ? null : result.message,
+      ...(result.ok ? { unlisted } : {}),
     });
   }
-  return result;
+  return result.ok ? { ...result, unlisted } : result;
 }
