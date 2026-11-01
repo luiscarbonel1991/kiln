@@ -80,7 +80,12 @@ export function AssembledPromptTray({
             value={model}
             onChange={(next) => onEditModel(next)}
           />
-          <ModelParams model={model} onEdit={onEditModel} testId={testId} />
+          <ModelParams
+            model={model}
+            onEdit={onEditModel}
+            testId={testId}
+            video={Boolean(video)}
+          />
           {video ? (
             <div className="font-mono text-[0.6875rem]">
               <div className="flex justify-between border-border-soft border-b py-1">

@@ -16,6 +16,7 @@ export function RenderCanvas({
   type,
   direction,
   outputUrl,
+  seconds,
   testId,
 }: {
   seed: number;
@@ -23,6 +24,8 @@ export function RenderCanvas({
   type: Card["type"];
   direction: string;
   outputUrl?: string;
+  // A video card's length.
+  seconds?: number;
   testId: string;
 }) {
   const rendering = status === "rendering";
@@ -63,7 +66,7 @@ export function RenderCanvas({
       ) : null}
       {type === "video" ? (
         <span className="pointer-events-none absolute top-2.5 right-2.5 flex items-center gap-1 rounded-pill bg-prov-recipe px-2 py-0.5 font-mono text-[0.625rem] text-primary-foreground">
-          <Film className="size-2.5" /> Video 8s
+          <Film className="size-2.5" /> Video{seconds ? ` ${seconds}s` : ""}
         </span>
       ) : null}
       {type === "video" && !rendering && !showOutput && !failed ? (

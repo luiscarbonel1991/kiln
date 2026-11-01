@@ -175,6 +175,7 @@ export function GenerationCard({
           type={card.type}
           direction={card.direction}
           outputUrl={card.outputs[0]}
+          seconds={card.video?.durationSec}
           testId={`card-${card.id}`}
         />
         {purpose ? (
