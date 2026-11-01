@@ -257,6 +257,22 @@ export function modelEntry(model: {
 }
 
 // "Veo 3.1 Fast", "Sora 2 (retired)", or the bare id when unknown.
+// The models Kiln offers from a provider that the provider's own model list (a
+// free key check) no longer names: Veo stayed on offer after Google shut it
+// down. None when the list is empty, which leaves nothing to compare with. A
+// model the list still names is not therefore offered: `retired` always wins
+// (OpenAI still lists Sora 2).
+export function unlistedModels(
+  provider: ProviderId,
+  listed: readonly string[],
+): string[] {
+  if (listed.length === 0) return [];
+  const names = new Set(listed);
+  return MODEL_CATALOG.filter(
+    (m) => m.provider === provider && !m.retired && !names.has(m.id),
+  ).map((m) => m.id);
+}
+
 export function modelLabel(model: { provider: string; model: string }): string {
   const entry = modelEntry(model);
   if (!entry) return model.model;

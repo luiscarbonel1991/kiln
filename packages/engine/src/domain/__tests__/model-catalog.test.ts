@@ -9,6 +9,7 @@ import {
   ModelRefused,
   makerModels,
   modelLabel,
+  unlistedModels,
 } from "@/domain/model-defaults";
 
 describe("model catalog", () => {
@@ -67,6 +68,24 @@ describe("model catalog", () => {
     expect(
       modelLabel({ provider: "google", model: "gemini-3.1-flash-image" }),
     ).toBe("Gemini 3.1 Flash Image");
+  });
+
+  it("names the offered models a provider's list no longer has; retired always wins", () => {
+    const google = catalogFor("video")
+      .concat(catalogFor("image"), catalogFor("text"))
+      .filter((m) => m.provider === "google")
+      .map((m) => m.id);
+    const listed = google.filter((id) => id !== "gemini-3.1-flash-lite-image");
+    // Veo is retired: not offered, so never named, though Google lists none.
+    expect(unlistedModels("google", listed)).toEqual([
+      "gemini-3.1-flash-lite-image",
+    ]);
+    expect(unlistedModels("google", [])).toEqual([]);
+    // OpenAI still lists Sora 2; it stays refused.
+    expect(unlistedModels("openai", ["sora-2"])).not.toContain("sora-2");
+    expect(
+      checkModel({ provider: "openai", model: "sora-2" }, "video").ok,
+    ).toBe(false);
   });
 
   it("offers each provider's most capable text model, verified 2026-10-31", () => {

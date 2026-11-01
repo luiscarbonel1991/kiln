@@ -8,8 +8,8 @@ const env = vi.hoisted(() => ({
 }));
 vi.mock("../../env", () => ({ env }));
 const lists = vi.hoisted(() => ({
-  openai: vi.fn(async () => {}),
-  google: vi.fn(async () => {}),
+  openai: vi.fn(async (): Promise<string[]> => []),
+  google: vi.fn(async (): Promise<string[]> => []),
 }));
 vi.mock("@/providers/openai/key-check", () => ({
   checkOpenAIKey: lists.openai,
@@ -24,15 +24,16 @@ beforeEach(() => {
   env.KILN_PROVIDERS = "live";
   env.OPENAI_API_KEY = "sk-test";
   env.GOOGLE_API_KEY = "g-test";
-  lists.openai.mockReset().mockResolvedValue(undefined);
-  lists.google.mockReset().mockResolvedValue(undefined);
+  lists.openai.mockReset().mockResolvedValue(["gpt-image-2"]);
+  lists.google.mockReset().mockResolvedValue(["gemini-omni-1.1-flash"]);
 });
 
 describe("checkProviderKey", () => {
-  it("a key the provider takes is ok, and only that provider is called", async () => {
+  it("a key the provider takes is ok with the models it lists, and only that provider is called", async () => {
     expect(await checkProviderKey("google")).toEqual({
       ok: true,
       called: true,
+      models: ["gemini-omni-1.1-flash"],
     });
     expect(lists.google).toHaveBeenCalledTimes(1);
     expect(lists.openai).not.toHaveBeenCalled();

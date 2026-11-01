@@ -183,6 +183,7 @@ export {
   modelLabel,
   PROVIDER_LABELS,
   ProviderId,
+  unlistedModels,
   VideoResolution,
 } from "@/domain/model-defaults";
 export {
