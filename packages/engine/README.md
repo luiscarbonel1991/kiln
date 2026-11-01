@@ -7,7 +7,7 @@ content studio. Two pieces, framework-agnostic and server-side:
   "master" image's identity (subject, materials, palette) is resolved and
   **locked by default**, so it's preserved across every generated variant. The
   cascade is what keeps a set on-brand instead of drifting.
-- **Multi-provider adapters** — Google Gemini **and** OpenAI (plus Veo for video)
+- **Multi-provider adapters** — Google Gemini **and** OpenAI (Gemini Omni Flash for video)
   behind clean interfaces, switchable per request. No SDK leaks outside its
   adapter; capabilities (generate / edit / compose / video) are gated per
   provider.
