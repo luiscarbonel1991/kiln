@@ -151,6 +151,26 @@ describe("product form", () => {
     expect(product.colours[1]).not.toHaveProperty("swatchUrl");
   });
 
+  it("keeps a colour's supplier page, and only a web address", () => {
+    const withLink = (supplierUrl: string) => ({
+      ...form,
+      colours: [{ ...form.colours[0], supplierUrl }, form.colours[1]],
+    });
+    const product = productFromForm(
+      withLink("https://supplier.example/birch"),
+      "7k2",
+    );
+    expect(product.colours[0].supplierUrl).toBe(
+      "https://supplier.example/birch",
+    );
+    expect(product.colours[1]).not.toHaveProperty("supplierUrl");
+    const refused = ProductForm.safeParse(withLink("javascript:alert(1)"));
+    expect(refused.error?.issues[0]).toMatchObject({
+      path: ["colours", 0, "supplierUrl"],
+      message: "Paste the supplier's page, starting with https://.",
+    });
+  });
+
   it("a photo becomes the reference; an SVG the plate, its scale from the width", () => {
     expect(
       productFromForm(

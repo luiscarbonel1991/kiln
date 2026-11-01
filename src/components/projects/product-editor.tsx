@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu, ToggleGroup } from "radix-ui";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   createProductAction,
   draftProductAction,
@@ -19,6 +19,7 @@ import {
   updateProductAction,
   uploadProductFileAction,
 } from "@/app/actions/products";
+import { MaterialCheck } from "@/components/projects/material-check";
 import { MaterialCombobox } from "@/components/projects/material-combobox";
 import {
   type Details,
@@ -125,6 +126,8 @@ interface Colour {
   swatchUrl?: string;
   // A layered finish: the base that shows through the cuts.
   base?: string;
+  // The supplier's page for this colour.
+  supplierUrl?: string;
 }
 
 // A layered colour's base until the maker picks one: readable on its face.
@@ -276,6 +279,25 @@ export function ProductEditor({
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewing, startReview] = useTransition();
   const busy = uploading || drafting || saving || reviewing;
+  // The colour whose material photo is being checked against its swatch, and
+  // the photo's colour when the upload already read it.
+  const [checking, setChecking] = useState<{
+    row: number;
+    photoColour: { name: string; hex: string } | null;
+    seq: number;
+  } | null>(null);
+  const checks = useRef(0);
+  const check = (
+    row: number,
+    photoColour: { name: string; hex: string } | null = null,
+  ) => {
+    checks.current += 1;
+    setChecking({ row, photoColour, seq: checks.current });
+  };
+  const setRow = (row: number, change: Partial<Colour>) =>
+    setColours((all) =>
+      all.map((x, j) => (j === row ? { ...x, ...change } : x)),
+    );
 
   function setWidthFollowing(value: string) {
     setWidth(value);
@@ -302,8 +324,8 @@ export function ProductEditor({
     });
   }
 
-  // A colour's material photo: stored like the product photo; its dominant
-  // colour becomes the swatch's hex (the maker can change it).
+  // A colour's material photo: stored like the product photo, then checked
+  // against the swatch. The photo never changes the swatch on its own.
   function uploadSample(row: number, chosen: File) {
     setError(null);
     startUpload(async () => {
@@ -318,17 +340,8 @@ export function ProductEditor({
         setError("A material sample is a photo (PNG, JPEG or WebP).");
         return;
       }
-      setColours((all) =>
-        all.map((x, j) =>
-          j === row
-            ? {
-                ...x,
-                swatchUrl: result.url,
-                hex: result.colours[0]?.hex ?? x.hex,
-              }
-            : x,
-        ),
-      );
+      setRow(row, { swatchUrl: result.url });
+      check(row, result.colours[0] ?? null);
     });
   }
 
@@ -612,6 +625,20 @@ export function ProductEditor({
 
   return (
     <div className="col-span-full flex flex-col gap-5 rounded-card bg-card p-6 shadow-card">
+      {checking && colours[checking.row]?.swatchUrl ? (
+        <MaterialCheck
+          key={checking.seq}
+          colour={{
+            name: colours[checking.row].name,
+            hex: colours[checking.row].hex,
+            swatchUrl: colours[checking.row].swatchUrl ?? "",
+          }}
+          photoColour={checking.photoColour}
+          onClose={() => setChecking(null)}
+          onPhoto={(url) => setRow(checking.row, { swatchUrl: url })}
+          onHex={(hex) => setRow(checking.row, { hex: hex.toUpperCase() })}
+        />
+      ) : null}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3
@@ -936,12 +963,22 @@ export function ProductEditor({
                 />
                 {c.swatchUrl ? (
                   <span className="relative flex-shrink-0">
-                    {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
-                    <img
-                      src={c.swatchUrl}
-                      alt={`${c.name || `Colour ${i + 1}`} material`}
-                      className="size-9 rounded-swatch border border-border object-cover"
-                    />
+                    <button
+                      type="button"
+                      aria-label={`Check the material photo of ${c.name || `colour ${i + 1}`}`}
+                      title="Check the photo against the swatch"
+                      data-testid={`material-photo-${i + 1}-check`}
+                      disabled={busy}
+                      onClick={() => check(i)}
+                      className="block rounded-swatch"
+                    >
+                      {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
+                      <img
+                        src={c.swatchUrl}
+                        alt={`${c.name || `Colour ${i + 1}`} material`}
+                        className="size-9 rounded-swatch border border-border object-cover"
+                      />
+                    </button>
                     <button
                       type="button"
                       aria-label="Remove the material photo"
@@ -1024,6 +1061,31 @@ export function ProductEditor({
                   />
                   Base that shows through the cuts
                 </label>
+              ) : null}
+              <label className="flex items-center gap-2 pl-11 font-sans text-[0.75rem] text-on-surface-mid">
+                <span className="flex-shrink-0">Supplier page</span>
+                <input
+                  type="url"
+                  inputMode="url"
+                  aria-label={`Colour ${i + 1} supplier page`}
+                  data-testid={`colour-${i + 1}-supplier`}
+                  data-field={`colours.${i}.supplierUrl`}
+                  placeholder="https://… (optional)"
+                  value={c.supplierUrl ?? ""}
+                  onChange={(e) =>
+                    setRow(i, {
+                      supplierUrl: e.target.value.trim()
+                        ? e.target.value
+                        : undefined,
+                    })
+                  }
+                  className={cn(FIELD, "h-7 max-w-[320px] text-[0.75rem]")}
+                />
+              </label>
+              {problems[`colours.${i}.supplierUrl`] ? (
+                <span className="pl-11 font-sans text-[0.75rem] text-prov-local">
+                  {problems[`colours.${i}.supplierUrl`]}
+                </span>
               ) : null}
               {note(`colours.${i}.name`)}
             </div>

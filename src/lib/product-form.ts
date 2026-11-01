@@ -5,6 +5,7 @@ import {
   DEFAULT_FORBIDDEN,
   Hex,
   Product,
+  safeLink,
   Treatment,
   Unit,
   ViewLabel,
@@ -120,6 +121,16 @@ export function productFormSchema(limits: FormLimits = FORM_LIMITS) {
             // A layered finish: the base layer's colour, which shows through
             // the cuts (the colour's inlay).
             base: Hex.optional(),
+            // The supplier's page for this colour, opened by the maker to
+            // compare; Kiln never fetches it.
+            supplierUrl: z
+              .string()
+              .trim()
+              .max(2000)
+              .refine((url) => safeLink(url) !== null, {
+                message: "Paste the supplier's page, starting with https://.",
+              })
+              .optional(),
           }),
         )
         .min(1, "Add at least one colour.")
@@ -316,6 +327,7 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
       face: c.hex.toUpperCase(),
       ...(c.base ? { inlay: c.base.toUpperCase() } : {}),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
+      ...(c.supplierUrl ? { supplierUrl: c.supplierUrl } : {}),
     })),
     defaultColour: keys[form.defaultColour] ?? keys[0],
     typography: { family: "Hanken Grotesk" },
@@ -418,6 +430,7 @@ export function formFromProduct(product: Product): ProductForm {
       hex: c.face,
       ...(c.inlay ? { base: c.inlay } : {}),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
+      ...(safeLink(c.supplierUrl) ? { supplierUrl: c.supplierUrl } : {}),
     })),
     defaultColour: Math.max(
       0,
@@ -479,9 +492,14 @@ export function mergeForm(
     const kept = c.key ? before.get(c.key) : undefined;
     const {
       swatchUrl: _swatch,
+      supplierUrl: stored,
       inlayName,
       ...rest
     }: Partial<ColourOption> = kept ?? {};
+    // The form shows a supplier link only when it is one; anything else an
+    // import stored there is kept as it was.
+    const supplierUrl =
+      c.supplierUrl ?? (safeLink(stored) ? undefined : stored);
     // A new base colour: the old one's name no longer fits it.
     const base =
       c.base && kept?.inlay?.toUpperCase() !== c.base.toUpperCase()
@@ -498,6 +516,7 @@ export function mergeForm(
           : c.hex.toUpperCase(),
       ...(base ? { inlay: base } : {}),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
+      ...(supplierUrl ? { supplierUrl } : {}),
     };
   });
   const old = stored.source;

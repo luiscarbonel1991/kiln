@@ -168,4 +168,29 @@ describe("editing a product", () => {
     // The form shows the base, so it is not named as kept.
     expect(keptWords(layered)).toEqual(["typeface Hanken Grotesk"]);
   });
+
+  it("edits a colour's supplier page; a stored note that is not a link stays", () => {
+    const linked = Product.parse({
+      ...formMade,
+      colours: formMade.colours.map((c, i) => ({
+        ...c,
+        supplierUrl: i === 0 ? "https://supplier.example/birch" : "Rowmark 2",
+      })),
+    });
+    const form = formFromProduct(linked);
+    expect(form.colours[0].supplierUrl).toBe("https://supplier.example/birch");
+    expect(form.colours[1]).not.toHaveProperty("supplierUrl");
+    expect(canonicalJson(merged(linked))).toBe(canonicalJson(linked));
+    const edited = merged(linked, {
+      colours: form.colours.map((c, i) =>
+        i === 0
+          ? { ...c, supplierUrl: undefined }
+          : { ...c, supplierUrl: "https://supplier.example/walnut" },
+      ),
+    });
+    expect(edited.colours[0]).not.toHaveProperty("supplierUrl");
+    expect(edited.colours[1].supplierUrl).toBe(
+      "https://supplier.example/walnut",
+    );
+  });
 });
