@@ -127,7 +127,7 @@ export function cardRoute(
   return { next, maxMicros: worst === null ? null : toMicros(worst) };
 }
 
-// "openai gpt-image-2 medium", "google veo-3.1-fast-generate-preview 720p".
+// "openai gpt-image-2 medium", "google gemini-omni-1.1-flash 720p".
 const batchLabel = (m: BatchModel) =>
   [m.provider, m.model, m.quality, m.resolution].filter(Boolean).join(" ");
 

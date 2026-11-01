@@ -11,7 +11,7 @@ import { videoCall, withDirectSpend } from "@/server/direct-spend";
 // the reason, never swapped. Mirrors edit.ts; Zod is the trust boundary. The
 // video reserves its pinned max against the monthly cap and records what it
 // cost, like the image calls. The card's length snaps to the nearest one its
-// model renders (Veo: 4, 6 or 8 s), so the price and the call agree.
+// model renders (Gemini Omni: 3 to 10 s), so the price and the call agree.
 export async function animateVideo(
   input: AnimateInput,
 ): Promise<GenerationResult> {

@@ -47,8 +47,8 @@ export interface ModelEntry {
 }
 
 const QUALITIES: readonly ImageQuality[] = ["low", "medium", "high"];
-// Veo 3.1 (all three): 4, 6 or 8 s at 720p; 1080p only at 8 s
-// (ai.google.dev/gemini-api/docs/veo, 2026-10-06).
+// Veo 3.1 (all three, shut down by Google on 2026-10-22): 4, 6 or 8 s at
+// 720p; 1080p only at 8 s (ai.google.dev/gemini-api/docs/veo, 2026-10-06).
 const VEO_SECONDS = { "720p": [4, 6, 8], "1080p": [8] } as const;
 // Gemini Omni Flash: 3 to 10 s. Only 720p, the one resolution Google prices
 // (1080p and 4K are upscaled from it, unpriced).
@@ -123,6 +123,7 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     provider: "google",
     id: "veo-3.1-generate-preview",
     label: "Veo 3.1",
+    retired: "2026-10-22",
     seconds: VEO_SECONDS,
   },
   {
@@ -130,6 +131,7 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     provider: "google",
     id: "veo-3.1-fast-generate-preview",
     label: "Veo 3.1 Fast",
+    retired: "2026-10-22",
     seconds: VEO_SECONDS,
   },
   {
@@ -137,6 +139,7 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     provider: "google",
     id: "veo-3.1-lite-generate-preview",
     label: "Veo 3.1 Lite",
+    retired: "2026-10-22",
     seconds: VEO_SECONDS,
   },
   {
@@ -324,7 +327,7 @@ export const DEFAULT_MAKER_MODELS: MakerModels = {
   image: { provider: "openai", model: "gpt-image-2", quality: "medium" },
   video: {
     provider: "google",
-    model: "veo-3.1-fast-generate-preview",
+    model: "gemini-omni-1.1-flash",
     resolution: "720p",
   },
   text: { provider: "openai", model: "gpt-6.1-sol" },

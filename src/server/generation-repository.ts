@@ -845,7 +845,7 @@ export interface OutputSource {
   prompt: string;
   provider: string;
   model: string;
-  // "Veo 3.1 Fast", "Sora 2 (retired)".
+  // "Gemini Omni Flash", "Veo 3.1 Fast (retired)".
   label: string;
   costMicros: number | null;
   generatedAt: string | null;

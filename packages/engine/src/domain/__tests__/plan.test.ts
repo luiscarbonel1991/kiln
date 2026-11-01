@@ -845,26 +845,23 @@ describe("video slots", () => {
   });
 
   it("prices the plan's videos beside its scenes, at each video's length", () => {
-    const veoFast = {
+    const omni = {
       provider: "google",
-      model: "veo-3.1-fast-generate-preview",
+      model: "gemini-omni-1.1-flash",
     };
     const shopWithVideo = { ...shop, video: { minSec: 5, maxSec: 15 } };
-    // 8 s at $0.10/s on Veo 3.1 Fast 720p.
-    expect(planVideos(withVideo(), [shopWithVideo, social], veoFast)).toEqual({
+    // 8 s at $0.1014/s on Gemini Omni Flash 720p, plus $0.01 a clip.
+    expect(planVideos(withVideo(), [shopWithVideo, social], omni)).toEqual({
       count: 1,
       seconds: [8],
-      usd: 0.8,
+      usd: 0.82,
     });
     expect(
-      planVideos(withVideo(), [shopWithVideo, social], veoFast, ["shop.video"]),
+      planVideos(withVideo(), [shopWithVideo, social], omni, ["shop.video"]),
     ).toEqual({ count: 0, seconds: [], usd: 0 });
     expect(
-      planVideos(
-        withSlotOff(withVideo(), video, true),
-        [shopWithVideo],
-        veoFast,
-      ).count,
+      planVideos(withSlotOff(withVideo(), video, true), [shopWithVideo], omni)
+        .count,
     ).toBe(0);
     expect(
       planVideos(withVideo(), [shopWithVideo], {
@@ -893,7 +890,7 @@ describe("video slots", () => {
       motion: "light",
       seconds: 8,
       orientation: "portrait",
-      allowed: [6, 8],
+      allowed: [5, 6, 7, 8, 9, 10],
     });
   });
 

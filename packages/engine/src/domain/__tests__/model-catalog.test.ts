@@ -36,6 +36,23 @@ describe("model catalog", () => {
     );
   });
 
+  it("offers Gemini Omni Flash for video; Veo is shut down, refused with the date", () => {
+    expect(catalogFor("video").map((m) => m.id)).toEqual([
+      "gemini-omni-1.1-flash",
+    ]);
+    const check = checkModel(
+      { provider: "google", model: "veo-3.1-fast-generate-preview" },
+      "video",
+    );
+    expect(check).toMatchObject({ ok: false, reason: "retired" });
+    expect(check.ok ? "" : check.message).toMatch(
+      /Veo 3\.1 Fast was shut down on 2026-10-22/,
+    );
+    expect(
+      modelLabel({ provider: "google", model: "veo-3.1-generate-preview" }),
+    ).toBe("Veo 3.1 (retired)");
+  });
+
   it("offers each provider's most capable text model, verified 2026-10-31", () => {
     const text = catalogFor("text").map((m) => m.id);
     expect(text).toEqual([
@@ -112,12 +129,12 @@ describe("model catalog", () => {
 });
 
 describe("maker defaults", () => {
-  it("are images on gpt-image-2 medium, video on Veo 3.1 Fast 720p, text on gpt-6.1-sol", () => {
+  it("are images on gpt-image-2 medium, video on Gemini Omni Flash 720p, text on gpt-6.1-sol", () => {
     expect(DEFAULT_MAKER_MODELS).toEqual({
       image: { provider: "openai", model: "gpt-image-2", quality: "medium" },
       video: {
         provider: "google",
-        model: "veo-3.1-fast-generate-preview",
+        model: "gemini-omni-1.1-flash",
         resolution: "720p",
       },
       text: { provider: "openai", model: "gpt-6.1-sol" },

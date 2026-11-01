@@ -78,9 +78,9 @@ describe("proposeRoutes", () => {
       { provider: "openai", model: "gpt-image-2", quality: "low" },
       { provider: "google", model: "gemini-3.1-flash-lite-image" },
     ]);
+    // Gemini Omni Flash is the one video model that runs.
     expect(routes.video.models.map((m) => m.model)).toEqual([
-      "veo-3.1-fast-generate-preview",
-      "veo-3.1-lite-generate-preview",
+      "gemini-omni-1.1-flash",
     ]);
     expect(MakerRoutes.safeParse(routes).success).toBe(true);
   });
@@ -107,7 +107,7 @@ describe("proposeRoutes", () => {
     // The video head is the maker's default even without its key: the
     // proposal never switches the model a task runs on first.
     expect(routes.video.models.map((m) => m.model)).toEqual([
-      "veo-3.1-fast-generate-preview",
+      "gemini-omni-1.1-flash",
     ]);
   });
 
@@ -203,7 +203,14 @@ describe("MakerRoutes and readRoutes", () => {
           fallback: true,
         },
         video: {
-          models: [{ provider: "openai", model: "sora-2" }],
+          models: [
+            { provider: "openai", model: "sora-2" },
+            {
+              provider: "google",
+              model: "veo-3.1-fast-generate-preview",
+              resolution: "720p",
+            },
+          ],
           fallback: true,
         },
       },
@@ -214,7 +221,7 @@ describe("MakerRoutes and readRoutes", () => {
       models: [
         {
           provider: "google",
-          model: "veo-3.1-fast-generate-preview",
+          model: "gemini-omni-1.1-flash",
           resolution: "720p",
         },
       ],

@@ -49,7 +49,7 @@ describe("buildVideoRequest", () => {
       motion: "a subtle, slow push-in toward the product",
       model: {
         provider: "google",
-        model: "veo-3.1-fast-generate-preview",
+        model: "gemini-omni-1.1-flash",
         resolution: "720p",
         aspect: "9:16",
       },

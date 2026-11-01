@@ -81,7 +81,7 @@ vi.mock("@/server/generation-queue", () => ({
             kind: "video",
             model: {
               provider: "google",
-              model: "veo-3.1-fast-generate-preview",
+              model: "gemini-omni-1.1-flash",
               quality: "medium",
               resolution: "720p",
             },
@@ -194,7 +194,7 @@ describe("quote", () => {
     });
     expect(answer).toMatchObject({
       ok: true,
-      output: { data: { lines: [{ model: "Veo 3.1 Fast 720p" }] } },
+      output: { data: { lines: [{ model: "Gemini Omni Flash 720p" }] } },
     });
   });
 

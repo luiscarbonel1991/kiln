@@ -303,18 +303,12 @@ const DRAFT: Pair = {
   openai: { provider: "openai", model: "gpt-image-2", quality: "low" },
   google: { provider: "google", model: "gemini-3.1-flash-lite-image" },
 };
-const VIDEO_PAIR = {
-  fast: {
-    provider: "google",
-    model: "veo-3.1-fast-generate-preview",
-    resolution: "720p",
-  },
-  lite: {
-    provider: "google",
-    model: "veo-3.1-lite-generate-preview",
-    resolution: "720p",
-  },
-} as const satisfies Record<string, RouteEntry>;
+// The one video model that runs (Veo shut down on 2026-10-22, Sora retired).
+const VIDEO = {
+  provider: "google",
+  model: "gemini-omni-1.1-flash",
+  resolution: "720p",
+} as const satisfies RouteEntry;
 
 const other = (provider: ProviderId): ProviderId =>
   provider === "openai" ? "google" : "openai";
@@ -356,16 +350,7 @@ export function proposeRoutes(
       false,
     ),
     draft: route("image", DRAFT[image], [DRAFT[other(image)]], false),
-    video: route(
-      "video",
-      videoHead,
-      [
-        sameModel(videoHead, VIDEO_PAIR.lite)
-          ? VIDEO_PAIR.fast
-          : VIDEO_PAIR.lite,
-      ],
-      false,
-    ),
+    video: route("video", videoHead, [VIDEO], false),
   };
 }
 

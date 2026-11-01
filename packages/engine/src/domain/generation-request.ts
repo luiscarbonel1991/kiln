@@ -32,8 +32,8 @@ export const VideoGenerationRequest = z.object({
   prompt: z.string().min(1),
   motion: z.string().min(1),
   durationSec: VideoSeconds,
-  // What the clip must never show, sent where the model takes a negative
-  // prompt (Veo); the prompt says it too.
+  // What the clip must never show; the prompt says it too, and Gemini Omni,
+  // which takes no negative prompt, reads it there.
   negative: z.string().default(""),
   model: ModelConfig,
 });

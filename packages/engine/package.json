@@ -2,7 +2,7 @@
   "name": "@kiln/engine",
   "version": "0.1.0",
   "private": true,
-  "description": "Kiln engine — the provenance cascade (brand -> image -> recipe -> local) and multi-provider AI adapters (Gemini / OpenAI / Veo) behind clean interfaces.",
+  "description": "Kiln engine — the provenance cascade (brand -> image -> recipe -> local) and multi-provider AI adapters (Gemini / OpenAI) behind clean interfaces.",
   "license": "FSL-1.1-Apache-2.0",
   "type": "module",
   "main": "./dist/providers/index.js",

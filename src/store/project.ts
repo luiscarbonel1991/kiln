@@ -334,9 +334,9 @@ export const useProject = create<ProjectState>((set, get) => ({
     });
   },
   // Promote a card to a NEW image-to-video child card (parentId lineage), in
-  // "draft" — Veo only runs when the user clicks Generate on it (it's the most
-  // expensive call). Idempotent: re-promoting is a no-op once the card exists.
-  // Video is single-provider google/Veo; inserted right after its source.
+  // "draft" — the video model only runs when the user clicks Generate on it
+  // (it's the most expensive call). Idempotent: re-promoting is a no-op once
+  // the card exists. Inserted right after its source.
   promoteToVideo: (sourceId) => {
     const cards = get().cards;
     if (!cards) return;
@@ -357,7 +357,7 @@ export const useProject = create<ProjectState>((set, get) => ({
         aspect: "9:16",
       },
       video: {
-        durationSec: 8, // Etsy accepts 5-15 s; Veo renders 4, 6 or 8
+        durationSec: 8, // Etsy accepts 5-15 s; Gemini Omni renders 3 to 10
         // A still camera keeps the product exact; the light moves.
         motion: VIDEO_MOTIONS.light.text,
         startFrameAssetId:

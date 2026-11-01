@@ -558,7 +558,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
             model: {
               ...card("x", []).model,
               provider: "google" as const,
-              model: "veo-3.1-fast-generate-preview",
+              model: "gemini-omni-1.1-flash",
               resolution: "720p" as const,
               aspect: "9:16",
             },
@@ -581,22 +581,22 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       true,
     );
     const { cards, model } = await estimateProjectCards(id, ["etsy.video"]);
-    // Veo 3.1 Fast at 720p: $0.10 a second.
+    // Gemini Omni Flash at 720p: $0.1014 a second, plus $0.01 a clip.
     expect(cards[0]).toMatchObject({
-      typicalMicros: 800_000,
-      maxMicros: 800_000,
+      typicalMicros: 821_200,
+      maxMicros: 821_200,
       request: {
         kind: "video",
         startFrameUrl: "https://stub.local/in-use.png",
         durationSec: 8,
         model: {
           provider: "google",
-          model: "veo-3.1-fast-generate-preview",
+          model: "gemini-omni-1.1-flash",
           aspect: "9:16",
         },
       },
     });
-    expect(model).toBe("google veo-3.1-fast-generate-preview 720p ×1");
+    expect(model).toBe("google gemini-omni-1.1-flash 720p ×1");
     // Its provider without a key: refused before anything is queued.
     keys.present = false;
     try {
@@ -605,7 +605,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       ).rejects.toMatchObject({
         reason: "provider",
         message:
-          "etsy.video uses Veo 3.1 Fast, but Google has no API key (GOOGLE_API_KEY).",
+          "etsy.video uses Gemini Omni Flash, but Google has no API key (GOOGLE_API_KEY).",
       });
     } finally {
       keys.present = true;

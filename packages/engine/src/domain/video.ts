@@ -51,7 +51,7 @@ export const VideoChoice = z.object({
 export type VideoChoice = z.infer<typeof VideoChoice>;
 
 // The lengths the model renders at its resolution that the destination
-// accepts (Veo on Etsy, 5-15 s: 6 or 8; at 1080p only 8). When none fits, the
+// accepts (Gemini Omni on Etsy, 5-15 s: 5 to 10). When none fits, the
 // model's length nearest to the destination's range.
 export function videoSecondsFor(
   rules?: { minSec: number; maxSec: number },

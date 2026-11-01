@@ -108,7 +108,8 @@ export interface DeliveredFile {
   takes?: number;
 }
 
-// A clip's pixel size by resolution and orientation (Veo; Sora rendered 720p).
+// A clip's pixel size by resolution and orientation (Gemini Omni renders 720p;
+// Veo also rendered 1080p).
 const VIDEO_SIZE: Record<
   string,
   Record<"portrait" | "landscape", { width: number; height: number }>
