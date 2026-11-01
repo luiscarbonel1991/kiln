@@ -128,8 +128,24 @@ form, or `kiln swatch` over HTTP). It is a close photo of the material in that c
 a real photo carries the grain better than a drawn texture. Every scene sends the
 default colour's sample as the image after the product's reference, and the prompt
 says the surfaces take its material, colour and grain. On gpt-image-2 that adds about
-$0.009 per scene. The colour sheet shows each sample, and the board shows it beside
-the reference, so each scene can be checked by eye.
+$0.009 per scene. The colour sheet shows each sample.
+
+A material photo never changes the colour's swatch on its own. On the form, the upload
+opens **Check the material photo**: the photo large, and the swatch beside what the
+photo reads.
+- Tap something white or grey (a sheet of paper beside the sample) to correct the
+  light.
+- Say which is true. "The photo is right" takes the photo's colour as the swatch. "The
+  swatch is right" tints the photo to the swatch and keeps its grain.
+- Both corrections are free (ImageMagick, no model). Undo puts the photo and the swatch
+  back as they were. Nothing changes until Save.
+
+Each colour may also name its **supplier page** (`supplierUrl`, http or https; Kiln never
+opens it). The board lists every colour beside the reference: its sample or swatch, a
+layered colour's face and the base its cuts show, the supplier page, and which colour
+scenes use. A colour with neither a material photo nor a supplier page reads
+**unverified look**, and so does every image scene made in it, since nothing real backs
+its look.
 
 **Parts and views.**
 - A product made of several pieces lists them in `parts`: a plate standing in a base,
@@ -212,7 +228,7 @@ behind your own sign-in (a VPN, a reverse proxy with authentication) and start i
 | Call | Body | Answer |
 |---|---|---|
 | `POST /api/import` | the product package (JSON, at most 32 MB) | each product's Kiln `id`, `sku`, `status` (new, updated, unchanged), what `changed` and its colour keys; `rejected` with the page's reasons; `warnings`. 400 not JSON, 413 too large, 422 nothing reads as a package |
-| `POST /api/products/:id/colours/:key/swatch` | a PNG, JPEG or WebP (at most 15 MB), as the body or a multipart `file` | the colour with its stored `swatchUrl`, `status`, `changed`, the projects now `behind`, and `photoColour` (a suggestion: the swatch hex stays yours). 404 unknown product or colour, 409 a catalog connector's product, 415 not a photo |
+| `POST /api/products/:id/colours/:key/swatch` | a PNG, JPEG or WebP (at most 15 MB), as the body or a multipart `file`; optionally `?white=x,y` (a white or grey spot, from the top left, each 0 to 1) or `?match=swatch` | the colour with its stored `swatchUrl`, `status`, `changed`, the projects now `behind`, and `photoColour` (read after any correction; a suggestion: the swatch hex stays yours). 400 a correction it cannot read, 404 unknown product or colour, 409 a catalog connector's product, 415 not a photo, 422 a correction the photo refuses (a coloured spot, a photo too far from the swatch), nothing stored |
 | `DELETE /api/products/:id/colours/:key/swatch` | none | the same, with `swatchUrl: null` |
 | `GET /api/results` | none | every followed listing (`projectId`, `destinationId`, `listingUrl`, `liveOn`): the reads `due` today, each with its `window`, the `next` one, the `reads` taken, the `comparison` in words and the frames `changed` |
 | `GET /api/projects` | none | the projects that have frames (`id`, `name`, `type`, `phase`, `updatedAt`), newest first |
@@ -251,6 +267,8 @@ which builds the engine and then the CLI, since it uses the engine's own checks)
 pnpm kiln validate package.json          # the import's checks, offline
 pnpm kiln import package.json            # check, then POST /api/import
 pnpm kiln swatch CB-01 maple maple.jpg   # a colour's material photo
+pnpm kiln swatch CB-01 maple maple.jpg --white=0.12,0.2   # its light balanced first
+pnpm kiln swatch CB-01 maple maple.jpg --match-swatch     # or tinted to the swatch
 pnpm kiln swatch CB-01 maple --remove
 pnpm kiln schema                         # the package's JSON Schema
 pnpm kiln projects                       # the projects with frames
