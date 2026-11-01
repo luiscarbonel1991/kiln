@@ -33,6 +33,19 @@ vi.mock("@/providers/asset-bytes", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   storeAsset,
 }));
+// Kiln's defaults, never the shared test maker's saved routes: the
+// maker-repository suite writes them while other files run.
+vi.mock("@/server/maker-repository", async (original) => {
+  const { DEFAULT_MAKER_MODELS } = await import("@/domain/model-defaults");
+  return {
+    ...(await original<typeof import("@/server/maker-repository")>()),
+    getMakerModelSetup: async () => ({
+      models: DEFAULT_MAKER_MODELS,
+      routes: null,
+      agents: {},
+    }),
+  };
+});
 
 const { createProductAction, importProductsAction, uploadProductFileAction } =
   await import("@/app/actions/products");

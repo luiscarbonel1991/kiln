@@ -1,8 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { listingDraft } from "@/domain/listing";
 import { Product } from "@/domain/product";
 import { SEED_DESTINATIONS } from "@/domain/seed";
 import { writeListing } from "@/server/text-calls";
+
+// Kiln's defaults, never the shared test maker's saved routes: the
+// maker-repository suite writes them while other files run.
+vi.mock("@/server/maker-repository", async (original) => {
+  const { DEFAULT_MAKER_MODELS } = await import("@/domain/model-defaults");
+  return {
+    ...(await original<typeof import("@/server/maker-repository")>()),
+    getMakerModelSetup: async () => ({
+      models: DEFAULT_MAKER_MODELS,
+      routes: null,
+      agents: {},
+    }),
+  };
+});
 
 const rules = SEED_DESTINATIONS.find((d) => d.id === "etsy")?.text;
 if (!rules) throw new Error("Etsy has no text rules");

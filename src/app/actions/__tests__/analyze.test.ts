@@ -1,6 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { analyzeMaster } from "@/app/actions/analyze";
 
+// Kiln's defaults, never the shared test maker's saved routes: the
+// maker-repository suite writes them while other files run.
+vi.mock("@/server/maker-repository", async (original) => {
+  const { DEFAULT_MAKER_MODELS } = await import("@/domain/model-defaults");
+  return {
+    ...(await original<typeof import("@/server/maker-repository")>()),
+    getMakerModelSetup: async () => ({
+      models: DEFAULT_MAKER_MODELS,
+      routes: null,
+      agents: {},
+    }),
+  };
+});
+
 describe("analyzeMaster", () => {
   // The offer's price is dated: read it before Google's change.
   beforeEach(() => {
