@@ -100,6 +100,17 @@ function messageOf(row: {
   };
 }
 
+// Whether a conversation is the current maker's, without reading it.
+export async function chatOwned(id: string): Promise<boolean> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  const session = await db.chatSession.findFirst({
+    where: { id, makerId: maker.id },
+    select: { id: true },
+  });
+  return session !== null;
+}
+
 export async function getChat(id: string): Promise<StoredChat | null> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();

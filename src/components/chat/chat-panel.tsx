@@ -17,8 +17,9 @@ import {
   useTransition,
 } from "react";
 import { createChatAction } from "@/app/actions/chat";
-import { ChatMessage, money } from "@/components/chat/chat-parts";
+import { ChatMessage } from "@/components/chat/chat-parts";
 import { sentMessage } from "@/components/chat/chat-request";
+import { money, spentLine, textMicros } from "@/components/chat/chat-spend";
 import { Button } from "@/components/ui/button";
 import {
   MessageScroller,
@@ -35,6 +36,7 @@ import { cn } from "@/lib/utils";
 import type { ChatEstimate, ChatPanelData } from "@/server/chat/chat-view";
 import type { KilnMessage } from "@/server/chat/messages";
 import type { SpecialistId } from "@/server/chat/specialists";
+import type { SessionSpend } from "@/server/generation-repository";
 
 // Kiln's chat (ROADMAP "Agents", stage 2): a project's conversation beside
 // its board, or one of the maker's own on the Chat page. The maker writes;
@@ -54,6 +56,39 @@ const SUGGESTIONS = {
 };
 
 type Pending = { text: string; plan: boolean; specialist: SpecialistId };
+
+const NO_RUNS: SessionSpend = { spentMicros: 0, queuedMicros: 0 };
+
+// What the conversation's paid tools spent and hold, read again while a turn
+// or the work it queued runs, and once more when it stops.
+function useRuns(
+  sessionId: string,
+  initial: SessionSpend | null,
+  busy: boolean,
+): SessionSpend | null {
+  const [runs, setRuns] = useState(initial);
+  const paid = initial !== null;
+  const active = busy || (runs?.queuedMicros ?? 0) > 0;
+  useEffect(() => {
+    if (!paid) return;
+    let alive = true;
+    const read = async () => {
+      const response = await fetch(`/api/chat/${sessionId}/spend`, {
+        cache: "no-store",
+      }).catch(() => null);
+      if (!alive || !response?.ok) return;
+      const body = (await response.json()) as { runs: SessionSpend | null };
+      setRuns(body.runs);
+    };
+    void read();
+    const timer = active ? setInterval(read, 4_000) : undefined;
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [sessionId, paid, active]);
+  return runs;
+}
 
 // The mode the chip starts in: the one the last turn ran in, else the
 // conversation's own (SVG on a design).
@@ -164,6 +199,13 @@ export function ChatPanel({
           specialist={specialist}
           onSpecialist={setSpecialist}
           lessons={data.lessons}
+          runs={
+            sessionId === data.sessionId
+              ? data.runs
+              : data.runs === null
+                ? null
+                : NO_RUNS
+          }
         />
       ) : (
         <>
@@ -227,6 +269,7 @@ function Conversation({
   specialist,
   onSpecialist,
   lessons,
+  runs: initialRuns,
 }: {
   sessionId: string;
   initial: KilnMessage[];
@@ -240,6 +283,7 @@ function Conversation({
   specialist: SpecialistId;
   onSpecialist: (id: SpecialistId) => void;
   lessons: ChatPanelData["lessons"];
+  runs: SessionSpend | null;
 }) {
   const router = useRouter();
   const plan = useRef(false);
@@ -331,6 +375,7 @@ function Conversation({
 
   const working = status === "submitted" || status === "streaming";
   const busy = working || catchingUp;
+  const runs = useRuns(sessionId, initialRuns, busy);
 
   // A page refresh (the board's, when a batch ends) brings what Kiln stored
   // since, such as its notice: taken in while no turn runs.
@@ -413,6 +458,7 @@ function Conversation({
           void sendMessage({ text });
         }}
         onStop={working || catchingUp ? stopTurn : undefined}
+        spent={spentLine(textMicros(messages), runs)}
       />
     </>
   );
@@ -435,6 +481,7 @@ function Composer({
   onSpecialist,
   onSend,
   onStop,
+  spent,
 }: {
   estimates: ChatPanelData["estimates"];
   busy: boolean;
@@ -443,6 +490,8 @@ function Composer({
   onSpecialist: (id: SpecialistId) => void;
   onSend: (text: string, plan: boolean) => void;
   onStop?: () => void;
+  // What the conversation has spent so far; none before it starts.
+  spent?: { line: string; detail: string };
 }) {
   const [text, setText] = useState("");
   const [plan, setPlan] = useState(false);
@@ -518,13 +567,24 @@ function Composer({
         >
           Plan first
         </Switch>
-        <span
-          className="min-w-0 flex-1 truncate text-right font-mono text-[0.6rem] text-on-surface-dim"
-          title={estimate.models.join(" → ")}
-          data-testid="chat-estimate"
-        >
-          {costLine(estimate)}
-        </span>
+        <div className="flex min-w-0 flex-1 flex-col items-end font-mono text-[0.6rem] text-on-surface-dim">
+          <span
+            className="max-w-full truncate"
+            title={estimate.models.join(" → ")}
+            data-testid="chat-estimate"
+          >
+            {costLine(estimate)}
+          </span>
+          {spent ? (
+            <span
+              className="max-w-full truncate"
+              title={spent.detail}
+              data-testid="chat-spent"
+            >
+              {spent.line}
+            </span>
+          ) : null}
+        </div>
         {onStop ? (
           <Button
             type="button"

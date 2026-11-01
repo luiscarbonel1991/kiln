@@ -11,6 +11,7 @@ import {
 import { useState, useTransition } from "react";
 import { Streamdown } from "streamdown";
 import { decideLessonAction } from "@/app/actions/lessons";
+import { money } from "@/components/chat/chat-spend";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -57,11 +58,6 @@ export const PAID = new Set([
   "write_listing",
   "review_product",
 ]);
-
-export function money(usd: number | null | undefined): string {
-  if (usd === null || usd === undefined) return "no pinned price";
-  return `$${usd < 0.1 ? usd.toFixed(3) : usd.toFixed(2)}`;
-}
 
 export function toolName(part: { type: string }): string | null {
   return part.type.startsWith("tool-") ? part.type.slice(5) : null;
@@ -497,7 +493,7 @@ export function ChatMessage({
               <span>{meta.models.join(" → ")}</span>
             ) : null}
             {meta.costMicros ? (
-              <span>· {money(meta.costMicros / 1_000_000)}</span>
+              <span>· text {money(meta.costMicros / 1_000_000)}</span>
             ) : null}
             {meta.specialist && meta.specialist !== "kiln" ? (
               <span>

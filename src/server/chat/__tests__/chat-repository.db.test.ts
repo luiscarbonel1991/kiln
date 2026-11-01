@@ -113,6 +113,12 @@ describe.skipIf(!enabled)("chat sessions (database)", async () => {
     expect((await repo.getChat(id))?.running).toBe(false);
   });
 
+  it("knows a conversation of the maker's without reading it", async () => {
+    const { id } = await session();
+    expect(await repo.chatOwned(id)).toBe(true);
+    expect(await repo.chatOwned("no-such-chat")).toBe(false);
+  });
+
   it("refuses a project that is not there", async () => {
     await expect(repo.createChatSession("no-such-project")).rejects.toThrow(
       "That project no longer exists.",

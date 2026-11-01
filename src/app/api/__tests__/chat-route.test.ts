@@ -33,9 +33,15 @@ vi.mock("@/server/chat/chat-repository", () => ({
       : null,
 }));
 
+vi.mock("@/server/chat/chat-view", () => ({
+  chatRuns: async (id: string) =>
+    id === "s1" ? { runs: { spentMicros: 512_000, queuedMicros: 0 } } : null,
+}));
+
 const chat = await import("@/app/api/chat/route");
 const one = await import("@/app/api/chat/[id]/route");
 const stop = await import("@/app/api/chat/[id]/stop/route");
+const spend = await import("@/app/api/chat/[id]/spend/route");
 
 const post = (body: unknown, headers: Record<string, string> = {}) =>
   new Request("http://localhost:3000/api/chat", {
@@ -97,6 +103,19 @@ describe("GET /api/chat/:id and POST /api/chat/:id/stop", () => {
           params("nope"),
         )
       ).status,
+    ).toBe(404);
+  });
+});
+
+describe("GET /api/chat/:id/spend", () => {
+  it("answers what a conversation's paid tools spent, only for its maker", async () => {
+    const found = await spend.GET(new Request("http://x"), params("s1"));
+    expect(found.headers.get("cache-control")).toBe("no-store");
+    expect(await found.json()).toEqual({
+      runs: { spentMicros: 512_000, queuedMicros: 0 },
+    });
+    expect(
+      (await spend.GET(new Request("http://x"), params("nope"))).status,
     ).toBe(404);
   });
 });
