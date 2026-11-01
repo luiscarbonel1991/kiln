@@ -204,9 +204,9 @@ describe("generation cost", () => {
       model: "gemini-3.1-flash-image",
     });
     // $0.067 per image plus the reference and prompt read in ($0.0009
-    // typical, $0.0025 at most).
-    expect(e?.typical).toBe(0.1358);
-    expect(e?.max).toBe(0.139);
+    // typical, $0.0025 at most) and its thinking ($0.003, $0.006 at most).
+    expect(e?.typical).toBe(0.1418);
+    expect(e?.max).toBe(0.151);
     expect(e?.quality).toBeNull();
   });
 
@@ -271,16 +271,24 @@ describe("actual cost and the monthly cap", () => {
     ).toBeCloseTo((1400 * 1.5 + 1120 * 30 + 200 * 7.5) / 1e6, 9);
   });
 
-  it("estimates a Gemini image at its 1K price plus its input allowance", () => {
+  it("estimates a Gemini image at its 1K price plus its input and thinking allowances", () => {
     expect(
       estimateGeneration(
         { provider: "google", model: "gemini-3.1-flash-image" },
         "4:5",
       ),
-    ).toEqual({ typical: 0.0679, max: 0.0695 });
+    ).toEqual({ typical: 0.0709, max: 0.0755 });
     expect(
       estimateGeneration({ provider: "google", model: "gemini-3-pro-image" }),
-    ).toEqual({ typical: 0.1376, max: 0.144 });
+    ).toEqual({ typical: 0.1496, max: 0.168 });
+    // Nano Banana 2.1's edit on 2026-10-31 cost $0.0428 (986 tokens of
+    // thinking): within its estimate.
+    expect(
+      estimateGeneration(
+        { provider: "google", model: "gemini-nano-banana-2.1" },
+        "4:5",
+      ),
+    ).toEqual({ typical: 0.0438, max: 0.0561 });
   });
 
   it("reads the row of the card's quality", () => {
@@ -309,8 +317,8 @@ describe("actual cost and the monthly cap", () => {
     // Gemini's input max already allows three more; the typical grows.
     const gemini = { provider: "google", model: "gemini-3.1-flash-image" };
     expect(estimateGeneration(gemini, "4:5", 1)).toEqual({
-      typical: 0.0685,
-      max: 0.0695,
+      typical: 0.0715,
+      max: 0.0755,
     });
   });
 

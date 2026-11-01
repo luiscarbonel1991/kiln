@@ -46,6 +46,8 @@ export interface ImagePrice {
   // $ per image: square (1024x1024) and non-square (1024x1536 / 1536x1024).
   output: { square: number; nonSquare: number };
   input: { typical: number; max: number };
+  // The text and thinking written beside the image (Gemini; none on OpenAI).
+  beside: { typical: number; max: number };
   confidence: "official" | "derived";
 }
 
@@ -206,6 +208,9 @@ const GOOGLE_PER_IMAGE: Record<string, number> = {
 // What a Gemini edit reads: the prompt and the reference (about 1,100 tokens
 // per image), up to three more references at most.
 const GOOGLE_INPUT_TOKENS = { typical: 1_800, max: 5_000 };
+// What a Gemini image model thinks and writes beside the image, billed at its
+// text rate: Nano Banana 2.1 wrote 986 tokens for one edit (2026-10-31).
+const GOOGLE_BESIDE_TOKENS = { typical: 1_000, max: 2_000 };
 
 function round(n: number): number {
   return Math.round(n * 10000) / 10000;
@@ -227,6 +232,7 @@ export function imagePrice(model: {
       quality,
       output: { square, nonSquare },
       input: { typical: 0.01, max: 0.02 },
+      beside: { typical: 0, max: 0 },
       confidence: "official",
     };
   }
@@ -242,6 +248,10 @@ export function imagePrice(model: {
       input: {
         typical: round((GOOGLE_INPUT_TOKENS.typical * tokens.imageIn) / 1e6),
         max: round((GOOGLE_INPUT_TOKENS.max * tokens.imageIn) / 1e6),
+      },
+      beside: {
+        typical: round((GOOGLE_BESIDE_TOKENS.typical * tokens.textOut) / 1e6),
+        max: round((GOOGLE_BESIDE_TOKENS.max * tokens.textOut) / 1e6),
       },
       confidence: "official",
     };
@@ -265,8 +275,9 @@ const OPENAI_PER_REFERENCE = { typical: 0.009, max: 0.012 };
 const GOOGLE_TOKENS_PER_REFERENCE = 1_100;
 
 // What one generation at this model and aspect costs: output plus the edit's
-// input allowance, with `references` further images read beside the
-// reference. null when the model has no pinned price.
+// input allowance and what the model writes beside the image, with
+// `references` further images read beside the reference. null when the model
+// has no pinned price.
 export function estimateGeneration(
   model: { provider: string; model: string; quality?: ImageQuality },
   aspect?: string,
@@ -293,8 +304,10 @@ export function estimateGeneration(
             max: 0,
           };
   return {
-    typical: round(output + price.input.typical + extra.typical),
-    max: round(output + price.input.max + extra.max),
+    typical: round(
+      output + price.input.typical + price.beside.typical + extra.typical,
+    ),
+    max: round(output + price.input.max + price.beside.max + extra.max),
   };
 }
 
