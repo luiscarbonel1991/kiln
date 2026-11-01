@@ -154,8 +154,11 @@ export interface VideoBytesResult {
   bytes: Uint8Array;
   mime: string;
   model: string;
-  // The seconds rendered (what the clip is billed by).
+  // The seconds rendered.
   seconds: number;
+  // What the render used, when the provider reports it (Gemini Omni bills
+  // tokens): its cost is measured from it, else priced by the second.
+  usage?: GenerationUsage;
 }
 
 export interface VideoProvider {

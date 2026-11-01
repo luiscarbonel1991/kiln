@@ -585,6 +585,38 @@ describe("video jobs", () => {
     expect(d.storeAsset).toHaveBeenCalledWith(clip.bytes, "video/mp4", "cards");
   });
 
+  it("a clip whose provider reports its usage is costed from it", async () => {
+    const usage = {
+      inputTextTokens: 133,
+      inputImageTokens: 1100,
+      outputTokens: 28960,
+      outputTextTokens: 352,
+    };
+    const { d } = videoDeps(async (options) => {
+      await options.beforeCall?.();
+      return {
+        ...clip,
+        model: "gemini-omni-1.1-flash",
+        seconds: 5,
+        usage,
+      };
+    });
+    await runJob(d, {
+      ...videoJob(),
+      request: {
+        ...videoRequest,
+        durationSec: 5,
+        model: { ...videoRequest.model, model: "gemini-omni-1.1-flash" },
+      },
+    });
+    // 1,233 in at $1.50, 28,960 video at $17.50 and 352 thinking at $9 per 1M.
+    expect(d.recordCost).toHaveBeenCalledWith(
+      "v",
+      { seconds: 5, resolution: "720p", tokens: usage },
+      511_818,
+    );
+  });
+
   it("a render that fails after its call is final: never a second paid render", async () => {
     const { d, animateBytes } = videoDeps(async (options) => {
       await options.beforeCall?.();

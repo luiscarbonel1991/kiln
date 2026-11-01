@@ -50,14 +50,15 @@ export interface ImagePrice {
 
 export const PRICES_AS_OF = "2026-10-06";
 
-// $ per 1M tokens. An image model's main output is the image (`imageOut`);
-// text and thinking beside it bill at `textOut`. A text model's output,
-// thinking included, bills at `textOut`.
+// $ per 1M tokens. An image model's main output is the image (`imageOut`),
+// a video model's the video (`videoOut`); text and thinking beside it bill at
+// `textOut`. A text model's output, thinking included, bills at `textOut`.
 interface Prices {
   textIn: number;
   imageIn: number;
   textOut: number;
   imageOut: number;
+  videoOut?: number;
 }
 // A price the provider has dated: `later` applies from its day (UTC) on.
 interface TokenPrices extends Prices {
@@ -90,6 +91,13 @@ const TOKEN_PRICES: Record<string, TokenPrices> = {
     imageIn: 2,
     textOut: 12,
     imageOut: 120,
+  },
+  "google/gemini-omni-1.1-flash": {
+    textIn: 1.5,
+    imageIn: 1.5,
+    textOut: 9,
+    imageOut: 0,
+    videoOut: 17.5,
   },
   "openai/gpt-6.1-sol": { textIn: 2, imageIn: 2, textOut: 10, imageOut: 0 },
   "openai/gpt-6-astra": { textIn: 10, imageIn: 10, textOut: 50, imageOut: 0 },
@@ -305,18 +313,27 @@ export function estimateScenes(
   };
 }
 
-// Video is billed by the second rendered, at a price per resolution: Veo 3.1
-// (Google, 2026-10-06, audio included). Sora is retired; its rates stay so
-// old outputs keep their cost.
+// Video is priced by the second rendered, at a price per resolution. Gemini
+// Omni Flash bills tokens: 5,792 video tokens a second at 720p, at $17.50 per
+// 1M (Google's pricing page, 2026-10-30; measured exactly on 2026-10-31), so
+// $0.1014 a second, plus its input and thinking, allowed per clip (measured
+// 1,233 in and 352 thinking, $0.005). Its finished clips are costed from the
+// usage Google reports. Veo 3.1 (shut down) and Sora (retired) keep their
+// rates so old outputs keep their cost.
 const VIDEO_PER_SECOND: Record<
   string,
   Partial<Record<VideoResolution, number>>
 > = {
+  "google/gemini-omni-1.1-flash": { "720p": 0.1014 },
   "google/veo-3.1-generate-preview": { "720p": 0.4, "1080p": 0.4 },
   "google/veo-3.1-fast-generate-preview": { "720p": 0.1, "1080p": 0.12 },
   "google/veo-3.1-lite-generate-preview": { "720p": 0.05, "1080p": 0.08 },
   "openai/sora-2": { "720p": 0.1 },
   "openai/sora-2-pro": { "720p": 0.3 },
+};
+
+const VIDEO_PER_CLIP: Record<string, number> = {
+  "google/gemini-omni-1.1-flash": 0.01,
 };
 
 // What `seconds` of video cost on this model at its resolution; null when it
@@ -327,7 +344,8 @@ export function videoCost(
 ): number | null {
   const resolution = model.resolution ?? DEFAULT_VIDEO_RESOLUTION;
   const perSecond = VIDEO_PER_SECOND[key(model)]?.[resolution];
-  return perSecond === undefined ? null : round(perSecond * seconds);
+  if (perSecond === undefined) return null;
+  return round(perSecond * seconds + (VIDEO_PER_CLIP[key(model)] ?? 0));
 }
 
 // What one video of this length costs, before it is made: null when the model
@@ -361,13 +379,15 @@ export function costFromUsage(
 ): number | null {
   const p = tokenPrices(model);
   if (!p) return null;
-  const isText = modelEntry(model)?.kind === "text";
+  const kind = modelEntry(model)?.kind;
   const input =
     usage.inputTextTokens * p.textIn + usage.inputImageTokens * p.imageIn;
-  const output = isText
-    ? usage.outputTokens * p.textOut
-    : usage.outputTokens * p.imageOut +
-      (usage.outputTextTokens ?? 0) * p.textOut;
+  const output =
+    kind === "text"
+      ? usage.outputTokens * p.textOut
+      : usage.outputTokens *
+          (kind === "video" ? (p.videoOut ?? 0) : p.imageOut) +
+        (usage.outputTextTokens ?? 0) * p.textOut;
   return (input + output) / 1_000_000;
 }
 

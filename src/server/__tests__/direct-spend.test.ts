@@ -19,15 +19,15 @@ vi.mock("@/server/maker-repository", () => ({
 const { imageCall, openDirectCall, textCall, videoCall, withDirectSpend } =
   await import("@/server/direct-spend");
 
-const VEO = {
+const OMNI = {
   provider: "google" as const,
-  model: "veo-3.1-fast-generate-preview",
+  model: "gemini-omni-1.1-flash",
 };
 
 const video: GenerationResult = {
   assets: [{ id: "v", url: "https://x/v.mp4", mime: "video/mp4" }],
   provider: "google",
-  model: VEO.model,
+  model: OMNI.model,
 };
 
 afterEach(() => vi.clearAllMocks());
@@ -35,7 +35,7 @@ afterEach(() => vi.clearAllMocks());
 describe("direct spend", () => {
   it("a video reserves its pinned max and records the seconds it generated", async () => {
     const result = await withDirectSpend(
-      videoCall(VEO, 8),
+      videoCall(OMNI, 8),
       async (beforeCall) => {
         await beforeCall();
         return video;
@@ -45,18 +45,35 @@ describe("direct spend", () => {
     expect(reserveDirectCall).toHaveBeenCalledWith({
       makerId: "maker-1",
       provider: "google",
-      model: VEO.model,
-      estimateMicros: 800_000,
+      model: OMNI.model,
+      estimateMicros: 821_200,
     });
     expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
       usage: undefined,
-      actualMicros: 800_000,
+      actualMicros: 821_200,
+    });
+  });
+
+  it("a video that reports its usage records what it measured", async () => {
+    const usage = {
+      inputTextTokens: 133,
+      inputImageTokens: 1100,
+      outputTokens: 28960,
+      outputTextTokens: 352,
+    };
+    await withDirectSpend(videoCall(OMNI, 5), async (beforeCall) => {
+      await beforeCall();
+      return { ...video, usage };
+    });
+    expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
+      usage,
+      actualMicros: 511_818,
     });
   });
 
   it("a length the model does not render has no price, so nothing is reserved", async () => {
     const call = vi.fn();
-    await expect(withDirectSpend(videoCall(VEO, 12), call)).rejects.toThrow(
+    await expect(withDirectSpend(videoCall(OMNI, 12), call)).rejects.toThrow(
       "No pinned price",
     );
     expect(reserveDirectCall).not.toHaveBeenCalled();
@@ -78,7 +95,7 @@ describe("direct spend", () => {
   });
 
   it("a call that never went out (a stub) records no cost", async () => {
-    await withDirectSpend(videoCall(VEO, 8), async () => video);
+    await withDirectSpend(videoCall(OMNI, 8), async () => video);
     expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
       usage: undefined,
       actualMicros: null,

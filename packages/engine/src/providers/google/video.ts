@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import type { Interactions } from "@google/genai";
+import type { GenerationUsage } from "@/domain/generation-cost";
 import {
   assertModel,
   DEFAULT_VIDEO_RESOLUTION,
@@ -25,26 +27,30 @@ import type {
 import { mockDelay, mockOutage, providerMode } from "@/providers/mode";
 import { GenerationResult } from "@/providers/types";
 
-// Veo 3.1 (image to video) under the same money rules as the other paid calls.
-// It is a long-running operation: the create is the paid request — marked by
-// `beforeCall` right before it, bounded, never retried (a retry after a
-// timeout could start a second render); the polls and the download are free
-// and tolerate a blip. A render that fails or outlives the deadline throws
-// without an HTTP status, so it counts at its estimate (it may be charged); a
-// clip Google's safety filter blocked throws a refusal with a status, so it
-// counts nothing ("You will not be charged if your video is blocked",
-// ai.google.dev/gemini-api/docs/veo, 2026-10-06).
+// Gemini Omni Flash (image to video) through the Interactions API, under the
+// same money rules as the other paid calls. The create is the paid request:
+// marked by `beforeCall` right before it, bounded, never retried (the
+// Interactions client retries twice unless told not to; a retry after a
+// timeout could start a second render). It runs in the background, which
+// Google requires stored, so the polls and the download are free and tolerate
+// a blip, and Kiln deletes the stored interaction and clip once it has the
+// clip. A render that fails after it rendered, or outlives the deadline,
+// throws without an HTTP status, so it counts at its estimate (it may be
+// charged). Checked on 2026-10-31: a 5 s 720p clip took 35 s and billed
+// 28,960 video tokens (5,792 a second), 1,233 in and 352 of thinking.
+
+type Interaction = Interactions.Interaction;
 
 const CREATE_TIMEOUT_MS = 120_000;
+const POLL_TIMEOUT_MS = 30_000;
 const POLL_MS = 10_000;
-// Veo takes 11 s to 6 min (the docs); the deadline stays under the direct-spend
-// row's 15 min lease.
-export const VEO_POLL_DEADLINE_MS = 10 * 60_000;
+// The deadline stays under the direct-spend row's 15 min lease.
+export const VIDEO_POLL_DEADLINE_MS = 10 * 60_000;
 const POLL_TOLERANCE = 3;
 const DOWNLOAD_ATTEMPTS = 3;
+const ONCE = { maxRetries: 0 };
 
-// The pixel size each resolution renders at (Veo keeps the clip 2 days, so it
-// is downloaded and stored at once).
+// The pixel size each resolution renders at, for the start frame.
 const SIZES: Record<
   VideoResolution,
   { portrait: [number, number]; landscape: [number, number] }
@@ -53,8 +59,8 @@ const SIZES: Record<
   "1080p": { portrait: [1080, 1920], landscape: [1920, 1080] },
 };
 
-// A refusal Google answered (nothing generated, nothing charged): it carries a
-// status, so the queue and the spend row count it at $0 and never retry it.
+// A refusal Google answered (no video made): it carries a status, so the queue
+// and the spend row count it at $0 and never retry it.
 export class VideoRefused extends Error {
   readonly name = "VideoRefused";
   readonly status = 422;
@@ -85,6 +91,9 @@ function vetted(input: AnimateRequest) {
   );
   const resolution = input.model.resolution ?? DEFAULT_VIDEO_RESOLUTION;
   const lengths = entry.seconds?.[resolution] ?? [];
+  if (lengths.length === 0) {
+    throw new ModelRefused(`${entry.label} does not render ${resolution}.`);
+  }
   if (!lengths.includes(input.durationSec)) {
     throw new ModelRefused(
       `${entry.label} renders ${lengths.join(", ")} s at ${resolution}, not ${input.durationSec} s.`,
@@ -93,14 +102,35 @@ function vetted(input: AnimateRequest) {
   return { entry, resolution, seconds: input.durationSec };
 }
 
+const tokensOf = (
+  list: { modality?: string; tokens?: number }[] | undefined,
+  modality: string,
+) => list?.find((m) => m.modality === modality)?.tokens ?? 0;
+
+// What the render used, as Kiln prices it: the video it made is the main
+// output; its thinking and any text bill as text.
+export function omniUsage(
+  usage: Interaction["usage"],
+): GenerationUsage | undefined {
+  if (!usage) return undefined;
+  const inputText = tokensOf(usage.input_tokens_by_modality, "text");
+  const video = tokensOf(usage.output_tokens_by_modality, "video");
+  return {
+    inputTextTokens: inputText,
+    inputImageTokens: Math.max(0, (usage.total_input_tokens ?? 0) - inputText),
+    outputTokens: video,
+    outputTextTokens:
+      Math.max(0, (usage.total_output_tokens ?? 0) - video) +
+      (usage.total_thought_tokens ?? 0),
+  };
+}
+
 async function download(video: {
   uri?: string;
-  videoBytes?: string;
-  mimeType?: string;
+  data?: string;
 }): Promise<Uint8Array> {
-  if (video.videoBytes)
-    return new Uint8Array(Buffer.from(video.videoBytes, "base64"));
-  if (!video.uri) throw new Error("Veo returned no video file");
+  if (video.data) return new Uint8Array(Buffer.from(video.data, "base64"));
+  if (!video.uri) throw new Error("Gemini Omni returned no video file");
   let last: unknown;
   for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt++) {
     try {
@@ -120,6 +150,56 @@ async function download(video: {
   );
 }
 
+// Nothing of the render stays at Google once Kiln has the clip: the stored
+// interaction and the clip's file (kept 48 hours otherwise). Free, and a
+// failure here costs nothing, so it is never in the way.
+async function forget(id: string, uri?: string): Promise<void> {
+  const ai = getGenAI();
+  await ai.interactions.delete(id, {}, ONCE).catch(() => {});
+  const file = uri ? /\/(files\/[^/:?]+)/.exec(uri)?.[1] : undefined;
+  if (file) await ai.files.delete({ name: file }).catch(() => {});
+}
+
+async function render(
+  request: Interactions.CreateModelInteractionParamsNonStreaming,
+  beforeCall?: () => Promise<void>,
+): Promise<Interaction> {
+  const ai = getGenAI();
+  await beforeCall?.();
+  let it = await ai.interactions.create(request, {
+    ...ONCE,
+    timeout: CREATE_TIMEOUT_MS,
+  });
+  const deadline = Date.now() + VIDEO_POLL_DEADLINE_MS;
+  let pollErrors = 0;
+  while (it.status === "in_progress") {
+    if (Date.now() >= deadline) {
+      await ai.interactions.cancel(it.id, {}, ONCE).catch(() => {});
+      throw new Error(
+        `Gemini Omni did not finish within ${VIDEO_POLL_DEADLINE_MS / 60_000} minutes; the render may still be charged.`,
+      );
+    }
+    await sleep(POLL_MS);
+    try {
+      it = await ai.interactions.get(
+        it.id,
+        {},
+        { ...ONCE, timeout: POLL_TIMEOUT_MS },
+      );
+      pollErrors = 0;
+    } catch (error) {
+      pollErrors += 1;
+      if (pollErrors >= POLL_TOLERANCE) {
+        // Rethrown without a status: the render's outcome is unknown.
+        throw new Error(
+          `Lost track of the Gemini Omni render (${errorMessage(error)}); it may still be charged.`,
+        );
+      }
+    }
+  }
+  return it;
+}
+
 async function animateBytes(
   input: AnimateRequest,
   options?: { beforeCall?: () => Promise<void> },
@@ -134,75 +214,75 @@ async function animateBytes(
   }
   const landscape = input.model.aspect === "16:9";
   const [w, h] = SIZES[resolution][landscape ? "landscape" : "portrait"];
-  let image: { imageBytes: string; mimeType: string } | undefined;
+  const frame: Interactions.ImageContent[] = [];
   if (isFetchable(input.startFrameAssetId)) {
-    const frame = await fetchAsset(input.startFrameAssetId);
-    const sized = await frameSizedTo(frame.bytes, w, h);
-    image = { imageBytes: sized.toString("base64"), mimeType: "image/png" };
+    const bytes = (await fetchAsset(input.startFrameAssetId)).bytes;
+    const sized = await frameSizedTo(bytes, w, h);
+    frame.push({
+      type: "image",
+      data: sized.toString("base64"),
+      mime_type: "image/png",
+    });
   }
+  // Omni has no negative prompt and adds sound: what to avoid (speech and
+  // music among it) is said in the prompt.
+  const text = [
+    input.prompt,
+    `Motion: ${input.motion}.`,
+    input.negative ? `Avoid: ${input.negative}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  const ai = getGenAI();
-  await options?.beforeCall?.();
-  let op = await ai.models.generateVideos({
-    model: entry.id,
-    prompt: `${input.prompt} Motion: ${input.motion}.`,
-    ...(image ? { image } : {}),
-    config: {
-      numberOfVideos: 1,
-      aspectRatio: landscape ? "16:9" : "9:16",
-      durationSeconds: seconds,
-      resolution,
-      // Image to video accepts only "allow_adult".
-      ...(image ? { personGeneration: "allow_adult" } : {}),
-      ...(input.negative ? { negativePrompt: input.negative } : {}),
-      httpOptions: { timeout: CREATE_TIMEOUT_MS },
+  const it = await render(
+    {
+      model: entry.id,
+      input: [...frame, { type: "text", text }],
+      response_modalities: ["video"],
+      response_format: {
+        type: "video",
+        aspect_ratio: landscape ? "16:9" : "9:16",
+        resolution,
+        duration: `${seconds}s`,
+        delivery: "uri",
+      },
+      background: true,
     },
-  });
-
-  const deadline = Date.now() + VEO_POLL_DEADLINE_MS;
-  let pollErrors = 0;
-  while (!op.done) {
-    if (Date.now() >= deadline) {
+    options?.beforeCall,
+  );
+  const usage = omniUsage(it.usage);
+  const video = it.output_video;
+  if (it.status !== "completed" || !video) {
+    await forget(it.id);
+    if ((usage?.outputTokens ?? 0) > 0) {
       throw new Error(
-        `Veo did not finish within ${VEO_POLL_DEADLINE_MS / 60_000} minutes; the render may still be charged.`,
+        `Gemini Omni stopped (${it.status}) after rendering; it may still be charged.`,
       );
     }
-    await sleep(POLL_MS);
-    try {
-      op = await ai.operations.getVideosOperation({ operation: op });
-      pollErrors = 0;
-    } catch (error) {
-      pollErrors += 1;
-      if (pollErrors >= POLL_TOLERANCE) {
-        // Rethrown without a status: the render's outcome is unknown.
-        throw new Error(
-          `Lost track of the Veo render (${errorMessage(error)}); it may still be charged.`,
-        );
-      }
+    const said = it.output_text?.trim();
+    if (it.status === "completed") {
+      throw new VideoRefused(
+        `Gemini Omni made no video${said ? `: ${said}` : ""}. No video was billed.`,
+      );
     }
-  }
-  if (op.error) {
-    const message = (op.error as { message?: unknown }).message;
-    throw new Error(
-      `Veo could not render the video (${typeof message === "string" ? message : "no reason given"}); it may still be charged.`,
+    // Answered with nothing rendered: a retry, or the route's next model, may pass.
+    throw Object.assign(
+      new Error(`Gemini Omni could not render the video (${it.status}).`),
+      { status: 502 },
     );
   }
-  const response = op.response;
-  const video = response?.generatedVideos?.[0]?.video;
-  if (!video) {
-    if ((response?.raiMediaFilteredCount ?? 0) > 0) {
-      const reasons = response?.raiMediaFilteredReasons?.join("; ");
-      throw new VideoRefused(
-        `Google's safety filter blocked this video (not charged)${reasons ? `: ${reasons}` : ""}.`,
-      );
-    }
-    throw new Error("Veo returned no video; it may still be charged.");
+  let bytes: Uint8Array;
+  try {
+    bytes = await download(video);
+  } finally {
+    await forget(it.id, video.uri);
   }
   return {
-    bytes: await download(video),
-    mime: video.mimeType ?? "video/mp4",
+    bytes,
+    mime: video.mime_type ?? "video/mp4",
     model: entry.id,
     seconds,
+    ...(usage ? { usage } : {}),
   };
 }
 
@@ -221,6 +301,7 @@ export const googleVideoProvider: VideoProvider = {
       assets: [{ id: randomUUID(), url, mime: clip.mime }],
       provider: "google",
       model: clip.model,
+      ...(clip.usage ? { usage: clip.usage } : {}),
     });
   },
 };

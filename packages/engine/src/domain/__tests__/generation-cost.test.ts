@@ -42,6 +42,24 @@ describe("video cost", () => {
     expect(estimateVideo(veo("veo-9"), 8)).toBeNull();
   });
 
+  it("prices Gemini Omni Flash by its tokens: 5,792 a second at $17.50 per 1M, plus a clip's input and thinking", () => {
+    const omni = veo("gemini-omni-1.1-flash");
+    expect(estimateVideo(omni, 5)).toBe(0.517);
+    expect(estimateVideo(omni, 8)).toBe(0.8212);
+    expect(estimateVideo(omni, 10)).toBe(1.024);
+    expect(estimateVideo(omni, 11)).toBeNull();
+    expect(estimateVideo(veo("gemini-omni-1.1-flash", "1080p"), 8)).toBeNull();
+    // The clip measured on 2026-10-31: 1,233 in, 28,960 video, 352 thinking.
+    const measured = costFromUsage(omni, {
+      inputTextTokens: 133,
+      inputImageTokens: 1100,
+      outputTokens: 28960,
+      outputTextTokens: 352,
+    });
+    expect(measured).toBeCloseTo(0.5118, 4);
+    expect(measured ?? 1).toBeLessThan(estimateVideo(omni, 5) ?? 0);
+  });
+
   it("keeps Sora's rates for old outputs only", () => {
     expect(videoCost({ provider: "openai", model: "sora-2" }, 12)).toBe(1.2);
   });

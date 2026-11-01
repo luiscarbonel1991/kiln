@@ -179,7 +179,8 @@ async function callImage(
   };
 }
 
-// A video: the approved start frame animated; billed by the seconds rendered.
+// A video: the approved start frame animated; costed from the usage the
+// provider reports, else by the seconds rendered.
 async function callVideo(
   deps: WorkerDeps,
   job: ClaimedJob,
@@ -206,18 +207,21 @@ async function callVideo(
     { beforeCall },
   );
   onPaid();
+  const ran = {
+    provider: request.model.provider,
+    model: clip.model,
+    resolution: request.model.resolution,
+  };
   await recordPaidCost(
     deps,
     job,
-    { seconds: clip.seconds, resolution: request.model.resolution },
-    videoCost(
-      {
-        provider: request.model.provider,
-        model: clip.model,
-        resolution: request.model.resolution,
-      },
-      clip.seconds,
-    ),
+    {
+      seconds: clip.seconds,
+      resolution: request.model.resolution,
+      ...(clip.usage ? { tokens: clip.usage } : {}),
+    },
+    (clip.usage ? costFromUsage(ran, clip.usage) : null) ??
+      videoCost(ran, clip.seconds),
   );
   return clip;
 }

@@ -50,6 +50,9 @@ const QUALITIES: readonly ImageQuality[] = ["low", "medium", "high"];
 // Veo 3.1 (all three): 4, 6 or 8 s at 720p; 1080p only at 8 s
 // (ai.google.dev/gemini-api/docs/veo, 2026-10-06).
 const VEO_SECONDS = { "720p": [4, 6, 8], "1080p": [8] } as const;
+// Gemini Omni Flash: 3 to 10 s. Only 720p, the one resolution Google prices
+// (1080p and 4K are upscaled from it, unpriced).
+const OMNI_SECONDS = { "720p": [3, 4, 5, 6, 7, 8, 9, 10] } as const;
 // Text, from each model's page (2026-10-31): OpenAI's reasoning effort takes
 // every level, up to 128,000 output tokens; Gemini thinks at low, medium or
 // high, up to 65,536. Every one reads images.
@@ -105,6 +108,15 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     provider: "google",
     id: "gemini-3.1-flash-lite-image",
     label: "Gemini 3.1 Flash-Lite Image",
+  },
+  // Video. Gemini Omni Flash, verified 2026-10-31 (GET v1beta/models, and one
+  // render through the Interactions API): 24 fps, 9:16 or 16:9, with sound.
+  {
+    kind: "video",
+    provider: "google",
+    id: "gemini-omni-1.1-flash",
+    label: "Gemini Omni Flash",
+    seconds: OMNI_SECONDS,
   },
   {
     kind: "video",

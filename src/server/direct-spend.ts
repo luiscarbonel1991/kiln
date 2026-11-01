@@ -61,8 +61,9 @@ export function imageCall(
   };
 }
 
-// Video bills the seconds rendered, so a finished video costs its estimate. A
-// length the model does not render has no estimate, so it never runs.
+// Video is priced by the second rendered; a clip whose provider reports its
+// usage (Gemini Omni) is costed from it. A length the model does not render
+// has no estimate, so it never runs.
 export function videoCall(
   model: { provider: string; model: string; resolution?: VideoResolution },
   durationSec: number,
@@ -71,15 +72,17 @@ export function videoCall(
     provider: model.provider,
     model: model.model,
     estimateMax: estimateVideo(model, durationSec),
-    costOf: (result) =>
-      videoCost(
-        {
-          provider: result.provider,
-          model: result.model,
-          resolution: model.resolution,
-        },
-        durationSec,
-      ),
+    costOf: (result) => {
+      const ran = {
+        provider: result.provider,
+        model: result.model,
+        resolution: model.resolution,
+      };
+      return (
+        (result.usage ? costFromUsage(ran, result.usage) : null) ??
+        videoCost(ran, durationSec)
+      );
+    },
   };
 }
 
