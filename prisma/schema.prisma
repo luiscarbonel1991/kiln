@@ -405,6 +405,9 @@ model GenerationJob {
   // the maker approved the estimate, and each move it made, with why. A
   // direct call records only the move that led to it.
   route          Json?
+  // The chat conversation whose paid tool started it (generate, draw,
+  // write_listing, review_product): what the chat says that work spent.
+  sessionId      String?
 
   // One queued or running job per card. The predicate is written as Postgres
   // stores it (it normalizes IN to = ANY), so migrate sees no drift.
@@ -412,4 +415,5 @@ model GenerationJob {
   @@index([status, mode, availableAt])
   @@index([projectId, cardId])
   @@index([makerId, createdAt])
+  @@index([sessionId])
 }

@@ -367,6 +367,8 @@ export async function enqueueProjectCards(input: {
   projectId: string;
   cardIds: string[];
   shownMaxMicros?: number;
+  // The chat conversation whose paid tool queues them.
+  sessionId?: string;
 }) {
   const maker = await getCurrentMaker();
   const planned = await db.project.findFirst({
@@ -394,6 +396,7 @@ export async function enqueueProjectCards(input: {
       next: c.next,
     })),
     shownMaxMicros: input.shownMaxMicros,
+    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   });
   ensureGenerationWorker()?.wake();
   return result;

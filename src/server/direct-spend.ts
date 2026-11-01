@@ -34,10 +34,15 @@ import { getCurrentMaker } from "@/server/maker-repository";
 // Mock runs neither reserve nor count. Without a database (tests) both are
 // no-ops.
 
-// What a direct call may cost, and how to measure what it did cost.
-export interface PricedCall<T extends { usage?: unknown }> {
-  // The project the call works for, so its cost counts there.
+// What a direct call's cost counts for: the project it works for, and the
+// chat conversation whose paid tool made it.
+export interface SpendFor {
   projectId?: string;
+  sessionId?: string;
+}
+
+// What a direct call may cost, and how to measure what it did cost.
+export interface PricedCall<T extends { usage?: unknown }> extends SpendFor {
   // The move along its route that led to this call, kept on its row.
   route?: JobRoute;
   provider: string;
@@ -161,6 +166,7 @@ export async function openDirectCall<T extends { usage?: unknown }>(
     model: priced.model,
     estimateMicros: toMicros(priced.estimateMax),
     ...(priced.projectId ? { projectId: priced.projectId } : {}),
+    ...(priced.sessionId ? { sessionId: priced.sessionId } : {}),
     ...(priced.route ? { route: priced.route } : {}),
   });
   let callStarted = false;

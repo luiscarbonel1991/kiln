@@ -33,7 +33,7 @@ describe.skipIf(!enabled)(
     // Every queued card is a scene slot of the project's plan ("q.<key>").
     const KEYS = [
       ...["a", "b", "c", "d", "e", "f", "dup", "cx", "cy", "sx", "sy"],
-      ...["ra", "rb", "rc"],
+      ...["ra", "rb", "rc", "sa", "sb", "sc"],
     ];
     const plan = {
       destinations: [
@@ -595,6 +595,66 @@ describe.skipIf(!enabled)(
       });
       await db.generationJob.updateMany({
         where: { batchId: batch.id },
+        data: { status: "canceled", finishedAt: new Date() },
+      });
+    });
+
+    it("a conversation's paid work: what it spent, and what it holds", async () => {
+      const sessionId = `chat-${slug}`;
+      const { batchId } = await repo.enqueueBatch({
+        ...base(),
+        jobs: [job("sa", 10_000), job("sb", 20_000)],
+        sessionId,
+      });
+      const jobs = await db.generationJob.findMany({ where: { batchId } });
+      expect(jobs.map((j) => j.sessionId)).toEqual([sessionId, sessionId]);
+      expect(await repo.sessionSpend(makerId, sessionId)).toEqual({
+        spentMicros: 0,
+        queuedMicros: 30_000,
+      });
+
+      // A measured cost counts; a call with no answer counts at its estimate.
+      const now = new Date();
+      await db.generationJob.updateMany({
+        where: { batchId, cardId: "q.sa" },
+        data: { status: "done", actualMicros: 7_000, finishedAt: now },
+      });
+      await db.generationJob.updateMany({
+        where: { batchId, cardId: "q.sb" },
+        data: { status: "failed", callStartedAt: now, finishedAt: now },
+      });
+      // A direct call (the listing text) holds its estimate until it closes.
+      const direct = await repo.reserveDirectCall({
+        makerId,
+        provider: "openai",
+        model: "gpt-6.1-sol",
+        estimateMicros: 5_000,
+        sessionId,
+      });
+      expect(await repo.sessionSpend(makerId, sessionId)).toEqual({
+        spentMicros: 27_000,
+        queuedMicros: 5_000,
+      });
+      await repo.markDirectCall(direct);
+      await repo.closeDirectCall(direct, { usage: {}, actualMicros: 1_000 });
+
+      // A mock run is never paid, and another maker reads nothing of it.
+      const mock = await repo.enqueueBatch({
+        ...base(),
+        mode: "mock",
+        jobs: [job("sc", 50_000)],
+        sessionId,
+      });
+      expect(await repo.sessionSpend(makerId, sessionId)).toEqual({
+        spentMicros: 28_000,
+        queuedMicros: 0,
+      });
+      expect(await repo.sessionSpend("someone-else", sessionId)).toEqual({
+        spentMicros: 0,
+        queuedMicros: 0,
+      });
+      await db.generationJob.updateMany({
+        where: { batchId: mock.batchId },
         data: { status: "canceled", finishedAt: new Date() },
       });
     });

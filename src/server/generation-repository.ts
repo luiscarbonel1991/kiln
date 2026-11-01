@@ -148,6 +148,8 @@ export async function enqueueBatch(input: {
   model: string;
   jobs: NewJob[];
   shownMaxMicros?: number;
+  // The chat conversation whose paid tool queued it.
+  sessionId?: string;
 }): Promise<{ batchId: string; queued: number; skipped: string[] }> {
   assertDatabaseUrl();
   const { makerId, projectId, mode } = input;
@@ -269,6 +271,7 @@ export async function enqueueBatch(input: {
           : {}),
         estimateMicros: j.estimateMicros,
         productHash: link?.productHash ?? null,
+        sessionId: input.sessionId ?? null,
       })),
     });
     return { batchId: batch.id, queued: fresh.length, skipped: [...busy] };
@@ -627,6 +630,8 @@ export async function reserveDirectCall(input: {
   projectId?: string;
   // The move along its route that led to this call (domain JobRoute).
   route?: JobRoute;
+  // The chat conversation whose paid tool made it.
+  sessionId?: string;
 }): Promise<string> {
   assertDatabaseUrl();
   return db.$transaction(async (tx) => {
@@ -649,6 +654,7 @@ export async function reserveDirectCall(input: {
       data: {
         makerId: input.makerId,
         projectId: input.projectId ?? null,
+        sessionId: input.sessionId ?? null,
         cardId: "direct",
         mode: "live",
         status: "running",
@@ -948,6 +954,36 @@ export async function projectSpend(projectId: string): Promise<{
     else byCard.set(row.cardId, { spentMicros: row.spent, takes: row.takes });
   }
   return { byCard, directMicros };
+}
+
+export interface SessionSpend {
+  spentMicros: number;
+  queuedMicros: number;
+}
+
+// What the paid tools of one chat conversation spent, under the budget's
+// rule (live jobs, a job's measured cost, else its estimate once its paid
+// call went out), and what its queued and running work has reserved.
+export async function sessionSpend(
+  makerId: string,
+  sessionId: string,
+): Promise<SessionSpend> {
+  assertDatabaseUrl();
+  const [row] = await db.$queryRaw<{ spent: number; queued: number }[]>`
+    SELECT
+      COALESCE(SUM(CASE
+        WHEN "status" IN ('done', 'failed', 'canceled')
+        THEN COALESCE("actualMicros", CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)
+        ELSE 0 END), 0)::float8 AS "spent",
+      COALESCE(SUM(CASE
+        WHEN "status" = 'running'
+          OR ("status" = 'queued' AND "projectId" IS NOT NULL)
+        THEN COALESCE("actualMicros", "estimateMicros")
+        ELSE 0 END), 0)::float8 AS "queued"
+    FROM "GenerationJob"
+    WHERE "makerId" = ${makerId} AND "sessionId" = ${sessionId}
+      AND "mode" = 'live'`;
+  return { spentMicros: row.spent, queuedMicros: row.queued };
 }
 
 // What produced each of these outputs: the queue job that finished with it

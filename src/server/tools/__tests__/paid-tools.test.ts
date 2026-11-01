@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ToolContext } from "@/server/tools/registry";
 
 // quote and the paid tools on stubbed services: what a quote stores and
 // answers, and that each paid tool runs what was quoted, for a token that may
@@ -111,8 +112,15 @@ vi.mock("@/server/text-calls", () => ({
 }));
 vi.mock("@/server/listing-write", () => ({
   listingTarget: async (project: string) => (project === "p1" ? {} : null),
-  writeProjectListing: async (project: string, destination: string) => {
-    s.wrote.push([project, destination]);
+  writeProjectListing: async (
+    project: string,
+    destination: string,
+    _model?: unknown,
+    sessionId?: string,
+  ) => {
+    s.wrote.push(
+      sessionId ? [project, destination, sessionId] : [project, destination],
+    );
     return { listing: { title: "A planter" } };
   },
 }));
@@ -141,7 +149,7 @@ const { callTool } = await import("@/server/tools/registry");
 const { QueueRefusal } = await import("@/server/generation-repository");
 
 const SPENDER = { tokenId: "t1", tokenName: "Agent", canSpend: true };
-const call = (name: string, args: unknown, ctx = SPENDER) =>
+const call = (name: string, args: unknown, ctx: ToolContext = SPENDER) =>
   callTool(TOOLS, name, args, ctx);
 
 afterEach(() => {
@@ -359,5 +367,29 @@ describe("write_listing", () => {
       output: { data: { listing: { title: "A planter" } } },
     });
     expect(s.wrote).toEqual([["p1", "etsy"]]);
+  });
+});
+
+describe("a paid tool run from the chat", () => {
+  const CHAT = { ...SPENDER, tokenId: null, sessionId: "s1" };
+
+  it("counts what it spends for that conversation", async () => {
+    await call("quote", { action: "generate", project: "p1" }, CHAT);
+    await call("generate", { quote: "q1" }, CHAT);
+    expect(s.enqueued).toEqual([
+      {
+        projectId: "p1",
+        cardIds: ["etsy.hero", "etsy.lifestyle"],
+        shownMaxMicros: 140_000,
+        sessionId: "s1",
+      },
+    ]);
+    await call(
+      "quote",
+      { action: "write_listing", project: "p1", destination: "etsy" },
+      CHAT,
+    );
+    await call("write_listing", { quote: "q2" }, CHAT);
+    expect(s.wrote).toEqual([["p1", "etsy", "s1"]]);
   });
 });

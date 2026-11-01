@@ -13,7 +13,12 @@ const withStatus = (status: number) =>
 let routes: MakerRoutes | null = null;
 const keys = { openai: true, google: true };
 const answers = new Map<string, unknown>();
-const priced: { model: string; route?: unknown; estimateMax?: unknown }[] = [];
+const priced: {
+  model: string;
+  route?: unknown;
+  estimateMax?: unknown;
+  sessionId?: string;
+}[] = [];
 const sent: { model: string; effort?: string }[] = [];
 
 vi.mock("@/server/maker-repository", () => ({
@@ -26,13 +31,19 @@ vi.mock("@/providers/mode", () => ({ providerMode: () => "live" }));
 vi.mock("@/server/direct-spend", async (original) => ({
   ...(await original<typeof import("@/server/direct-spend")>()),
   withDirectSpend: async (
-    call: { model: string; route?: unknown; estimateMax?: unknown },
+    call: {
+      model: string;
+      route?: unknown;
+      estimateMax?: unknown;
+      sessionId?: string;
+    },
     run: (beforeCall: () => Promise<void>) => Promise<unknown>,
   ) => {
     priced.push({
       model: call.model,
       route: call.route,
       estimateMax: call.estimateMax,
+      sessionId: call.sessionId,
     });
     return run(async () => {});
   },
@@ -110,6 +121,12 @@ describe("text calls on a route", () => {
         },
       ],
     });
+  });
+
+  it("counts every attempt for the conversation whose tool asked", async () => {
+    answers.set("openai/gpt-6-luna", withStatus(503));
+    await reviewProduct(fields, undefined, { sessionId: "s1" });
+    expect(priced.map((p) => p.sessionId)).toEqual(["s1", "s1"]);
   });
 
   it("keeps a call with no answer final: it may have been charged", async () => {

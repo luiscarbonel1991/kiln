@@ -46,7 +46,11 @@ import type {
   ProductReview,
   ReviewField,
 } from "@/providers/text-prompts";
-import { textCall, withDirectSpend } from "@/server/direct-spend";
+import {
+  type SpendFor,
+  textCall,
+  withDirectSpend,
+} from "@/server/direct-spend";
 import { getMakerModelSetup } from "@/server/maker-repository";
 
 // Vision, the art director and the product and listing text, on their role's
@@ -163,7 +167,7 @@ async function runText<T>(
   kind: TextCallKind,
   asked: TextModel | undefined,
   call: (model: TextModel, options: TextCallOptions) => Promise<TextResult<T>>,
-  projectId?: string,
+  counts: SpendFor = {},
 ): Promise<{ value: T; label: string; ranOn?: RanOn }> {
   const { candidates, effort } = await textCandidates(kind, asked);
   let [current] = candidates;
@@ -180,7 +184,7 @@ async function runText<T>(
       const result = await withDirectSpend(
         {
           ...textCall<T>(model, kind, effort),
-          ...(projectId ? { projectId } : {}),
+          ...counts,
           ...(move
             ? {
                 route: {
@@ -345,15 +349,16 @@ export async function writeListing(
     draft: ListingText;
   },
   model?: TextModel,
-  // The project the listing is for: the call's cost counts there.
-  projectId?: string,
+  // The project the listing is for (the call's cost counts there), and the
+  // conversation whose paid tool asked for it.
+  counts: SpendFor = {},
 ): Promise<{ copy?: ListingCopy; degraded?: Degraded; ranOn?: RanOn }> {
   try {
     const { value, ranOn } = await runText<ListingCopy>(
       "listingCopy",
       model,
       (m, options) => getArtDirector(m.provider).writeListing(input, options),
-      projectId,
+      counts,
     );
     const clean = (list: string[]) => list.map((x) => x.trim()).filter(Boolean);
     return {
@@ -378,6 +383,8 @@ export async function writeListing(
 export async function reviewProduct(
   fields: ReviewField[],
   model?: TextModel,
+  // The conversation whose paid tool asked for it.
+  counts: SpendFor = {},
 ): Promise<{
   review?: ProductReview;
   // The model that answered.
@@ -391,6 +398,7 @@ export async function reviewProduct(
       model,
       (m, options) =>
         getArtDirector(m.provider).reviewProduct({ fields }, options),
+      counts,
     );
     return { review: value, label, ...(ranOn ? { ranOn } : {}) };
   } catch (error) {

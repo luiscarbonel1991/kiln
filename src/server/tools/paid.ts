@@ -23,7 +23,11 @@ import {
   type QuoteAction,
 } from "@/server/spend-quotes";
 import { reviewProduct, textRoute } from "@/server/text-calls";
-import { defineTool, ToolRefusal } from "@/server/tools/registry";
+import {
+  defineTool,
+  type ToolContext,
+  ToolRefusal,
+} from "@/server/tools/registry";
 import { takeQuote } from "@/server/tools/spend";
 
 // The paid tools (ROADMAP "Agents", stage 1): `quote` prices a task and
@@ -48,6 +52,10 @@ const ListingQuote = z.object({ project: z.string(), destination: z.string() });
 const ReviewQuote = z.object({ product: z.string() });
 
 const ESTIMATE_ROSE = "The estimate rose since the quote: quote again.";
+
+// A paid tool run from the chat: its spend counts for that conversation.
+const spentIn = (ctx: ToolContext) =>
+  ctx.sessionId ? { sessionId: ctx.sessionId } : {};
 
 function requestModel(request: GenerationRequest): string {
   const detail =
@@ -320,6 +328,7 @@ export const generate = defineTool({
       projectId: project,
       cardIds: frames,
       shownMaxMicros: quoted.maxMicros,
+      ...spentIn(ctx),
     }).catch((error) => {
       throw asRefusal(error);
     });
@@ -350,6 +359,7 @@ export const draw = defineTool({
       projectId: project,
       cardIds: cards,
       shownMaxMicros: quoted.maxMicros,
+      ...spentIn(ctx),
     }).catch((error) => {
       throw asRefusal(error);
     });
@@ -388,7 +398,12 @@ export const writeListingTool = defineTool({
     const quoted = await takeQuote(ctx, id, "write_listing");
     const { project, destination } = ListingQuote.parse(quoted.input);
     await stillPriced("listingCopy", quoted.maxMicros);
-    const result = await writeProjectListing(project, destination);
+    const result = await writeProjectListing(
+      project,
+      destination,
+      undefined,
+      ctx.sessionId,
+    );
     if ("error" in result) throw new ToolRefusal(result.error);
     if ("degraded" in result) {
       throw new ToolRefusal(
@@ -429,7 +444,7 @@ export const reviewProductTool = defineTool({
       );
     }
     const fields = reviewFields(form.data, editLimits(product));
-    const result = await reviewProduct(fields);
+    const result = await reviewProduct(fields, undefined, spentIn(ctx));
     if (!result.review) {
       throw new ToolRefusal(
         result.degraded

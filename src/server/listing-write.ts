@@ -33,6 +33,8 @@ export async function writeProjectListing(
   projectId: string,
   destinationId: string,
   model?: { provider: ProviderId; model: string },
+  // The conversation whose paid tool asked for it.
+  sessionId?: string,
 ): Promise<
   | { error: string }
   | { degraded: Degraded | undefined }
@@ -48,7 +50,7 @@ export async function writeProjectListing(
       draft: target.current,
     },
     model,
-    projectId,
+    { projectId, ...(sessionId ? { sessionId } : {}) },
   );
   if (!result.copy) return { degraded: result.degraded };
   const listing = withCopy(target.current, result.copy);
