@@ -36,7 +36,8 @@ export function MaterialCheck({
     read: photoColour,
   }));
   const [read, setRead] = useState<Named | null>(photoColour);
-  const [lightFixed, setLightFixed] = useState(false);
+  // The last correction made, as the hint under the photo says it.
+  const [fixed, setFixed] = useState<"light" | "tint" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startPending] = useTransition();
 
@@ -65,7 +66,7 @@ export function MaterialCheck({
       }
       onPhoto(result.url);
       setRead(result.colour);
-      if ("white" in how) setLightFixed(true);
+      setFixed("white" in how ? "light" : "tint");
     });
 
   function tap(e: MouseEvent<HTMLButtonElement>) {
@@ -86,7 +87,7 @@ export function MaterialCheck({
     onPhoto(start.url);
     onHex(start.hex);
     setRead(start.read);
-    setLightFixed(false);
+    setFixed(null);
     if (!start.read) {
       startPending(async () => {
         const result = await checkSampleAction({ url: start.url });
@@ -133,9 +134,11 @@ export function MaterialCheck({
           ) : null}
         </button>
         <p className="font-sans text-[0.75rem] leading-snug text-on-surface-mid">
-          {lightFixed
+          {fixed === "light"
             ? "Light corrected from the spot you tapped. Tap again to try another spot."
-            : "Tap something white or grey (a sheet of paper beside the sample) to correct the light. Optional."}
+            : fixed === "tint"
+              ? "Tinted to the swatch; the grain stays. Undo goes back to the photo as it was."
+              : "Tap something white or grey (a sheet of paper beside the sample) to correct the light. Optional."}
         </p>
       </div>
 
