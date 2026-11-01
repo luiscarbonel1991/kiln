@@ -548,8 +548,9 @@ key reaches: free, nothing is generated, and the answer is kept as the
 provider's latest call, so a key replaced in `.env` (then a restart) clears
 the error the old one left. The list is also compared with the catalog: a model
 Kiln offers that the provider no longer lists is named on the provider's card
-and in every model picker ("no longer offered by Google"), and the queue refuses
-a card on it before any paid call. The catalog's `retired` always wins over the
+and in every model picker ("no longer offered by Google"), and Kiln refuses it
+before any paid call: the queue's cards, the studio's calls, the text calls and
+the chat (a route moves past it). The catalog's `retired` always wins over the
 list.
 
 Keys: `OPENAI_API_KEY` and `GOOGLE_API_KEY` (`.env`). Tests drop both before
