@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ORIGINAL, productStyles, styleName } from "@/domain/product-look";
 import { importPackage, importSummary } from "@/server/product-import";
 import { listProducts } from "@/server/product-repository";
 import { defineTool, ToolRefusal } from "@/server/tools/registry";
@@ -9,7 +10,7 @@ export const listProductsTool = defineTool({
   name: "list_products",
   title: "List products",
   description:
-    "The maker's products, by name: id, sku, name, family, description, its colours and default colour, and its wording lines.",
+    "The maker's products, by name: id, sku, name, family, description, its colours and default colour, its styles (other designs), and its wording lines. A project or a scene can show any colour and style.",
   input: z.object({}),
   hints: { readOnly: true },
   run: async () => ({
@@ -22,6 +23,19 @@ export const listProductsTool = defineTool({
         ...(p.description ? { description: p.description } : {}),
         defaultColour: p.defaultColour,
         colours: p.colours.map((c) => ({ key: c.key, name: c.name })),
+        // Other designs of the product, each chosen per project or frame
+        // like a colour; "original" is its own drawing.
+        ...(productStyles(p).length > 0
+          ? {
+              styles: [
+                { key: ORIGINAL, name: styleName(p, null) },
+                ...productStyles(p).map((st) => ({
+                  key: st.key,
+                  name: st.name,
+                })),
+              ],
+            }
+          : {}),
         wording: p.wording.map((w) => ({
           label: w.label,
           maxChars: w.maxChars,

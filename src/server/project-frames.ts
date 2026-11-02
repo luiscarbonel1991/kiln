@@ -6,9 +6,11 @@ import {
   waitingFrames,
 } from "@/domain/frame-view";
 import { type CardLike, ProjectPlan } from "@/domain/plan";
+import { Product } from "@/domain/product";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { projectGenerationState } from "@/server/generation-repository";
 import { getCurrentMaker } from "@/server/maker-repository";
+import { rowToProduct } from "@/server/product-mapper";
 
 // A project's frames as an agent reads them (README "HTTP API"): what the
 // board shows, without the board.
@@ -35,6 +37,22 @@ async function loadFrames(projectId: string) {
       phase: true,
       plan: true,
       master: { select: { assetUrl: true } },
+      products: {
+        orderBy: { position: "asc" },
+        take: 1,
+        select: {
+          productSnapshot: true,
+          product: {
+            select: {
+              id: true,
+              sku: true,
+              name: true,
+              spec: true,
+              source: true,
+            },
+          },
+        },
+      },
     },
   });
   const plan = project ? ProjectPlan.safeParse(project.plan) : null;
@@ -45,10 +63,18 @@ async function loadFrames(projectId: string) {
     const parsed = CardState.safeParse(card);
     if (parsed.success) cards[id] = parsed.data;
   }
-  const { plan: _plan, master, ...summary } = project;
+  const { plan: _plan, master, products, ...summary } = project;
+  // The version of the product the project follows.
+  const link = products[0];
+  const product = link
+    ? (Product.safeParse(link.productSnapshot).data ??
+      rowToProduct(link.product) ??
+      undefined)
+    : undefined;
   return {
     project: summary,
     plan: plan.data,
+    product,
     cards,
     jobs: state.jobs,
     reference: master !== null,
@@ -60,8 +86,8 @@ export async function projectFrames(
 ): Promise<ProjectFrames | null> {
   const loaded = await loadFrames(projectId);
   if (!loaded) return null;
-  const { project, plan, cards, jobs } = loaded;
-  return { project, frames: frameViews(plan, cards, jobs) };
+  const { project, plan, cards, jobs, product } = loaded;
+  return { project, frames: frameViews(plan, cards, jobs, product) };
 }
 
 // The scene frames a batch would generate now, as the board's Generate picks

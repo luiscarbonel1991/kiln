@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { heroSettingsOf } from "@/domain/hero-setting";
 import { slotCardId } from "@/domain/plan";
+import { projectLook } from "@/domain/plan-look";
+import { Look, lookLabel } from "@/domain/product-look";
 import { ProjectType } from "@/domain/project";
 import { CATALOG } from "@/lib/recipes";
 import { deliverDestination } from "@/server/deliver/deliver-destination";
@@ -31,6 +33,9 @@ const NewProject = z.object({
     .max(60)
     .default([])
     .describe('Frames to leave out ("etsy.gift"), as plan_project lists them.'),
+  look: Look.optional().describe(
+    "The colour and style the project shows, by key (list_products; style \"original\" is the product's own drawing). Left out, the product's default, which never changes for the project.",
+  ),
 });
 
 async function productOf(id: string) {
@@ -43,16 +48,17 @@ export const planProjectTool = defineTool({
   name: "plan_project",
   title: "Plan a project",
   description:
-    "The frames a project would start with, without starting it: each destination's slots, what fills each (scene: a paid take; exact: drawn from the product, free; video; shared: repeats an approved scene) and the hero's setting. Nothing is saved.",
+    "The frames a project would start with, without starting it: the look it shows (its colour and style), each destination's slots, what fills each (scene: a paid take; exact: drawn from the product, free; video; shared: repeats an approved scene) and the hero's setting. Nothing is saved.",
   input: NewProject,
   hints: { readOnly: true },
-  run: async ({ product, type, destinations, off }) => {
+  run: async ({ product, type, destinations, off, look }) => {
     const found = await productOf(product);
     const { plan } = await startingPlan(found, {
       type,
       destinationIds: destinations,
       offSlots: off,
       heroSettings: {},
+      look,
     }).catch((error) => {
       throw new ToolRefusal((error as Error).message);
     });
@@ -64,6 +70,7 @@ export const planProjectTool = defineTool({
       data: {
         product: { id: found.id, name: found.name },
         type,
+        look: lookLabel(found, projectLook(plan, found)),
         destinations: plan.destinations.map((d) => ({
           destination: d.destinationId,
           ...(heroes.has(d.destinationId)
@@ -90,12 +97,13 @@ export const createProjectTool = defineTool({
     "Start a project as New project does: its plan, the product's reference and a draft for every scene. No model is called and nothing is paid; quote generate next to take its scenes.",
   input: NewProject,
   hints: {},
-  run: async ({ product, type, destinations, off }) => {
+  run: async ({ product, type, destinations, off, look }) => {
     const started = await startProject({
       productId: product,
       type,
       destinationIds: destinations,
       offSlots: off,
+      ...(look ? { look } : {}),
     });
     if ("error" in started) throw new ToolRefusal(started.error);
     const frames = await projectFrames(started.id);

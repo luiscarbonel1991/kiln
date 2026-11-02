@@ -229,6 +229,7 @@ interface FrameAnswer {
   approvedOutput: string | null;
   approvable: boolean;
   ranOn?: { label: string; from: string; reason: string };
+  look?: { colour: string; style?: string; name: string };
 }
 
 interface FramesAnswer {
@@ -507,8 +508,9 @@ async function frames(
     const ran = f.ranOn
       ? ` · on ${f.ranOn.label} (from ${f.ranOn.from}: ${f.ranOn.reason})`
       : "";
+    const look = f.look ? ` · in ${f.look.name}` : "";
     io.out(
-      `${f.frame.padEnd(width)}  ${f.state.padEnd(10)} ${f.label}${take}${ran}${failed}`,
+      `${f.frame.padEnd(width)}  ${f.state.padEnd(10)} ${f.label}${look}${take}${ran}${failed}`,
     );
   }
   const waiting = all.filter((f) => f.approvable);

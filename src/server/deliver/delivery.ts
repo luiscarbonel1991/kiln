@@ -79,9 +79,21 @@ export interface DeliveryInput {
   listing?: ListingText;
   // Where a version or a shared frame comes from ("re-frames Hook").
   markOf?(slot: PlanSlot): string | undefined;
+  // The colour and style a frame shows, for a product in more than one
+  // look: how the maker links each photo to its variation.
+  lookOf?(slot: PlanSlot): FrameLook | undefined;
   // What this destination's photo work cost (live spend), when it counts.
   cost?: DestinationCost;
   now: Date;
+}
+
+export interface FrameLook {
+  colour: string;
+  colourName: string;
+  style?: string;
+  styleName?: string;
+  // "Gold/Black · Do not disturb".
+  name: string;
 }
 
 export interface DeliveredFile {
@@ -103,6 +115,8 @@ export interface DeliveredFile {
   text?: string;
   // Where a version or a shared frame comes from.
   from?: string;
+  // The colour and style it shows, for a product in more than one look.
+  look?: FrameLook;
   // What the frame cost, every take included (scenes and the video).
   spentMicros?: number;
   takes?: number;
@@ -169,12 +183,13 @@ function briefLines(brief: MarketBrief | undefined): string[] {
 
 // One delivered image in the README: what it is and what made it.
 function frameLine(folder: string, f: DeliveredFile): string {
+  const look = f.look ? `, in ${f.look.name}` : "";
   const what =
     f.kind === "exact"
-      ? "drawn from the product spec"
+      ? `drawn from the product spec${look}`
       : f.kind === "photo"
         ? "your photo, as on the listing"
-        : `approved scene${f.source ? `, ${sourceModel(f.source)}` : ""}${f.from ? `; ${f.from}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}${takesLine(f)}`;
+        : `approved scene${look}${f.source ? `, ${sourceModel(f.source)}` : ""}${f.from ? `; ${f.from}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}${takesLine(f)}`;
   return `${folder}/${f.file} — ${f.label} (${what}), ${f.width} x ${f.height} px`;
 }
 
@@ -346,6 +361,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       const svg = exactFrameSvg(view, slot.aspect, input.plate);
       const file = `${stem}.png`;
       entries[`${folder}/${file}`] = renderExactPng(svg, size.width);
+      const look = input.lookOf?.(slot);
       files.push({
         file,
         photo: number,
@@ -353,6 +369,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
         label: slot.label,
         kind: "exact",
         ...size,
+        ...(look ? { look } : {}),
       });
       continue;
     }
@@ -375,6 +392,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
         )
       : scene;
     const from = input.markOf?.(slot);
+    const look = input.lookOf?.(slot);
     files.push({
       file,
       photo: number,
@@ -384,6 +402,7 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       ...size,
       output,
       source: input.sourceOf(output),
+      ...(look ? { look } : {}),
       ...(slot.place ? { place: slot.place } : {}),
       ...(text ? { text } : {}),
       ...(from ? { from } : {}),

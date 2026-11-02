@@ -79,6 +79,31 @@ describe("plan_project", () => {
     expect(s.started).toEqual([]);
   });
 
+  it("names the look the project shows, and refuses one Kiln cannot draw", async () => {
+    const answer = await call("plan_project", {
+      product: product.id,
+      type: "listing-kit",
+      destinations: ["etsy"],
+    });
+    expect(answer).toMatchObject({
+      ok: true,
+      output: { data: { look: product.colours[0].name } },
+    });
+    expect(
+      await call("plan_project", {
+        product: product.id,
+        type: "listing-kit",
+        destinations: ["etsy"],
+        look: { colour: product.colours[1].key },
+      }),
+    ).toEqual({
+      ok: false,
+      error: expect.stringContaining(
+        "Kiln draws other colours from a design file",
+      ),
+    });
+  });
+
   it("refuses an unknown product", async () => {
     expect(
       await call("plan_project", {
@@ -109,6 +134,20 @@ describe("create_project", () => {
       },
     });
     expect(s.started).toHaveLength(1);
+  });
+
+  it("refuses a look the product does not offer", async () => {
+    expect(
+      await call("create_project", {
+        product: product.id,
+        type: "listing-kit",
+        destinations: ["etsy"],
+        look: { colour: "copper" },
+      }),
+    ).toEqual({
+      ok: false,
+      error: `${product.name} has no colour "copper".`,
+    });
   });
 
   it("refuses a design project: it starts in the studio", async () => {

@@ -195,6 +195,44 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
     ]);
   });
 
+  it("names each photo's colour and style, so the maker links it to its variation", async () => {
+    const gold = {
+      colour: "gold",
+      colourName: "Gold",
+      style: "leaf",
+      styleName: "Leaf",
+      name: "Gold · Leaf",
+    };
+    const result = await buildDelivery(
+      input({
+        lookOf: (slot: { key: string; exact?: string }) =>
+          slot.exact === "colour-grid"
+            ? undefined
+            : slot.key === "hero"
+              ? gold
+              : {
+                  colour: "natural",
+                  colourName: "Natural",
+                  name: "Natural · Sprig",
+                },
+      }),
+    );
+    const folder = "botanical-coaster-launch-etsy";
+    const files = unzipSync(result.zip);
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    const of = (slot: string) =>
+      manifest.files.find((f: { slot: string }) => f.slot === slot);
+    expect(of("hero").look).toEqual(gold);
+    expect(of("in-use").look).toMatchObject({ colour: "natural" });
+    expect(of("scale").look).toMatchObject({ colour: "natural" });
+    expect(of("colours")).not.toHaveProperty("look");
+    const readme = strFromU8(files[`${folder}/README.txt`]);
+    expect(readme).toContain("Hero (approved scene, in Gold · Leaf");
+    expect(readme).toContain(
+      "(drawn from the product spec, in Natural · Sprig)",
+    );
+  });
+
   it("names the model a frame ran on after it moved down its route", async () => {
     const result = await buildDelivery(
       input({

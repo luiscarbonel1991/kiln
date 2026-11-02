@@ -350,6 +350,7 @@ describe("kiln projects, frames, approve", () => {
         output: null,
         approvedOutput: null,
         approvable: false,
+        look: { colour: "gold", name: "Gold" },
       },
     ],
   };
@@ -383,7 +384,7 @@ describe("kiln projects, frames, approve", () => {
     expect(c.out.slice(1)).toEqual([
       "etsy.hero    to-review  Marketplace hero · https://storage/hero-2.png · on Gemini 3.1 Flash Image (from GPT Image 2: OpenAI answered 503)",
       "etsy.size    exact      Size & spec",
-      "etsy.in-use  queued     In-use mockup · failed: the provider timed out",
+      "etsy.in-use  queued     In-use mockup · in Gold · failed: the provider timed out",
       "1 to review. After your check: kiln approve p1 <frame> <take>",
     ]);
   });

@@ -8,6 +8,9 @@ import {
   withSlotPlace,
   withSlotTuning,
 } from "@/domain/plan";
+import { slotLook, slotView } from "@/domain/plan-look";
+import type { Product } from "@/domain/product";
+import { lookLabel, productStyles } from "@/domain/product-look";
 import {
   CameraStop,
   DistanceStop,
@@ -34,7 +37,7 @@ import {
   setSlotApproval,
   setSlotOff,
 } from "@/server/project-repository";
-import { retuneSlot } from "@/server/slot-tuning";
+import { relookSlot, retuneSlot } from "@/server/slot-tuning";
 import { defineTool, ToolRefusal } from "@/server/tools/registry";
 
 // The board as tools: the projects, their frames, a look at a take, and the
@@ -280,19 +283,30 @@ const KnobsInput = z
   .strict();
 
 // A slot's knobs as a tool answers them: each offered knob, its stop and who
-// set it, and the board's one-line summary.
+// set it, the board's one-line summary, and its look (a product in more than
+// one).
 function knobsOf(
   slot: PlanSlot,
   plan: ProjectPlan,
   master: string | undefined,
+  product: Product | null,
 ) {
   if (!slot.knobs) return null;
   const knobs = effectiveKnobs(
     slot.knobs,
     slot.tuned,
-    kilnPick(slot.knobs, threeQuarterFor(plan.references, master)),
+    kilnPick(
+      slot.knobs,
+      product
+        ? slotView(plan, slot, master, product)
+        : threeQuarterFor(plan.references, master),
+    ),
     slot.learned,
   );
+  const look =
+    product && (product.colours.length > 1 || productStyles(product).length > 0)
+      ? slotLook(plan, slot, product)
+      : null;
   return {
     summary: knobSummary(knobs),
     knobs: Object.fromEntries(
@@ -318,6 +332,15 @@ function knobsOf(
       }),
     ),
     ...(slot.place ? { place: slot.place } : {}),
+    ...(product && look
+      ? {
+          look: {
+            colour: look.colour,
+            ...(look.style ? { style: look.style } : {}),
+            name: lookLabel(product, look),
+          },
+        }
+      : {}),
   };
 }
 
@@ -332,7 +355,7 @@ export const tuneFrame = defineTool({
   name: "tune_frame",
   title: "Tune a scene",
   description:
-    "Set a scene's knobs (setting, camera, distance, light, shadow, props) and its place, as the board's Tune does: free, nothing is generated. Each knob takes one of its stops, or \"default\"; a knob the scene does not offer is refused. A place (\"on a walnut desk\") puts the scene there; null returns it to the product's places. The answer is the scene's knobs after the change. The next take reads it once you quote it and generate. A scene in the queue, or whose take is approved, is not tuned.",
+    "Set a scene's knobs (setting, camera, distance, light, shadow, props), its place, and its colour and style, as the board's Tune does: free, nothing is generated. Each knob takes one of its stops, or \"default\"; a knob the scene does not offer is refused. A place (\"on a walnut desk\") puts the scene there; null returns it to the product's places. A colour or style key (list_products; \"original\" is the product's own drawing) shows the scene in that look, Kiln drawing it from the design file; null returns it to the project's. The answer is the scene's knobs after the change. The next take reads it once you quote it and generate. A scene in the queue, or whose take is approved, is not tuned.",
   input: FrameRef.extend({
     knobs: KnobsInput.optional(),
     place: z
@@ -343,9 +366,25 @@ export const tuneFrame = defineTool({
       .nullable()
       .optional()
       .describe("Where the scene stands, in a few words; null clears it."),
+    colour: z
+      .string()
+      .min(1)
+      .max(64)
+      .nullable()
+      .optional()
+      .describe("A colour key of the product; null for the project's."),
+    style: z
+      .string()
+      .min(1)
+      .max(64)
+      .nullable()
+      .optional()
+      .describe(
+        'A style key of the product, or "original"; null for the project\'s.',
+      ),
   }),
   hints: { idempotent: true },
-  run: async ({ project, frame, knobs = {}, place }) => {
+  run: async ({ project, frame, knobs = {}, place, colour, style }) => {
     const view = await frameOf(project, frame);
     if (view.fill !== "scene") {
       throw new ToolRefusal(
@@ -359,21 +398,31 @@ export const tuneFrame = defineTool({
         { knob: k, stop: stop === "default" ? null : stop } as KnobChoice,
       ];
     });
-    if (choices.length === 0 && place === undefined) {
-      throw new ToolRefusal("Name a knob to set, or a place.");
+    const relooks = colour !== undefined || style !== undefined;
+    if (choices.length === 0 && place === undefined && !relooks) {
+      throw new ToolRefusal("Name a knob to set, a place, or a look.");
     }
     const ref = refOf(frame);
-    let tuned: Awaited<ReturnType<typeof retuneSlot>>;
+    let tuned: Awaited<ReturnType<typeof retuneSlot>> | null = null;
     try {
-      tuned = await retuneSlot(project, ref, (plan) =>
-        choices.reduce(
-          (p, choice) => withSlotTuning(p, ref, choice),
-          place === undefined ? plan : withSlotPlace(plan, ref, place),
-        ),
-      );
+      if (relooks) {
+        tuned = await relookSlot(project, ref, {
+          ...(colour !== undefined ? { colour } : {}),
+          ...(style !== undefined ? { style } : {}),
+        });
+      }
+      if (choices.length > 0 || place !== undefined) {
+        tuned = await retuneSlot(project, ref, (plan) =>
+          choices.reduce(
+            (p, choice) => withSlotTuning(p, ref, choice),
+            place === undefined ? plan : withSlotPlace(plan, ref, place),
+          ),
+        );
+      }
     } catch (error) {
       throw refusal(error);
     }
+    if (!tuned) throw new ToolRefusal("Kiln could not change it.");
     const slot = tuned.plan.destinations
       .find((d) => d.destinationId === ref.destinationId)
       ?.slots.find((s) => s.key === ref.slotKey);
@@ -382,7 +431,12 @@ export const tuneFrame = defineTool({
       data: {
         frame,
         ...(slot
-          ? knobsOf(slot, tuned.plan, loaded?.board.master?.assetUrl)
+          ? knobsOf(
+              slot,
+              tuned.plan,
+              loaded?.board.master?.assetUrl,
+              tuned.product,
+            )
           : {}),
         next: `The next take of ${frame} reads this: quote it, then generate.`,
       },

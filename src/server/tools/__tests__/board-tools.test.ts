@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   approvals: [] as unknown[][],
   tuned: [] as unknown[],
   places: [] as unknown[],
+  looks: [] as unknown[],
   switched: [] as unknown[][],
   noted: [] as unknown[][],
   approvedOutput: null as string | null,
@@ -89,6 +90,10 @@ vi.mock("@/server/project-repository", async () => {
   };
 });
 vi.mock("@/server/slot-tuning", () => ({
+  relookSlot: async (_project: string, _ref: unknown, asked: unknown) => {
+    state.looks.push(asked);
+    return { product: null, plan };
+  },
   retuneSlot: async (
     _project: string,
     _ref: unknown,
@@ -118,6 +123,7 @@ const call = (name: string, args: Record<string, unknown>) =>
 
 afterEach(() => {
   state.approvals.length = 0;
+  state.looks.length = 0;
   state.tuned.length = 0;
   state.places.length = 0;
   state.switched.length = 0;
@@ -276,6 +282,21 @@ describe("tune_frame", () => {
     });
   });
 
+  it("shows a scene in a colour and style of its own, or the project's again with null", async () => {
+    const answer = await call("tune_frame", {
+      project: "p1",
+      frame: "etsy.hero",
+      colour: "gold-black",
+      style: null,
+    });
+    expect(state.looks).toEqual([{ colour: "gold-black", style: null }]);
+    expect(state.tuned).toEqual([]);
+    expect(answer).toMatchObject({
+      ok: true,
+      output: { data: { frame: "etsy.hero" } },
+    });
+  });
+
   it("refuses a knob the scene does not offer, nothing to set, and a frame that is not a scene", async () => {
     expect(
       await call("tune_frame", {
@@ -286,7 +307,7 @@ describe("tune_frame", () => {
     ).toEqual({ ok: false, error: "this scene has no camera knob" });
     expect(
       await call("tune_frame", { project: "p1", frame: "etsy.hero" }),
-    ).toEqual({ ok: false, error: "Name a knob to set, or a place." });
+    ).toEqual({ ok: false, error: "Name a knob to set, a place, or a look." });
     expect(
       await call("tune_frame", {
         project: "p1",

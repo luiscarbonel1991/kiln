@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { frameSlots, frameViews, waitingFrames } from "@/domain/frame-view";
-import { approveSlot, planProject } from "@/domain/plan";
+import { approveSlot, planProject, withSlotLook } from "@/domain/plan";
 import { SEED_DESTINATIONS, SEED_SHOT_LISTS } from "@/domain/seed";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
+import { DOOR_TAG } from "./fixtures/door-tag";
 
 const launch = () =>
   planProject({
@@ -14,6 +15,35 @@ const launch = () =>
 const take = (url: string) => ({ status: "done" as const, outputs: [url] });
 
 describe("frameViews", () => {
+  it("names each scene's look for a product in more than one, and none for one in a single look", () => {
+    const plan = withSlotLook(
+      planProject({
+        product: DOOR_TAG,
+        type: "listing-kit",
+        destinationIds: ["etsy"],
+        catalog: {
+          destinations: SEED_DESTINATIONS,
+          shotLists: SEED_SHOT_LISTS,
+        },
+      }),
+      { destinationId: "etsy", slotKey: "hero" },
+      { colour: "gold-black", style: "do-not-disturb" },
+    );
+    const frames = frameViews(plan, {}, {}, DOOR_TAG);
+    const at = (frame: string) => frames.find((f) => f.frame === frame);
+    expect(at("etsy.hero")?.look).toEqual({
+      colour: "gold-black",
+      style: "do-not-disturb",
+      name: "Gold/Black · Do not disturb",
+    });
+    expect(at("etsy.in-use")?.look).toEqual({
+      colour: "black-white",
+      name: "Black/White · Quiet please",
+    });
+    expect(at("etsy.size")).not.toHaveProperty("look");
+    expect(frameViews(plan, {}, {})[0]).not.toHaveProperty("look");
+  });
+
   it("names each frame, its state and the take an approval would approve", () => {
     const plan = approveSlot(
       launch(),

@@ -8,6 +8,9 @@ import {
   slotCardId,
   slotState,
 } from "@/domain/plan";
+import { slotLook } from "@/domain/plan-look";
+import type { Product } from "@/domain/product";
+import { lookLabel, productStyles } from "@/domain/product-look";
 import type { SlotFill } from "@/domain/shot-list";
 
 // Each frame of a project as an agent reads it (the HTTP API's frames, `kiln
@@ -39,6 +42,8 @@ export interface FrameView {
   // After a move down its route (Settings → Models): the model its latest
   // take ran on, the first model it left and why.
   ranOn?: { label: string; from: string; reason: string };
+  // A scene's colour and style, for a product in more than one look.
+  look?: { colour: string; style?: string; name: string };
 }
 
 function outputOf(
@@ -55,12 +60,20 @@ export function frameViews(
   plan: ProjectPlan,
   cards: Record<string, CardLike>,
   jobs: Record<string, JobLike>,
+  // The product the project follows: a scene names its look by it.
+  product?: Product,
 ): FrameView[] {
+  const looks =
+    product && (product.colours.length > 1 || productStyles(product).length > 0)
+      ? product
+      : null;
   return plan.destinations.flatMap((d) =>
     d.slots.map((slot): FrameView => {
       const frame = slotCardId(d.destinationId, slot.key);
       const card = cards[frame];
       const view = slotState(slot, card, jobs[frame]);
+      const look =
+        looks && slot.fill === "scene" ? slotLook(plan, slot, looks) : null;
       return {
         frame,
         destinationId: d.destinationId,
@@ -76,6 +89,15 @@ export function frameViews(
         approvable: view.state === "to-review",
         ...(slot.versionOf ? { versionOf: slot.versionOf } : {}),
         ...(jobs[frame]?.ranOn ? { ranOn: jobs[frame].ranOn } : {}),
+        ...(looks && look
+          ? {
+              look: {
+                colour: look.colour,
+                ...(look.style ? { style: look.style } : {}),
+                name: lookLabel(looks, look),
+              },
+            }
+          : {}),
       };
     }),
   );

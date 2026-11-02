@@ -1,6 +1,8 @@
 import { listingDraft } from "@/domain/listing";
-import { slotCardId } from "@/domain/plan";
-import { projectProduct } from "@/domain/plan-look";
+import { type PlanSlot, slotCardId } from "@/domain/plan";
+import { projectLook, projectProduct, slotLook } from "@/domain/plan-look";
+import { colourOf } from "@/domain/product";
+import { lookLabel, productStyles, styleName } from "@/domain/product-look";
 import { projectCost } from "@/domain/project-cost";
 import { plateHref } from "@/lib/plate-href";
 import { CATALOG } from "@/lib/recipes";
@@ -75,6 +77,39 @@ export async function deliverDestination(
       fetchOutput: async (url) => (await fetchAsset(url)).bytes,
       sourceOf: (output) => sources.get(output),
       markOf: (slot) => versionMark(fullPlan, slot, { waits: false }),
+      // Each frame's colour and style, for a product in more than one look:
+      // exact frames are drawn in the project's, scenes in their own.
+      ...(loaded.product.colours.length > 1 ||
+      productStyles(loaded.product).length > 0
+        ? {
+            lookOf: (slot: PlanSlot) => {
+              const stored = loaded.product;
+              // The colour sheet shows every colour; a text card none.
+              if (
+                !stored ||
+                slot.exact === "colour-grid" ||
+                slot.exact === "text-card"
+              ) {
+                return undefined;
+              }
+              const look =
+                slot.fill === "scene"
+                  ? slotLook(fullPlan, slot, stored)
+                  : projectLook(fullPlan, stored);
+              return {
+                colour: look.colour,
+                colourName: colourOf(stored, look.colour).name,
+                ...(look.style
+                  ? {
+                      style: look.style,
+                      styleName: styleName(stored, look.style),
+                    }
+                  : {}),
+                name: lookLabel(stored, look),
+              };
+            },
+          }
+        : {}),
       // Spend counts in a live run only (mock jobs are never paid).
       ...(providerMode() === "live"
         ? {
