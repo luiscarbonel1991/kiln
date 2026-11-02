@@ -276,10 +276,17 @@ export interface LetterComparison {
   widthOk: boolean;
 }
 
+// Under four pixels of stroke, one pixel either way is a quarter of it:
+// letters that small cannot tell one weight from the next.
+export const MIN_STROKE_PX = 4;
+
+// The take's letterforms against the reference's, or null when the take's
+// letters are too small for the stroke to be told apart.
 export function compareLetterforms(
   take: Letterform,
   reference: Letterform,
-): LetterComparison {
+): LetterComparison | null {
+  if (take.height * reference.stroke < MIN_STROKE_PX) return null;
   const within = (a: number, b: number, tolerance: number) =>
     Math.abs(a / b - 1) <= tolerance;
   return {

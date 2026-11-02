@@ -246,7 +246,7 @@ export async function checkTake(input: {
     if (inRef && inTake && inRef.glyphs === inTake.glyphs) {
       const a = letterformOf(take.image, inTake);
       const b = letterformOf(ref.image, inRef);
-      if (a && b) letters = compareLetterforms(a, b);
+      if (a && b) letters = compareLetterforms(a, b) ?? undefined;
     }
     return {
       expected: line,

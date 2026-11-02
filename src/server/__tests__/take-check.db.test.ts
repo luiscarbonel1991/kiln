@@ -27,6 +27,7 @@ describe.skipIf(!enabled)("take check (database)", async () => {
   const { getCurrentMaker } = await import("@/server/maker-repository");
   const { recheckTake } = await import("@/server/qc/project-take");
   const { outputFacts } = await import("@/server/generation-repository");
+  const { projectFrames } = await import("@/server/project-frames");
   const { Product } = await import("@/domain/product");
 
   const product = Product.parse({
@@ -149,6 +150,16 @@ describe.skipIf(!enabled)("take check (database)", async () => {
     expect(job.takeCheck).toEqual(check);
     const facts = await outputFacts(projectId, [take]);
     expect(facts.get(take)?.check).toEqual(check);
+    // What get_frames and view_frame read.
+    const frames = await projectFrames(projectId);
+    const hero = frames?.frames.find((f) => f.frame === "etsy.hero");
+    expect(hero?.check).toEqual({
+      status: "unchecked",
+      problems: [],
+      notes: [],
+      scale: "10 x 6 in, about 1/3 as wide as the door",
+      unchecked: "no OCR engine on this machine",
+    });
   });
 
   it("refuses a frame with no take, and a take no job of Kiln's made", async () => {

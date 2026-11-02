@@ -113,7 +113,17 @@ describe("compareLetterforms", () => {
       widthOk: true,
     });
     const bold = compareLetterforms(measure(700, 180), reference);
-    expect(bold.strokeOk).toBe(false);
-    expect(bold.take.stroke).toBeGreaterThan(bold.reference.stroke);
+    expect(bold?.strokeOk).toBe(false);
+    expect(bold?.take.stroke).toBeGreaterThan(bold?.reference.stroke ?? 1);
+  });
+
+  it("does not compare letters too small for their stroke to be told apart", () => {
+    const reference = measure(400, 180);
+    expect(
+      compareLetterforms({ ...reference, height: 20 }, reference),
+    ).toBeNull();
+    expect(
+      compareLetterforms({ ...reference, height: 40 }, reference),
+    ).not.toBeNull();
   });
 });

@@ -216,10 +216,12 @@ describe("checkExpectedText", () => {
 describe("judgeTake", () => {
   const at = "2026-11-02T10:00:00.000Z";
   const plate = { stroke: 0.08, width: 2.3, height: 340 };
-  const same = compareLetterforms(
-    { stroke: 0.085, width: 2.2, height: 140 },
-    plate,
-  );
+  const compared = (...args: Parameters<typeof compareLetterforms>) => {
+    const comparison = compareLetterforms(...args);
+    if (!comparison) throw new Error("too small to compare");
+    return comparison;
+  };
+  const same = compared({ stroke: 0.085, width: 2.2, height: 140 }, plate);
 
   it("passes a take that reads every line the reference reads, in the same letters", () => {
     const check = judgeTake({
@@ -250,10 +252,7 @@ describe("judgeTake", () => {
   });
 
   it("fails a missing line, a line too small to read, and a heavier weight", () => {
-    const bold = compareLetterforms(
-      { stroke: 0.15, width: 2.3, height: 150 },
-      plate,
-    );
+    const bold = compared({ stroke: 0.15, width: 2.3, height: 150 }, plate);
     const check = judgeTake({
       engine: "apple-vision",
       checkedAt: at,
@@ -290,10 +289,7 @@ describe("judgeTake", () => {
   });
 
   it("notes a narrower line without failing it: an angled camera narrows letters too", () => {
-    const narrow = compareLetterforms(
-      { stroke: 0.08, width: 1.7, height: 140 },
-      plate,
-    );
+    const narrow = compared({ stroke: 0.08, width: 1.7, height: 140 }, plate);
     const check = judgeTake({
       engine: "apple-vision",
       checkedAt: at,
