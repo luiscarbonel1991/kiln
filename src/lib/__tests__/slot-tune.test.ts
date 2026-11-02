@@ -165,6 +165,33 @@ describe("tuneView", () => {
     expect(t?.take?.max).toBeGreaterThanOrEqual(t?.take?.typical ?? 0);
   });
 
+  it("marks the reason Kiln's check points to: text read too small", () => {
+    const { slot, card } = setup();
+    const done = {
+      ...card,
+      status: "done" as const,
+      outputs: ["https://x/1.png"],
+    };
+    const check = {
+      status: "failed" as const,
+      lines: [{ expected: "205", found: true, height: 0.01, tooSmall: true }],
+      problems: ['"205" too small: 1.0 % of the height (min 1.5 %)'],
+      notes: [],
+      checkedAt: "2026-11-02T10:00:00.000Z",
+    };
+    const t = tuneView({
+      slot,
+      card: done,
+      view: slotState(slot, done),
+      check,
+    });
+    expect(t?.reasons.filter((r) => r.suggested).map((r) => r.key)).toEqual([
+      "small",
+    ]);
+    const clean = tuneView({ slot, card: done, view: slotState(slot, done) });
+    expect(clean?.reasons.some((r) => r.suggested)).toBe(false);
+  });
+
   it("no reasons and no new take while queued, before a take, or once approved", () => {
     const { slot, card } = setup();
     const done = {

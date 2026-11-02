@@ -149,6 +149,13 @@ export default async function ProjectBoardPage({
         })
         .map((c) => c.id)
     : [];
+  // What Kiln read in each shown take, by card (null: never checked).
+  const checks = Object.fromEntries(
+    board.cards.flatMap((c) => {
+      const fact = c.outputs[0] ? facts.get(c.outputs[0]) : undefined;
+      return fact && c.type === "image" ? [[c.id, fact.check]] : [];
+    }),
+  );
   const maker = await getCurrentMaker();
   const writeUsd = await textWorstCase("listingCopy");
   const listingPrice = writeUsd === null ? null : `≈ $${writeUsd.toFixed(2)}`;
@@ -192,6 +199,7 @@ export default async function ProjectBoardPage({
         cost={cost}
         takeRoutes={await takeRoutes()}
         prompts={board.master ? await scenePrompts(board.id) : {}}
+        checks={checks}
       />
     ) : (
       <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">

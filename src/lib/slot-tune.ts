@@ -11,6 +11,7 @@ import {
   resolveLook,
   styleName,
 } from "@/domain/product-look";
+import { suggestedReason, type TakeCheck } from "@/domain/qc";
 import type { JobView } from "@/domain/queue";
 import {
   effectiveKnobs,
@@ -67,8 +68,14 @@ export interface TuneView {
   // The whole prompt the next take sends, what it must never show and how
   // many images go with the reference (DOGFOOD #42); null when unknown.
   prompt: { text: string; negative: string; images: number } | null;
-  // What may be off about the take to review, each with the knob it moves.
-  reasons: { key: ReasonKey; label: string; move: KnobChoice }[];
+  // What may be off about the take to review, each with the knob it moves;
+  // `suggested` when Kiln's check of the take points to it.
+  reasons: {
+    key: ReasonKey;
+    label: string;
+    move: KnobChoice;
+    suggested?: boolean;
+  }[];
   // One more take of this scene (it replaces the one shown), with its price
   // in USD; null unless there is a take to review and nothing queued.
   take: { typical: number; max: number } | null;
@@ -199,6 +206,8 @@ export function tuneView(input: {
   blocked?: string | null;
   // What the next take sends (scenePrompts).
   prompt?: { prompt: string; negative: string; images: number } | null;
+  // What Kiln read in the take to review: its reason, when one helps.
+  check?: TakeCheck | null;
 }): TuneView | null {
   const { slot, card, view, job, places = [], above = null } = input;
   if (slot.fill !== "scene" || !slot.knobs) return null;
@@ -254,7 +263,16 @@ export function tuneView(input: {
     reasons: reviewing
       ? ReasonKey.options.flatMap((key) => {
           const move = reasonMove(key, knobs);
-          return move ? [{ key, label: REASONS[key].label, move }] : [];
+          if (!move) return [];
+          const suggested = input.check && suggestedReason(input.check) === key;
+          return [
+            {
+              key,
+              label: REASONS[key].label,
+              move,
+              ...(suggested ? { suggested: true } : {}),
+            },
+          ];
         })
       : [],
     take: input.blocked ? null : price,

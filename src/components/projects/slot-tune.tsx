@@ -305,9 +305,22 @@ export function SlotTune({
                       data-testid={`tune-${destinationId}-${slotKey}-reason-${reason.key}`}
                       disabled={disabled}
                       onClick={() => set(reason.move, reason.key)}
-                      className="rounded-pill border border-border-soft bg-secondary px-3 py-1 font-sans text-xs text-on-surface-mid transition-colors hover:border-primary disabled:opacity-60"
+                      title={
+                        reason.suggested
+                          ? "Kiln's check read the take's text too small to read at a glance."
+                          : undefined
+                      }
+                      className={cn(
+                        "rounded-pill border bg-secondary px-3 py-1 font-sans text-xs text-on-surface-mid transition-colors hover:border-primary disabled:opacity-60",
+                        reason.suggested
+                          ? "border-prov-local"
+                          : "border-border-soft",
+                      )}
                     >
                       {reason.label}
+                      {reason.suggested ? (
+                        <span className="text-prov-local"> · Kiln's check</span>
+                      ) : null}
                     </button>
                   ))}
                 </div>

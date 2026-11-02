@@ -40,6 +40,7 @@ import {
 } from "@/components/projects/slot-frame";
 import { SlotModel } from "@/components/projects/slot-model";
 import { SlotTune } from "@/components/projects/slot-tune";
+import { TakeCheckChips } from "@/components/projects/take-check";
 import { VideoArt } from "@/components/projects/video-art";
 import {
   AddVideoButton,
@@ -91,6 +92,7 @@ import {
 } from "@/domain/product";
 import { lookLabel, sameLook } from "@/domain/product-look";
 import type { FrameCost, ProjectCost } from "@/domain/project-cost";
+import type { TakeCheck } from "@/domain/qc";
 import type { JobView } from "@/domain/queue";
 import { threeQuarterFor } from "@/domain/scene-reference";
 import { VIDEO_MOTIONS } from "@/domain/video";
@@ -253,6 +255,7 @@ export function ProjectBoard({
   cost,
   takeRoutes = NO_TAKE_ROUTES,
   prompts = {},
+  checks = {},
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -289,6 +292,9 @@ export function ProjectBoard({
     string,
     { prompt: string; negative: string; images: number }
   >;
+  // What Kiln read in each scene's shown take, by card: null when the job
+  // that made it left no check; absent when no job made it.
+  checks?: Record<string, TakeCheck | null>;
 }) {
   const rows = boardRows(board, jobs);
   const frameCosts = new Map(
@@ -514,9 +520,11 @@ export function ProjectBoard({
                               ? providerBlock(notes, card.model.provider, mode)
                               : null,
                             prompt: prompts[cardId] ?? null,
+                            check: checks[cardId] ?? null,
                           })}
                           hasReference={board.master !== null}
                           look={frameLookOf(slot)}
+                          check={checks[cardId]}
                           blocked={
                             card
                               ? providerBlock(notes, card.model.provider, mode)
@@ -955,6 +963,7 @@ function SlotActions({
   tune,
   hasReference,
   look,
+  check,
   blocked,
   order,
   video,
@@ -978,6 +987,9 @@ function SlotActions({
     // What in the product's text contradicts the frame's colour.
     textWarning: string | null;
   };
+  // What Kiln read in the shown take (null: never checked); undefined
+  // when no job made it.
+  check?: TakeCheck | null;
   // Why the card's provider cannot take a paid call now; else null.
   blocked: string | null;
   order: { place: number; last: number; firstLabel: string } | null;
@@ -1182,6 +1194,20 @@ function SlotActions({
           >
             text names another colour
           </span>
+        ) : null,
+      )}
+      {keep(
+        check !== undefined &&
+          (view.state === "to-review" ||
+            view.state === "approved" ||
+            view.state === "delivered") ? (
+          <TakeCheckChips
+            projectId={projectId}
+            destinationId={destinationId}
+            slotKey={slot.key}
+            cardId={cardId}
+            check={check}
+          />
         ) : null,
       )}
       {failure}
