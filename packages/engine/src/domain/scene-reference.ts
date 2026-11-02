@@ -34,7 +34,7 @@ export type LookReference = z.infer<typeof LookReference>;
 export const PlanReferences = z.object({
   threeQuarter: ThreeQuarterView.optional(),
   // Every look in use, the project's included.
-  looks: z.array(LookReference).max(40).optional(),
+  looks: z.array(LookReference).max(100).optional(),
 });
 export type PlanReferences = z.infer<typeof PlanReferences>;
 

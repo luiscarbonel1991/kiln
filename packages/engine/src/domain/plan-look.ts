@@ -222,3 +222,25 @@ export function withoutUndrawnLooks(
     })),
   };
 }
+
+// The plan keeping only the looks in use: the project's and each scene's
+// own. A look a frame tried and left is dropped, so the plan never fills
+// with drawings no frame shows.
+export function withLooksInUse(
+  plan: ProjectPlan,
+  product: Product,
+): ProjectPlan {
+  const used = [
+    projectLook(plan, product),
+    ...plan.destinations
+      .flatMap((d) => d.slots)
+      .filter((slot) => slot.fill === "scene" && slot.look)
+      .map((slot) => resolveLook(product, slot.look, plan.look)),
+  ];
+  return withLookReferences(
+    plan,
+    (plan.references?.looks ?? []).filter((ref) =>
+      used.some((look) => sameLook(look, lookOf(ref))),
+    ),
+  );
+}

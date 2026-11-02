@@ -27,6 +27,7 @@ import {
   projectLook,
   projectProduct,
   withLookReferences,
+  withLooksInUse,
   withoutUndrawnLooks,
 } from "@/domain/plan-look";
 import { productUnderstanding } from "@/domain/product-understanding";
@@ -283,8 +284,11 @@ export async function updateProjectProductAction(
     // maker's own reference keeps the plan's (it no longer applies).
     // A frame whose look no longer draws shows the project's look again.
     const viewed = (p: ProjectPlan) => {
-      const kept = withoutUndrawnLooks(
-        withLookReferences(p, [...(own ? [own] : []), ...others]),
+      const kept = withLooksInUse(
+        withoutUndrawnLooks(
+          withLookReferences(p, [...(own ? [own] : []), ...others]),
+          product,
+        ),
         product,
       );
       return fresh ? withThreeQuarter(kept, drawn?.threeQuarter ?? null) : kept;

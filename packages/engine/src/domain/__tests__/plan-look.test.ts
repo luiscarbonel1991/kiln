@@ -18,6 +18,7 @@ import {
   slotView,
   withLookReference,
   withLookReferences,
+  withLooksInUse,
   withoutUndrawnLooks,
 } from "@/domain/plan-look";
 import { Product } from "@/domain/product";
@@ -202,6 +203,23 @@ describe("a frame's look", () => {
     expect(
       undrawn.destinations[0].slots.find((s) => s.key === "hero"),
     ).not.toHaveProperty("look");
+  });
+
+  it("keeps only the looks in use: the project's and each scene's own", () => {
+    const black = { ...gold, colour: "black-white" };
+    const tried = { ...gold, style: "do-not-disturb" };
+    const p = withLooksInUse(
+      withSlotLook(
+        withLookReference(
+          withLookReference(withLookReference(planned, black), gold),
+          tried,
+        ),
+        hero,
+        { colour: "gold-black" },
+      ),
+      DOOR_TAG,
+    );
+    expect(p.references?.looks).toEqual([black, gold]);
   });
 
   it("edits the view from above drawn for its look, or the project's", () => {

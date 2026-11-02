@@ -6,6 +6,7 @@ import {
   frameLook,
   lookReference,
   withLookReference,
+  withLooksInUse,
 } from "@/domain/plan-look";
 import { Product } from "@/domain/product";
 import { resolveLook } from "@/domain/product-look";
@@ -83,8 +84,12 @@ export async function relookSlot(
   return setSlotTuning(
     projectId,
     ref,
+    // The looks no frame shows any more are dropped.
     (p) =>
-      withSlotLook(drawn ? withLookReference(p, drawn) : p, ref, chosen.look),
+      withLooksInUse(
+        withSlotLook(drawn ? withLookReference(p, drawn) : p, ref, chosen.look),
+        product,
+      ),
     derivedCard(ref),
     "card",
   );

@@ -286,6 +286,7 @@ export {
   slotView,
   withLookReference,
   withLookReferences,
+  withLooksInUse,
   withoutUndrawnLooks,
 } from "@/domain/plan-look";
 export {
