@@ -85,7 +85,10 @@ imports a catalog:
   through to a base of another colour) asks each colour for its base, the colour that
   shows through the cuts, and the scenes draw the marks recessed in that colour. An optional photo becomes the reference
   every scene starts from. An optional design file (SVG) is drawn to scale, and its height
-  follows its proportions. "Fill from the photo" drafts the form with the text model
+  follows its proportions; it is measured as it shows (a grain clipped to the outline is
+  left out). Replacing it later keeps the product's colours, size and samples: the new
+  design's colours are offered ("Use the design's colours"), and its height is a click
+  beside the proportions note. "Fill from the photo" drafts the form with the text model
   (priced, on a click).
 - **A design that does not exist yet:** draw it in the studio (Design: line art, then
   vectorize), then "Make it a product".
@@ -210,7 +213,9 @@ maker's own card edits. Scenes made from the earlier version are marked, and so 
 the generate confirmation and the Deliver checklist. Kiln never blocks Generate over
 this. The update also reflects the plan where the product decides it: a second colour
 adds Colour options, lines removed take How to personalize with them, and scenes,
-approvals, knobs and the order stay. The banner says what it will do before the click
+approvals, knobs and the order stay. The plan says which frames the product does not
+take, and why ("No How to personalize: it has no text lines, so nothing to
+personalize."), on New project and on the board. The banner says what it will do before the click
 ("Etsy: adds Colour options.") and names a delivered destination whose photos
 renumber. The board's title renames in place.
 
@@ -366,7 +371,7 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 |---|---|
 | Products | `list_products`, `import_products` (a product package), `review_product` (paid) |
 | Projects | `plan_project` (the frames it would start with and the look it shows; nothing saved), `create_project` (free, in a colour and style), `deliver` (a destination's zip; publishing stays the maker's) |
-| The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do), `tune_frame` (any of a scene's knobs, its place, and its colour and style, as Tune does; free), `switch_frame` (a frame off or back on; free) |
+| The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do), `tune_frame` (any of a scene's knobs, its place, and its colour and style, as Tune does; free), `switch_frame` (a frame off or back on; free), `make_stills_video` (a video frame's free stills in motion) |
 | Designs | `list_designs`, `get_design` (each drawing's state, line art and vector, and the link where the maker makes a vector into a product), `view_design` (a drawing's line art, or its vector rendered), `vectorize` (free: outline or centerline, detail fine, balanced or clean; kept as the drawing's vector) |
 | Paid work | `quote`, then `generate`, `draw` (a design's line art, through the queue), `write_listing` or `review_product` with its id |
 | Selling | `get_listing` (the listing's fields, who wrote each, its problems and tag ideas), `edit_listing` (free; a field the maker wrote only with `overwriteMakerText`, after asking), `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only) |
@@ -625,6 +630,28 @@ change, which keeps the product exact; the push-in is a choice. The same rules h
 - A timeout or a failed render counts at its estimate.
 - A render is never paid twice.
 
+**Before and after a failed call.** A frame whose take failed says why on the frame
+itself, in the provider's words ("Failed: Google rejected the API key — …"). In a live
+run, a provider with no key, or one that rejected its key on its last call, cannot
+take a paid call: the scene batch is refused with the reason, the video's Generate is
+greyed with it, and Tune shows it in place of a new take. A transient failure (a
+503, a rate limit) is only noted, since the next call may work. "Check the key" in
+Settings → Providers clears a rejected key once it is replaced.
+
+**Stills in motion.** A video slot is made by a model or, as an explicit choice,
+"Stills in motion · free": Kiln shows each approved scene of the destination (the start
+frame first) whole in the frame on a blurred copy of itself, with a slow zoom, sliding to
+the next (slides, not crossfades, which doubled two plates' lettering). ffmpeg, H.264,
+720p, 8, 10 or 12 s, no audio, no model, nothing paid. It becomes the video's take, to
+approve like any other; the export names it, and an agent makes it with
+`make_stills_video`.
+
+**Test takes.** Tune offers "Test take" on a scene whose model has a low quality (the
+GPT Image models): the scene at low quality (≈ $0.006 on GPT Image 2), on that model
+alone. Its take reads "test take · low quality" in place of Approve and is never
+approved (board, API and agents alike); a full take replaces it. An agent quotes test
+takes with `generate`'s `test`.
+
 **Scene knobs.** A scene planned on the Etsy shot list (hero, in-use, lifestyle,
 gift) is tuned with knobs, never with prose: camera (eye level, a little above,
 from above), distance (close, medium, wide), light (window, studio, warm), shadow
@@ -636,6 +663,11 @@ from above), distance (close, medium, wide), light (window, studio, warm), shado
 - A take to review offers "What's off?" chips ("Can't see its top", "Product too
   small", "Too busy", "Too dark", "Shadows too strong"), each moving one knob, and
   "New take", priced on the button.
+- "What the model reads" shows the whole prompt the next take sends, built as the queue
+  builds it, what it must never show, and the images that go with the reference.
+- A product with wording never shows it mirrored: "mirrored or reflected lettering" is
+  in what its scenes must never show, and its scenes in a place of use ask for matte
+  surfaces around it.
 - The stops and their words are data (`packages/engine/src/domain/scene-knobs.ts`);
   a shot-list slot names the knobs it offers with its defaults, and the plan keeps
   the maker's choices. Knobs lock while the scene is queued or approved. Projects
@@ -760,15 +792,16 @@ An approved scene is made once and reused in every size:
   for free: in a Launch, Instagram's "in place" and "detail" are Etsy's in-use and
   material detail (slots of the same `role`). It is approved with its source.
 
-## System dependencies (vectorize, Deliver)
+## System dependencies (vectorize, Deliver, stills in motion)
 
 The line-art **Centerline** trace — a single path per drawn stroke — shells out to two
-native binaries, and **Deliver** upscales scenes with one of them. Install them on any
-machine or deploy image that runs the app:
+native binaries, **Deliver** upscales scenes with one of them, and **stills in motion**
+renders with ffmpeg. Install them on any machine or deploy image that runs the app:
 
 - **autotrace** — centerline tracing (`brew install autotrace` · `apt-get install autotrace`)
 - **ImageMagick** (`magick`) — flattens the raster to a clean B&W bitmap first, and
   upscales scenes for delivery (`brew install imagemagick` · `apt-get install imagemagick`)
+- **ffmpeg** — the free stills-in-motion video (`brew install ffmpeg` · `apt-get install ffmpeg`)
 
 The **Outline** trace (and everything else) is pure-npm via `@neplex/vectorizer` and needs
 nothing extra; if the binaries are missing, only the Centerline button fails (it's caught,
