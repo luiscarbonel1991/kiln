@@ -663,6 +663,9 @@ Etsy (2000 px) and Amazon (1600), not Instagram (1080).
   1600x2000 for 4:5): $0.107 a square take at medium, against $0.053 at 1K.
 - Gemini Nano Banana 2.1, 3 Pro Image and 3.1 Flash Image are asked for "2K". GPT Image
   1.5, 1 Mini and Flash-Lite stay at 1K, and so does a test take.
+- At 1K, GPT Image 2 is asked for each aspect exactly too: 1024x1280 for a 4:5, $0.045 at
+  medium. A 4:5 scene is then composed as 4:5, where it used to be cropped from 2:3. The
+  other GPT models and Gemini take their nearest size, and Deliver crops the rest.
 
 The estimate, the Generate dialog and the agents' quotes say it ("GPT Image 2 medium
 2K"). A frame's model picker prices each model at that frame's size ("≈ $0.081/image at

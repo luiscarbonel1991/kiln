@@ -47,6 +47,9 @@ export interface ModelEntry {
   // be asked for (1k alone when absent).
   qualities?: readonly ImageQuality[];
   sizes?: readonly ImageSize[];
+  // Image: takes any size whose sides are multiples of 16, so each aspect is
+  // asked exactly instead of the nearest standard size (image-size.ts).
+  exactAspects?: boolean;
   // Video: the lengths it renders at each resolution it offers.
   seconds?: Partial<Record<VideoResolution, readonly number[]>>;
   // Text: the effort levels it offers (domain/effort.ts), the most it writes
@@ -90,6 +93,7 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     label: "GPT Image 2",
     qualities: QUALITIES,
     sizes: UP_TO_2K,
+    exactAspects: true,
   },
   {
     kind: "image",

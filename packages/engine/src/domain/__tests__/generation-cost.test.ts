@@ -168,16 +168,16 @@ describe("generation cost", () => {
   });
 
   it("sums one generation per scene at the pinned quality, by size, plus the edit's input allowance", () => {
-    // gpt-image-2 medium: $0.053 square, $0.041 portrait (cheaper, per the
-    // official table); input $0.01 typical, $0.02 at most.
+    // gpt-image-2 medium: $0.053 square (the official table), $0.0453 at
+    // 1024x1280 for 4:5 (1,510 tokens); input $0.01 typical, $0.02 at most.
     const e = estimateScenes([{ aspect: "1:1" }, { aspect: "4:5" }], {
       provider: "openai",
       model: "gpt-image-2",
     });
     expect(e).toEqual({
       count: 2,
-      typical: 0.114,
-      max: 0.134,
+      typical: 0.1183,
+      max: 0.1383,
       quality: "medium",
       confidence: "official",
     });
@@ -215,6 +215,18 @@ describe("generation cost", () => {
     expect(
       estimateScenes([{}], { provider: "openai", model: "gpt-image-9" }),
     ).toBeNull();
+  });
+});
+
+describe("each aspect exactly at 1K", () => {
+  it("prices GPT Image 2 at its own 1K size; the other GPT models at the standard one", () => {
+    const at = (model: string, aspect: string) =>
+      estimateGeneration({ provider: "openai", model }, aspect)?.typical;
+    // 1,510 tokens at 1024x1280, 1,234 at 1008x1792, $30 per 1M.
+    expect(at("gpt-image-2", "4:5")).toBe(0.0553);
+    expect(at("gpt-image-2", "9:16")).toBe(0.047);
+    expect(at("gpt-image-2", "2:3")).toBe(0.051);
+    expect(at("gpt-image-1.5", "4:5")).toBe(0.06);
   });
 });
 
@@ -288,8 +300,8 @@ describe("2K images", () => {
       ],
       { provider: "openai", model: "gpt-image-2" },
     );
-    // $0.117 + $0.051 typical.
-    expect(e?.typical).toBe(0.168);
+    // $0.117 + $0.0553 typical.
+    expect(e?.typical).toBe(0.1723);
   });
 });
 

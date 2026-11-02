@@ -3,7 +3,9 @@ import { requestModelLabel } from "@/domain/generation-request";
 import {
   destinationImageSize,
   destinationTargetPx,
+  OPENAI_1K,
   OPENAI_2K,
+  openaiSize,
   sizeOn,
 } from "@/domain/image-size";
 import { SEED_DESTINATIONS } from "@/domain/seed";
@@ -42,6 +44,25 @@ describe("the size a scene is asked for", () => {
     expect(sizeOn({ provider: "openai", model: "gpt-image-2" }, "1:1")).toBe(
       "1k",
     );
+  });
+
+  it("sends GPT Image 2 each aspect exactly at 1K too; the other GPT models the nearest standard size", () => {
+    const gpt2 = { provider: "openai", model: "gpt-image-2" };
+    expect(openaiSize(gpt2, "4:5")).toBe("1024x1280");
+    expect(openaiSize(gpt2, "9:16")).toBe("1008x1792");
+    expect(openaiSize(gpt2, "1:1")).toBe("1024x1024");
+    expect(openaiSize(gpt2, "2:3")).toBe("1024x1536");
+    expect(openaiSize({ ...gpt2, size: "2k" }, "4:5")).toBe("1600x2000");
+    const older = { provider: "openai", model: "gpt-image-1.5" };
+    expect(openaiSize(older, "4:5")).toBe("1024x1536");
+    expect(openaiSize(older, "16:9")).toBe("1536x1024");
+    for (const [aspect, { width, height }] of Object.entries(OPENAI_1K)) {
+      const [a, b] = aspect.split(":").map(Number);
+      expect(width * b, aspect).toBe(height * a);
+      expect(Math.min(width, height), aspect).toBeGreaterThanOrEqual(1008);
+      expect((width % 16) + (height % 16), aspect).toBe(0);
+      expect(width * height, aspect).toBeGreaterThanOrEqual(655_360);
+    }
   });
 
   it("asks GPT Image 2 for each aspect exactly, long side 2048, sides multiples of 16", () => {

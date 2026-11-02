@@ -112,7 +112,7 @@ describe("direct spend", () => {
     expect(
       imageCall({ provider: "openai", model: "gpt-image-2" }, "4:5")
         .estimateMax,
-    ).toBe(0.061);
+    ).toBe(0.0653);
   });
 
   it("a call that never went out (a stub) records no cost", async () => {

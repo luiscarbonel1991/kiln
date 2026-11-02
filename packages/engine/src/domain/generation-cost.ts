@@ -4,7 +4,7 @@ import {
   effortOn,
   effortScale,
 } from "@/domain/effort";
-import { OPENAI_2K, sizeOn } from "@/domain/image-size";
+import { openaiSize, sizeOn } from "@/domain/image-size";
 import {
   DEFAULT_IMAGE_QUALITY,
   DEFAULT_VIDEO_RESOLUTION,
@@ -39,10 +39,10 @@ import {
 //   image, at high fidelity on gpt-image-2, and the prompt): measured at
 //   203-206 text + 1024 image tokens (~$0.0092) with a 1024px reference; the
 //   input max leaves room for longer prompts and larger references.
-// - 2K images, checked 2026-11-02: GPT Image 2's output tokens at each 2K
-//   size from the guide's output-token calculator (it gives 1756 / 1372 at
-//   1024 medium, as measured), billed at its image output rate; Gemini's per
-//   2K image from its pricing page.
+// - GPT Image 2's own sizes (each aspect exactly, at 1K and 2K), checked
+//   2026-11-02: output tokens from the guide's output-token calculator (it
+//   gives 1756 / 1372 at 1024 medium, as measured), billed at its image
+//   output rate; Gemini's per 2K image from its pricing page.
 
 export interface ImagePrice {
   provider: "google" | "openai";
@@ -203,21 +203,25 @@ const OPENAI_OUTPUT: Record<string, Record<ImageQuality, [number, number]>> = {
   },
 };
 
-// GPT Image 2's output tokens at each of its 2K sizes (OPENAI_2K), per
-// quality; a portrait size and its landscape twin cost the same.
-const TOKENS_2K: Record<string, Record<ImageQuality, number>> = {
+// GPT Image 2's output tokens at each of its own sizes (OPENAI_1K and
+// OPENAI_2K), per quality; a portrait size and its landscape twin cost the
+// same. The standard sizes are priced from the cost table (OPENAI_OUTPUT).
+const EXACT_TOKENS: Record<string, Record<ImageQuality, number>> = {
+  "1024x1280": { low: 173, medium: 1510, high: 6119 },
+  "1056x1408": { low: 168, medium: 1507, high: 6026 },
+  "1008x1792": { low: 138, medium: 1234, high: 4934 },
   "2048x2048": { low: 397, medium: 3568, high: 14272 },
   "1600x2000": { low: 271, medium: 2372, high: 9610 },
   "1344x2016": { low: 208, medium: 1809, high: 7234 },
   "1536x2048": { low: 247, medium: 2223, high: 8892 },
   "1152x2048": { low: 157, medium: 1413, high: 5650 },
 };
-const OPENAI_2K_TOKENS: Record<
+const OPENAI_SIZE_TOKENS: Record<
   string,
   Record<string, Record<ImageQuality, number>>
 > = {
   "gpt-image-2": Object.fromEntries(
-    Object.entries(TOKENS_2K).flatMap(([size, tokens]) => {
+    Object.entries(EXACT_TOKENS).flatMap(([size, tokens]) => {
       const [w, h] = size.split("x");
       return [
         [size, tokens],
@@ -312,19 +316,30 @@ export interface SceneEstimate {
 const OPENAI_PER_REFERENCE = { typical: 0.009, max: 0.012 };
 const GOOGLE_TOKENS_PER_REFERENCE = 1_100;
 
-// One 2K image's output on this model at this aspect; null without a pinned
-// price for it.
-function output2k(
-  model: { provider: string; model: string; quality?: ImageQuality },
+// One image's output on this model at this aspect, at the size it is sent
+// at; null without a pinned price for that size. Gemini bills per image (1K
+// whatever the aspect, or 2K); OpenAI by the size requested.
+function imageOutput(
+  model: {
+    provider: string;
+    model: string;
+    quality?: ImageQuality;
+    size?: ImageSize;
+  },
   aspect: string | undefined,
+  price: ImagePrice,
 ): number | null {
   if (model.provider === "google") {
-    return GOOGLE_PER_IMAGE_2K[model.model] ?? null;
+    return sizeOn(model, aspect) === "2k"
+      ? (GOOGLE_PER_IMAGE_2K[model.model] ?? null)
+      : price.output.square;
   }
-  const size = OPENAI_2K[aspect ?? "1:1"];
-  const tokens = size
-    ? OPENAI_2K_TOKENS[model.model]?.[`${size.width}x${size.height}`]
-    : undefined;
+  const size = openaiSize(model, aspect);
+  if (size === "1024x1024") return price.output.square;
+  if (size === "1024x1536" || size === "1536x1024") {
+    return price.output.nonSquare;
+  }
+  const tokens = OPENAI_SIZE_TOKENS[model.model]?.[size];
   const rate = tokenPrices(model)?.imageOut;
   if (!tokens || rate === undefined) return null;
   return round(
@@ -348,12 +363,7 @@ export function estimateGeneration(
 ): { typical: number; max: number } | null {
   const price = imagePrice(model);
   if (!price) return null;
-  const output =
-    sizeOn(model, aspect) === "2k"
-      ? output2k(model, aspect)
-      : !aspect || aspect === "1:1"
-        ? price.output.square
-        : price.output.nonSquare;
+  const output = imageOutput(model, aspect, price);
   if (output === null) return null;
   const extra =
     references === 0

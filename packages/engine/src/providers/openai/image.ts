@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { toFile } from "openai";
-import { OPENAI_2K, sizeOn } from "@/domain/image-size";
+import { openaiSize } from "@/domain/image-size";
 import {
   assertModel,
   DEFAULT_IMAGE_QUALITY,
@@ -49,22 +49,10 @@ const MOCK_USAGE: GenerationUsage = {
   outputTokens: 1800,
 };
 
-// Map our aspect ratios to gpt-image supported sizes; at 2K (sizeOn), GPT
-// Image 2's own size for the aspect.
-function sizeFor(model: {
-  model: string;
-  aspect: string;
-  size?: ImageSize;
-}): string {
-  const { aspect } = model;
-  const large = OPENAI_2K[aspect];
-  if (large && sizeOn({ ...model, provider: "openai" }, aspect) === "2k") {
-    return `${large.width}x${large.height}`;
-  }
-  if (["4:5", "2:3", "9:16", "3:4"].includes(aspect)) return "1024x1536";
-  if (["5:4", "3:2", "16:9", "4:3"].includes(aspect)) return "1536x1024";
-  return "1024x1024";
-}
+// The size each request is sent at (image-size.ts): the estimate prices the
+// same one.
+const sizeFor = (model: { model: string; aspect: string; size?: ImageSize }) =>
+  openaiSize({ ...model, provider: "openai" }, model.aspect);
 
 // The API's usage block (input split into text and image tokens) as ours.
 function usageOf(usage: unknown): GenerationUsage | undefined {

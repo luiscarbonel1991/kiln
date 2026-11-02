@@ -56,7 +56,8 @@ describe("openai editBytes (the queue's edit)", () => {
     });
     expect(edit.mock.calls[0][0]).toMatchObject({
       model: "gpt-image-2",
-      size: "1024x1536",
+      // A 4:5 slot exactly, never 2:3 to be cropped (DOGFOOD #78).
+      size: "1024x1280",
       quality: "medium",
       prompt: "a scene\nAvoid: text overlay",
     });

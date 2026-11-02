@@ -20,7 +20,8 @@ describe("priceHint", () => {
 
   it("prices an image at a portrait 1K, or at a frame's aspect and size", () => {
     const gpt2 = { provider: "openai", model: "gpt-image-2" };
-    expect(priceHint(gpt2, "image")).toBe("≈ $0.051/image");
+    // A 4:5 at 1024x1280 (DOGFOOD #78).
+    expect(priceHint(gpt2, "image")).toBe("≈ $0.055/image");
     expect(priceHint(gpt2, "image", { aspect: "4:5", size: "2k" })).toBe(
       "≈ $0.081/image at 2K",
     );
