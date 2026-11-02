@@ -126,8 +126,8 @@ imports a catalog:
 Each colour can carry a **material sample** (`swatchUrl`, "Material photo" on the
 form, or `kiln swatch` over HTTP). It is a close photo of the material in that colour, with even light and no text;
 a real photo carries the grain better than a drawn texture. Every scene sends the
-default colour's sample as the image after the product's reference, and the prompt
-says the surfaces take its material, colour and grain. On gpt-image-2 that adds about
+sample of the colour it shows as the image after the product's reference, and the
+prompt says the surfaces take its material, colour and grain. On gpt-image-2 that adds about
 $0.009 per scene. The colour sheet shows each sample.
 
 A material photo never changes the colour's swatch on its own. On the form, the upload
@@ -146,6 +146,27 @@ layered colour's face and the base its cuts show, the supplier page, and which c
 scenes use. A colour with neither a material photo nor a supplier page reads
 **unverified look**, and so does every image scene made in it, since nothing real backs
 its look.
+
+**Colours, styles and looks.** One product holds the whole matrix a shop lists: every
+colour, and every design (wording) it comes in. A look is one colour and one style.
+- A vector product's design is drawn in one of its colours. Kiln redraws it in each
+  other one for free: it swaps the colour's face, edge and marks for the other's, and
+  leaves every other paint as drawn. A drawing that paints none of the product's
+  colours shows its default only, and the picker says why.
+- **Styles** are other designs of the same piece: `styles` in the package (a key, a
+  name, its SVG, the wording it shows line by line), or Styles on the form. The
+  product's own drawing is named by `styleName` ("Original" when absent).
+- New project's Plan step picks the project's colour and style. The reference plate,
+  every scene and the exact frames (in the plan, on the board and in the export)
+  show it. The product's own default never changes for a project.
+- Tune gives one scene a colour and style of its own, free: Kiln draws that look
+  (kept in the plan, `references.looks`), writes the scene's card in it with that
+  colour's material sample, keeps the maker's own fields, and the scene edits that
+  plate. The frame reads "in Gold/Black · Do not disturb". A version and a video show
+  their source scene's look.
+- The export names each photo's look in `manifest.json` and the README, so each photo
+  is linked to its variation. Only a product drawn from an SVG takes another look; a
+  photo or a typed-in product shows its default colour.
 
 **Parts and views.**
 - A product made of several pieces lists them in `parts`: a plate standing in a base,
@@ -232,7 +253,7 @@ behind your own sign-in (a VPN, a reverse proxy with authentication) and start i
 | `DELETE /api/products/:id/colours/:key/swatch` | none | the same, with `swatchUrl: null` |
 | `GET /api/results` | none | every followed listing (`projectId`, `destinationId`, `listingUrl`, `liveOn`): the reads `due` today, each with its `window`, the `next` one, the `reads` taken, the `comparison` in words and the frames `changed` |
 | `GET /api/projects` | none | the projects that have frames (`id`, `name`, `type`, `phase`, `updatedAt`), newest first |
-| `GET /api/projects/:id/frames` | none | each frame as the board shows it: `frame` (`etsy.hero`), `label`, `fill`, `aspect`, `state`, `failed` and `error`, `output` (the take an approval approves), `approvedOutput`, `approvable`, `versionOf`, and `ranOn` when its latest take moved down its route. 404 unknown project or one with no frames |
+| `GET /api/projects/:id/frames` | none | each frame as the board shows it: `frame` (`etsy.hero`), `label`, `fill`, `aspect`, `state`, `failed` and `error`, `output` (the take an approval approves), `approvedOutput`, `approvable`, `versionOf`, `ranOn` when its latest take moved down its route, and a scene's `look` (`colour`, `style`, `name`) for a product in more than one. 404 unknown project or one with no frames |
 | `PUT /api/projects/:id/frames/:destinationId/:slotKey/approval` | optionally `{ "output": "<url>" }`, the take you checked | the `frame` after its approval. 404 unknown project or frame, 409 a newer take landed since the one you checked, 422 a frame that takes no approval (an exact frame, the maker's photo, a shared frame, no finished take) |
 | `DELETE /api/projects/:id/frames/:destinationId/:slotKey/approval` | none | the `frame`, its approval withdrawn |
 | `PUT /api/projects/:id/results/:destinationId/:read` | `{ visits, views, favourites, orders, revenue, searchVisits }` (any of them), optionally `from`, `to`, `source`, `readOn` | the read kept (`:read` is `before`, `day14` or `day30`; its window and today by default, source "API"). 400 not JSON, 404 unknown project, destination or read, 422 a read Kiln cannot keep |
@@ -272,7 +293,7 @@ pnpm kiln swatch CB-01 maple maple.jpg --match-swatch     # or tinted to the swa
 pnpm kiln swatch CB-01 maple --remove
 pnpm kiln schema                         # the package's JSON Schema
 pnpm kiln projects                       # the projects with frames
-pnpm kiln frames <project>               # each frame, its state and its take
+pnpm kiln frames <project>               # each frame, its state, its take and its look
 pnpm kiln approve <project> etsy.hero <take>
 pnpm kiln unapprove <project> etsy.hero
 pnpm kiln tools                          # the MCP tools (below)
@@ -344,8 +365,8 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 | Tools | |
 |---|---|
 | Products | `list_products`, `import_products` (a product package), `review_product` (paid) |
-| Projects | `plan_project` (the frames it would start with; nothing saved), `create_project` (free), `deliver` (a destination's zip; publishing stays the maker's) |
-| The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do), `tune_frame` (any of a scene's knobs and its place, as Tune does; free), `switch_frame` (a frame off or back on; free) |
+| Projects | `plan_project` (the frames it would start with and the look it shows; nothing saved), `create_project` (free, in a colour and style), `deliver` (a destination's zip; publishing stays the maker's) |
+| The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do), `tune_frame` (any of a scene's knobs, its place, and its colour and style, as Tune does; free), `switch_frame` (a frame off or back on; free) |
 | Designs | `list_designs`, `get_design` (each drawing's state, line art and vector, and the link where the maker makes a vector into a product), `view_design` (a drawing's line art, or its vector rendered), `vectorize` (free: outline or centerline, detail fine, balanced or clean; kept as the drawing's vector) |
 | Paid work | `quote`, then `generate`, `draw` (a design's line art, through the queue), `write_listing` or `review_product` with its id |
 | Selling | `get_listing` (the listing's fields, who wrote each, its problems and tag ideas), `edit_listing` (free; a field the maker wrote only with `overwriteMakerText`, after asking), `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only) |
