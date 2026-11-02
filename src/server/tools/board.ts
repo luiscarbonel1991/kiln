@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { colourTextWarning } from "@/domain/colour-text";
 import type { FrameView } from "@/domain/frame-view";
 import {
   type PlanSlot,
@@ -340,10 +341,17 @@ function knobsOf(
             colour: look.colour,
             ...(look.style ? { style: look.style } : {}),
             name: lookLabel(product, look),
+            ...textWarningOf(product, look.colour),
           },
         }
       : {}),
   };
+}
+
+// What in the product's text contradicts a colour, for the agent to pass on.
+function textWarningOf(product: Product, colour: string) {
+  const warning = colourTextWarning(product, colour);
+  return warning ? { textWarning: warning } : {};
 }
 
 const refusal = (error: unknown) =>
@@ -357,7 +365,7 @@ export const tuneFrame = defineTool({
   name: "tune_frame",
   title: "Tune a scene",
   description:
-    "Set a scene's knobs (setting, camera, distance, light, shadow, props), its place, and its colour and style, as the board's Tune does: free, nothing is generated. Each knob takes one of its stops, or \"default\"; a knob the scene does not offer is refused. A place (\"on a walnut desk\") puts the scene there; null returns it to the product's places. A colour or style key (list_products; \"original\" is the product's own drawing) shows the scene in that look, Kiln drawing it from the design file; null returns it to the project's. The answer is the scene's knobs after the change. The next take reads it once you quote it and generate. A scene in the queue, or whose take is approved, is not tuned.",
+    "Set a scene's knobs (setting, camera, distance, light, shadow, props), its place, and its colour and style, as the board's Tune does: free, nothing is generated. Each knob takes one of its stops, or \"default\"; a knob the scene does not offer is refused. A place (\"on a walnut desk\") puts the scene there; null returns it to the product's places. A colour or style key (list_products; \"original\" is the product's own drawing) shows the scene in that look, Kiln drawing it from the design file; null returns it to the project's. The answer is the scene's knobs after the change, and its look; a look's textWarning says the product's text contradicts that colour (tell the maker: the product needs that colour's own name, material or things to avoid). The next take reads it once you quote it and generate. A scene in the queue, or whose take is approved, is not tuned.",
   input: FrameRef.extend({
     knobs: KnobsInput.optional(),
     place: z

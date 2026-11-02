@@ -90,9 +90,21 @@ vi.mock("@/server/project-repository", async () => {
   };
 });
 vi.mock("@/server/slot-tuning", () => ({
-  relookSlot: async (_project: string, _ref: unknown, asked: unknown) => {
+  relookSlot: async (
+    _project: string,
+    _ref: unknown,
+    asked: { colour?: string | null },
+  ) => {
     state.looks.push(asked);
-    return { product: null, plan };
+    // A door tag whose name says its default colour: the answer passes on
+    // that it contradicts gold.
+    const { DOOR_TAG } = await import("@/domain/__tests__/fixtures/door-tag");
+    const product = { ...DOOR_TAG, name: "Engraved door tag, black & white" };
+    const [d] = plan.destinations;
+    const slots = d.slots.map((s, i) =>
+      i === 0 && asked.colour ? { ...s, look: { colour: asked.colour } } : s,
+    );
+    return { product, plan: { ...plan, destinations: [{ ...d, slots }] } };
   },
   retuneSlot: async (
     _project: string,
@@ -293,7 +305,16 @@ describe("tune_frame", () => {
     expect(state.tuned).toEqual([]);
     expect(answer).toMatchObject({
       ok: true,
-      output: { data: { frame: "etsy.hero" } },
+      output: {
+        data: {
+          frame: "etsy.hero",
+          look: {
+            colour: "gold-black",
+            name: "Gold/Black · Quiet please",
+            textWarning: expect.stringContaining("its name says white"),
+          },
+        },
+      },
     });
   });
 

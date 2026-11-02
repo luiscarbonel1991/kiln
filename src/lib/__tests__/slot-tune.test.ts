@@ -324,6 +324,23 @@ describe("a scene's look in Tune", () => {
     expect(tuneLook(DOOR_TAG, own, scene(own, "size"))).toBeNull();
   });
 
+  it("says on a colour what in the product's text contradicts it, the project's too", () => {
+    const named = Product.parse({
+      ...DOOR_TAG,
+      name: "Engraved door tag, black & white",
+    });
+    const warnings = (plan: typeof tagPlan) =>
+      tuneLook(named, plan, scene(plan, "hero"))?.colours.map(
+        (c) => c.warning ?? null,
+      );
+    const [project, black, gold] = warnings(tagPlan) ?? [];
+    expect([project, black]).toEqual([null, null]);
+    expect(gold).toContain("written for Black/White: its name says white");
+    // A project in gold: a scene that follows it is warned too.
+    const inGold = { ...tagPlan, look: { colour: "gold-black" } };
+    expect(warnings(inGold)?.[0]).toBe(gold);
+  });
+
   it("offers none for a product in one look, and says why for one not drawn from an SVG", () => {
     const { plan, slot } = setup();
     expect(tuneLook(plate, plan, slot)).toBeNull();

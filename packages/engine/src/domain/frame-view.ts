@@ -1,3 +1,4 @@
+import { colourTextWarning } from "@/domain/colour-text";
 import {
   type CardLike,
   type JobLike,
@@ -44,8 +45,17 @@ export interface FrameView {
   // After a move down its route (Settings → Models): the model its latest
   // take ran on, the first model it left and why.
   ranOn?: { label: string; from: string; reason: string };
-  // A scene's colour and style, for a product in more than one look.
-  look?: { colour: string; style?: string; name: string };
+  // A scene's colour and style, for a product in more than one look, and
+  // what in the product's text contradicts that colour (colourTextWarning).
+  look?: { colour: string; style?: string; name: string; textWarning?: string };
+}
+
+function textWarningOf(
+  product: Product,
+  colour: string,
+): { textWarning?: string } {
+  const warning = colourTextWarning(product, colour);
+  return warning ? { textWarning: warning } : {};
 }
 
 function outputOf(
@@ -98,6 +108,7 @@ export function frameViews(
                 colour: look.colour,
                 ...(look.style ? { style: look.style } : {}),
                 name: lookLabel(looks, look),
+                ...textWarningOf(looks, look.colour),
               },
             }
           : {}),

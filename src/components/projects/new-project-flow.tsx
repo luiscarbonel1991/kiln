@@ -37,6 +37,7 @@ import {
 import { ReadyMark } from "@/components/ready-mark";
 import { Button } from "@/components/ui/button";
 import type { BrandKit } from "@/domain/brand";
+import { colourTextWarning } from "@/domain/colour-text";
 import {
   exactView,
   renderTextTemplate,
@@ -1010,12 +1011,16 @@ function ProjectLook({
         testId="project-look"
         label="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim"
         disabled={pending}
-        colours={product.colours.map((c) => ({
-          key: c.key,
-          label: c.name,
-          face: c.face,
-          ...(c.inStock ? {} : { refused: `${c.name} is out of stock` }),
-        }))}
+        colours={product.colours.map((c) => {
+          const warning = colourTextWarning(product, c.key);
+          return {
+            key: c.key,
+            label: c.name,
+            face: c.face,
+            ...(c.inStock ? {} : { refused: `${c.name} is out of stock` }),
+            ...(warning ? { warning } : {}),
+          };
+        })}
         styles={[
           { key: ORIGINAL, label: styleName(product, null) },
           ...styles.map((s) => ({ key: s.key, label: s.name })),

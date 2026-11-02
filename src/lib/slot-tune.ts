@@ -1,4 +1,5 @@
 import type { Card } from "@/domain/card";
+import { colourTextWarning } from "@/domain/colour-text";
 import { modelEntry } from "@/domain/model-defaults";
 import { type Route, takeEstimate } from "@/domain/model-routing";
 import type { PlanSlot, ProjectPlan, SlotView } from "@/domain/plan";
@@ -102,6 +103,8 @@ export interface TuneLookOption {
   face?: string;
   // Why it cannot be picked; absent when it can.
   refused?: string;
+  // What in the product's text contradicts the colour (colourTextWarning).
+  warning?: string;
 }
 
 export interface TuneLook {
@@ -114,6 +117,11 @@ export interface TuneLook {
   // Why the scene cannot take a look of its own, else null.
   refused: string | null;
 }
+
+const warningOf = (product: Product, colour: string) => {
+  const warning = colourTextWarning(product, colour);
+  return warning ? { warning } : {};
+};
 
 // The looks a scene can show: the project's, or one of the product's colours
 // and styles. A version shows its source's, so it offers none.
@@ -132,12 +140,14 @@ export function tuneLook(
       {
         key: null,
         label: `The project's (${colourOf(product, project.colour).name})`,
+        ...warningOf(product, project.colour),
       },
       ...product.colours.map((c) => ({
         key: c.key,
         label: c.name,
         face: c.face,
         ...(c.inStock ? {} : { refused: `${c.name} is out of stock` }),
+        ...warningOf(product, c.key),
       })),
     ],
     styles:

@@ -10,11 +10,15 @@ export interface LookOption {
   face?: string;
   // Why it cannot be picked; absent when it can.
   refused?: string;
+  // What in the product's text contradicts this colour, said once it is
+  // picked; it can still be picked.
+  warning?: string;
 }
 
 // A colour and a style to show the product in (ROADMAP P2-9): New project
 // picks the project's, Tune a frame's. Free: Kiln redraws the design in the
-// look, nothing is generated. An option Kiln cannot draw says why.
+// look, nothing is generated. An option Kiln cannot draw says why, and a
+// colour the product's text contradicts says what, once picked.
 export function LookPicker({
   colours,
   styles,
@@ -75,9 +79,18 @@ export function LookPicker({
       </div>
     </div>
   );
+  const warning = colours.find((o) => o.key === colour)?.warning;
   return (
     <div className="flex flex-col gap-3" data-testid={testId}>
       {colours.length > 1 ? row("Colour", colours, colour, onColour) : null}
+      {warning ? (
+        <output
+          data-testid={`${testId}-text-warning`}
+          className="block font-sans text-[0.75rem] text-prov-local"
+        >
+          {warning}
+        </output>
+      ) : null}
       {styles.length > 1 ? row("Style", styles, style, onStyle) : null}
     </div>
   );

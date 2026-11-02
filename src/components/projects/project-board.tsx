@@ -48,6 +48,7 @@ import {
 import { ReadyMark } from "@/components/ready-mark";
 import type { BrandKit } from "@/domain/brand";
 import type { Card } from "@/domain/card";
+import { colourTextWarning } from "@/domain/colour-text";
 import {
   exactView,
   renderTextTemplate,
@@ -308,12 +309,15 @@ export function ProjectBoard({
   // A scene may show a colour and style of its own (Tune): its look, named
   // when it is not the project's, and flagged when nothing real backs it.
   const frameLookOf = (slot: PlanSlot) => {
-    if (slot.fill !== "scene") return { own: null, unverified: null };
+    if (slot.fill !== "scene") {
+      return { own: null, unverified: null, textWarning: null };
+    }
     const look = slotLook(board.plan, slot, product);
     const colour = colourOf(product, look.colour);
     return {
       own: sameLook(look, project) ? null : lookLabel(product, look),
       unverified: lookVerified(colour) ? null : colour.name,
+      textWarning: colourTextWarning(product, look.colour),
     };
   };
   // Scenes in a colour other than the project's, by colour.
@@ -968,7 +972,12 @@ function SlotActions({
   hasReference: boolean;
   // The scene's look when it is not the project's, and its colour when
   // nothing real backs it; else null.
-  look: { own: string | null; unverified: string | null };
+  look: {
+    own: string | null;
+    unverified: string | null;
+    // What in the product's text contradicts the frame's colour.
+    textWarning: string | null;
+  };
   // Why the card's provider cannot take a paid call now; else null.
   blocked: string | null;
   order: { place: number; last: number; firstLabel: string } | null;
@@ -1161,6 +1170,17 @@ function SlotActions({
             className="font-mono text-[0.6rem] text-prov-local"
           >
             unverified look · {look.unverified}
+          </span>
+        ) : null,
+      )}
+      {keep(
+        look.textWarning ? (
+          <span
+            title={look.textWarning}
+            data-testid={`slot-text-warning-${cardId}`}
+            className="font-mono text-[0.6rem] text-prov-local"
+          >
+            text names another colour
           </span>
         ) : null,
       )}

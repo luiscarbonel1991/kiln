@@ -44,6 +44,27 @@ describe("frameViews", () => {
     expect(frameViews(plan, {}, {})[0]).not.toHaveProperty("look");
   });
 
+  it("passes on what in the product's text contradicts a scene's colour", () => {
+    const named = { ...DOOR_TAG, name: "Engraved door tag, black & white" };
+    const plan = withSlotLook(
+      planProject({
+        product: named,
+        type: "listing-kit",
+        destinationIds: ["etsy"],
+        catalog: {
+          destinations: SEED_DESTINATIONS,
+          shotLists: SEED_SHOT_LISTS,
+        },
+      }),
+      { destinationId: "etsy", slotKey: "hero" },
+      { colour: "gold-black" },
+    );
+    const frames = frameViews(plan, {}, {}, named);
+    const at = (frame: string) => frames.find((f) => f.frame === frame);
+    expect(at("etsy.hero")?.look?.textWarning).toContain("its name says white");
+    expect(at("etsy.in-use")?.look).not.toHaveProperty("textWarning");
+  });
+
   it("names each frame, its state and the take an approval would approve", () => {
     const plan = approveSlot(
       launch(),
