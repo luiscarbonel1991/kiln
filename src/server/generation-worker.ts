@@ -10,6 +10,7 @@ import {
   type RouteEntry,
   readJobRoute,
 } from "@/domain/model-routing";
+import { type TakeCheck, uncheckedTake } from "@/domain/qc";
 import {
   describeProviderError,
   errorMessage,
@@ -56,7 +57,12 @@ export interface WorkerDeps {
     usage: unknown,
     actualMicros: number | null,
   ): Promise<void>;
-  completeJob(id: string, token: string, outputUrl: string): Promise<boolean>;
+  completeJob(
+    id: string,
+    token: string,
+    outputUrl: string,
+    check?: TakeCheck | null,
+  ): Promise<boolean>;
   failJob(
     id: string,
     token: string,
@@ -77,6 +83,14 @@ export interface WorkerDeps {
   provider(id: "google" | "openai"): ImageProvider;
   videoProvider(id: "google" | "openai"): VideoProvider | undefined;
   storeAsset(bytes: Uint8Array, mime: string, prefix: string): Promise<string>;
+  // What Kiln reads in an image take before it lands (domain TakeCheck): free
+  // and local. Null when the take is not a project's scene.
+  checkTake?(
+    job: ClaimedJob,
+    request: ImageGenerationRequest,
+    take: { url: string; bytes: Uint8Array; mime: string },
+  ): Promise<TakeCheck | null>;
+  checkTimeoutMs?: number;
   log(message: string, error?: unknown): void;
 }
 
@@ -104,6 +118,37 @@ async function storeWithRetries(
     }
   }
   throw last;
+}
+
+const CHECK_TIMEOUT_MS = 20_000;
+
+// A take's check never costs the take: one that throws or stalls lands it
+// unchecked, never as a failed job (it was paid for).
+async function checkLanding(
+  deps: WorkerDeps,
+  job: ClaimedJob,
+  request: ImageGenerationRequest,
+  take: { url: string; bytes: Uint8Array; mime: string },
+): Promise<TakeCheck | null> {
+  if (!deps.checkTake) return null;
+  const at = () => new Date().toISOString();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      deps.checkTake(job, request, take),
+      new Promise<TakeCheck>((resolve) => {
+        timer = setTimeout(
+          () => resolve(uncheckedTake("the check took too long", at())),
+          deps.checkTimeoutMs ?? CHECK_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } catch (error) {
+    deps.log(`could not check the take of ${job.id}`, error);
+    return uncheckedTake("the check could not run", at());
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // The job lost its lease, its project was deleted or its batch canceled
@@ -297,7 +342,15 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
       );
     }
     const url = await storeWithRetries(deps, result.bytes, result.mime);
-    await deps.completeJob(job.id, job.leaseToken, url);
+    const check =
+      parsed.kind === "image"
+        ? await checkLanding(deps, job, parsed, {
+            url,
+            bytes: result.bytes,
+            mime: result.mime,
+          })
+        : null;
+    await deps.completeJob(job.id, job.leaseToken, url, check);
   } catch (error) {
     const unanswered = callStarted && !paid && !hadResponse(error);
     const mayBeCharged = paid || unanswered;

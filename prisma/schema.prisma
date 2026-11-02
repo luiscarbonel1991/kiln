@@ -408,6 +408,10 @@ model GenerationJob {
   // The chat conversation whose paid tool started it (generate, draw,
   // write_listing, review_product): what the chat says that work spent.
   sessionId      String?
+  // What Kiln read in its image before it landed (domain TakeCheck): text,
+  // letterforms and the scale asked for. Free and local; null for a video,
+  // a direct call, or a take from before the check.
+  takeCheck      Json?
 
   // One queued or running job per card. The predicate is written as Postgres
   // stores it (it normalizes IN to = ANY), so migrate sees no drift.

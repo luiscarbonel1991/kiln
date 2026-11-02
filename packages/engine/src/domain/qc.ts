@@ -62,6 +62,8 @@ export interface TextLineFinding {
   height: number | null;
   confidence: number | null;
   tooSmall: boolean;
+  // Where it was read: the box around every line it was read from.
+  bbox: OcrBox | null;
 }
 
 export interface TextCheck {
@@ -167,6 +169,14 @@ function takeAcrossEntries(
   return null;
 }
 
+function around(boxes: OcrBox[]): OcrBox {
+  const x = Math.min(...boxes.map((b) => b.x));
+  const y = Math.min(...boxes.map((b) => b.y));
+  const right = Math.max(...boxes.map((b) => b.x + b.w));
+  const bottom = Math.max(...boxes.map((b) => b.y + b.h));
+  return { x, y, w: right - x, h: bottom - y };
+}
+
 export function checkExpectedText(
   expected: ExpectedText,
   ocr: OcrResult,
@@ -244,6 +254,7 @@ export function checkExpectedText(
           height: null,
           confidence: null,
           tooSmall: false,
+          bbox: null,
         });
         continue;
       }
@@ -258,6 +269,7 @@ export function checkExpectedText(
         height,
         confidence,
         tooSmall: height < minTextHeight,
+        bbox: around(hits.map((h) => h.line.bbox)),
       });
       const pos = Math.min(...hits.map(axis));
       positions[pi] =
@@ -373,6 +385,7 @@ export function judgeTake(input: {
   const problems: string[] = [];
   const notes: string[] = [];
   const lines: TakeCheckLine[] = [];
+  const stacked: string[] = [];
   for (const l of input.lines) {
     if (!l.inReference) {
       notes.push(
@@ -404,8 +417,7 @@ export function judgeTake(input: {
       problems.push(
         `"${l.expected}" too small: ${(100 * (l.height ?? 0)).toFixed(1)} % of the height (min ${(100 * minTextHeight).toFixed(1)} %)`,
       );
-    if (l.how === "stack")
-      notes.push(`"${l.expected}" read one piece at a time, as a stack`);
+    if (l.how === "stack") stacked.push(`"${l.expected}"`);
     if (l.how === "ambiguous")
       notes.push(`"${l.expected}" read only loosely (O/0, I/1, S/5…)`);
     const c = l.letters;
@@ -417,6 +429,13 @@ export function judgeTake(input: {
       notes.push(
         `"${l.expected}" letters ${c.take.width > c.reference.width ? "wider" : "narrower"} than the reference (${ratio(c.take.width)} vs ${ratio(c.reference.width)} of their height); an angled camera narrows them too`,
       );
+  }
+  if (stacked.length > 0) {
+    const named =
+      stacked.length === 1
+        ? stacked[0]
+        : `${stacked.slice(0, -1).join(", ")} and ${stacked.at(-1)}`;
+    notes.push(`${named} read one piece at a time, as a stack`);
   }
   const base = {
     engine: input.engine,

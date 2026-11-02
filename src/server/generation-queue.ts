@@ -63,6 +63,7 @@ import {
 import { createWorker, type Worker } from "@/server/generation-worker";
 import { getCurrentMaker, getMakerRoutes } from "@/server/maker-repository";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
+import { checkProjectTake } from "@/server/qc/project-take";
 
 // The queue's entry points for the app: estimate and enqueue a planned
 // project's cards, and the per-process worker.
@@ -532,6 +533,7 @@ export function ensureGenerationWorker(): Worker | null {
       provider: (id) => getImageProvider(id),
       videoProvider: (id) => getVideoProvider(id),
       storeAsset,
+      checkTake: (job, request, take) => checkProjectTake(job, request, take),
       log: (message, error) =>
         console.warn(`[kiln queue] ${message}`, error ?? ""),
     });

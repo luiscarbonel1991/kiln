@@ -54,6 +54,7 @@ import {
   setSlotOrder,
   setVideoChoice,
 } from "@/server/project-repository";
+import { recheckTake } from "@/server/qc/project-take";
 import { relookSlot, retuneSlot } from "@/server/slot-tuning";
 import { makeStillsVideo } from "@/server/stills-video";
 import type { Degraded } from "@/server/text-calls";
@@ -91,6 +92,28 @@ export async function setSlotOffAction(
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Could not switch it.",
+    };
+  }
+  refresh();
+}
+
+const Frame = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  slotKey: z.string().min(1),
+});
+
+// Read a scene's shown take again (free): one from before the check, or one
+// left unchecked.
+export async function checkTakeAction(
+  input: unknown,
+): Promise<{ error: string } | undefined> {
+  const { projectId, destinationId, slotKey } = Frame.parse(input);
+  try {
+    await recheckTake(projectId, { destinationId, slotKey });
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Could not check it.",
     };
   }
   refresh();

@@ -17,6 +17,7 @@ import {
 } from "@/domain/model-routing";
 import { generableCardIds, ProjectPlan } from "@/domain/plan";
 import type { CardSpend } from "@/domain/project-cost";
+import { readTakeCheck, type TakeCheck } from "@/domain/qc";
 import {
   ACTIVE_JOB_STATUSES,
   type JobStatus,
@@ -377,12 +378,14 @@ export async function recordCost(
 }
 
 // Finish a job and put its output on the card, in one transaction (job, then
-// card; never the project row, so it cannot deadlock with an autosave). false
-// = the lease was lost and nothing was written.
+// card; never the project row, so it cannot deadlock with an autosave), with
+// what Kiln read in it, so a take never shows before its check. false = the
+// lease was lost and nothing was written.
 export async function completeJob(
   id: string,
   token: string,
   outputUrl: string,
+  check?: TakeCheck | null,
 ): Promise<boolean> {
   const batchId = await db.$transaction(async (tx) => {
     const done = await tx.generationJob.updateMany({
@@ -394,6 +397,7 @@ export async function completeJob(
         finishedAt: new Date(),
         leaseToken: null,
         leaseUntil: null,
+        ...(check ? { takeCheck: check } : {}),
       },
     });
     if (done.count !== 1) return false;
@@ -911,22 +915,39 @@ export interface OutputSource {
   fallback?: { from: string; reason: string };
 }
 
-// The product version each of these outputs was made from (the job that
-// finished with it): null for a job from before versions were kept; an output
-// no job made (a studio edit) is absent.
-export async function outputVersions(
+export interface OutputFacts {
+  // The product version it was made from: null for a job from before
+  // versions were kept.
+  productHash: string | null;
+  // What Kiln read in it: null for a take from before the check (or a video).
+  check: TakeCheck | null;
+}
+
+// What is known of each of these outputs from the job that finished with it;
+// an output no job made (a studio edit) is absent.
+export async function outputFacts(
   projectId: string,
   outputs: string[],
-): Promise<Map<string, string | null>> {
+): Promise<Map<string, OutputFacts>> {
   assertDatabaseUrl();
   if (outputs.length === 0) return new Map();
   const jobs = await db.generationJob.findMany({
     where: { projectId, status: "done", outputUrl: { in: outputs } },
-    select: { outputUrl: true, productHash: true },
+    select: { outputUrl: true, productHash: true, takeCheck: true },
   });
   return new Map(
     jobs.flatMap((job) =>
-      job.outputUrl ? [[job.outputUrl, job.productHash] as const] : [],
+      job.outputUrl
+        ? [
+            [
+              job.outputUrl,
+              {
+                productHash: job.productHash,
+                check: readTakeCheck(job.takeCheck),
+              },
+            ] as const,
+          ]
+        : [],
     ),
   );
 }

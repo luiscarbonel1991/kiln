@@ -18,7 +18,7 @@ import { providerMode } from "@/providers/mode";
 import { chatPanelData } from "@/server/chat/chat-view";
 import { estimateProjectCards, scenePrompts } from "@/server/generation-queue";
 import {
-  outputVersions,
+  outputFacts,
   projectGenerationState,
   projectSpend,
   QueueRefusal,
@@ -140,17 +140,15 @@ export default async function ProjectBoardPage({
   // cards whose current output shows an earlier version.
   const drift = product && version ? productDrift(product, version) : null;
   const shown = board.cards.flatMap((c) => c.outputs.slice(0, 1));
-  const versions = version?.hash
-    ? await outputVersions(board.id, shown)
-    : new Map<string, string | null>();
-  const earlier = board.cards
-    .filter((c) => {
-      const output = c.outputs[0];
-      return (
-        output && versions.has(output) && versions.get(output) !== version?.hash
-      );
-    })
-    .map((c) => c.id);
+  const facts = await outputFacts(board.id, shown);
+  const earlier = version?.hash
+    ? board.cards
+        .filter((c) => {
+          const fact = c.outputs[0] ? facts.get(c.outputs[0]) : undefined;
+          return fact !== undefined && fact.productHash !== version.hash;
+        })
+        .map((c) => c.id)
+    : [];
   const maker = await getCurrentMaker();
   const writeUsd = await textWorstCase("listingCopy");
   const listingPrice = writeUsd === null ? null : `≈ $${writeUsd.toFixed(2)}`;

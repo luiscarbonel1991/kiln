@@ -181,14 +181,24 @@ describe.skipIf(!enabled)(
         where: { makerId, status: "running", mode: "live" },
       });
       const token = running.leaseToken ?? "";
+      const check = {
+        status: "passed" as const,
+        engine: "fake",
+        lines: [{ expected: "205", found: true, how: "read" as const }],
+        problems: [],
+        notes: [],
+        checkedAt: "2026-11-02T10:00:00.000Z",
+      };
       expect(
-        await repo.completeJob(running.id, token, "https://x/done.png"),
+        await repo.completeJob(running.id, token, "https://x/done.png", check),
       ).toBe(true);
       const saved = await db.card.findUniqueOrThrow({
         where: { projectId_cardId: { projectId, cardId: running.cardId } },
       });
       expect(saved.outputs).toEqual(["https://x/done.png"]);
       expect(saved.status).toBe("done");
+      const facts = await repo.outputFacts(projectId, ["https://x/done.png"]);
+      expect(facts.get("https://x/done.png")?.check).toEqual(check);
     });
 
     it("a retried failure waits out its backoff; an expired lease follows the retry rule", async () => {

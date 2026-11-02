@@ -125,6 +125,63 @@ describe("runJob", () => {
       "a",
       "t-a",
       "https://storage/out.png",
+      null,
+    );
+  });
+
+  it("checks an image take before it lands, and lands it with its check", async () => {
+    const check = {
+      status: "passed" as const,
+      engine: "fake",
+      lines: [],
+      problems: [],
+      notes: [],
+      checkedAt: "2026-11-02T10:00:00.000Z",
+    };
+    const checkTake = vi.fn(async () => check);
+    const { d, calls } = deps({ checkTake });
+    await runJob(d, claimed("a"));
+    expect(calls).toEqual(["mark", "edit", "cost", "store", "complete"]);
+    expect(checkTake).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "a" }),
+      expect.objectContaining({ kind: "image" }),
+      { url: "https://storage/out.png", bytes: bytes.bytes, mime: "image/png" },
+    );
+    expect(d.completeJob).toHaveBeenCalledWith(
+      "a",
+      "t-a",
+      "https://storage/out.png",
+      check,
+    );
+  });
+
+  it("a check that throws or stalls lands the take unchecked, never failed", async () => {
+    const thrown = deps({
+      checkTake: vi.fn(async () => {
+        throw new Error("vision crashed");
+      }),
+    });
+    await runJob(thrown.d, claimed("a"));
+    expect(thrown.d.failJob).not.toHaveBeenCalled();
+    expect(thrown.d.completeJob).toHaveBeenCalledWith(
+      "a",
+      "t-a",
+      "https://storage/out.png",
+      expect.objectContaining({
+        status: "unchecked",
+        unchecked: "the check could not run",
+      }),
+    );
+    const stalled = deps({
+      checkTake: () => new Promise(() => {}),
+      checkTimeoutMs: 5,
+    });
+    await runJob(stalled.d, claimed("b"));
+    expect(stalled.d.completeJob).toHaveBeenCalledWith(
+      "b",
+      "t-b",
+      "https://storage/out.png",
+      expect.objectContaining({ unchecked: "the check took too long" }),
     );
   });
 
@@ -251,6 +308,7 @@ describe("runJob", () => {
       "a",
       "t-a",
       "https://storage/out.png",
+      null,
     );
   });
 
@@ -514,6 +572,7 @@ describe("createWorker", () => {
       "late",
       "t-late",
       "https://storage/out.png",
+      null,
     );
   });
 });
