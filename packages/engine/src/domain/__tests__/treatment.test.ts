@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { assemblePrompt } from "@/domain/cascade";
 import { reliefLabel } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
+import { sceneCues } from "@/domain/scene-direction";
 import { SEED_BRAND, SEED_RECIPE } from "@/domain/seed";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
 
@@ -54,7 +55,7 @@ describe("the treatment drives the prompt", () => {
       "white raised elements standing 1/8 in proud of the face, their side walls visible, a short soft shadow under each",
     );
     expect(u.avoid).toBe(
-      "flat printed lettering, lettering flush with the face",
+      "flat printed lettering, lettering flush with the face, mirrored or reflected lettering",
     );
   });
 
@@ -63,7 +64,9 @@ describe("the treatment drives the prompt", () => {
     expect(u.materials).toContain(
       "white engraved detail cut into the face and flush with it, a slightly textured engraved surface, no relief above the face",
     );
-    expect(u.avoid).toBe("raised lettering, shadows under the lettering");
+    expect(u.avoid).toBe(
+      "raised lettering, shadows under the lettering, mirrored or reflected lettering",
+    );
   });
 
   it("a layered build shows its base through every cut, never paint", () => {
@@ -73,7 +76,7 @@ describe("the treatment drives the prompt", () => {
       "a two-layer build: the design cut cleanly through the top layer (1/8 in thick), so every mark shows the white base layer beneath, the marks recessed below the face with crisp vertical cut walls, nothing painted or printed",
     );
     expect(u.avoid).toBe(
-      "painted lettering, printed lettering, raised lettering",
+      "painted lettering, printed lettering, raised lettering, mirrored or reflected lettering",
     );
     expect(u.palette).toEqual(["#1A1A1A", "#FFFFFF"]);
     // A package without the base's colour still says it contrasts.
@@ -102,5 +105,21 @@ describe("the treatment drives the prompt", () => {
       SEED_BRAND,
     );
     expect(older.negative).not.toContain("lettering");
+  });
+});
+
+describe("mirrored lettering", () => {
+  it("a product with wording never shows it mirrored, and its scenes keep glossy surfaces away", () => {
+    expect(productUnderstanding(engraved).avoid).toContain(
+      "mirrored or reflected lettering",
+    );
+    const blank = { ...engraved, wording: [] };
+    expect(productUnderstanding(blank).avoid).not.toContain("mirrored");
+    expect(sceneCues(engraved, "a kitchen counter")).toContain(
+      "the surfaces around it matte or honed, nothing glossy that mirrors its lettering",
+    );
+    expect(sceneCues(blank, "a kitchen counter").join(" ")).not.toContain(
+      "mirrors",
+    );
   });
 });

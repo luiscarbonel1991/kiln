@@ -166,6 +166,12 @@ export function sceneCues(
       : "its light face set against a darker background, so it stands out",
     // The objects named for scale invite their brands and labels.
     "everything around it plain and unbranded",
+    // A polished counter mirrored a plate's wording (DOGFOOD #46).
+    ...(product.wording.some((w) => w.example?.trim())
+      ? [
+          "the surfaces around it matte or honed, nothing glossy that mirrors its lettering",
+        ]
+      : []),
   ];
 }
 

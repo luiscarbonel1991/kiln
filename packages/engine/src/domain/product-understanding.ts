@@ -45,6 +45,11 @@ const TREATMENT_AVOID: Record<Treatment, string> = {
   reveal: "painted lettering, printed lettering, raised lettering",
 };
 
+// A glossy counter mirrored a plate's wording upside down, and QC cannot read
+// mirrored text (DOGFOOD #46): a product with wording never shows it
+// reflected.
+const MIRRORED = "mirrored or reflected lettering";
+
 function reliefOf(dimensions: Dimensions): string | null {
   return dimensions.relief
     ? reliefLabel(dimensions.relief, dimensions.unit)
@@ -123,7 +128,9 @@ export function productUnderstanding(
     useContext: product.useContexts[0] ?? "",
     sceneProps: "",
     materials: `${material}, ${TREATMENT_DETAIL[product.treatment](inkOf(colour), reliefOf(product.dimensions))}${sample}`,
-    avoid: TREATMENT_AVOID[product.treatment],
+    avoid: [TREATMENT_AVOID[product.treatment], wording ? MIRRORED : ""]
+      .filter(Boolean)
+      .join(", "),
     lighting: "soft natural light",
     composition: "the product centered, filling most of the frame",
     mood: "clean and true to the product",
