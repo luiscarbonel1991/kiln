@@ -134,6 +134,26 @@ function widthAgainst(
     : `about ${k} times as wide as the ${object.label}`;
 }
 
+const SIZE_CUE = "the product true to its real size";
+
+// The size a scene's prompt asked for, as sceneCues wrote it ("2.65 x 2.65
+// in, about 1/5 as wide as the locker door"), or null when it asked none: the
+// one thing a take's check says but cannot measure.
+export function sizeCueIn(prompt: string): string | null {
+  const at = prompt.indexOf(SIZE_CUE);
+  if (at === -1) return null;
+  const rest = prompt.slice(at + SIZE_CUE.length);
+  if (rest.startsWith(": ")) {
+    const end = rest.indexOf(";");
+    return rest.slice(2, end === -1 ? undefined : end).trim() || null;
+  }
+  if (rest.startsWith(" (")) {
+    const end = rest.indexOf(")");
+    return end === -1 ? null : rest.slice(2, end).trim() || null;
+  }
+  return null;
+}
+
 // What a scene in a real place must keep true of this product: its size
 // against the objects its place names (else the nearest everyday reference,
 // as in the exact scale frame), never enlarged to fill the frame (the frame
@@ -150,9 +170,9 @@ export function sceneCues(
   const objects = placeObjects(place);
   let size: string;
   if (objects.length > 0) {
-    size = `the product true to its real size: ${dimensionsLabel(dims)}, ${objects.map((o) => widthAgainst(widthIn, o)).join(" and ")}`;
+    size = `${SIZE_CUE}: ${dimensionsLabel(dims)}, ${objects.map((o) => widthAgainst(widthIn, o)).join(" and ")}`;
   } else {
-    size = `the product true to its real size (${dimensionsLabel(dims)}, ${sizeComparison(dims).words}) against every object around it`;
+    size = `${SIZE_CUE} (${dimensionsLabel(dims)}, ${sizeComparison(dims).words}) against every object around it`;
   }
   const dark =
     contrastInk(colourOf(product, product.defaultColour).face) === "#ffffff";

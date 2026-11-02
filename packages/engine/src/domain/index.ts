@@ -355,15 +355,35 @@ export {
 export {
   checkExpectedText,
   type ExpectedText,
+  judgeTake,
   lenientKey,
   normalizeText,
   type OcrBox,
   type OcrLine,
   type OcrResult,
+  readTakeCheck,
+  suggestedReason,
+  TakeCheck,
+  TakeCheckLine,
+  type TakeLineReading,
   type TextCheck,
   type TextCheckOptions,
   type TextLineFinding,
+  takeCheckLabel,
+  uncheckedTake,
 } from "@/domain/qc";
+export {
+  compareLetterforms,
+  type InkComponent,
+  inkComponents,
+  LETTER_TOLERANCE,
+  type LetterComparison,
+  type Letterform,
+  letterform,
+  type PixelRect,
+  type RgbaImage,
+  stackedRun,
+} from "@/domain/qc-pixels";
 export {
   ACTIVE_JOB_STATUSES,
   classifyGenerationError,
@@ -393,6 +413,7 @@ export {
   type SceneDefaults,
   type SceneSlot,
   sceneVariants,
+  sizeCueIn,
 } from "@/domain/scene-direction";
 export {
   CameraStop,

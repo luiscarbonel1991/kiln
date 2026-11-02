@@ -7,6 +7,7 @@ import {
   productSceneCues,
   sceneCues,
   sceneVariants,
+  sizeCueIn,
   surfaceCue,
 } from "@/domain/scene-direction";
 import type { BaseUnderstanding } from "@/domain/understanding";
@@ -317,6 +318,26 @@ describe("sceneCues", () => {
         "a door",
       )[0],
     ).toContain("about 1/7 as wide as the door");
+  });
+
+  it("reads back the size a scene's prompt asked for, either way it was written", () => {
+    const plaque = {
+      ...CUTTING_BOARD,
+      dimensions: { w: 5, h: 3, unit: "in" as const },
+    };
+    const composition = (place?: string) =>
+      `Composition: the product centered; ${sceneCues(plaque, place).join("; ")}.`;
+    expect(
+      sizeCueIn(composition("an exterior front door, beside a video doorbell")),
+    ).toBe(
+      "5 x 3 in, about 1/7 as wide as the door and about twice as wide as the video doorbell",
+    );
+    expect(sizeCueIn(composition())).toBe(
+      "5 x 3 in, about the size of a phone",
+    );
+    expect(
+      sizeCueIn("Composition: the product centered on a sweep."),
+    ).toBeNull();
   });
 
   it("a place naming no known object keeps the everyday reference", () => {

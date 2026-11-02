@@ -4,6 +4,10 @@
 // order. OCR engines live outside the engine (scripts/ocr.mjs: Apple Vision on
 // macOS); they only have to produce an OcrResult. Nothing here touches the network.
 
+import { z } from "zod";
+import type { LetterComparison } from "@/domain/qc-pixels";
+import type { ReasonKey } from "@/domain/scene-knobs";
+
 // Normalized to the frame (0..1), origin TOP-left.
 export interface OcrBox {
   x: number;
@@ -304,4 +308,171 @@ export function checkExpectedText(
     orderOk,
     problems,
   };
+}
+
+// A take's check (ROADMAP Phase 10, on the board): what Kiln read in a
+// generated image against the reference it edited, written when the take
+// lands. Text and letterforms are measured; the scale is only said, since no
+// local check can see the door it is measured against.
+export const TakeCheckLine = z.object({
+  expected: z.string(),
+  found: z.boolean(),
+  // read: as one line; stack: one piece at a time, re-laid in a row;
+  // ambiguous: only through a look-alike glyph or another reading.
+  how: z.enum(["read", "stack", "ambiguous"]).optional(),
+  // Fraction of the frame height.
+  height: z.number().optional(),
+  tooSmall: z.boolean().optional(),
+  // The take's stroke and width over the reference's (1 = the same).
+  letters: z.object({ stroke: z.number(), width: z.number() }).optional(),
+});
+export type TakeCheckLine = z.infer<typeof TakeCheckLine>;
+
+export const TakeCheck = z.object({
+  status: z.enum(["passed", "failed", "unchecked"]),
+  engine: z.string().optional(),
+  lines: z.array(TakeCheckLine).default([]),
+  problems: z.array(z.string()).default([]),
+  notes: z.array(z.string()).default([]),
+  // The size the scene asked for, which nothing verified.
+  scale: z.string().optional(),
+  // Why nothing was checked.
+  unchecked: z.string().optional(),
+  checkedAt: z.string(),
+});
+export type TakeCheck = z.infer<typeof TakeCheck>;
+
+// A stored check, or null when there is none or it no longer reads.
+export function readTakeCheck(value: unknown): TakeCheck | null {
+  return TakeCheck.safeParse(value).data ?? null;
+}
+
+export interface TakeLineReading {
+  expected: string;
+  // The reference reads it: only then can the take be held to it.
+  inReference: boolean;
+  found: boolean;
+  how?: "read" | "stack" | "ambiguous";
+  height?: number;
+  letters?: LetterComparison;
+}
+
+const ratio = (n: number) => n.toFixed(2);
+
+// The check from what was read: a promised line the take misses, reads too
+// small, or draws in another weight fails it; a line the reference itself
+// does not read is not held against the take; the rest is said as notes.
+export function judgeTake(input: {
+  lines: TakeLineReading[];
+  engine: string;
+  scale?: string;
+  minTextHeight?: number;
+  checkedAt: string;
+}): TakeCheck {
+  const minTextHeight = input.minTextHeight ?? 0.015;
+  const problems: string[] = [];
+  const notes: string[] = [];
+  const lines: TakeCheckLine[] = [];
+  for (const l of input.lines) {
+    if (!l.inReference) {
+      notes.push(
+        `"${l.expected}" not checked: the reference does not read it either`,
+      );
+      continue;
+    }
+    const tooSmall = l.found && (l.height ?? 0) < minTextHeight;
+    lines.push({
+      expected: l.expected,
+      found: l.found,
+      ...(l.how ? { how: l.how } : {}),
+      ...(l.height !== undefined ? { height: l.height } : {}),
+      ...(tooSmall ? { tooSmall } : {}),
+      ...(l.letters
+        ? {
+            letters: {
+              stroke: l.letters.take.stroke / l.letters.reference.stroke,
+              width: l.letters.take.width / l.letters.reference.width,
+            },
+          }
+        : {}),
+    });
+    if (!l.found) {
+      problems.push(`missing "${l.expected}"`);
+      continue;
+    }
+    if (tooSmall)
+      problems.push(
+        `"${l.expected}" too small: ${(100 * (l.height ?? 0)).toFixed(1)} % of the height (min ${(100 * minTextHeight).toFixed(1)} %)`,
+      );
+    if (l.how === "stack")
+      notes.push(`"${l.expected}" read one piece at a time, as a stack`);
+    if (l.how === "ambiguous")
+      notes.push(`"${l.expected}" read only loosely (O/0, I/1, S/5…)`);
+    const c = l.letters;
+    if (c && !c.strokeOk)
+      problems.push(
+        `"${l.expected}" letters ${c.take.stroke > c.reference.stroke ? "thicker" : "thinner"} than the reference: stroke ${ratio(c.take.stroke)} vs ${ratio(c.reference.stroke)} of their height`,
+      );
+    if (c && !c.widthOk)
+      notes.push(
+        `"${l.expected}" letters ${c.take.width > c.reference.width ? "wider" : "narrower"} than the reference (${ratio(c.take.width)} vs ${ratio(c.reference.width)} of their height); an angled camera narrows them too`,
+      );
+  }
+  const base = {
+    engine: input.engine,
+    lines,
+    notes,
+    ...(input.scale ? { scale: input.scale } : {}),
+    checkedAt: input.checkedAt,
+  };
+  if (lines.length === 0) {
+    return {
+      ...base,
+      status: "unchecked",
+      problems: [],
+      unchecked:
+        input.lines.length === 0
+          ? "no wording to read"
+          : "the reference shows no wording it can read",
+    };
+  }
+  return {
+    ...base,
+    status: problems.length > 0 ? "failed" : "passed",
+    problems,
+  };
+}
+
+// A take nothing could read (no OCR engine here, an image it cannot open):
+// the scale is still said.
+export function uncheckedTake(
+  reason: string,
+  checkedAt: string,
+  scale?: string,
+): TakeCheck {
+  return {
+    status: "unchecked",
+    lines: [],
+    problems: [],
+    notes: [],
+    unchecked: reason,
+    ...(scale ? { scale } : {}),
+    checkedAt,
+  };
+}
+
+// The board's chip: "checked · text 2/2 · letters match".
+export function takeCheckLabel(check: TakeCheck): string {
+  if (check.status === "unchecked")
+    return `unchecked · ${check.unchecked ?? "nothing to read"}`;
+  if (check.status === "failed")
+    return `check failed · ${check.problems[0] ?? "see the take"}`;
+  const n = check.lines.length;
+  const measured = check.lines.some((l) => l.letters);
+  return `checked · text ${n}/${n}${measured ? " · letters match" : ""}`;
+}
+
+// The reason chip a failed check points to, when one moves a knob that helps.
+export function suggestedReason(check: TakeCheck): ReasonKey | null {
+  return check.lines.some((l) => l.tooSmall) ? "small" : null;
 }

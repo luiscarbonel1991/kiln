@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   checkExpectedText,
+  judgeTake,
   lenientKey,
   normalizeText,
   type OcrLine,
   type OcrResult,
+  readTakeCheck,
+  suggestedReason,
+  takeCheckLabel,
+  uncheckedTake,
 } from "@/domain/qc";
+import { compareLetterforms } from "@/domain/qc-pixels";
 
 // Fixtures are real Apple Vision readings of kiln heroes (2026-09-18), trimmed.
 const line = (
@@ -204,5 +210,134 @@ describe("checkExpectedText", () => {
       ocr([line("1204", 0.3, 0.4, 0.2, 0.1)]),
     );
     expect(r.missing).toEqual(["204"]);
+  });
+});
+
+describe("judgeTake", () => {
+  const at = "2026-11-02T10:00:00.000Z";
+  const plate = { stroke: 0.08, width: 2.3, height: 340 };
+  const same = compareLetterforms(
+    { stroke: 0.085, width: 2.2, height: 140 },
+    plate,
+  );
+
+  it("passes a take that reads every line the reference reads, in the same letters", () => {
+    const check = judgeTake({
+      engine: "apple-vision",
+      checkedAt: at,
+      scale: "2.65 x 2.65 in, about 1/5 as wide as the locker door",
+      lines: [
+        {
+          expected: "205",
+          inReference: true,
+          found: true,
+          how: "read",
+          height: 0.15,
+          letters: same,
+        },
+        { expected: "Suite", inReference: false, found: false },
+      ],
+    });
+    expect(check.status).toBe("passed");
+    expect(check.lines).toHaveLength(1);
+    expect(check.lines[0].letters?.stroke).toBeCloseTo(1.06, 2);
+    expect(check.notes).toEqual([
+      '"Suite" not checked: the reference does not read it either',
+    ]);
+    expect(takeCheckLabel(check)).toBe("checked · text 1/1 · letters match");
+    expect(suggestedReason(check)).toBeNull();
+    expect(readTakeCheck(JSON.parse(JSON.stringify(check)))).toEqual(check);
+  });
+
+  it("fails a missing line, a line too small to read, and a heavier weight", () => {
+    const bold = compareLetterforms(
+      { stroke: 0.15, width: 2.3, height: 150 },
+      plate,
+    );
+    const check = judgeTake({
+      engine: "apple-vision",
+      checkedAt: at,
+      lines: [
+        {
+          expected: "205",
+          inReference: true,
+          found: true,
+          how: "stack",
+          height: 0.2,
+          letters: bold,
+        },
+        {
+          expected: "Suite",
+          inReference: true,
+          found: true,
+          how: "read",
+          height: 0.01,
+        },
+        { expected: "Floor 2", inReference: true, found: false },
+      ],
+    });
+    expect(check.status).toBe("failed");
+    expect(check.problems).toEqual([
+      '"205" letters thicker than the reference: stroke 0.15 vs 0.08 of their height',
+      '"Suite" too small: 1.0 % of the height (min 1.5 %)',
+      'missing "Floor 2"',
+    ]);
+    expect(check.notes).toEqual(['"205" read one piece at a time, as a stack']);
+    expect(takeCheckLabel(check)).toBe(
+      'check failed · "205" letters thicker than the reference: stroke 0.15 vs 0.08 of their height',
+    );
+    expect(suggestedReason(check)).toBe("small");
+  });
+
+  it("notes a narrower line without failing it: an angled camera narrows letters too", () => {
+    const narrow = compareLetterforms(
+      { stroke: 0.08, width: 1.7, height: 140 },
+      plate,
+    );
+    const check = judgeTake({
+      engine: "apple-vision",
+      checkedAt: at,
+      lines: [
+        {
+          expected: "205",
+          inReference: true,
+          found: true,
+          height: 0.1,
+          letters: narrow,
+        },
+      ],
+    });
+    expect(check.status).toBe("passed");
+    expect(check.notes[0]).toMatch(
+      /narrower than the reference .*angled camera/,
+    );
+  });
+
+  it("is unchecked when the reference reads none of the wording, or there is none", () => {
+    const none = judgeTake({
+      engine: "apple-vision",
+      checkedAt: at,
+      lines: [],
+    });
+    expect(none).toMatchObject({
+      status: "unchecked",
+      unchecked: "no wording to read",
+    });
+    const unread = judgeTake({
+      engine: "apple-vision",
+      checkedAt: at,
+      lines: [{ expected: "Quiet please", inReference: false, found: false }],
+    });
+    expect(unread.unchecked).toBe("the reference shows no wording it can read");
+    const elsewhere = uncheckedTake(
+      "no OCR engine on this machine",
+      at,
+      "5 x 3 in",
+    );
+    expect(takeCheckLabel(elsewhere)).toBe(
+      "unchecked · no OCR engine on this machine",
+    );
+    expect(elsewhere.scale).toBe("5 x 3 in");
+    expect(readTakeCheck({ status: "maybe" })).toBeNull();
   });
 });
