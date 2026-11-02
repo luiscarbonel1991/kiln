@@ -288,6 +288,7 @@ export {
   type ProductImage,
   ProductPart,
   ProductSource,
+  ProductStyle,
   ProductView,
   partLabel,
   productImages,
@@ -298,6 +299,18 @@ export {
   validateWording,
   WordingLine,
 } from "@/domain/product";
+export {
+  Look,
+  lookLabel,
+  ORIGINAL,
+  productInLook,
+  productStyles,
+  type ResolvedLook,
+  resolveLook,
+  sameLook,
+  storedLook,
+  styleName,
+} from "@/domain/product-look";
 export {
   type PackageResult,
   packageJsonSchema,

@@ -176,6 +176,39 @@ export const OutlineBox = z.object({
 });
 export type OutlineBox = z.infer<typeof OutlineBox>;
 
+// Another design of the same product (the same size, material and colours):
+// its own drawing and the wording it shows ("Do not disturb" beside "Quiet
+// please"), the wording side of the variant matrix every shop has. Only a
+// vector product has styles; its own drawing is the first, named
+// `styleName`. Kiln measures each drawing's outline at import, as it does the
+// source's, and redraws it in each colour.
+export const ProductStyle = z.object({
+  // "original" names the product's own drawing (product-look.ts).
+  key: z
+    .string()
+    .min(1)
+    .max(64)
+    .refine((k) => k !== "original", {
+      message: '"original" is the product\'s own drawing: pick another key',
+    }),
+  name: z.string().trim().min(1).max(40),
+  svgUrl: z
+    .string()
+    .min(1)
+    .describe(
+      "This design's SVG, drawn in one of the product's colours: a data: image, Kiln's storage or an origin in KILN_ASSET_ORIGINS. Kiln redraws it in each colour.",
+    ),
+  outlineBox: OutlineBox.optional(),
+  examples: z
+    .array(z.string())
+    .max(6)
+    .describe(
+      "The wording this design shows, one entry per wording line in order; a line left out shows the product's example.",
+    )
+    .optional(),
+});
+export type ProductStyle = z.infer<typeof ProductStyle>;
+
 // Where the product definition comes from. `catalog` = a maker's code catalog,
 // exported as a product package; `vector` = a traced or drawn SVG
 // (the maker on-ramp, see PRODUCT-MODEL.md); `photo` = only a photo exists
@@ -226,6 +259,18 @@ export const Product = z.object({
   wording: z.array(WordingLine).default([]),
   icons: z.array(ProductIcon).default([]),
   variants: z.array(VariantAxis).default([]),
+  // Other designs of a vector product, each chosen per project and per
+  // frame like a colour; absent for one design.
+  styles: z.array(ProductStyle).min(1).max(8).optional(),
+  styleName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(40)
+    .describe(
+      'The name of the product\'s own drawing among its styles ("Quiet please"); "Original" when absent.',
+    )
+    .optional(),
   forbidden: z.array(z.string()).default([...DEFAULT_FORBIDDEN]),
   // Where the product is used, the most typical first ("a kitchen counter",
   // "an exterior front door"): scenes that show it in context take these in

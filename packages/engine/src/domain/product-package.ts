@@ -131,6 +131,40 @@ export function productLabel(product: { sku: string; name: string }): string {
   return `"${product.sku}" ${product.name}`;
 }
 
+// Styles are other drawings of a vector product, each with the wording it
+// shows: one that could not be drawn, or whose wording breaks the product's
+// limits, would only fail later, on a frame.
+function styleProblems(product: Product): string[] {
+  const styles = product.styles ?? [];
+  if (styles.length === 0) return [];
+  if (product.source.kind !== "vector") {
+    return ["styles need a vector source: Kiln draws each style from its SVG"];
+  }
+  const seen = new Set<string>();
+  return styles.flatMap((style) => {
+    const problems: string[] = [];
+    if (seen.has(style.key)) {
+      problems.push(`styles › ${style.key}: the key appears earlier`);
+    }
+    seen.add(style.key);
+    const examples = style.examples ?? [];
+    if (examples.length > product.wording.length) {
+      problems.push(
+        `styles › ${style.key}: ${examples.length} examples given, the product has ${product.wording.length} wording lines`,
+      );
+    }
+    examples.forEach((text, i) => {
+      const line = product.wording[i];
+      if (line?.maxChars != null && text.length > line.maxChars) {
+        problems.push(
+          `styles › ${style.key}: "${line.label}" has ${text.length} characters, max ${line.maxChars}`,
+        );
+      }
+    });
+    return problems;
+  });
+}
+
 function label(raw: unknown, index: number): string {
   const sku = at(raw, ["sku"]);
   const name = at(raw, ["name"]);
@@ -186,7 +220,7 @@ export function parseProductPackage(input: unknown): PackageResult {
     const errors = seen.has(product.sku)
       ? [`sku "${product.sku}" appears earlier in the package`]
       : keys.includes(product.defaultColour)
-        ? []
+        ? styleProblems(product)
         : [
             `defaultColour "${product.defaultColour}" is not one of its colours (${keys.join(", ")})`,
           ];

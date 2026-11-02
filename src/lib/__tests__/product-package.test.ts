@@ -69,6 +69,43 @@ describe("parseProductPackage", () => {
     ]);
   });
 
+  it("takes styles on a vector product only, each with a key of its own and wording that fits", () => {
+    const coaster = pkg.products[1];
+    const style = {
+      key: "leaf",
+      name: "Leaf",
+      svgUrl: coaster.source.svgUrl,
+    };
+    const ok = parseProductPackage({
+      ...coaster,
+      styleName: "Sprig",
+      styles: [style],
+    });
+    expect(ok.ok && ok.products[0].styles?.map((s) => s.key)).toEqual(["leaf"]);
+    const result = parseProductPackage([
+      { ...board, styles: [style] },
+      { ...coaster, sku: "CO-03", styles: [style, style] },
+      {
+        ...board,
+        sku: "CB-04",
+        source: coaster.source,
+        styles: [{ ...style, examples: ["The Riveras family", "2026", "x"] }],
+      },
+      { ...coaster, sku: "CO-05", styles: [{ ...style, key: "original" }] },
+    ]);
+    expect(result.ok && result.rejected.map((r) => r.errors)).toEqual([
+      ["styles need a vector source: Kiln draws each style from its SVG"],
+      ["styles › leaf: the key appears earlier"],
+      [
+        "styles › leaf: 3 examples given, the product has 2 wording lines",
+        'styles › leaf: "Family name" has 18 characters, max 14',
+      ],
+      [
+        'styles › original › key: "original" is the product\'s own drawing: pick another key',
+      ],
+    ]);
+  });
+
   it("reads the maker's brand kit from the maker block", () => {
     const result = parseProductPackage(pkg);
     expect(result.ok && result.brand).toEqual({
