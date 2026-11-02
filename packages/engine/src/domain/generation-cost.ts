@@ -4,10 +4,12 @@ import {
   effortOn,
   effortScale,
 } from "@/domain/effort";
+import { OPENAI_2K, sizeOn } from "@/domain/image-size";
 import {
   DEFAULT_IMAGE_QUALITY,
   DEFAULT_VIDEO_RESOLUTION,
   type ImageQuality,
+  type ImageSize,
   modelEntry,
   type VideoResolution,
 } from "@/domain/model-defaults";
@@ -37,6 +39,10 @@ import {
 //   image, at high fidelity on gpt-image-2, and the prompt): measured at
 //   203-206 text + 1024 image tokens (~$0.0092) with a 1024px reference; the
 //   input max leaves room for longer prompts and larger references.
+// - 2K images, checked 2026-11-02: GPT Image 2's output tokens at each 2K
+//   size from the guide's output-token calculator (it gives 1756 / 1372 at
+//   1024 medium, as measured), billed at its image output rate; Gemini's per
+//   2K image from its pricing page.
 
 export interface ImagePrice {
   provider: "google" | "openai";
@@ -197,6 +203,38 @@ const OPENAI_OUTPUT: Record<string, Record<ImageQuality, [number, number]>> = {
   },
 };
 
+// GPT Image 2's output tokens at each of its 2K sizes (OPENAI_2K), per
+// quality; a portrait size and its landscape twin cost the same.
+const TOKENS_2K: Record<string, Record<ImageQuality, number>> = {
+  "2048x2048": { low: 397, medium: 3568, high: 14272 },
+  "1600x2000": { low: 271, medium: 2372, high: 9610 },
+  "1344x2016": { low: 208, medium: 1809, high: 7234 },
+  "1536x2048": { low: 247, medium: 2223, high: 8892 },
+  "1152x2048": { low: 157, medium: 1413, high: 5650 },
+};
+const OPENAI_2K_TOKENS: Record<
+  string,
+  Record<string, Record<ImageQuality, number>>
+> = {
+  "gpt-image-2": Object.fromEntries(
+    Object.entries(TOKENS_2K).flatMap(([size, tokens]) => {
+      const [w, h] = size.split("x");
+      return [
+        [size, tokens],
+        [`${h}x${w}`, tokens],
+      ];
+    }),
+  ),
+};
+
+// $ per 2K image: 1,680 output tokens on Nano Banana 2.1 and 3.1 Flash Image;
+// Gemini 3 Pro Image bills 1,120 at 1K and 2K alike.
+const GOOGLE_PER_IMAGE_2K: Record<string, number> = {
+  "gemini-nano-banana-2.1": 0.0504,
+  "gemini-3.1-flash-image": 0.101,
+  "gemini-3-pro-image": 0.134,
+};
+
 // $ per 1K image (1,120 output tokens at the image rate).
 const GOOGLE_PER_IMAGE: Record<string, number> = {
   "gemini-nano-banana-2.1": 0.0336,
@@ -274,19 +312,49 @@ export interface SceneEstimate {
 const OPENAI_PER_REFERENCE = { typical: 0.009, max: 0.012 };
 const GOOGLE_TOKENS_PER_REFERENCE = 1_100;
 
+// One 2K image's output on this model at this aspect; null without a pinned
+// price for it.
+function output2k(
+  model: { provider: string; model: string; quality?: ImageQuality },
+  aspect: string | undefined,
+): number | null {
+  if (model.provider === "google") {
+    return GOOGLE_PER_IMAGE_2K[model.model] ?? null;
+  }
+  const size = OPENAI_2K[aspect ?? "1:1"];
+  const tokens = size
+    ? OPENAI_2K_TOKENS[model.model]?.[`${size.width}x${size.height}`]
+    : undefined;
+  const rate = tokenPrices(model)?.imageOut;
+  if (!tokens || rate === undefined) return null;
+  return round(
+    (tokens[model.quality ?? DEFAULT_IMAGE_QUALITY] * rate) / 1_000_000,
+  );
+}
+
 // What one generation at this model and aspect costs: output plus the edit's
 // input allowance and what the model writes beside the image, with
 // `references` further images read beside the reference. null when the model
 // has no pinned price.
 export function estimateGeneration(
-  model: { provider: string; model: string; quality?: ImageQuality },
+  model: {
+    provider: string;
+    model: string;
+    quality?: ImageQuality;
+    size?: ImageSize;
+  },
   aspect?: string,
   references = 0,
 ): { typical: number; max: number } | null {
   const price = imagePrice(model);
   if (!price) return null;
   const output =
-    !aspect || aspect === "1:1" ? price.output.square : price.output.nonSquare;
+    sizeOn(model, aspect) === "2k"
+      ? output2k(model, aspect)
+      : !aspect || aspect === "1:1"
+        ? price.output.square
+        : price.output.nonSquare;
+  if (output === null) return null;
   const extra =
     references === 0
       ? { typical: 0, max: 0 }
@@ -314,14 +382,14 @@ export function estimateGeneration(
 // One generation per scene slot, at each slot's aspect. null when the model has
 // no pinned price (the UI says so instead of guessing).
 export function estimateScenes(
-  slots: { aspect?: string }[],
+  slots: { aspect?: string; size?: ImageSize }[],
   model: { provider: string; model: string; quality?: ImageQuality },
   references = 0,
 ): SceneEstimate | null {
   const price = imagePrice(model);
   if (!price) return null;
   const each = slots.map((s) =>
-    estimateGeneration(model, s.aspect, references),
+    estimateGeneration({ ...model, size: s.size }, s.aspect, references),
   );
   const sum = (pick: (e: { typical: number; max: number }) => number) =>
     round(each.reduce((t, e) => t + (e ? pick(e) : 0), 0));

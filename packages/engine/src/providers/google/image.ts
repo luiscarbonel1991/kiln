@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Modality, type Part } from "@google/genai";
-import { assertModel } from "@/domain/model-defaults";
+import { sizeOn } from "@/domain/image-size";
+import { assertModel, type ImageSize } from "@/domain/model-defaults";
 import {
   type FetchedAsset,
   fetchAsset,
@@ -82,6 +83,18 @@ export function aspectFor(aspect: string): string {
 const modelOf = (input: { model: { model: string } }) =>
   assertModel({ provider: "google", model: input.model.model }, "image").id;
 
+// The frame a request asks for: its aspect, and 2K where the model offers it.
+interface Frame {
+  aspect: string | undefined;
+  size: ImageSize;
+}
+const frameOf = (input: {
+  model: { model: string; aspect?: string; size?: ImageSize };
+}): Frame => ({
+  aspect: input.model.aspect,
+  size: sizeOn({ ...input.model, provider: "google" }, input.model.aspect),
+});
+
 interface GeminiImage {
   bytes: Uint8Array | null;
   mime: string;
@@ -94,7 +107,7 @@ interface GeminiImage {
 async function callGemini(
   contents: string | Part[],
   model: string,
-  aspect: string | undefined,
+  { aspect, size }: Frame,
   options: { timeoutMs: number; beforeCall?: () => Promise<void> },
 ): Promise<GeminiImage> {
   await options.beforeCall?.();
@@ -103,7 +116,14 @@ async function callGemini(
     contents,
     config: {
       responseModalities: [Modality.TEXT, Modality.IMAGE],
-      ...(aspect ? { imageConfig: { aspectRatio: aspectFor(aspect) } } : {}),
+      ...(aspect || size === "2k"
+        ? {
+            imageConfig: {
+              ...(aspect ? { aspectRatio: aspectFor(aspect) } : {}),
+              ...(size === "2k" ? { imageSize: "2K" } : {}),
+            },
+          }
+        : {}),
       httpOptions: { timeout: options.timeoutMs },
     },
   });
@@ -173,7 +193,7 @@ export const googleImageProvider: ImageProvider = {
       await mockDelay();
       return mockResult("generate", model);
     }
-    const image = await callGemini(input.prompt, model, input.model.aspect, {
+    const image = await callGemini(input.prompt, model, frameOf(input), {
       timeoutMs: DIRECT_TIMEOUT_MS,
       beforeCall: options?.beforeCall,
     });
@@ -193,7 +213,7 @@ export const googleImageProvider: ImageProvider = {
     const image = await callGemini(
       editContents(input, master, refs),
       model,
-      input.model.aspect,
+      frameOf(input),
       { timeoutMs: DIRECT_TIMEOUT_MS, beforeCall: options?.beforeCall },
     );
     return stored(image, model);
@@ -224,7 +244,7 @@ export const googleImageProvider: ImageProvider = {
     const image = await callGemini(
       editContents(input, master, refs),
       model,
-      input.model.aspect,
+      frameOf(input),
       options,
     );
     return { ...image, model };
@@ -243,7 +263,7 @@ export const googleImageProvider: ImageProvider = {
         inlineData: { mimeType: i.mime, data: i.base64 },
       })),
     ];
-    const image = await callGemini(contents, model, input.model.aspect, {
+    const image = await callGemini(contents, model, frameOf(input), {
       timeoutMs: DIRECT_TIMEOUT_MS,
       beforeCall: options?.beforeCall,
     });

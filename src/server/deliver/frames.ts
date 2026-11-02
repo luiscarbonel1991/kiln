@@ -9,6 +9,7 @@ import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import { SceneTextLayer } from "@/components/projects/scene-text-layer";
 import type { DestinationProfile } from "@/domain/destination";
 import type { ExactView } from "@/domain/exact";
+import { destinationTargetPx } from "@/domain/image-size";
 import type { PlateImage } from "@/lib/plate-href";
 import { toSvgMarkup } from "@/lib/svg-markup";
 
@@ -21,14 +22,8 @@ export function targetSize(
   aspect: string | undefined,
   destination: Pick<DestinationProfile, "formats">,
 ): { width: number; height: number } {
-  const ratio = aspect ?? "1:1";
-  const [a, b] = ratio.split(":").map(Number);
-  const targets = destination.formats.flatMap((f) =>
-    f.minPx ? [f.minPx] : [],
-  );
-  const minPx =
-    destination.formats.find((f) => f.aspect === ratio)?.minPx ??
-    (targets.length > 0 ? Math.max(...targets) : 2000);
+  const [a, b] = (aspect ?? "1:1").split(":").map(Number);
+  const minPx = destinationTargetPx(aspect, destination);
   if (!a || !b) return { width: minPx, height: minPx };
   return a <= b
     ? { width: minPx, height: Math.round((minPx * b) / a) }

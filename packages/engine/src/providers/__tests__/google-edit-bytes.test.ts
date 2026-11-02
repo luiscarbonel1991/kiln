@@ -78,6 +78,30 @@ describe("google editBytes (the queue's edit)", () => {
     expect(storeAsset).not.toHaveBeenCalled();
   });
 
+  it("asks for 2K where the model offers it, and never on Flash-Lite", async () => {
+    generateContent.mockResolvedValue(
+      answer([
+        { inlineData: { data: Buffer.from("image").toString("base64") } },
+      ]),
+    );
+    const big = { ...input, model: { ...input.model, size: "2k" as const } };
+    await googleImageProvider.editBytes?.(big, { timeoutMs: 180_000 });
+    expect(generateContent.mock.calls[0][0].config.imageConfig).toEqual({
+      aspectRatio: "3:4",
+      imageSize: "2K",
+    });
+    await googleImageProvider.editBytes?.(
+      {
+        ...big,
+        model: { ...big.model, model: "gemini-3.1-flash-lite-image" },
+      },
+      { timeoutMs: 180_000 },
+    );
+    expect(generateContent.mock.calls[1][0].config.imageConfig).toEqual({
+      aspectRatio: "3:4",
+    });
+  });
+
   it("an answer without an image keeps its usage and says why", async () => {
     generateContent.mockResolvedValue(
       answer([], { promptFeedback: { blockReason: "IMAGE_SAFETY" } }),

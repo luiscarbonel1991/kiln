@@ -64,6 +64,31 @@ describe("openai editBytes (the queue's edit)", () => {
     expect(storeAsset).not.toHaveBeenCalled();
   });
 
+  it("asks GPT Image 2 for its own 2K size at the slot's aspect; a model without 2K stays at 1K", async () => {
+    edit.mockResolvedValue({
+      data: [{ b64_json: Buffer.from("image").toString("base64") }],
+    });
+    const big = { ...input, model: { ...input.model, size: "2k" as const } };
+    await openaiImageProvider.editBytes?.(big, { timeoutMs: 180_000 });
+    expect(edit.mock.calls[0][0].size).toBe("1600x2000");
+    await openaiImageProvider.editBytes?.(
+      { ...big, model: { ...big.model, aspect: "1:1" } },
+      { timeoutMs: 180_000 },
+    );
+    expect(edit.mock.calls[1][0].size).toBe("2048x2048");
+    // An aspect without a 2K size, and a model that offers none.
+    await openaiImageProvider.editBytes?.(
+      { ...big, model: { ...big.model, aspect: "21:9" } },
+      { timeoutMs: 180_000 },
+    );
+    expect(edit.mock.calls[2][0].size).toBe("1024x1024");
+    await openaiImageProvider.editBytes?.(
+      { ...big, model: { ...big.model, model: "gpt-image-1.5" } },
+      { timeoutMs: 180_000 },
+    );
+    expect(edit.mock.calls[3][0].size).toBe("1024x1536");
+  });
+
   it("sends the reference first, then each further reference (a material sample)", async () => {
     edit.mockResolvedValue({
       data: [{ b64_json: Buffer.from("image").toString("base64") }],

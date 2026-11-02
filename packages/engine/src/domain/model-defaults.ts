@@ -23,6 +23,11 @@ export const ImageQuality = z.enum(["low", "medium", "high"]);
 export type ImageQuality = z.infer<typeof ImageQuality>;
 export const VideoResolution = z.enum(["720p", "1080p"]);
 export type VideoResolution = z.infer<typeof VideoResolution>;
+// The size an image is asked for: 1k is every model's standard size (1024 px
+// on its short side or about); 2k its larger one, for a destination that
+// needs more pixels than 1K gives (image-size.ts, DOGFOOD #86).
+export const ImageSize = z.enum(["1k", "2k"]);
+export type ImageSize = z.infer<typeof ImageSize>;
 
 export interface ModelEntry {
   kind: ModelKind;
@@ -38,8 +43,10 @@ export interface ModelEntry {
   retired?: string;
   // Retired: the model its provider answers it with now.
   replacedBy?: string;
-  // Image: the qualities the request may be sent with.
+  // Image: the qualities the request may be sent with, and the sizes it can
+  // be asked for (1k alone when absent).
   qualities?: readonly ImageQuality[];
+  sizes?: readonly ImageSize[];
   // Video: the lengths it renders at each resolution it offers.
   seconds?: Partial<Record<VideoResolution, readonly number[]>>;
   // Text: the effort levels it offers (domain/effort.ts), the most it writes
@@ -50,6 +57,11 @@ export interface ModelEntry {
 }
 
 const QUALITIES: readonly ImageQuality[] = ["low", "medium", "high"];
+// 2K, verified 2026-11-02: GPT Image 2 takes any size with both sides
+// multiples of 16 (developers.openai.com image generation guide); Gemini's
+// image models take imageSize "2K" (ai.google.dev image generation; Flash-Lite
+// lists 1K only). GPT Image 1.5 and 1 Mini take the three standard sizes.
+const UP_TO_2K: readonly ImageSize[] = ["1k", "2k"];
 // Veo 3.1 (all three, shut down by Google on 2026-10-22): 4, 6 or 8 s at
 // 720p; 1080p only at 8 s (ai.google.dev/gemini-api/docs/veo, 2026-10-06).
 const VEO_SECONDS = { "720p": [4, 6, 8], "1080p": [8] } as const;
@@ -77,6 +89,7 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     id: "gpt-image-2",
     label: "GPT Image 2",
     qualities: QUALITIES,
+    sizes: UP_TO_2K,
   },
   {
     kind: "image",
@@ -101,12 +114,14 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     provider: "google",
     id: "gemini-nano-banana-2.1",
     label: "Gemini Nano Banana 2.1",
+    sizes: UP_TO_2K,
   },
   {
     kind: "image",
     provider: "google",
     id: "gemini-3-pro-image",
     label: "Gemini 3 Pro Image",
+    sizes: UP_TO_2K,
   },
   {
     kind: "image",
@@ -114,6 +129,7 @@ export const MODEL_CATALOG: readonly ModelEntry[] = [
     id: "gemini-3.1-flash-image",
     label: "Gemini 3.1 Flash Image",
     deprecated: "2026-10-06",
+    sizes: UP_TO_2K,
   },
   {
     kind: "image",

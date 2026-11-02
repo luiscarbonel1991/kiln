@@ -10,6 +10,7 @@ import {
   toMicros,
   videoCost,
 } from "@/domain/generation-cost";
+import { OPENAI_2K } from "@/domain/image-size";
 import { catalogFor, DEFAULT_IMAGE_QUALITY } from "@/domain/model-defaults";
 
 const veo = (model: string, resolution?: "720p" | "1080p") => ({
@@ -214,6 +215,81 @@ describe("generation cost", () => {
     expect(
       estimateScenes([{}], { provider: "openai", model: "gpt-image-9" }),
     ).toBeNull();
+  });
+});
+
+describe("2K images", () => {
+  const gpt2 = {
+    provider: "openai",
+    model: "gpt-image-2",
+    size: "2k" as const,
+  };
+
+  it("prices GPT Image 2 at 2K from its output tokens at $30 per 1M (calculator, 2026-11-02)", () => {
+    // 3,568 tokens square and 2,372 at 1600x2000 (medium), plus the edit's
+    // input allowance as at 1K.
+    expect(estimateGeneration(gpt2, "1:1")).toEqual({
+      typical: 0.117,
+      max: 0.127,
+    });
+    expect(estimateGeneration(gpt2, "4:5")).toEqual({
+      typical: 0.0812,
+      max: 0.0912,
+    });
+    expect(estimateGeneration({ ...gpt2, quality: "high" }, "1:1")).toEqual({
+      typical: 0.4382,
+      max: 0.4482,
+    });
+  });
+
+  it("a model or aspect without 2K is priced at 1K, as it runs", () => {
+    const mini = { provider: "openai", model: "gpt-image-1.5" };
+    expect(estimateGeneration({ ...mini, size: "2k" }, "4:5")).toEqual(
+      estimateGeneration(mini, "4:5"),
+    );
+    expect(estimateGeneration(gpt2, "21:9")).toEqual(
+      estimateGeneration({ provider: "openai", model: "gpt-image-2" }, "21:9"),
+    );
+  });
+
+  it("prices Gemini per 2K image: Nano Banana 2.1 $0.0504, 3 Pro as at 1K", () => {
+    const nano = { provider: "google", model: "gemini-nano-banana-2.1" };
+    const at1k = estimateGeneration(nano, "1:1");
+    const at2k = estimateGeneration({ ...nano, size: "2k" }, "1:1");
+    expect(
+      Math.round(((at2k?.typical ?? 0) - (at1k?.typical ?? 0)) * 1e4) / 1e4,
+    ).toBe(0.0168);
+    const pro = { provider: "google", model: "gemini-3-pro-image" };
+    expect(estimateGeneration({ ...pro, size: "2k" }, "4:5")).toEqual(
+      estimateGeneration(pro, "4:5"),
+    );
+  });
+
+  it("prices every model that offers 2K, at every 2K aspect and quality", () => {
+    for (const m of catalogFor("image").filter((e) =>
+      e.sizes?.includes("2k"),
+    )) {
+      for (const aspect of Object.keys(OPENAI_2K)) {
+        for (const quality of m.qualities ?? [undefined]) {
+          const model = { provider: m.provider, model: m.id, quality };
+          const big = estimateGeneration({ ...model, size: "2k" }, aspect);
+          expect(big, `${m.id} ${aspect} ${quality}`).not.toBeNull();
+          expect(big?.max ?? 0).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it("sums scenes each at its own size", () => {
+    const e = estimateScenes(
+      [
+        { aspect: "1:1", size: "2k" },
+        { aspect: "4:5", size: "1k" },
+      ],
+      { provider: "openai", model: "gpt-image-2" },
+    );
+    // $0.117 + $0.051 typical.
+    expect(e?.typical).toBe(0.168);
   });
 });
 

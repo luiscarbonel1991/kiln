@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { toFile } from "openai";
+import { OPENAI_2K, sizeOn } from "@/domain/image-size";
 import {
   assertModel,
   DEFAULT_IMAGE_QUALITY,
   type ImageQuality,
+  type ImageSize,
 } from "@/domain/model-defaults";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { assertCapability, OPENAI_CAPS } from "@/providers/capabilities";
@@ -47,8 +49,18 @@ const MOCK_USAGE: GenerationUsage = {
   outputTokens: 1800,
 };
 
-// Map our aspect ratios to gpt-image supported sizes.
-function sizeFor(aspect: string): "1024x1024" | "1024x1536" | "1536x1024" {
+// Map our aspect ratios to gpt-image supported sizes; at 2K (sizeOn), GPT
+// Image 2's own size for the aspect.
+function sizeFor(model: {
+  model: string;
+  aspect: string;
+  size?: ImageSize;
+}): string {
+  const { aspect } = model;
+  const large = OPENAI_2K[aspect];
+  if (large && sizeOn({ ...model, provider: "openai" }, aspect) === "2k") {
+    return `${large.width}x${large.height}`;
+  }
   if (["4:5", "2:3", "9:16", "3:4"].includes(aspect)) return "1024x1536";
   if (["5:4", "3:2", "16:9", "4:3"].includes(aspect)) return "1536x1024";
   return "1024x1024";
@@ -85,7 +97,7 @@ function editParams(input: ImageEditInput, model: string) {
     prompt: input.negative
       ? `${input.prompt}\nAvoid: ${input.negative}`
       : input.prompt,
-    size: sizeFor(input.model.aspect),
+    size: sizeFor(input.model),
     quality: qualityOf(input),
   };
 }
@@ -147,7 +159,7 @@ export const openaiImageProvider: ImageProvider = {
       {
         model,
         prompt: input.prompt,
-        size: sizeFor(input.model.aspect),
+        size: sizeFor(input.model),
         quality: qualityOf(input),
       },
       { maxRetries: 0 },
