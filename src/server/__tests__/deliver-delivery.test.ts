@@ -233,6 +233,53 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
     );
   });
 
+  it("names a stills-in-motion video as Kiln's own, free", async () => {
+    const STILLS = "https://storage.test/stills/listing.mp4";
+    const result = await buildDelivery(
+      input({
+        plan: {
+          ...plan,
+          slots: plan.slots.map((s) =>
+            s.key === "video"
+              ? {
+                  ...s,
+                  approvedOutput: STILLS,
+                  video: { stills: true, seconds: 10 },
+                }
+              : s,
+          ),
+        },
+        cardOf: (key: string) =>
+          ({
+            "in-use": { status: "done" as const, outputs: [IN_USE] },
+            hero: { status: "done" as const, outputs: [HERO] },
+            video: { status: "done" as const, outputs: [STILLS] },
+          })[key],
+        fetchOutput: async (url: string) =>
+          url === STILLS
+            ? new TextEncoder().encode("mp4 bytes")
+            : url === IN_USE
+              ? png("1024x1536")
+              : png("1024x1024"),
+      }),
+    );
+    const folder = "botanical-coaster-launch-etsy";
+    const files = unzipSync(result.zip);
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    const video = manifest.files.find(
+      (f: { kind: string }) => f.kind === "video",
+    );
+    expect(video).toMatchObject({
+      seconds: 10,
+      width: 720,
+      height: 1280,
+      source: { model: "kiln-stills", costMicros: 0 },
+    });
+    expect(strFromU8(files[`${folder}/README.txt`])).toContain(
+      "10 s, stills in motion, made by Kiln (free)",
+    );
+  });
+
   it("names the model a frame ran on after it moved down its route", async () => {
     const result = await buildDelivery(
       input({

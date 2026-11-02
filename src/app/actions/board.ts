@@ -55,6 +55,7 @@ import {
   setVideoChoice,
 } from "@/server/project-repository";
 import { relookSlot, retuneSlot } from "@/server/slot-tuning";
+import { makeStillsVideo } from "@/server/stills-video";
 import type { Degraded } from "@/server/text-calls";
 
 // Board mutations. Server Functions are POST-reachable: Zod is the trust
@@ -391,6 +392,25 @@ const Video = z.object({
 export async function setVideoChoiceAction(input: z.infer<typeof Video>) {
   const { projectId, destinationId, slotKey, choice } = Video.parse(input);
   await setVideoChoice(projectId, { destinationId, slotKey }, choice);
+  refresh();
+}
+
+const Stills = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  slotKey: z.string().min(1),
+});
+
+// Make the stills-in-motion video from the approved scenes: free, local,
+// the video card's take to review.
+export async function makeStillsVideoAction(
+  input: unknown,
+): Promise<{ error: string } | undefined> {
+  const parsed = Stills.safeParse(input);
+  if (!parsed.success) return { error: "Name the video frame." };
+  const { projectId, destinationId, slotKey } = parsed.data;
+  const made = await makeStillsVideo(projectId, { destinationId, slotKey });
+  if ("error" in made) return made;
   refresh();
 }
 

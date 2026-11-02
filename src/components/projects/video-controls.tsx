@@ -2,7 +2,11 @@
 
 import { Film, Loader2, Plus } from "lucide-react";
 import { useState, useTransition } from "react";
-import { addVideoAction, setVideoChoiceAction } from "@/app/actions/board";
+import {
+  addVideoAction,
+  makeStillsVideoAction,
+  setVideoChoiceAction,
+} from "@/app/actions/board";
 import { enqueueGenerationAction } from "@/app/actions/generation";
 import type {
   ModelValue,
@@ -84,18 +88,60 @@ export function VideoControls({
       if ("error" in result) setError(result.error);
       setConfirming(false);
     });
+  // Stills in motion: Kiln makes it now, free, from the approved scenes.
+  const makeStills = () =>
+    startTransition(async () => {
+      setError(null);
+      const result = await makeStillsVideoAction({
+        projectId,
+        destinationId,
+        slotKey,
+      });
+      if (result?.error) setError(result.error);
+    });
   const frameLabel =
     scenes.find((s) => s.key === settings.from)?.label ?? "an approved scene";
+  const pill = (active: boolean) =>
+    `rounded-pill border px-2.5 py-0.5 font-sans text-[0.68rem] transition-colors disabled:opacity-50 ${
+      active
+        ? "border-primary bg-primary text-primary-foreground"
+        : "border-border-soft bg-secondary text-foreground hover:border-primary"
+    }`;
   return (
     <div className="flex w-full flex-col gap-1.5">
-      <SlotModel
-        projectId={projectId}
-        cardId={cardId}
-        kind="video"
-        value={model}
-        notes={notes}
-        disabled={pending || busy}
-      />
+      <fieldset className="flex flex-wrap gap-1">
+        <legend className="sr-only">Who makes the video</legend>
+        <button
+          type="button"
+          aria-pressed={!settings.stills}
+          data-testid={`video-${destinationId}-${slotKey}-by-model`}
+          disabled={pending || busy}
+          onClick={() => choose({ stills: false })}
+          className={pill(!settings.stills)}
+        >
+          A model
+        </button>
+        <button
+          type="button"
+          aria-pressed={settings.stills}
+          data-testid={`video-${destinationId}-${slotKey}-stills`}
+          disabled={pending || busy}
+          onClick={() => choose({ stills: true })}
+          className={pill(settings.stills)}
+        >
+          Stills in motion · free
+        </button>
+      </fieldset>
+      {settings.stills ? null : (
+        <SlotModel
+          projectId={projectId}
+          cardId={cardId}
+          kind="video"
+          value={model}
+          notes={notes}
+          disabled={pending || busy}
+        />
+      )}
       <label className="flex flex-col gap-0.5 font-mono text-[0.58rem] text-on-surface-dim">
         Starts from
         <select
@@ -115,8 +161,13 @@ export function VideoControls({
           ))}
         </select>
       </label>
-      <div className="grid grid-cols-2 gap-1.5">
+      <div
+        className={
+          settings.stills ? "grid gap-1.5" : "grid grid-cols-2 gap-1.5"
+        }
+      >
         <select
+          hidden={settings.stills}
           aria-label="Motion"
           data-testid={`video-${destinationId}-${slotKey}-motion`}
           className={SELECT}
@@ -160,7 +211,26 @@ export function VideoControls({
         <option value="portrait">Vertical 9:16</option>
         <option value="landscape">Landscape 16:9</option>
       </select>
+      {settings.stills ? (
+        <>
+          <Button
+            variant="secondary"
+            size="xs"
+            data-testid={`video-${destinationId}-${slotKey}-make-stills`}
+            disabled={pending || busy || !settings.startFrame}
+            onClick={makeStills}
+          >
+            {pending ? <Loader2 className="animate-spin" /> : <Film />}
+            {rendered ? "Make it again · free" : "Make the video · free"}
+          </Button>
+          <span className="font-sans text-[0.68rem] leading-snug text-on-surface-mid">
+            Kiln shows each approved scene with a slow zoom and slides to the
+            next, starting from {frameLabel}: no model, no audio, nothing paid.
+          </span>
+        </>
+      ) : null}
       <Button
+        hidden={settings.stills}
         variant="secondary"
         size="xs"
         data-testid={`video-${destinationId}-${slotKey}-generate`}
@@ -178,7 +248,7 @@ export function VideoControls({
         {rendered ? "Re-roll video" : "Generate video"}
         {usd === null ? "" : ` · ${money(usd)}`}
       </Button>
-      {blocked ? (
+      {blocked && !settings.stills ? (
         <span
           data-testid={`video-${destinationId}-${slotKey}-blocked`}
           className="font-sans text-[0.68rem] leading-snug text-prov-local"

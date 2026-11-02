@@ -23,6 +23,7 @@ import {
 } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import type { DestinationCost } from "@/domain/project-cost";
+import { isStillsVideo } from "@/domain/video";
 import type { PlateImage } from "@/lib/plate-href";
 import {
   asJpeg,
@@ -295,7 +296,21 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
         model,
       );
       const file = `video.${extensionOf(output)}`;
-      const source = input.sourceOf(output);
+      // A stills-in-motion video was made by Kiln, free, not by a model.
+      const source =
+        input.sourceOf(output) ??
+        (isStillsVideo(output)
+          ? {
+              prompt:
+                "Stills in motion: each approved scene with a slow zoom, sliding to the next",
+              model: "kiln-stills",
+              label: "stills in motion, made by Kiln (free)",
+              costMicros: 0,
+              generatedAt: null,
+              seconds: settings.seconds,
+              aspect: settings.orientation === "landscape" ? "16:9" : "9:16",
+            }
+          : undefined);
       const orientation = source?.aspect
         ? source.aspect === "16:9"
           ? "landscape"

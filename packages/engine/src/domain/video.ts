@@ -47,8 +47,29 @@ export const VideoChoice = z.object({
   motion: VideoMotion.optional(),
   seconds: VideoSeconds.optional(),
   orientation: VideoOrientation.optional(),
+  // Stills in motion (DOGFOOD #45): Kiln makes the video itself, free, from
+  // the approved scenes (a slow zoom on each, sliding to the next), instead
+  // of a model animating one. The maker's explicit choice, never a fallback.
+  stills: z.boolean().optional(),
 });
 export type VideoChoice = z.infer<typeof VideoChoice>;
+
+// The lengths a stills-in-motion video takes, within the destination's.
+const STILLS_SECONDS: VideoSeconds[] = [8, 10, 12];
+
+export function stillsSecondsFor(rules?: {
+  minSec: number;
+  maxSec: number;
+}): VideoSeconds[] {
+  const ok = rules
+    ? STILLS_SECONDS.filter((s) => s >= rules.minSec && s <= rules.maxSec)
+    : STILLS_SECONDS;
+  return ok.length > 0 ? ok : [8];
+}
+
+// A stills-in-motion video is stored under its own prefix (Kiln names the
+// key), so its output says what made it.
+export const isStillsVideo = (url: string) => /\/stills\/[^/]+\.mp4$/.test(url);
 
 // The lengths the model renders at its resolution that the destination
 // accepts (Gemini Omni on Etsy, 5-15 s: 5 to 10). When none fits, the

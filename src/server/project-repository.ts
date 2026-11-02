@@ -419,6 +419,35 @@ export async function saveCardOutput(
   });
 }
 
+// A planned project's video card takes the stills-in-motion video Kiln made
+// (free, no queue job): its take, to review and approve like any other.
+// Refused while the card has a job in the queue.
+export async function setStillsVideo(
+  projectId: string,
+  cardId: string,
+  url: string,
+): Promise<void> {
+  assertDatabaseUrl();
+  const maker = await getCurrentMaker();
+  await db.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Project"
+      WHERE "id" = ${projectId} AND "makerId" = ${maker.id}
+      FOR UPDATE`;
+    if (locked.length === 0) throw new Error("project not found");
+    const busy = await tx.generationJob.count({
+      where: { projectId, cardId, status: { in: ACTIVE_JOB_STATUSES } },
+    });
+    if (busy > 0) {
+      throw new Error("This video is in the queue; wait for it to finish.");
+    }
+    await tx.card.update({
+      where: { projectId_cardId: { projectId, cardId } },
+      data: { outputs: [url], status: "done" },
+    });
+  });
+}
+
 // A studio card's vector, traced on the server from the take it shows: kept
 // only while the card still shows that take (a newer take clears the vector,
 // so a late trace never lands on it). False when nothing was written.

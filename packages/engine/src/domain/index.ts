@@ -473,6 +473,8 @@ export {
 export { BaseUnderstanding } from "@/domain/understanding";
 export {
   aspectOf,
+  isStillsVideo,
+  stillsSecondsFor,
   VIDEO_MOTIONS,
   VideoChoice,
   VideoMotion,

@@ -36,8 +36,10 @@ import {
   loadProjectBoard,
   setSlotApproval,
   setSlotOff,
+  setVideoChoice,
 } from "@/server/project-repository";
 import { relookSlot, retuneSlot } from "@/server/slot-tuning";
+import { makeStillsVideo } from "@/server/stills-video";
 import { defineTool, ToolRefusal } from "@/server/tools/registry";
 
 // The board as tools: the projects, their frames, a look at a take, and the
@@ -461,5 +463,43 @@ export const switchFrame = defineTool({
       throw refusal(error);
     }
     return { data: { frame, on } };
+  },
+});
+
+export const makeStillsVideoTool = defineTool({
+  name: "make_stills_video",
+  title: "Make the stills video",
+  description:
+    "Make a video frame's listing video as stills in motion, as the board's \"Stills in motion · free\" does: each approved scene of its destination with a slow zoom, sliding to the next, no audio. Free and local, no model is called. It becomes the video frame's take, to approve like any other. Length and orientation are the frame's (seconds 8, 10 or 12).",
+  input: FrameRef.extend({
+    seconds: z
+      .union([z.literal(8), z.literal(10), z.literal(12)])
+      .optional()
+      .describe("Its length; left out, the frame's."),
+  }),
+  hints: { idempotent: false },
+  run: async ({ project, frame, seconds }) => {
+    const view = await frameOf(project, frame);
+    if (view.fill !== "video") {
+      throw new ToolRefusal(`${frame} is not a video frame (${view.fill}).`);
+    }
+    const ref = refOf(frame);
+    try {
+      await setVideoChoice(project, ref, {
+        stills: true,
+        ...(seconds ? { seconds } : {}),
+      });
+    } catch (error) {
+      throw refusal(error);
+    }
+    const made = await makeStillsVideo(project, ref);
+    if ("error" in made) throw new ToolRefusal(made.error);
+    return {
+      data: {
+        frame,
+        take: made.url,
+        next: `Check the take, then approve ${frame} with it.`,
+      },
+    };
   },
 });

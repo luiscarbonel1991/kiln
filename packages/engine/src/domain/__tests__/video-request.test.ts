@@ -5,6 +5,7 @@ import {
   VideoNeedsScene,
 } from "@/domain/generation-request";
 import type { VideoSettings } from "@/domain/plan";
+import { isStillsVideo, stillsSecondsFor } from "@/domain/video";
 import { CUTTING_BOARD } from "./fixtures/cutting-board";
 
 // A plate with raised white lettering, 1/8 in proud.
@@ -32,6 +33,7 @@ const settings: VideoSettings = {
   motion: "push-in",
   seconds: 8,
   orientation: "portrait",
+  stills: false,
   allowed: [8, 12],
 };
 
@@ -134,5 +136,19 @@ describe("buildVideoRequest", () => {
         settings: { ...settings, from: null, startFrame: null },
       }),
     ).toThrow(VideoNeedsScene);
+  });
+});
+
+describe("stills in motion", () => {
+  it("takes 8, 10 or 12 s within the destination's lengths, and names its own output", () => {
+    expect(stillsSecondsFor({ minSec: 5, maxSec: 15 })).toEqual([8, 10, 12]);
+    expect(stillsSecondsFor({ minSec: 5, maxSec: 10 })).toEqual([8, 10]);
+    expect(stillsSecondsFor({ minSec: 20, maxSec: 30 })).toEqual([8]);
+    expect(
+      isStillsVideo("http://localhost:9000/kiln-assets/stills/3f2a.mp4"),
+    ).toBe(true);
+    expect(
+      isStillsVideo("http://localhost:9000/kiln-assets/videos/3f2a.mp4"),
+    ).toBe(false);
   });
 });

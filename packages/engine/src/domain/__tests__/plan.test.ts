@@ -892,7 +892,19 @@ describe("video slots", () => {
       seconds: 8,
       orientation: "portrait",
       allowed: [5, 6, 7, 8, 9, 10],
+      stills: false,
     });
+    // Stills in motion: Kiln's own lengths, within the destination's.
+    const stills = withVideoChoice(approved, video, {
+      stills: true,
+      seconds: 12,
+    });
+    expect(
+      videoSettings(shopOf(stills), slotOf(stills, "video"), {
+        minSec: 5,
+        maxSec: 15,
+      }),
+    ).toMatchObject({ stills: true, seconds: 12, allowed: [8, 10, 12] });
   });
 
   it("offers the lengths the card's model renders at its resolution", () => {

@@ -31,6 +31,7 @@ import {
 } from "@/domain/shot-list";
 import {
   snapSeconds,
+  stillsSecondsFor,
   type VideoChoice,
   VideoChoice as VideoChoiceSchema,
   type VideoMotion,
@@ -496,8 +497,10 @@ export interface VideoSettings {
   seconds: VideoSeconds;
   orientation: VideoOrientation;
   // The lengths the model renders (at its resolution) that the destination
-  // accepts.
+  // accepts; for stills in motion, the lengths Kiln makes.
   allowed: VideoSeconds[];
+  // Kiln makes it from the approved scenes, free (VideoChoice.stills).
+  stills: boolean;
 }
 
 // A video slot's choices with their defaults: the start frame is the chosen
@@ -518,7 +521,10 @@ export function videoSettings(
     (s) => s.fill === "scene" && !s.off && s.approvedOutput,
   );
   const chosen = scenes.find((s) => s.key === choice.from) ?? scenes[0];
-  const allowed = videoSecondsFor(rules, model);
+  const stills = choice.stills === true;
+  const allowed = stills
+    ? stillsSecondsFor(rules)
+    : videoSecondsFor(rules, model);
   const seconds = snapSeconds(choice.seconds, allowed);
   return {
     from: chosen?.key ?? null,
@@ -527,6 +533,7 @@ export function videoSettings(
     seconds,
     orientation: choice.orientation ?? "portrait",
     allowed,
+    stills,
   };
 }
 
