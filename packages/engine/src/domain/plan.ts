@@ -180,6 +180,27 @@ const EXACT_RULES: Partial<Record<ExactKind, (product: Product) => boolean>> = {
   "colour-grid": (p) => p.colours.length > 1,
 };
 
+// Why the product takes no such frame, as the plan says it (DOGFOOD #57).
+const EXACT_WHY: Partial<Record<ExactKind, string>> = {
+  personalize: "it has no text lines, so nothing to personalize",
+  "colour-grid": "it comes in one colour",
+};
+
+// The frames a destination's shot list has that the product does not take,
+// each with why: a plan that drops one says so instead of shrinking quietly.
+export function skippedFrames(
+  destination: Pick<PlanDestination, "shotListId">,
+  product: Product,
+  shotLists: ShotList[],
+): { label: string; why: string }[] {
+  const list = shotLists.find((l) => l.id === destination.shotListId);
+  return (list?.slots ?? []).flatMap((slot) =>
+    ruled(slot) && slot.exact && !exactApplies(slot, product)
+      ? [{ label: slot.label, why: EXACT_WHY[slot.exact] ?? "" }]
+      : [],
+  );
+}
+
 function exactApplies(
   slot: { fill: string; exact?: ExactKind },
   product: Product,

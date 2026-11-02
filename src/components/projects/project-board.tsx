@@ -29,6 +29,7 @@ import { PhotoArt } from "@/components/projects/photo-art";
 import { ProductChangedBanner } from "@/components/projects/product-changed";
 import { ProjectTitle } from "@/components/projects/project-title";
 import { SceneArt } from "@/components/projects/scene-art";
+import { SkippedFrames } from "@/components/projects/skipped-frames";
 import {
   framePosition,
   onIndexes,
@@ -69,6 +70,7 @@ import {
   type ProjectPlan,
   replan,
   type SlotView,
+  skippedFrames,
   slotCardId,
   slotState,
   type VideoSettings,
@@ -440,6 +442,10 @@ export function ProjectBoard({
                   />
                 ) : null}
               </h2>
+              <SkippedFrames
+                frames={skippedFrames(plan, product, CATALOG.shotLists)}
+                testId={`board-skipped-${plan.destinationId}`}
+              />
               <SlotGrid>
                 {slots.map(({ slot, cardId, card, view, onView }, i) => {
                   const video =

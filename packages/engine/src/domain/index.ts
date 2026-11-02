@@ -254,6 +254,7 @@ export {
   type SlotView,
   sceneCardIds,
   shotListFor,
+  skippedFrames,
   slotCardId,
   slotRecipeId,
   slotState,

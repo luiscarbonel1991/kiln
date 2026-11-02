@@ -25,6 +25,7 @@ import { LookPicker } from "@/components/projects/look-picker";
 import { PhotoArt } from "@/components/projects/photo-art";
 import { ProductEditor } from "@/components/projects/product-editor";
 import { SceneArt } from "@/components/projects/scene-art";
+import { SkippedFrames } from "@/components/projects/skipped-frames";
 import {
   framePosition,
   onIndexes,
@@ -61,6 +62,7 @@ import {
   planProject,
   planVideos,
   replacementFrames,
+  skippedFrames,
   slotCardId,
 } from "@/domain/plan";
 import {
@@ -722,6 +724,10 @@ export function NewProjectFlow({
                       "frame",
                     )}
                   </h3>
+                  <SkippedFrames
+                    frames={skippedFrames(d, product, CATALOG.shotLists)}
+                    testId={`plan-skipped-${d.destinationId}`}
+                  />
                   <SlotGrid>
                     {d.slots.map((slot, i) => {
                       const id = slotCardId(d.destinationId, slot.key);

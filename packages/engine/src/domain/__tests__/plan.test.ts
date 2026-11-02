@@ -17,6 +17,7 @@ import {
   planVideos,
   replan,
   sceneCardIds,
+  skippedFrames,
   slotCardId,
   slotRecipeId,
   slotState,
@@ -1243,5 +1244,31 @@ describe("withSlotPlace", () => {
     expect(() => withSlotPlace(plan, ref, "x".repeat(161))).toThrow(
       /at most 160/,
     );
+  });
+});
+
+describe("skippedFrames", () => {
+  it("names the frames a product does not take, and why", () => {
+    const fixed = {
+      ...CUTTING_BOARD,
+      wording: [],
+      colours: [CUTTING_BOARD.colours[0]],
+    };
+    expect(
+      skippedFrames({ shotListId: "shop-kit" }, fixed, catalog.shotLists),
+    ).toEqual([
+      { label: "Colours", why: "it comes in one colour" },
+      {
+        label: "How to personalize",
+        why: "it has no text lines, so nothing to personalize",
+      },
+    ]);
+    expect(
+      skippedFrames(
+        { shotListId: "shop-kit" },
+        CUTTING_BOARD,
+        catalog.shotLists,
+      ),
+    ).toEqual([]);
   });
 });
