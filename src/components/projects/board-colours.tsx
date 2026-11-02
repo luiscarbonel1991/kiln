@@ -1,6 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { lookVerified, type Product, safeLink } from "@/domain/product";
 import { isRenderableUrl } from "@/lib/asset-url";
+import { plural } from "@/lib/plural";
 
 export const UNVERIFIED_TITLE =
   "No material photo or supplier page: the scene draws this colour from its hex alone. Add one on the product.";
@@ -14,9 +15,12 @@ export const UNVERIFIED_TITLE =
 export function BoardColours({
   product,
   scenes = product.defaultColour,
+  frames = {},
 }: {
   product: Product;
   scenes?: string;
+  // Scenes that show another colour of their own, by colour.
+  frames?: Record<string, number>;
 }) {
   const layered = product.treatment === "reveal";
   const defaultSample = product.colours.find(
@@ -56,7 +60,11 @@ export function BoardColours({
                   <span className="font-semibold text-foreground">
                     {c.name}
                   </span>
-                  {used ? " · scenes use this" : null}
+                  {used
+                    ? " · scenes use this"
+                    : frames[c.key]
+                      ? ` · ${plural(frames[c.key], "scene")}`
+                      : null}
                 </span>
                 {layered && c.inlay ? (
                   <span className="flex flex-wrap items-center gap-1 text-on-surface-mid">

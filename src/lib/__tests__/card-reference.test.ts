@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { DOOR_TAG } from "@/domain/__tests__/fixtures/door-tag";
 import type { MasterAsset } from "@/domain/master-asset";
-import { planProject, withSlotTuning, withThreeQuarter } from "@/domain/plan";
+import {
+  planProject,
+  withSlotLook,
+  withSlotTuning,
+  withThreeQuarter,
+} from "@/domain/plan";
+import { withLookReference } from "@/domain/plan-look";
 import { Product } from "@/domain/product";
 import { cardReference, slotCamera } from "@/lib/card-reference";
 import { CATALOG } from "@/lib/recipes";
@@ -46,16 +53,18 @@ const slot = (p: typeof plan, key: string) => {
 
 describe("the camera a scene applies", () => {
   it("is Kiln's pick, a little above, once the view from above applies", () => {
-    expect(slotCamera(plain, slot(plain, "in-use"), master.assetUrl)).toBe(
-      "eye",
-    );
-    expect(slotCamera(plan, slot(plan, "in-use"), master.assetUrl)).toBe(
+    expect(
+      slotCamera(plain, slot(plain, "in-use"), master.assetUrl, product),
+    ).toBe("eye");
+    expect(
+      slotCamera(plan, slot(plan, "in-use"), master.assetUrl, product),
+    ).toBe("above");
+    expect(slotCamera(plan, slot(plan, "hero"), master.assetUrl, product)).toBe(
       "above",
     );
-    expect(slotCamera(plan, slot(plan, "hero"), master.assetUrl)).toBe("above");
-    expect(slotCamera(plan, slot(plan, "detail"), master.assetUrl)).toBe(
-      undefined,
-    );
+    expect(
+      slotCamera(plan, slot(plan, "detail"), master.assetUrl, product),
+    ).toBe(undefined);
   });
 
   it("the maker's stop wins over Kiln's pick", () => {
@@ -64,25 +73,25 @@ describe("the camera a scene applies", () => {
       { destinationId: "etsy", slotKey: "in-use" },
       { knob: "camera", stop: "eye" },
     );
-    expect(slotCamera(tuned, slot(tuned, "in-use"), master.assetUrl)).toBe(
-      "eye",
-    );
-    expect(cardReference(tuned, "etsy.in-use", master)).toBe(master);
+    expect(
+      slotCamera(tuned, slot(tuned, "in-use"), master.assetUrl, product),
+    ).toBe("eye");
+    expect(cardReference(tuned, "etsy.in-use", master, product)).toBe(master);
   });
 });
 
 describe("the image a scene card edits", () => {
   it("the view from above for a camera looking down, the front for the rest", () => {
-    expect(cardReference(plan, "etsy.hero", master).assetUrl).toBe(
+    expect(cardReference(plan, "etsy.hero", master, product).assetUrl).toBe(
       view.assetUrl,
     );
-    expect(cardReference(plan, "etsy.in-use", master).assetUrl).toBe(
+    expect(cardReference(plan, "etsy.in-use", master, product).assetUrl).toBe(
       view.assetUrl,
     );
     // The macro has no camera: it keeps the front.
-    expect(cardReference(plan, "etsy.detail", master)).toBe(master);
-    expect(cardReference(plan, "etsy.nowhere", master)).toBe(master);
-    expect(cardReference(plain, "etsy.hero", master)).toBe(master);
+    expect(cardReference(plan, "etsy.detail", master, product)).toBe(master);
+    expect(cardReference(plan, "etsy.nowhere", master, product)).toBe(master);
+    expect(cardReference(plain, "etsy.hero", master, product)).toBe(master);
   });
 
   it("a reference the maker uploaded replaces both views", () => {
@@ -91,6 +100,50 @@ describe("the image a scene card edits", () => {
       id: "m-own",
       assetUrl: "https://stub.local/mine.jpg",
     };
-    expect(cardReference(plan, "etsy.hero", own)).toBe(own);
+    expect(cardReference(plan, "etsy.hero", own, product)).toBe(own);
+  });
+
+  it("a frame in a look of its own edits the plate Kiln drew for that look, and that look's view from above", () => {
+    const gold = {
+      colour: "gold-black",
+      design: "https://stub.local/gold.svg",
+      front: "https://stub.local/gold.png",
+      threeQuarter: {
+        assetUrl: "https://stub.local/gold-above.png",
+        angleDeg: 30,
+        front: "https://stub.local/gold.png",
+      },
+    };
+    const tag = withSlotLook(
+      withLookReference(
+        withThreeQuarter(
+          planProject({
+            product: DOOR_TAG,
+            type: "listing-kit",
+            destinationIds: ["etsy"],
+            catalog: CATALOG,
+          }),
+          view,
+        ),
+        gold,
+      ),
+      { destinationId: "etsy", slotKey: "detail" },
+      { colour: "gold-black" },
+    );
+    const eyeLevel = cardReference(tag, "etsy.detail", master, DOOR_TAG);
+    expect(eyeLevel.assetUrl).toBe(gold.front);
+    expect(eyeLevel.id).toBe(master.id);
+    const above = withSlotLook(
+      tag,
+      { destinationId: "etsy", slotKey: "hero" },
+      { colour: "gold-black" },
+    );
+    expect(cardReference(above, "etsy.hero", master, DOOR_TAG).assetUrl).toBe(
+      gold.threeQuarter.assetUrl,
+    );
+    // The project's own frames keep the project's reference and view.
+    expect(cardReference(above, "etsy.in-use", master, DOOR_TAG).assetUrl).toBe(
+      view.assetUrl,
+    );
   });
 });

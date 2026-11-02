@@ -35,7 +35,7 @@ import type { ShotList } from "@/domain/shot-list";
 import { BaseUnderstanding } from "@/domain/understanding";
 import type { VideoChoice } from "@/domain/video";
 import { assertDatabaseUrl, db } from "@/lib/db";
-import { retuneFields } from "@/lib/project-refresh";
+import { freshFields, retuneFields } from "@/lib/project-refresh";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
 import { productHash } from "@/server/product-version";
@@ -772,6 +772,10 @@ export async function setSlotTuning(
     master: MasterAsset;
     product: Product;
   }) => Card | undefined,
+  // "direction": a knob or a place rewrites the scene's direction only;
+  // "card": a colour or style rewrites the whole card in it (its product
+  // fields and its material sample), the maker's own fields kept.
+  rewrite: "direction" | "card" = "direction",
 ): Promise<{ product: Product | null; plan: ProjectPlan }> {
   assertDatabaseUrl();
   const maker = await getCurrentMaker();
@@ -851,12 +855,22 @@ export async function setSlotTuning(
       if (derived) {
         await tx.card.update({
           where: { projectId_cardId: { projectId, cardId } },
-          data: {
-            fields: retuneFields(
-              fields,
-              derived.fields,
-            ) as unknown as Prisma.InputJsonValue,
-          },
+          data:
+            rewrite === "card"
+              ? {
+                  fields: freshFields(
+                    fields,
+                    derived.fields,
+                  ) as unknown as Prisma.InputJsonValue,
+                  references:
+                    derived.references as unknown as Prisma.InputJsonValue,
+                }
+              : {
+                  fields: retuneFields(
+                    fields,
+                    derived.fields,
+                  ) as unknown as Prisma.InputJsonValue,
+                },
         });
       }
     }

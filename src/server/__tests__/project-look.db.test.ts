@@ -37,7 +37,9 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
   const { upsertProducts, getProduct, updateProduct } = await import(
     "@/server/product-repository"
   );
-  const { updateProjectProductAction } = await import("@/app/actions/board");
+  const { setSlotLookAction, updateProjectProductAction } = await import(
+    "@/app/actions/board"
+  );
   const { Product } = await import("@/domain/product");
   const { DOOR_TAG } = await import("@/domain/__tests__/fixtures/door-tag");
 
@@ -114,5 +116,106 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
       before?.board.plan?.references?.looks?.[0].front,
     );
     expect(after?.board.master?.assetUrl).toBe(drawn.front);
+  });
+
+  it("a frame takes a look of its own: Kiln draws it and writes the frame's card in it, the maker's own fields kept", async () => {
+    const [id] = created;
+    const card = await db.card.findUniqueOrThrow({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.hero" } },
+    });
+    const fields = card.fields as Record<
+      string,
+      { value: unknown; source: string }
+    >;
+    await db.card.update({
+      where: { projectId_cardId: { projectId: id, cardId: "etsy.hero" } },
+      data: {
+        fields: {
+          ...fields,
+          mood: { value: "quiet and warm", locked: false, source: "local" },
+        },
+      },
+    });
+    expect(
+      await setSlotLookAction({
+        projectId: id,
+        destinationId: "etsy",
+        slotKey: "hero",
+        colour: "black-white",
+        style: "original",
+      }),
+    ).toBeUndefined();
+    const own = await repo.loadProjectBoard(id);
+    const hero = own?.board.plan?.destinations[0].slots.find(
+      (s) => s.key === "hero",
+    );
+    expect(hero?.look).toEqual({ colour: "black-white", style: "original" });
+    expect(own?.board.plan?.references?.looks?.map((l) => l.colour)).toEqual([
+      "gold-black",
+      "black-white",
+    ]);
+    const written = own?.board.cards.find((c) => c.id === "etsy.hero");
+    expect(written?.references).toEqual([
+      "https://storage.test/products/black.jpg",
+    ]);
+    expect(written?.fields.palette.value).toContain("#1B1B1B");
+    expect(written?.fields.mood).toEqual({
+      value: "quiet and warm",
+      locked: false,
+      source: "local",
+    });
+    // The project's other scenes stay in gold.
+    expect(
+      own?.board.cards.find((c) => c.id === "etsy.in-use")?.references,
+    ).toEqual(["https://storage.test/products/gold.jpg"]);
+
+    expect(
+      await setSlotLookAction({
+        projectId: id,
+        destinationId: "etsy",
+        slotKey: "size",
+        colour: "black-white",
+      }),
+    ).toEqual({ error: "Only a scene takes a colour and style of its own." });
+  });
+
+  it("an update that takes the frame's colour away writes the frame in the project's look", async () => {
+    const [id] = created;
+    const before = await repo.loadProjectBoard(id);
+    const product = before?.product;
+    if (!product) throw new Error("no product");
+    await updateProduct(
+      product.id,
+      Product.parse({
+        ...product,
+        colours: product.colours.filter((c) => c.key === "gold-black"),
+        defaultColour: "gold-black",
+      }),
+    );
+    expect(await updateProjectProductAction({ projectId: id })).toBeUndefined();
+    const after = await repo.loadProjectBoard(id);
+    expect(after?.board.plan?.references?.looks?.map((l) => l.colour)).toEqual([
+      "gold-black",
+    ]);
+    expect(
+      after?.board.cards.find((c) => c.id === "etsy.hero")?.references,
+    ).toEqual(["https://storage.test/products/gold.jpg"]);
+  });
+
+  it("follows the project's look again with null", async () => {
+    const [id] = created;
+    expect(
+      await setSlotLookAction({
+        projectId: id,
+        destinationId: "etsy",
+        slotKey: "hero",
+        colour: null,
+        style: null,
+      }),
+    ).toBeUndefined();
+    const back = await repo.loadProjectBoard(id);
+    expect(
+      back?.board.plan?.destinations[0].slots.find((s) => s.key === "hero"),
+    ).not.toHaveProperty("look");
   });
 });

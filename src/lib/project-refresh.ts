@@ -17,14 +17,24 @@ export function refreshCards(
   return existing.map((card) => {
     const next = byId.get(card.id);
     if (!next) return { ...card, masterAssetId };
-    const fields = Object.fromEntries(
-      Object.entries(card.fields).map(([key, field]) => [
-        key,
-        field.source === "local" ? field : next.fields[key as keyof Fields],
-      ]),
-    ) as Fields;
-    return { ...card, fields, references: next.references, masterAssetId };
+    return {
+      ...card,
+      fields: freshFields(card.fields, next.fields),
+      references: next.references,
+      masterAssetId,
+    };
   });
+}
+
+// Every field from the card the product now derives, except one the maker
+// wrote (source "local").
+export function freshFields(current: Fields, derived: Fields): Fields {
+  return Object.fromEntries(
+    Object.entries(current).map(([key, field]) => [
+      key,
+      field.source === "local" ? field : derived[key as keyof Fields],
+    ]),
+  ) as Fields;
 }
 
 // The direction a scene's knobs write. A tuned card takes these from the card

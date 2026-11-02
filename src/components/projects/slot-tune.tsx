@@ -3,8 +3,13 @@
 import { SlidersHorizontal } from "lucide-react";
 import { Popover, ToggleGroup } from "radix-ui";
 import { useState, useTransition } from "react";
-import { setSlotKnobAction, setSlotPlaceAction } from "@/app/actions/board";
+import {
+  setSlotKnobAction,
+  setSlotLookAction,
+  setSlotPlaceAction,
+} from "@/app/actions/board";
 import { enqueueGenerationAction } from "@/app/actions/generation";
+import { LookPicker } from "@/components/projects/look-picker";
 import { toMicros } from "@/domain/generation-cost";
 import type { KnobChoice } from "@/domain/scene-knobs";
 import type { TuneView } from "@/lib/slot-tune";
@@ -72,6 +77,18 @@ export function SlotTune({
       });
       setError(result?.error ?? null);
     });
+  // Its own colour and style, or the project's again (null): Kiln draws the
+  // look and writes the card in it.
+  const relook = (change: { colour?: string | null; style?: string | null }) =>
+    startTransition(async () => {
+      const result = await setSlotLookAction({
+        projectId,
+        destinationId,
+        slotKey,
+        ...change,
+      });
+      setError(result?.error ?? null);
+    });
   const disabled = pending || tune.locked !== null;
   return (
     <div className="flex w-full min-w-0 basis-full items-center gap-2">
@@ -103,6 +120,25 @@ export function SlotTune({
                 Free to change. The next take reads it.
               </p>
             )}
+            {tune.look ? (
+              tune.look.refused ? (
+                <p className={cn(NOTE, "text-on-surface-mid")}>
+                  {tune.look.refused}
+                </p>
+              ) : (
+                <LookPicker
+                  testId={`tune-${destinationId}-${slotKey}-look`}
+                  label={LABEL}
+                  disabled={disabled}
+                  colours={tune.look.colours}
+                  styles={tune.look.styles}
+                  colour={tune.look.colour}
+                  style={tune.look.style}
+                  onColour={(colour) => relook({ colour })}
+                  onStyle={(style) => relook({ style })}
+                />
+              )
+            ) : null}
             {tune.knobs.map((knob) => {
               const current = knob.stops.find((s) => s.key === knob.stop);
               return (

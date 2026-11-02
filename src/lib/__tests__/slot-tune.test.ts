@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { DOOR_TAG } from "@/domain/__tests__/fixtures/door-tag";
 import type { MasterAsset } from "@/domain/master-asset";
 import {
   planProject,
   slotState,
+  withSlotLook,
   withSlotPlace,
   withSlotTuning,
   withThreeQuarter,
@@ -10,7 +12,7 @@ import {
 import { Product } from "@/domain/product";
 import { slotCards } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
-import { tuneView } from "@/lib/slot-tune";
+import { tuneLook, tuneView } from "@/lib/slot-tune";
 
 const plate = Product.parse({
   id: "prod-t",
@@ -282,5 +284,56 @@ describe("tuneView with Kiln's view from above", () => {
       picked: false,
     });
     expect(tune?.startsFrom).toBe("front");
+  });
+});
+
+describe("a scene's look in Tune", () => {
+  const tagPlan = planProject({
+    product: DOOR_TAG,
+    type: "listing-kit",
+    destinationIds: ["etsy"],
+    catalog: CATALOG,
+  });
+  const scene = (p: typeof tagPlan, key: string) => {
+    const found = p.destinations[0].slots.find((s) => s.key === key);
+    if (!found) throw new Error(`no ${key}`);
+    return found;
+  };
+
+  it("offers the project's look, each colour and each style, and marks the scene's own", () => {
+    const own = withSlotLook(
+      tagPlan,
+      { destinationId: "etsy", slotKey: "hero" },
+      { colour: "gold-black" },
+    );
+    expect(tuneLook(DOOR_TAG, own, scene(own, "hero"))).toEqual({
+      colours: [
+        { key: null, label: "The project's (Black/White)" },
+        { key: "black-white", label: "Black/White", face: "#1B1B1B" },
+        { key: "gold-black", label: "Gold/Black", face: "#D3B66F" },
+      ],
+      styles: [
+        { key: null, label: "The project's (Quiet please)" },
+        { key: "original", label: "Quiet please" },
+        { key: "do-not-disturb", label: "Do not disturb" },
+      ],
+      colour: "gold-black",
+      style: null,
+      refused: null,
+    });
+    expect(tuneLook(DOOR_TAG, own, scene(own, "size"))).toBeNull();
+  });
+
+  it("offers none for a product in one look, and says why for one not drawn from an SVG", () => {
+    const { plan, slot } = setup();
+    expect(tuneLook(plate, plan, slot)).toBeNull();
+    const photo = Product.parse({
+      ...DOOR_TAG,
+      styles: undefined,
+      source: { kind: "photo", assetUrl: "https://stub.local/tag.png" },
+    });
+    expect(tuneLook(photo, tagPlan, scene(tagPlan, "hero"))?.refused).toBe(
+      "Kiln draws other colours and styles from a design file; this product has none.",
+    );
   });
 });

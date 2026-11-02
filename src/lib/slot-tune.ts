@@ -1,6 +1,14 @@
 import type { Card } from "@/domain/card";
 import { type Route, takeEstimate } from "@/domain/model-routing";
-import type { PlanSlot, SlotView } from "@/domain/plan";
+import type { PlanSlot, ProjectPlan, SlotView } from "@/domain/plan";
+import { projectLook } from "@/domain/plan-look";
+import { colourOf, type Product } from "@/domain/product";
+import {
+  ORIGINAL,
+  productStyles,
+  resolveLook,
+  styleName,
+} from "@/domain/product-look";
 import type { JobView } from "@/domain/queue";
 import {
   effectiveKnobs,
@@ -72,6 +80,75 @@ export interface TuneView {
   // The image the next take edits, when Kiln drew a view from above: that
   // view for a camera looking down, else the front. Null without one.
   startsFrom: "above" | "front" | null;
+  // The colour and style the scene shows (ROADMAP P2-9); null when the
+  // product shows in one look only.
+  look: TuneLook | null;
+}
+
+export interface TuneLookOption {
+  // null: the project's.
+  key: string | null;
+  label: string;
+  face?: string;
+  // Why it cannot be picked; absent when it can.
+  refused?: string;
+}
+
+export interface TuneLook {
+  colours: TuneLookOption[];
+  // Empty for a product with one design.
+  styles: TuneLookOption[];
+  // The scene's own colour and style, null where it shows the project's.
+  colour: string | null;
+  style: string | null;
+  // Why the scene cannot take a look of its own, else null.
+  refused: string | null;
+}
+
+// The looks a scene can show: the project's, or one of the product's colours
+// and styles. A version shows its source's, so it offers none.
+export function tuneLook(
+  product: Product,
+  plan: ProjectPlan,
+  slot: PlanSlot,
+): TuneLook | null {
+  if (slot.fill !== "scene" || slot.versionOf) return null;
+  const styles = productStyles(product);
+  if (product.colours.length < 2 && styles.length === 0) return null;
+  const project = projectLook(plan, product);
+  const own = resolveLook(product, slot.look);
+  return {
+    colours: [
+      {
+        key: null,
+        label: `The project's (${colourOf(product, project.colour).name})`,
+      },
+      ...product.colours.map((c) => ({
+        key: c.key,
+        label: c.name,
+        face: c.face,
+        ...(c.inStock ? {} : { refused: `${c.name} is out of stock` }),
+      })),
+    ],
+    styles:
+      styles.length === 0
+        ? []
+        : [
+            {
+              key: null,
+              label: `The project's (${styleName(product, project.style)})`,
+            },
+            { key: ORIGINAL, label: styleName(product, null) },
+            ...styles.map((st) => ({ key: st.key, label: st.name })),
+          ],
+    colour:
+      slot.look?.colour && own.colour === slot.look.colour ? own.colour : null,
+    style: slot.look?.style ? (own.style ?? ORIGINAL) : null,
+    refused:
+      product.source.kind === "vector"
+        ? null
+        : "Kiln draws other colours and styles from a design file; this product has none.",
+  };
 }
 
 export interface TunePlace {
@@ -96,6 +173,8 @@ export function tuneView(input: {
   // The scenes' route (final), its models that may run here: a take is
   // priced at the dearest model it may run on, as the queue reserves it.
   route?: Route | null;
+  // The scene's colour and style (tuneLook).
+  look?: TuneLook | null;
 }): TuneView | null {
   const { slot, card, view, job, places = [], above = null } = input;
   if (slot.fill !== "scene" || !slot.knobs) return null;
@@ -169,5 +248,6 @@ export function tuneView(input: {
           putsInPlace: slot.knobs?.setting !== undefined,
         }
       : null,
+    look: input.look ?? null,
   };
 }

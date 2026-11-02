@@ -27,6 +27,7 @@ import {
   projectLook,
   projectProduct,
   withLookReferences,
+  withoutUndrawnLooks,
 } from "@/domain/plan-look";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { KnobChoice, ReasonKey } from "@/domain/scene-knobs";
@@ -52,7 +53,7 @@ import {
   setSlotOrder,
   setVideoChoice,
 } from "@/server/project-repository";
-import { retuneSlot } from "@/server/slot-tuning";
+import { relookSlot, retuneSlot } from "@/server/slot-tuning";
 import type { Degraded } from "@/server/text-calls";
 
 // Board mutations. Server Functions are POST-reachable: Zod is the trust
@@ -126,6 +127,41 @@ export async function setSlotKnobAction(
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Could not tune it.",
+    };
+  }
+  refresh();
+}
+
+const LookKey = z.string().min(1).max(64).nullable().optional();
+const LookWrite = z.object({
+  projectId: z.string().min(1),
+  destinationId: z.string().min(1),
+  slotKey: z.string().min(1),
+  // A key, null for the project's, left out to keep the frame's.
+  colour: LookKey,
+  style: LookKey,
+});
+
+// Show one scene in a colour and style of its own, or the project's again
+// (null): free, its card is written again in it.
+export async function setSlotLookAction(
+  input: unknown,
+): Promise<{ error: string } | undefined> {
+  const parsed = LookWrite.safeParse(input);
+  if (!parsed.success) return { error: "Pick a colour or a style." };
+  const { projectId, destinationId, slotKey, colour, style } = parsed.data;
+  try {
+    await relookSlot(
+      projectId,
+      { destinationId, slotKey },
+      {
+        ...(colour !== undefined ? { colour } : {}),
+        ...(style !== undefined ? { style } : {}),
+      },
+    );
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Could not change it.",
     };
   }
   refresh();
@@ -245,8 +281,12 @@ export async function updateProjectProductAction(
     const others = await redrawnLooks(product, plan, look);
     // A fresh plate gets its view from above drawn again beside it; a
     // maker's own reference keeps the plan's (it no longer applies).
+    // A frame whose look no longer draws shows the project's look again.
     const viewed = (p: ProjectPlan) => {
-      const kept = withLookReferences(p, [...(own ? [own] : []), ...others]);
+      const kept = withoutUndrawnLooks(
+        withLookReferences(p, [...(own ? [own] : []), ...others]),
+        product,
+      );
       return fresh ? withThreeQuarter(kept, drawn?.threeQuarter ?? null) : kept;
     };
     const understanding = productUnderstanding(

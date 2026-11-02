@@ -65,6 +65,9 @@ export const PlanSlot = ShotSlotFields.extend({
   // places, the market brief, or typed): it stands there instead of taking
   // the product's next place.
   place: z.string().trim().min(1).max(160).optional(),
+  // A scene slot's own colour and style (plan-look.ts), over the project's;
+  // read leniently.
+  look: Look.optional().catch(undefined),
   // A photo slot's photo: the maker's own image, in Kiln's storage, delivered
   // as it is.
   photo: z.string().min(1).optional(),
@@ -986,6 +989,21 @@ export function withThreeQuarter(
   const references = view ? { ...kept, threeQuarter: view } : kept;
   const { references: _references, ...rest } = plan;
   return Object.keys(references).length > 0 ? { ...rest, references } : rest;
+}
+
+// A scene slot's own colour and style, or back to the project's (none). A
+// version re-frames its source and takes the source's.
+export function withSlotLook(
+  plan: ProjectPlan,
+  ref: SlotRef,
+  look: Look | undefined,
+): ProjectPlan {
+  return updateSlot(plan, ref, ({ look: _old, ...slot }) => {
+    if (slot.fill !== "scene" || slot.versionOf) {
+      throw new Error("only a scene takes a colour and style of its own");
+    }
+    return look && (look.colour || look.style) ? { ...slot, look } : slot;
+  });
 }
 
 // A scene slot's own place, or back to the product's places (null). A

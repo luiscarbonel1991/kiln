@@ -34,8 +34,14 @@ const layered = Product.parse({
   defaultColour: "walnut",
 });
 
-const markup = (product: Product, scenes?: string) =>
-  renderToStaticMarkup(createElement(BoardColours, { product, scenes }));
+const markup = (
+  product: Product,
+  scenes?: string,
+  frames?: Record<string, number>,
+) =>
+  renderToStaticMarkup(
+    createElement(BoardColours, { product, scenes, frames }),
+  );
 
 describe("the colours beside the reference", () => {
   it("shows each colour's sample, face and base, and supplier page", () => {
@@ -59,6 +65,9 @@ describe("the colours beside the reference", () => {
     const html = markup(layered, "black");
     expect(html).toContain("Black</span> · scenes use this");
     expect(html).not.toContain("Walnut</span> · scenes use this");
+    expect(markup(layered, "walnut", { black: 2 })).toContain(
+      "Black</span> · 2 scenes",
+    );
   });
 
   it("shows a colour's hex when it is not layered", () => {

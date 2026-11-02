@@ -1,14 +1,20 @@
-import type { ProjectPlan } from "@/domain/plan";
+import { type PlanSlot, type ProjectPlan, versionSource } from "@/domain/plan";
 import { colourOf, type Product } from "@/domain/product";
 import {
   type Look,
+  ORIGINAL,
   productInLook,
+  productStyles,
   type ResolvedLook,
   resolveLook,
   sameLook,
   storedLook,
 } from "@/domain/product-look";
-import type { LookReference } from "@/domain/scene-reference";
+import {
+  type LookReference,
+  type ThreeQuarterView,
+  threeQuarterFor,
+} from "@/domain/scene-reference";
 
 // The look a project shows (ROADMAP P2-9): the colour and style New project
 // picked, else the product's default colour and own drawing. The product's
@@ -108,4 +114,111 @@ export function chosenLook(
     };
   }
   return { look: storedLook(look) };
+}
+
+// The look a frame shows (ROADMAP P2-9, chosen per frame): its own over the
+// project's. A version re-frames its source scene, so it shows the source's.
+export function slotLook(
+  plan: ProjectPlan,
+  slot: Pick<PlanSlot, "look" | "versionOf">,
+  product: Product,
+): ResolvedLook {
+  const source = slot.versionOf ? versionSource(plan, slot)?.slot : undefined;
+  return resolveLook(product, (source ?? slot).look, plan.look);
+}
+
+// The product as a frame shows it, drawn from the design Kiln redrew for its
+// look.
+export function slotProduct(
+  product: Product,
+  plan: ProjectPlan,
+  slot: Pick<PlanSlot, "look" | "versionOf">,
+): Product {
+  const look = slotLook(plan, slot, product);
+  return productInLook(product, look, lookReference(plan, look)?.design);
+}
+
+// The view from above a frame's scene may edit: the project's, while its
+// reference is the plate it was drawn beside, or the one Kiln drew for the
+// frame's own look.
+export function slotView(
+  plan: ProjectPlan,
+  slot: Pick<PlanSlot, "look" | "versionOf">,
+  masterUrl: string | undefined,
+  product: Product,
+): ThreeQuarterView | null {
+  const look = slotLook(plan, slot, product);
+  return sameLook(look, projectLook(plan, product))
+    ? threeQuarterFor(plan.references, masterUrl)
+    : (lookReference(plan, look)?.threeQuarter ?? null);
+}
+
+// A frame's look as the maker changes it: a colour or a style given, null to
+// follow the project's again, undefined to keep the frame's. What the slot
+// stores (nothing when it shows the project's look), or why not.
+export function frameLook(
+  product: Product,
+  plan: ProjectPlan,
+  current: Look | undefined,
+  asked: { colour?: string | null; style?: string | null },
+): { look?: Look } | { refused: string } {
+  const pick = (key: "colour" | "style") =>
+    asked[key] === undefined ? current?.[key] : (asked[key] ?? undefined);
+  const colour = pick("colour");
+  const style = pick("style");
+  if (colour !== undefined) {
+    const found = product.colours.find((c) => c.key === colour);
+    if (!found)
+      return { refused: `${product.name} has no colour "${colour}".` };
+    if (!found.inStock) {
+      return {
+        refused: `${found.name} is out of stock: its scenes would sell a look you cannot ship.`,
+      };
+    }
+  }
+  if (
+    style !== undefined &&
+    style !== ORIGINAL &&
+    !productStyles(product).some((s) => s.key === style)
+  ) {
+    return { refused: `${product.name} has no style "${style}".` };
+  }
+  const own: Look = {
+    ...(colour !== undefined ? { colour } : {}),
+    ...(style !== undefined ? { style } : {}),
+  };
+  if (
+    sameLook(resolveLook(product, own, plan.look), projectLook(plan, product))
+  ) {
+    return {};
+  }
+  if (product.source.kind !== "vector") {
+    return {
+      refused:
+        "Kiln draws other colours and styles from a design file; this product has none.",
+    };
+  }
+  return { look: own };
+}
+
+// The plan without the frame looks Kiln no longer draws (after an update
+// left them out): those frames show the project's look again.
+export function withoutUndrawnLooks(
+  plan: ProjectPlan,
+  product: Product,
+): ProjectPlan {
+  const project = projectLook(plan, product);
+  return {
+    ...plan,
+    destinations: plan.destinations.map((d) => ({
+      ...d,
+      slots: d.slots.map((slot) => {
+        if (!slot.look) return slot;
+        const look = resolveLook(product, slot.look, plan.look);
+        if (sameLook(look, project) || lookReference(plan, look)) return slot;
+        const { look: _dropped, ...rest } = slot;
+        return rest;
+      }),
+    })),
+  };
 }

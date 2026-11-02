@@ -15,8 +15,18 @@ import {
   slotCardId,
   slotRecipeId,
 } from "@/domain/plan";
-import { projectProduct } from "@/domain/plan-look";
+import {
+  lookReference,
+  projectLook,
+  projectProduct,
+  slotLook,
+} from "@/domain/plan-look";
 import { type Product, productImages } from "@/domain/product";
+import {
+  productInLook,
+  type ResolvedLook,
+  sameLook,
+} from "@/domain/product-look";
 import { productUnderstanding } from "@/domain/product-understanding";
 import type { ProjectType } from "@/domain/project";
 import { productSceneCues, sceneVariants } from "@/domain/scene-direction";
@@ -68,10 +78,10 @@ export function slotCards(
   stored: Product,
   models: MakerModels = DEFAULT_MAKER_MODELS,
 ): Card[] {
-  // Every card is written for the product as the project shows it: in its
-  // colour and style (plan-look.ts).
-  const product = projectProduct(stored, plan);
-  const understanding = productUnderstanding(product);
+  // Every card is written for the product as its frame shows it: in the
+  // project's colour and style, or the frame's own (plan-look.ts).
+  const project = projectLook(plan, stored);
+  const understanding = productUnderstanding(projectProduct(stored, plan));
   return plan.destinations.flatMap((d) => {
     const recipe = findRecipe(slotRecipeId(d.shotListId, d.destinationId));
     if (!recipe) {
@@ -80,34 +90,6 @@ export function slotCards(
     // A version re-frames another scene: it takes no direction and no place
     // of use from the scenes, only a card of its own (below).
     const scenes = d.slots.filter((s) => s.fill === "scene" && !s.versionOf);
-    // A view from above drawn beside this reference: Kiln starts the scenes
-    // that offer the camera a little above (the maker's stop still wins).
-    const view = threeQuarterFor(plan.references, master.assetUrl);
-    const planning = buildPlanningContext(understanding, recipe, SEED_BRAND);
-    const variants =
-      recipe.style === "line-art"
-        ? undefined
-        : sceneVariants(
-            // Each slot applies its knobs: its defaults, Kiln's pick, the
-            // maker's kept lessons, then the maker's own choices.
-            scenes.map((s) =>
-              s.knobs
-                ? {
-                    ...s,
-                    knobs: effectiveKnobs(
-                      s.knobs,
-                      s.tuned,
-                      kilnPick(s.knobs, view),
-                      s.learned,
-                    ).stops,
-                  }
-                : s,
-            ),
-            recipe.fieldDefaults,
-            understanding,
-            product.useContexts,
-            productSceneCues(product),
-          );
     const slotRecipe = {
       ...recipe,
       directions: scenes.map((s) => ({
@@ -116,24 +98,76 @@ export function slotCards(
         ...(s.aspect ? { aspect: s.aspect } : {}),
       })),
     };
-    // A photographic scene reads the sample and the views after the
-    // reference, in the order the product's text names them.
-    const images =
-      recipe.style === "line-art"
-        ? []
-        : productImages(product).map((i) => i.url);
-    const sceneCards = buildCards({
-      master,
-      recipe: slotRecipe,
-      planning,
-      variants,
-      imageModel: defaultImageModel(models),
-    }).map((card, i) => ({
-      ...card,
-      id: slotCardId(d.destinationId, scenes[i].key),
-      status: "draft" as const,
-      references: images,
-    }));
+    // Every scene written in one look: run once per look the scenes show,
+    // so the product's places of use keep their order whatever look a scene
+    // takes.
+    const run = (look: ResolvedLook) => {
+      const product = productInLook(
+        stored,
+        look,
+        lookReference(plan, look)?.design,
+      );
+      const words = sameLook(look, project)
+        ? understanding
+        : productUnderstanding(product);
+      // A view from above drawn for this look: Kiln starts the scenes that
+      // offer the camera a little above (the maker's stop still wins).
+      const view = sameLook(look, project)
+        ? threeQuarterFor(plan.references, master.assetUrl)
+        : (lookReference(plan, look)?.threeQuarter ?? null);
+      const variants =
+        recipe.style === "line-art"
+          ? undefined
+          : sceneVariants(
+              // Each slot applies its knobs: its defaults, Kiln's pick, the
+              // maker's kept lessons, then the maker's own choices.
+              scenes.map((s) =>
+                s.knobs
+                  ? {
+                      ...s,
+                      knobs: effectiveKnobs(
+                        s.knobs,
+                        s.tuned,
+                        kilnPick(s.knobs, view),
+                        s.learned,
+                      ).stops,
+                    }
+                  : s,
+              ),
+              recipe.fieldDefaults,
+              words,
+              product.useContexts,
+              productSceneCues(product),
+            );
+      return {
+        cards: buildCards({
+          master,
+          recipe: slotRecipe,
+          planning: buildPlanningContext(words, recipe, SEED_BRAND),
+          variants,
+          imageModel: defaultImageModel(models),
+        }),
+        // A photographic scene reads the sample and the views after the
+        // reference, in the order the product's text names them.
+        images:
+          recipe.style === "line-art"
+            ? []
+            : productImages(product).map((i) => i.url),
+      };
+    };
+    const runs = new Map<string, ReturnType<typeof run>>();
+    const sceneCards = scenes.map((s, i) => {
+      const look = slotLook(plan, s, stored);
+      const key = `${look.colour}/${look.style ?? ""}`;
+      const written = runs.get(key) ?? run(look);
+      runs.set(key, written);
+      return {
+        ...written.cards[i],
+        id: slotCardId(d.destinationId, s.key),
+        status: "draft" as const,
+        references: written.images,
+      };
+    });
     const videoCards = d.slots
       .filter((s) => s.fill === "video")
       .map((s) =>

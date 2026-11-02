@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { DOOR_TAG } from "@/domain/__tests__/fixtures/door-tag";
 import type { MasterAsset } from "@/domain/master-asset";
-import { planProject, withThreeQuarter } from "@/domain/plan";
+import { planProject, withSlotLook, withThreeQuarter } from "@/domain/plan";
+import { withLookReference } from "@/domain/plan-look";
 import { Product } from "@/domain/product";
 import {
   photoReference,
@@ -382,5 +384,72 @@ describe("slotCards with Kiln's view from above", () => {
         "etsy.in-use",
       ),
     ).toContain("eye level");
+  });
+});
+
+describe("slotCards in each frame's look", () => {
+  const gold = {
+    colour: "gold-black",
+    design: "https://stub.local/gold.svg",
+    front: "https://stub.local/gold.png",
+  };
+  const tagPlan = withSlotLook(
+    withLookReference(
+      planProject({
+        product: DOOR_TAG,
+        type: "listing-kit",
+        destinationIds: ["etsy"],
+        catalog: CATALOG,
+      }),
+      gold,
+    ),
+    { destinationId: "etsy", slotKey: "detail" },
+    { colour: "gold-black" },
+  );
+  const tagMaster = { ...master, id: "plate-pkg:DT-01" };
+
+  it("writes a scene in its own colour, with that colour's material sample; the others stay in the project's", () => {
+    const cards = slotCards(tagPlan, tagMaster, DOOR_TAG);
+    const detail = cards.find((c) => c.id === "etsy.detail");
+    const hero = cards.find((c) => c.id === "etsy.hero");
+    expect(detail?.references).toEqual([
+      "https://storage.test/products/gold.jpg",
+    ]);
+    expect(detail?.fields.palette.value).toContain("#D3B66F");
+    expect(hero?.references).toEqual([
+      "https://storage.test/products/black.jpg",
+    ]);
+    expect(hero?.fields.palette.value).toContain("#1B1B1B");
+  });
+
+  it("keeps the places of use in order whatever look a scene takes", () => {
+    const placed = Product.parse({
+      ...DOOR_TAG,
+      useContexts: ["a nursery door", "an office door", "a hotel door"],
+    });
+    // The place each scene stands in.
+    const scenes = (p: typeof tagPlan) =>
+      slotCards(p, tagMaster, placed).map(
+        (c) =>
+          placed.useContexts.find((place) =>
+            c.fields.scene.value.includes(place),
+          ) ?? null,
+      );
+    const plain = planProject({
+      product: placed,
+      type: "listing-kit",
+      destinationIds: ["etsy"],
+      catalog: CATALOG,
+    });
+    expect(
+      scenes(
+        withSlotLook(
+          withLookReference(plain, gold),
+          { destinationId: "etsy", slotKey: "in-use" },
+          { colour: "gold-black" },
+        ),
+      ),
+    ).toEqual(scenes(plain));
+    expect(scenes(plain).filter(Boolean).length).toBeGreaterThan(1);
   });
 });

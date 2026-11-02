@@ -34,7 +34,7 @@ import {
   versionSource,
   videoSettings,
 } from "@/domain/plan";
-import { projectProduct } from "@/domain/plan-look";
+import { projectProduct, slotProduct } from "@/domain/plan-look";
 import { SEED_BRAND } from "@/domain/seed";
 import { cardReference } from "@/lib/card-reference";
 import { db, hasDatabase } from "@/lib/db";
@@ -233,9 +233,13 @@ export async function estimateProjectCards(
       : undefined;
     let request: GenerationRequest;
     try {
+      // The video animates its start frame: the product in that scene's look.
+      const from = destination.slots.find((s) => s.key === settings.from);
       request = buildVideoRequest({
         product: board.board.plan
-          ? projectProduct(board.product, board.board.plan)
+          ? from
+            ? slotProduct(board.product, board.board.plan, from)
+            : projectProduct(board.product, board.board.plan)
           : board.product,
         settings,
         scene: source?.fields.scene.value,
@@ -293,7 +297,7 @@ export async function estimateProjectCards(
     const request =
       slot?.versionOf && source?.slot.approvedOutput && board?.product && plan
         ? buildVersionRequest({
-            product: projectProduct(board.product, plan),
+            product: slotProduct(board.product, plan, source.slot),
             sourceOutput: source.slot.approvedOutput,
             aspect: slot.aspect ?? card.model.aspect,
             text: Boolean(slot.textTemplate),
@@ -301,7 +305,10 @@ export async function estimateProjectCards(
           })
         : buildGenerationRequest({
             card,
-            master: plan ? cardReference(plan, card.id, master) : master,
+            master:
+              plan && board?.product
+                ? cardReference(plan, card.id, master, board.product)
+                : master,
             understanding,
             recipe: findRecipe(card.recipeId) ?? SEED_RECIPES[0],
             brand: SEED_BRAND,

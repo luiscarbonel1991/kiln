@@ -74,13 +74,19 @@ import {
   type VideoSettings,
   videoSettings,
 } from "@/domain/plan";
-import { projectProduct } from "@/domain/plan-look";
+import {
+  projectLook,
+  projectProduct,
+  slotLook,
+  slotView,
+} from "@/domain/plan-look";
 import {
   buyerSizeLabel,
   colourOf,
   lookVerified,
   type Product,
 } from "@/domain/product";
+import { lookLabel, sameLook } from "@/domain/product-look";
 import type { FrameCost, ProjectCost } from "@/domain/project-cost";
 import type { JobView } from "@/domain/queue";
 import { threeQuarterFor } from "@/domain/scene-reference";
@@ -96,6 +102,7 @@ import {
   type TunePlace,
   type TuneView,
   takesPlace,
+  tuneLook,
   tuneView,
 } from "@/lib/slot-tune";
 import { versionMark } from "@/lib/version-mark";
@@ -287,8 +294,27 @@ export function ProjectBoard({
   // frames draw it, and scenes are made in it. Nothing real backs a look
   // without a material photo or a supplier page.
   const shown = projectProduct(product, board.plan);
+  const project = projectLook(board.plan, product);
   const sceneColour = colourOf(shown, shown.defaultColour);
-  const unverified = lookVerified(sceneColour) ? null : sceneColour.name;
+  // A scene may show a colour and style of its own (Tune): its look, named
+  // when it is not the project's, and flagged when nothing real backs it.
+  const frameLookOf = (slot: PlanSlot) => {
+    if (slot.fill !== "scene") return { own: null, unverified: null };
+    const look = slotLook(board.plan, slot, product);
+    const colour = colourOf(product, look.colour);
+    return {
+      own: sameLook(look, project) ? null : lookLabel(product, look),
+      unverified: lookVerified(colour) ? null : colour.name,
+    };
+  };
+  // Scenes in a colour other than the project's, by colour.
+  const framesIn: Record<string, number> = {};
+  for (const slot of board.plan.destinations.flatMap((d) => d.slots)) {
+    if (slot.fill !== "scene" || slot.off || slot.versionOf) continue;
+    const { colour } = slotLook(board.plan, slot, product);
+    if (colour !== project.colour)
+      framesIn[colour] = (framesIn[colour] ?? 0) + 1;
+  }
   const labelOf = new Map(
     rows.flatMap((r) => r.slots.map((s) => [s.cardId, s.slot.label] as const)),
   );
@@ -459,11 +485,17 @@ export function ProjectBoard({
                             view,
                             job: jobs[cardId],
                             places: placeOptions,
-                            above,
+                            above: slotView(
+                              board.plan,
+                              slot,
+                              board.master?.assetUrl,
+                              product,
+                            ),
                             route: takeRoutes.final,
+                            look: tuneLook(product, board.plan, slot),
                           })}
                           hasReference={board.master !== null}
-                          unverified={unverified}
+                          look={frameLookOf(slot)}
                           model={card ? (card.model as ModelValue) : null}
                           notes={notes}
                           video={
@@ -666,7 +698,11 @@ export function ProjectBoard({
               </p>
             </div>
           ) : null}
-          <BoardColours product={product} scenes={sceneColour.key} />
+          <BoardColours
+            product={product}
+            scenes={sceneColour.key}
+            frames={framesIn}
+          />
         </div>
 
         {board.master ? (
@@ -892,7 +928,7 @@ function SlotActions({
   onView,
   tune,
   hasReference,
-  unverified,
+  look,
   order,
   video,
   model,
@@ -907,8 +943,9 @@ function SlotActions({
   // The scene's knobs (a slot planned with them), else null.
   tune: TuneView | null;
   hasReference: boolean;
-  // The colour scenes show, when nothing real backs its look; else null.
-  unverified: string | null;
+  // The scene's look when it is not the project's, and its colour when
+  // nothing real backs it; else null.
+  look: { own: string | null; unverified: string | null };
   order: { place: number; last: number; firstLabel: string } | null;
   video: {
     settings: VideoSettings;
@@ -1061,13 +1098,23 @@ function SlotActions({
         ) : null,
       )}
       {keep(
-        unverified ? (
+        look.own ? (
+          <span
+            data-testid={`slot-look-${cardId}`}
+            className="font-mono text-[0.6rem] text-prov-brand"
+          >
+            in {look.own}
+          </span>
+        ) : null,
+      )}
+      {keep(
+        look.unverified ? (
           <span
             title={UNVERIFIED_TITLE}
             data-testid="unverified-look"
             className="font-mono text-[0.6rem] text-prov-local"
           >
-            unverified look · {unverified}
+            unverified look · {look.unverified}
           </span>
         ) : null,
       )}

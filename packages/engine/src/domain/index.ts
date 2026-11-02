@@ -267,6 +267,7 @@ export {
   withListingUrl,
   withLiveOn,
   withRead,
+  withSlotLook,
   withSlotOff,
   withSlotPlace,
   withSlotTuning,
@@ -276,11 +277,16 @@ export {
 export {
   chosenLook,
   drawnLooks,
+  frameLook,
   lookReference,
   projectLook,
   projectProduct,
+  slotLook,
+  slotProduct,
+  slotView,
   withLookReference,
   withLookReferences,
+  withoutUndrawnLooks,
 } from "@/domain/plan-look";
 export {
   buyerSizeLabel,
