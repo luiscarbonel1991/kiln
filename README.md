@@ -83,7 +83,11 @@ imports a catalog:
 - **New product** is a short form: name, what it is, size, material, finish, colours, the
   text a buyer personalizes, and where it is used. A **Layered** finish (a top layer cut
   through to a base of another colour) asks each colour for its base, the colour that
-  shows through the cuts, and the scenes draw the marks recessed in that colour. An optional photo becomes the reference
+  shows through the cuts, and the scenes draw the marks recessed in that colour. A
+  **Loose letters** finish is a product that is its wording, each letter and digit its own
+  piece with no backing: the scenes say so, fix each piece straight on the surface with a
+  short soft shadow, and never draw a plate behind them. Its thickness is the product's
+  depth, and "How far they stand off the surface" its relief. An optional photo becomes the reference
   every scene starts from. An optional design file (SVG) is drawn to scale, and its height
   follows its proportions; it is measured as it shows (a grain clipped to the outline is
   left out). Replacing it later keeps the product's colours, size and samples: the new
@@ -652,6 +656,18 @@ the next (slides, not crossfades, which doubled two plates' lettering). ffmpeg, 
 approve like any other; the export names it, and an agent makes it with
 `make_stills_video`.
 
+**Size.** A scene is asked at the size its destination needs. Where a 1K image (1024 px)
+would have to be stretched more than 1.25x to the destination's target, it goes at 2K:
+Etsy (2000 px) and Amazon (1600), not Instagram (1080).
+- GPT Image 2 is asked for each aspect exactly, its long side at 2048 (2048x2048,
+  1600x2000 for 4:5): $0.107 a square take at medium, against $0.053 at 1K.
+- Gemini Nano Banana 2.1, 3 Pro Image and 3.1 Flash Image are asked for "2K". GPT Image
+  1.5, 1 Mini and Flash-Lite stay at 1K, and so does a test take.
+
+The estimate and the Generate dialog say it ("GPT Image 2 medium 2K"), and a fallback
+model is priced at the size it would run at. The size is read from the destination at
+each take, so an older Etsy project goes to 2K from its next take.
+
 **Test takes.** Tune offers "Test take" on a scene whose model has a low quality (the
 GPT Image models): the scene at low quality (≈ $0.006 on GPT Image 2), on that model
 alone. Its take reads "test take · low quality" in place of Approve and is never
@@ -789,9 +805,9 @@ it. Exported slots read "delivered" until an approval or the order changes.
   `assets/fonts` (static TTFs under the SIL Open Font License, licenses alongside); the
   product's own typography comes from the system's fonts. A deployment must ship
   `assets/fonts`.
-- Scenes are the approved image, cropped to the slot's aspect and upscaled with
-  ImageMagick (Lanczos, light unsharp, JPEG 92): free, and the image is the approved
-  one.
+- Scenes are the approved image, cropped to the slot's aspect and sized to the target
+  with ImageMagick (Lanczos, light unsharp, JPEG 92): free, and the image is the
+  approved one. A 2K take (Etsy, Amazon) shrinks to the target; a 1K take is upscaled.
 - The approved listing video goes in as `video.mp4`, as rendered, outside the photo
   numbering.
 - The maker's own photos (a live listing's, kept) go in their place as they are: a
