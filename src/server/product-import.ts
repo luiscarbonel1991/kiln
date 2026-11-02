@@ -1,5 +1,5 @@
 import type { BrandKit } from "@/domain/brand";
-import type { Product } from "@/domain/product";
+import type { OutlineBox, Product } from "@/domain/product";
 import {
   parseProductPackage,
   productLabel,
@@ -46,6 +46,10 @@ export function blockedAsset(product: Product): string | null {
       where: `views › ${v.label} › url`,
       url: v.url,
     })),
+    ...(product.styles ?? []).map((s) => ({
+      where: `styles › ${s.key} › svgUrl`,
+      url: s.svgUrl,
+    })),
   ];
   for (const { where, url } of urls) {
     try {
@@ -58,41 +62,62 @@ export function blockedAsset(product: Product): string | null {
   return null;
 }
 
-// A vector product's outline, measured from its SVG (never taken from the
-// package): exact frames draw it to scale. A drawing that does not match the
-// declared dimensions is imported without one (its frames draw the spec's
-// outline) and reported.
+// Where a drawing's outline sits in its frame, measured (never taken from a
+// package), or why it is left without one.
+async function outlineOf(
+  url: string,
+  product: Product,
+  scalePxPerUnit?: number,
+): Promise<{ box: OutlineBox } | { problem: string }> {
+  try {
+    const { bytes } = await fetchAsset(url);
+    const measured = measureOutline(
+      bytes.toString("utf8"),
+      product.dimensions,
+      scalePxPerUnit,
+    );
+    return "box" in measured ? measured : { problem: measured.mismatch };
+  } catch (error) {
+    return {
+      problem: `its SVG could not be measured (${(error as Error).message})`,
+    };
+  }
+}
+
+// A vector product's outline, and each style's, measured from its SVG: exact
+// frames draw it to scale. A drawing that does not match the declared
+// dimensions is imported without one (its frames draw the spec's outline)
+// and reported.
 export async function withOutline(
   product: Product,
 ): Promise<{ product: Product; warning?: string }> {
   if (product.source.kind !== "vector") return { product };
   const { outlineBox: _ignored, ...source } = product.source;
-  const bare = { ...product, source };
-  try {
-    const { bytes } = await fetchAsset(source.svgUrl);
-    const measured = measureOutline(
-      bytes.toString("utf8"),
-      product.dimensions,
-      source.scalePxPerUnit,
-    );
-    if ("box" in measured) {
-      return {
-        product: {
-          ...product,
-          source: { ...source, outlineBox: measured.box },
-        },
-      };
-    }
-    return {
-      product: bare,
-      warning: `${measured.mismatch}; its scale frames draw the outline from the spec.`,
-    };
-  } catch (error) {
-    return {
-      product: bare,
-      warning: `its SVG could not be measured (${(error as Error).message}); its scale frames draw the outline from the spec.`,
-    };
-  }
+  const warnings: string[] = [];
+  const own = await outlineOf(source.svgUrl, product, source.scalePxPerUnit);
+  if ("problem" in own) warnings.push(own.problem);
+  const styles = product.styles
+    ? await Promise.all(
+        product.styles.map(async ({ outlineBox: _old, ...style }) => {
+          const measured = await outlineOf(style.svgUrl, product);
+          if ("box" in measured) return { ...style, outlineBox: measured.box };
+          warnings.push(`the ${style.name} style: ${measured.problem}`);
+          return style;
+        }),
+      )
+    : undefined;
+  return {
+    product: {
+      ...product,
+      source: "box" in own ? { ...source, outlineBox: own.box } : source,
+      ...(styles ? { styles } : {}),
+    },
+    ...(warnings.length > 0
+      ? {
+          warning: `${warnings.join("; ")}; its scale frames draw the outline from the spec.`,
+        }
+      : {}),
+  };
 }
 
 const RASTER = new Set(["image/png", "image/jpeg", "image/webp"]);

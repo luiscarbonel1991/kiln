@@ -22,6 +22,8 @@ const FIELDS: [Field, string][] = [
   ["wording", "text lines"],
   ["icons", "icons"],
   ["variants", "variants"],
+  ["styles", "styles"],
+  ["styleName", "the original style's name"],
   ["forbidden", "things to avoid"],
   ["useContexts", "places of use"],
   ["hook", "hook"],

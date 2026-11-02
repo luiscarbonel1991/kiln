@@ -44,6 +44,15 @@ describe("productChanges", () => {
         views: [{ label: "side", url: "http://storage.test/side.png" }],
       }),
     ).toEqual(["reference views"]);
+    expect(
+      productChanges(before, {
+        ...before,
+        styleName: "Leaf",
+        styles: [
+          { key: "sprig", name: "Sprig", svgUrl: "http://storage.test/c.svg" },
+        ],
+      }),
+    ).toEqual(["styles", "the original style's name"]);
   });
 
   it("says which colours were added, removed or changed", () => {

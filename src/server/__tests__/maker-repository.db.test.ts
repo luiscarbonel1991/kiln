@@ -59,24 +59,49 @@ describe.skipIf(!enabled)("maker brand kit (database)", async () => {
         outlineBox: { x: 0, y: 0, w: 1, h: 1 },
       },
     });
+    const wide = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect width="200" height="100" fill="#D9B98C"/></svg>`;
+    const styled = {
+      ...vector("OT-03", 4, 4),
+      styles: [
+        { key: "ring", name: "Ring", svgUrl: vector("x", 1, 1).source.svgUrl },
+        {
+          key: "wide",
+          name: "Wide",
+          svgUrl: `data:image/svg+xml;base64,${Buffer.from(wide).toString("base64")}`,
+          outlineBox: { x: 0, y: 0, w: 1, h: 1 },
+        },
+      ],
+    };
     const result = await importProductsAction([
       vector("OT-01", 4, 4),
       vector("OT-02", 5, 3),
+      styled,
     ]);
     if ("error" in result) throw new Error(result.error);
-    const [fits, off] = result.imported.map((i) => i.product);
+    const [fits, off, withStyles] = result.imported.map((i) => i.product);
     expect(fits.source).toMatchObject({
       outlineBox: { x: 0.025, y: 0.025, w: 0.95, h: 0.95 },
     });
     expect(off.source).not.toHaveProperty("outlineBox");
+    // Each style's outline is measured too, never taken from the package.
+    expect(withStyles.styles?.[0].outlineBox).toEqual({
+      x: 0.025,
+      y: 0.025,
+      w: 0.95,
+      h: 0.95,
+    });
+    expect(withStyles.styles?.[1]).not.toHaveProperty("outlineBox");
     expect(result.warnings).toEqual([
       expect.stringContaining(
         '"OT-02" Outline test coaster: its SVG\'s drawing is 1.00:1',
       ),
+      expect.stringContaining(
+        '"OT-03" Outline test coaster: the Wide style: its SVG\'s drawing is 2.00:1',
+      ),
     ]);
     const maker = await repo.getCurrentMaker();
     await db.product.deleteMany({
-      where: { makerId: maker.id, sku: { in: ["OT-01", "OT-02"] } },
+      where: { makerId: maker.id, sku: { in: ["OT-01", "OT-02", "OT-03"] } },
     });
   });
 

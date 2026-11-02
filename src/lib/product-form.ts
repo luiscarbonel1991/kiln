@@ -5,11 +5,13 @@ import {
   DEFAULT_FORBIDDEN,
   Hex,
   Product,
+  type ProductStyle,
   safeLink,
   Treatment,
   Unit,
   ViewLabel,
 } from "@/domain/product";
+import { ORIGINAL } from "@/domain/product-look";
 
 // The product form (New project, step 1): the few things a maker knows about
 // a piece, in plain words, turned into a Product. Kiln fills the rest — the
@@ -192,6 +194,26 @@ export function productFormSchema(limits: FormLimits = FORM_LIMITS) {
         .array(z.object({ label: ViewLabel, url: z.string().min(1) }))
         .max(2)
         .default([]),
+      // Other designs of a vector product: each its own drawing of the same
+      // piece, uploaded to Kiln's storage, with the wording it shows (a line
+      // left empty shows the product's example). `styleName` names the
+      // product's own drawing among them.
+      styleName: z.string().trim().max(40).optional(),
+      styles: z
+        .array(
+          z.object({
+            // The stored style this row edits (absent for a new one).
+            key: z.string().min(1).optional(),
+            name: z.string().trim().min(1, "Name this style.").max(40),
+            url: z.string().min(1),
+            examples: z
+              .array(z.string().trim().max(limits.example))
+              .max(3)
+              .default([]),
+          }),
+        )
+        .max(8)
+        .default([]),
       file: ProductFile.optional(),
     })
     .refine(
@@ -202,6 +224,26 @@ export function productFormSchema(limits: FormLimits = FORM_LIMITS) {
       },
     )
     .superRefine((f, ctx) => {
+      if (f.styles.length > 0 && f.file?.kind !== "vector") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["styles"],
+          message:
+            "Styles are other drawings of the design: give the product its SVG first.",
+        });
+      }
+      f.styles.forEach((style, i) => {
+        style.examples.forEach((example, j) => {
+          const max = f.wording[j]?.maxChars;
+          if (max != null && example.length > max) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["styles", i, "examples", j],
+              message: `At most ${max} characters, as the line allows.`,
+            });
+          }
+        });
+      });
       if (f.treatment !== "reveal") return;
       f.colours.forEach((c, i) => {
         if (!c.base) {
@@ -343,8 +385,42 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
     ...(form.description ? { description: form.description } : {}),
     ...(form.price ? { price: form.price } : {}),
     ...(form.views.length > 0 ? { views: form.views } : {}),
+    ...styleFields(form, new Map()),
     source,
   });
+}
+
+// The form's styles as the product holds them: a stored style keeps its key,
+// a new one takes one from its name (never "original", the own drawing's);
+// trailing empty examples are dropped, and a style with none shows the
+// product's wording. Only a vector product has styles.
+function styleFields(
+  form: z.output<typeof ProductForm>,
+  stored: Map<string, ProductStyle>,
+): Pick<Product, "styles" | "styleName"> {
+  if (form.file?.kind !== "vector") return {};
+  const taken = new Set([
+    ORIGINAL,
+    ...form.styles.flatMap((s) => (s.key && stored.has(s.key) ? [s.key] : [])),
+  ]);
+  const styles = form.styles.map((s) => {
+    const kept = s.key ? stored.get(s.key) : undefined;
+    const examples = [...s.examples];
+    while (examples.length > 0 && examples.at(-1) === "") examples.pop();
+    return {
+      key: kept?.key ?? freshKey(s.name, taken),
+      name: s.name,
+      svgUrl: s.url,
+      ...(kept?.outlineBox && kept.svgUrl === s.url
+        ? { outlineBox: kept.outlineBox }
+        : {}),
+      ...(examples.length > 0 ? { examples } : {}),
+    };
+  });
+  return {
+    ...(styles.length > 0 ? { styles } : {}),
+    ...(form.styleName ? { styleName: form.styleName } : {}),
+  };
 }
 
 const FILL =
@@ -450,6 +526,13 @@ export function formFromProduct(product: Product): ProductForm {
     ...(product.description ? { description: product.description } : {}),
     ...(product.price ? { price: product.price } : {}),
     views: product.views ?? [],
+    ...(product.styleName ? { styleName: product.styleName } : {}),
+    styles: (product.styles ?? []).map((s) => ({
+      key: s.key,
+      name: s.name,
+      url: s.svgUrl,
+      examples: s.examples ?? [],
+    })),
     ...(file ? { file } : {}),
   };
 }
@@ -545,6 +628,8 @@ export function mergeForm(
     cta: _cta,
     description: _description,
     views: _views,
+    styles: storedStyles,
+    styleName: _styleName,
     ...base
   } = stored;
   return {
@@ -576,6 +661,10 @@ export function mergeForm(
       ...(form.cta ? { cta: form.cta } : {}),
       ...(form.description ? { description: form.description } : {}),
       ...(form.views.length > 0 ? { views: form.views } : {}),
+      ...styleFields(
+        form,
+        new Map((storedStyles ?? []).map((s) => [s.key, s])),
+      ),
       source,
     }),
   };

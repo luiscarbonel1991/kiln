@@ -27,6 +27,10 @@ import {
   MoreDetails,
 } from "@/components/projects/more-details";
 import { PlacesOfUse } from "@/components/projects/places-of-use";
+import {
+  ProductStyles,
+  type StyleRow,
+} from "@/components/projects/product-styles";
 import { ReviewNote } from "@/components/projects/review-note";
 import {
   emptyWordingRow,
@@ -259,6 +263,16 @@ export function ProductEditor({
   const [views, setViews] = useState<{ label: ViewLabel; url: string }[]>(
     start?.views ?? [],
   );
+  // Other designs of a vector product, and the own drawing's name.
+  const [styles, setStyles] = useState<StyleRow[]>(
+    (start?.styles ?? []).map((s) => ({
+      ...(s.key ? { key: s.key } : {}),
+      name: s.name,
+      url: s.url,
+      examples: s.examples ?? [],
+    })),
+  );
+  const [styleName, setStyleName] = useState(start?.styleName ?? "");
   const [error, setError] = useState<string | null>(null);
   // After the first Save, each field shows its problem as it is fixed.
   const [attempted, setAttempted] = useState(false);
@@ -367,6 +381,32 @@ export function ProductEditor({
     });
   }
 
+  // Another style: an SVG of the same piece, stored like the product's.
+  function uploadStyle(chosen: File) {
+    setError(null);
+    startUpload(async () => {
+      const data = new FormData();
+      data.set("file", chosen);
+      const result = await uploadProductFileAction(data);
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      if (result.kind !== "vector") {
+        setError("A style is another design: upload its SVG.");
+        return;
+      }
+      setStyles((all) => [
+        ...all,
+        {
+          name: chosen.name.replace(/\.svg$/i, "").slice(0, 40),
+          url: result.url,
+          examples: [],
+        },
+      ]);
+    });
+  }
+
   function fill(model?: { provider: "google" | "openai"; model: string }) {
     if (file?.kind !== "photo") return;
     setError(null);
@@ -427,6 +467,8 @@ export function ProductEditor({
         : {}),
       ...(Number(price) > 0 ? { price: Number(price) } : {}),
       views,
+      ...(styleName.trim() ? { styleName } : {}),
+      styles,
       ...(file
         ? {
             file:
@@ -1250,6 +1292,23 @@ export function ProductEditor({
           </span>
         </div>
       </div>
+
+      {file?.kind === "vector" || styles.length > 0 ? (
+        <ProductStyles
+          styles={styles}
+          onStyles={setStyles}
+          styleName={styleName}
+          onStyleName={setStyleName}
+          lines={wording
+            .filter((w) => w.label.trim() || w.example.trim())
+            .map((w) => ({ label: w.label, example: w.example }))}
+          busy={busy}
+          onAdd={uploadStyle}
+          problems={problems}
+          field={FIELD}
+          label={LABEL}
+        />
+      ) : null}
 
       <MoreDetails
         details={details}

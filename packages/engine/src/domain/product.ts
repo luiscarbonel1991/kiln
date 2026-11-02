@@ -203,7 +203,7 @@ export const ProductStyle = z.object({
     .array(z.string())
     .max(6)
     .describe(
-      "The wording this design shows, one entry per wording line in order; a line left out shows the product's example.",
+      "The wording this design shows, one entry per wording line in order; a line left out or empty shows the product's example.",
     )
     .optional(),
 });

@@ -88,8 +88,9 @@ export function productInLook(
     : undefined;
   const wording = style?.examples
     ? product.wording.map((line, i) => {
-        const example = style.examples?.[i];
-        return example === undefined ? line : { ...line, example };
+        // A line left out or empty shows the product's example.
+        const example = style.examples?.[i]?.trim();
+        return example ? { ...line, example } : line;
       })
     : product.wording;
   if (product.source.kind !== "vector") {

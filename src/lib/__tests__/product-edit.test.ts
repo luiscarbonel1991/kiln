@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CUTTING_BOARD } from "@/domain/__tests__/fixtures/cutting-board";
+import { DOOR_TAG } from "@/domain/__tests__/fixtures/door-tag";
 import { PLATE_ON_BASE } from "@/domain/__tests__/fixtures/plate-on-base";
 import { Product } from "@/domain/product";
 import { parseProductPackage } from "@/domain/product-package";
@@ -52,6 +53,7 @@ describe("editing a product", () => {
       ...parsed.products,
       CUTTING_BOARD,
       PLATE_ON_BASE,
+      DOOR_TAG,
       formMade,
     ]) {
       expect(canonicalJson(merged(product))).toBe(canonicalJson(product));
@@ -134,6 +136,63 @@ describe("editing a product", () => {
       "x1",
     );
     expect(named.family).toBe("Key rings");
+  });
+
+  it("edits styles: a kept one keeps its key and outline, a new one gets its own, and the own drawing its name", () => {
+    const form = formFromProduct(DOOR_TAG);
+    expect(form.styles).toEqual([
+      {
+        key: "do-not-disturb",
+        name: "Do not disturb",
+        url: DOOR_TAG.styles?.[0].svgUrl,
+        examples: ["Do not disturb"],
+      },
+    ]);
+    const edited = merged(DOOR_TAG, {
+      styleName: "Quiet, please",
+      styles: [
+        { ...form.styles?.[0], name: "Please do not disturb" },
+        {
+          name: "Original",
+          url: "https://storage.test/products/welcome.svg",
+          examples: ["", "come in", ""],
+        },
+      ],
+    });
+    expect(edited.styleName).toBe("Quiet, please");
+    expect(edited.styles).toEqual([
+      {
+        ...DOOR_TAG.styles?.[0],
+        name: "Please do not disturb",
+      },
+      {
+        key: "original-2",
+        name: "Original",
+        svgUrl: "https://storage.test/products/welcome.svg",
+        examples: ["", "come in"],
+      },
+    ]);
+    expect(merged(DOOR_TAG, { styles: [] })).not.toHaveProperty("styles");
+  });
+
+  it("refuses styles without a design file, and a style's example longer than its line", () => {
+    const style = {
+      name: "Welcome",
+      url: "https://storage.test/products/welcome.svg",
+      examples: [],
+    };
+    expect(
+      mergeForm(CUTTING_BOARD, {
+        ...formFromProduct(CUTTING_BOARD),
+        styles: [style],
+      }),
+    ).toMatchObject({ issues: [{ path: "styles" }] });
+    expect(
+      mergeForm(DOOR_TAG, {
+        ...formFromProduct(DOOR_TAG),
+        styles: [{ ...style, examples: ["x".repeat(17)] }],
+      }),
+    ).toMatchObject({ issues: [{ path: "styles.0.examples.0" }] });
   });
 
   it("names what it keeps that the form does not show", () => {
