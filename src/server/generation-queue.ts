@@ -14,6 +14,7 @@ import {
   type GenerationRequest,
   VideoNeedsScene,
 } from "@/domain/generation-request";
+import { destinationImageSize, sizeOn } from "@/domain/image-size";
 import {
   checkModel,
   type ModelKind,
@@ -372,13 +373,23 @@ export async function estimateProjectCards(
             recipe: findRecipe(card.recipeId) ?? SEED_RECIPES[0],
             brand: SEED_BRAND,
           });
+    // A scene is asked for at the size its destination needs (2K for Etsy);
+    // a test take stays a cheap 1K look.
+    const size = destinationImageSize(
+      built.model.aspect,
+      CATALOG.destinations.find((d) => d.id === ref?.destinationId),
+    );
     const request = options.test
       ? {
           ...built,
-          model: { ...built.model, quality: "low" as const },
+          model: {
+            ...built.model,
+            quality: "low" as const,
+            size: "1k" as const,
+          },
           test: true,
         }
-      : built;
+      : { ...built, model: { ...built.model, size } };
     const estimate = estimateGeneration(
       request.model,
       request.model.aspect,
@@ -413,7 +424,11 @@ export async function estimateProjectCards(
           ? (imagePrice(request.model)?.quality ?? null)
           : null,
       resolution:
-        request.kind === "video" ? (request.model.resolution ?? "720p") : null,
+        request.kind === "video"
+          ? (request.model.resolution ?? "720p")
+          : sizeOn(request.model, request.model.aspect) === "2k"
+            ? "2K"
+            : null,
       count: 1,
     };
     const key = batchLabel(entry);

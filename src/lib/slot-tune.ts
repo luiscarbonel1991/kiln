@@ -1,6 +1,6 @@
 import type { Card } from "@/domain/card";
 import { colourTextWarning } from "@/domain/colour-text";
-import { modelEntry } from "@/domain/model-defaults";
+import { type ImageSize, modelEntry } from "@/domain/model-defaults";
 import { type Route, takeEstimate } from "@/domain/model-routing";
 import type { PlanSlot, ProjectPlan, SlotView } from "@/domain/plan";
 import { projectLook } from "@/domain/plan-look";
@@ -208,6 +208,8 @@ export function tuneView(input: {
   prompt?: { prompt: string; negative: string; images: number } | null;
   // What Kiln read in the take to review: its reason, when one helps.
   check?: TakeCheck | null;
+  // The size its destination asks the next take at (destinationImageSize).
+  size?: ImageSize;
 }): TuneView | null {
   const { slot, card, view, job, places = [], above = null } = input;
   if (slot.fill !== "scene" || !slot.knobs) return null;
@@ -226,7 +228,11 @@ export function tuneView(input: {
   const reviewing = view.state === "to-review" && locked === null && !!card;
   const price =
     reviewing && card
-      ? takeEstimate(card.model, card.references.length, input.route)
+      ? takeEstimate(
+          { ...card.model, size: input.size },
+          card.references.length,
+          input.route,
+        )
       : null;
   return {
     summary: knobSummary(knobs),

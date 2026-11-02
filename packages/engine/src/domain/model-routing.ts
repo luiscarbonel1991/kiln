@@ -11,6 +11,7 @@ import type { GenerationRequest } from "@/domain/generation-request";
 import {
   checkModel,
   ImageQuality,
+  type ImageSize,
   type MakerModels,
   type ModelKind,
   makerModels,
@@ -478,7 +479,12 @@ export function canRunRequest(
   }
   const caps = PROVIDER_CAPABILITIES[entry.provider];
   if (!caps.edit || request.imageInputs.length > caps.maxRefs) return false;
-  return estimateGeneration(entry, request.model.aspect) !== null;
+  return (
+    estimateGeneration(
+      { ...entry, size: request.model.size },
+      request.model.aspect,
+    ) !== null
+  );
 }
 
 // The most a request can cost along its route: one charged call at most, so
@@ -509,7 +515,7 @@ export function worstCase(
 // on (the queue reserves the same). null when its own model has no price.
 // `route` holds only the models that may run here (keyed providers).
 export function takeEstimate(
-  model: RouteEntry & { aspect?: string },
+  model: RouteEntry & { aspect?: string; size?: ImageSize },
   references: number,
   route: Route | null | undefined,
 ): { typical: number; max: number } | null {
@@ -519,7 +525,11 @@ export function takeEstimate(
   for (const entry of routeCandidates(route, model).slice(1)) {
     const caps = PROVIDER_CAPABILITIES[entry.provider];
     if (!caps.edit || references > caps.maxRefs) continue;
-    const e = estimateGeneration(entry, model.aspect, references);
+    const e = estimateGeneration(
+      { ...entry, size: model.size },
+      model.aspect,
+      references,
+    );
     if (e) max = Math.max(max, e.max);
   }
   return { typical: own.typical, max };

@@ -57,6 +57,7 @@ import {
 } from "@/domain/exact";
 import { waitingFrames } from "@/domain/frame-view";
 import { fromMicros } from "@/domain/generation-cost";
+import { destinationImageSize } from "@/domain/image-size";
 import { checkListing, listingDraft } from "@/domain/listing";
 import { etsyListingId } from "@/domain/live-listing";
 import type { SearchColumns } from "@/domain/market-brief";
@@ -521,6 +522,12 @@ export function ProjectBoard({
                               : null,
                             prompt: prompts[cardId] ?? null,
                             check: checks[cardId] ?? null,
+                            size: card
+                              ? destinationImageSize(
+                                  card.model.aspect,
+                                  destination,
+                                )
+                              : undefined,
                           })}
                           hasReference={board.master !== null}
                           look={frameLookOf(slot)}

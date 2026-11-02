@@ -165,6 +165,25 @@ describe("tuneView", () => {
     expect(t?.take?.max).toBeGreaterThanOrEqual(t?.take?.typical ?? 0);
   });
 
+  it("prices the new take at the size its destination asks for; the test take stays at 1K", () => {
+    const { slot, card } = setup();
+    const done = {
+      ...card,
+      model: {
+        ...card.model,
+        provider: "openai" as const,
+        model: "gpt-image-2",
+      },
+      status: "done" as const,
+      outputs: ["https://x/1.png"],
+    };
+    const view = slotState(slot, done);
+    const at1k = tuneView({ slot, card: done, view });
+    const at2k = tuneView({ slot, card: done, view, size: "2k" });
+    expect(at2k?.take?.typical ?? 0).toBeGreaterThan(at1k?.take?.typical ?? 0);
+    expect(at2k?.testTake).toEqual(at1k?.testTake);
+  });
+
   it("marks the reason Kiln's check points to: text read too small", () => {
     const { slot, card } = setup();
     const done = {

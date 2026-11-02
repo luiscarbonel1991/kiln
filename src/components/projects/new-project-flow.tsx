@@ -50,6 +50,7 @@ import {
   heroSettingsOf,
   withHeroSettings,
 } from "@/domain/hero-setting";
+import { destinationImageSize, sizeOn } from "@/domain/image-size";
 import {
   defaultImageModel,
   defaultVideoModel,
@@ -266,18 +267,33 @@ export function NewProjectFlow({
       d.slots.map((slot) => ({
         id: slotCardId(d.destinationId, slot.key),
         slot,
+        destinationId: d.destinationId,
       })),
     ) ?? [];
   const off = planned.filter((p) => offSlots.includes(p.id)).map((p) => p.id);
-  const slots = planned.filter((p) => !off.includes(p.id)).map((p) => p.slot);
+  const inPlan = planned.filter((p) => !off.includes(p.id));
+  const slots = inPlan.map((p) => p.slot);
   const scenes = slots.filter((s) => s.fill === "scene");
   const shared = slots.filter((s) => s.fill === "shared").length;
   const kept = slots.filter((s) => s.fill === "photo").length;
   const exact = slots.filter((s) => s.fill === "exact").length;
   const model = defaultImageModel(makerModels);
-  // Each scene reads the sample and the views beside the reference.
+  // Each scene reads the sample and the views beside the reference, at the
+  // size its destination asks for (2K for Etsy).
+  const sized = inPlan
+    .filter((p) => p.slot.fill === "scene")
+    .map((p) => ({
+      aspect: p.slot.aspect,
+      size: destinationImageSize(
+        p.slot.aspect,
+        CATALOG.destinations.find((d) => d.id === p.destinationId),
+      ),
+    }));
+  const at2k = sized.filter(
+    (s) => sizeOn({ ...model, size: s.size }, s.aspect) === "2k",
+  ).length;
   const estimate = estimateScenes(
-    scenes,
+    sized,
     model,
     shown ? productImages(shown).length : 0,
   );
@@ -886,7 +902,7 @@ export function NewProjectFlow({
                 </p>
                 <p className="font-mono text-[0.7rem] text-on-surface-mid">
                   {estimate
-                    ? `≈ ${money(estimate.typical)}–${money(estimate.max)} if each scene is generated once · ${model.model}${estimate.quality ? `, quality ${estimate.quality}` : ""}${estimate.confidence === "derived" ? " (derived price)" : ""}`
+                    ? `≈ ${money(estimate.typical)}–${money(estimate.max)} if each scene is generated once · ${model.model}${estimate.quality ? `, quality ${estimate.quality}` : ""}${at2k > 0 ? `, ${at2k} at 2K for ${at2k === 1 ? "its destination" : "their destinations"}` : ""}${estimate.confidence === "derived" ? " (derived price)" : ""}`
                     : `no pinned price for ${model.model}`}
                 </p>
                 {videos.count > 0 ? (

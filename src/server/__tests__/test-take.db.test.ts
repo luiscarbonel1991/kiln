@@ -36,7 +36,10 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
     await db.product.deleteMany({ where: { sku } });
   });
 
-  const start = async () => {
+  const start = async (
+    destination = "etsy",
+    type: "listing-kit" | "content" = "listing-kit",
+  ) => {
     const [product] = await upsertProducts([
       Product.parse({
         id: "pkg:TT",
@@ -55,17 +58,17 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
     ]);
     const plan = planProject({
       product,
-      type: "listing-kit",
-      destinationIds: ["etsy"],
+      type,
+      destinationIds: [destination],
       catalog: CATALOG,
     });
     const id = await repo.createProject({
-      type: "listing-kit",
+      type,
       product,
       plan,
       editor: startEditorState({
         product,
-        type: "listing-kit",
+        type,
         plan,
         master: photoReference(product),
       }),
@@ -89,6 +92,42 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
     await expect(
       estimateProjectCards(id, ["etsy.video"], { test: true }),
     ).rejects.toThrow();
+  });
+
+  it("asks an Etsy scene at 2K and says so; a test take and an Instagram scene stay at 1K", async () => {
+    const { estimateGeneration, toMicros } = await import(
+      "@/domain/generation-cost"
+    );
+    const id = await start();
+    const full = await estimateProjectCards(id, ["etsy.hero"]);
+    const [hero] = full.cards;
+    expect(hero.request.model).toMatchObject({
+      provider: "openai",
+      model: "gpt-image-2",
+      size: "2k",
+    });
+    const at2k = estimateGeneration(
+      hero.request.model,
+      hero.request.model.aspect,
+      hero.request.kind === "image" ? hero.request.imageInputs.length : 0,
+    );
+    expect(hero.typicalMicros).toBe(toMicros(at2k?.typical ?? 0));
+    expect(full.models[0]).toMatchObject({ resolution: "2K" });
+    expect(full.model).toContain("medium 2K");
+    const test = await estimateProjectCards(id, ["etsy.hero"], { test: true });
+    expect(test.cards[0].request.model).toMatchObject({ size: "1k" });
+
+    const feed = await start("instagram", "content");
+    const scene = await db.card.findFirstOrThrow({
+      where: {
+        projectId: feed,
+        type: "image",
+        cardId: { startsWith: "instagram." },
+      },
+    });
+    const post = await estimateProjectCards(feed, [scene.cardId]);
+    expect(post.cards[0].request.model).toMatchObject({ size: "1k" });
+    expect(post.models[0].resolution).toBeNull();
   });
 
   it("refuses a model with no low quality, and the approval of a test take", async () => {

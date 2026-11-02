@@ -752,7 +752,8 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
         model: "gpt-image-2",
         label: "GPT Image 2",
         quality: "medium",
-        resolution: null,
+        // Etsy's scenes are asked at 2K.
+        resolution: "2K",
         count: 2,
       },
     ]);
@@ -775,7 +776,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       ["google", "gemini-3.1-flash-image", 1],
     ]);
     expect(two.model).toBe(
-      "openai gpt-image-2 medium ×1, google gemini-3.1-flash-image ×1",
+      "openai gpt-image-2 medium 2K ×1, google gemini-3.1-flash-image 2K ×1",
     );
     // A card left on a model Kiln no longer offers is refused, never swapped.
     await db.card.update({
