@@ -913,6 +913,15 @@ export interface OutputSource {
   resolution?: string;
   // It moved down its route: the first model it left and why.
   fallback?: { from: string; reason: string };
+  // What Kiln read in it before it landed (an image take).
+  check?: SourceCheck;
+}
+
+export interface SourceCheck {
+  status: TakeCheck["status"];
+  problems: string[];
+  scale?: string;
+  unchecked?: string;
 }
 
 export interface OutputFacts {
@@ -1027,6 +1036,7 @@ export async function outputSources(
       route: true,
       actualMicros: true,
       finishedAt: true,
+      takeCheck: true,
     },
   });
   const sources = new Map<string, OutputSource>();
@@ -1034,6 +1044,7 @@ export async function outputSources(
     const request = GenerationRequest.safeParse(job.request);
     if (!job.outputUrl || !request.success) continue;
     const moved = ranOn(readJobRoute(job.route));
+    const check = readTakeCheck(job.takeCheck);
     sources.set(job.outputUrl, {
       ...(moved
         ? { fallback: { from: moved.from, reason: moved.reason } }
@@ -1049,6 +1060,16 @@ export async function outputSources(
             seconds: request.data.durationSec,
             aspect: request.data.model.aspect,
             resolution: request.data.model.resolution ?? "720p",
+          }
+        : {}),
+      ...(check
+        ? {
+            check: {
+              status: check.status,
+              problems: check.problems,
+              ...(check.scale ? { scale: check.scale } : {}),
+              ...(check.unchecked ? { unchecked: check.unchecked } : {}),
+            },
           }
         : {}),
     });

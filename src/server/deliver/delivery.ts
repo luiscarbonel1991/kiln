@@ -56,7 +56,22 @@ export interface SceneSource {
   resolution?: string;
   // It moved down its route (Settings → Models): the model it left and why.
   fallback?: { from: string; reason: string };
+  // What Kiln read in it before it landed (an image take).
+  check?: {
+    status: "passed" | "failed" | "unchecked";
+    problems: string[];
+    scale?: string;
+    unchecked?: string;
+  };
 }
+
+// "Kiln's check passed", "Kiln's check failed: missing "0"".
+const checkWords = (check: NonNullable<SceneSource["check"]>) =>
+  check.status === "passed"
+    ? "Kiln's check passed"
+    : check.status === "failed"
+      ? `Kiln's check failed: ${check.problems.join("; ")}`
+      : `not checked (${check.unchecked ?? "nothing to read"})`;
 
 // "Gemini 3.1 Flash Image (moved from GPT Image 2: OpenAI answered 503)".
 const sourceModel = (source: SceneSource) =>
@@ -190,7 +205,7 @@ function frameLine(folder: string, f: DeliveredFile): string {
       ? `drawn from the product spec${look}`
       : f.kind === "photo"
         ? "your photo, as on the listing"
-        : `approved scene${look}${f.source ? `, ${sourceModel(f.source)}` : ""}${f.from ? `; ${f.from}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}${takesLine(f)}`;
+        : `approved scene${look}${f.source ? `, ${sourceModel(f.source)}` : ""}${f.source?.check ? `; ${checkWords(f.source.check)}` : ""}${f.from ? `; ${f.from}` : ""}${f.place ? `, at ${f.place}` : ""}${f.text ? `, with "${f.text}" drawn by Kiln` : ""}${takesLine(f)}`;
   return `${folder}/${f.file} — ${f.label} (${what}), ${f.width} x ${f.height} px`;
 }
 

@@ -65,6 +65,39 @@ describe("frameViews", () => {
     expect(at("etsy.in-use")?.look).not.toHaveProperty("textWarning");
   });
 
+  it("passes on Kiln's check of a scene's shown take, and null for one never checked", () => {
+    const check = {
+      status: "failed" as const,
+      engine: "apple-vision",
+      lines: [{ expected: "205", found: false }],
+      problems: ['missing "205"'],
+      notes: [],
+      scale: "10 x 6 in, about 1/3 as wide as the door",
+      checkedAt: "2026-11-02T10:00:00.000Z",
+    };
+    const frames = frameViews(
+      launch(),
+      {
+        "etsy.hero": take("https://x/hero.png"),
+        "etsy.in-use": take("https://x/in-use.png"),
+      },
+      {},
+      CUTTING_BOARD,
+      { "etsy.hero": check, "etsy.in-use": null, "etsy.size": check },
+    );
+    const at = (frame: string) => frames.find((f) => f.frame === frame);
+    expect(at("etsy.hero")?.check).toEqual({
+      status: "failed",
+      problems: ['missing "205"'],
+      notes: [],
+      scale: "10 x 6 in, about 1/3 as wide as the door",
+    });
+    expect(at("etsy.in-use")?.check).toBeNull();
+    // Only a scene with a take shown carries one.
+    expect(at("etsy.size")).not.toHaveProperty("check");
+    expect(at("etsy.detail")).not.toHaveProperty("check");
+  });
+
   it("names each frame, its state and the take an approval would approve", () => {
     const plan = approveSlot(
       launch(),

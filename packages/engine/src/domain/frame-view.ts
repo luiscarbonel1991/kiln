@@ -12,6 +12,7 @@ import {
 import { slotLook } from "@/domain/plan-look";
 import type { Product } from "@/domain/product";
 import { lookLabel, productStyles } from "@/domain/product-look";
+import type { TakeCheck } from "@/domain/qc";
 import type { SlotFill } from "@/domain/shot-list";
 
 // Each frame of a project as an agent reads it (the HTTP API's frames, `kiln
@@ -48,6 +49,27 @@ export interface FrameView {
   // A scene's colour and style, for a product in more than one look, and
   // what in the product's text contradicts that colour (colourTextWarning).
   look?: { colour: string; style?: string; name: string; textWarning?: string };
+  // What Kiln read in a scene's shown take (domain TakeCheck): passed,
+  // failed or unchecked, what failed, what it noticed, and the size the
+  // scene asked for, which nothing measured. Null for a take never checked;
+  // absent without a scene take.
+  check?: FrameCheck | null;
+}
+
+export type FrameCheck = Pick<TakeCheck, "status" | "problems" | "notes"> & {
+  scale?: string;
+  unchecked?: string;
+};
+
+function frameCheck(check: TakeCheck | null): FrameCheck | null {
+  if (!check) return null;
+  return {
+    status: check.status,
+    problems: check.problems,
+    notes: check.notes,
+    ...(check.scale ? { scale: check.scale } : {}),
+    ...(check.unchecked ? { unchecked: check.unchecked } : {}),
+  };
 }
 
 function textWarningOf(
@@ -74,6 +96,8 @@ export function frameViews(
   jobs: Record<string, JobLike>,
   // The product the project follows: a scene names its look by it.
   product?: Product,
+  // What Kiln read in each frame's shown take (null: never checked).
+  checks: Record<string, TakeCheck | null> = {},
 ): FrameView[] {
   const looks =
     product && (product.colours.length > 1 || productStyles(product).length > 0)
@@ -86,6 +110,7 @@ export function frameViews(
       const view = slotState(slot, card, jobs[frame]);
       const look =
         looks && slot.fill === "scene" ? slotLook(plan, slot, looks) : null;
+      const output = outputOf(slot, card);
       return {
         frame,
         destinationId: d.destinationId,
@@ -96,7 +121,7 @@ export function frameViews(
         state: view.state,
         failed: view.failed,
         ...(view.error ? { error: view.error } : {}),
-        output: outputOf(slot, card),
+        output,
         approvedOutput: slot.approvedOutput ?? null,
         approvable: view.state === "to-review" && !view.test,
         ...(view.test ? { test: true } : {}),
@@ -111,6 +136,9 @@ export function frameViews(
                 ...textWarningOf(looks, look.colour),
               },
             }
+          : {}),
+        ...(slot.fill === "scene" && output && frame in checks
+          ? { check: frameCheck(checks[frame]) }
           : {}),
       };
     }),

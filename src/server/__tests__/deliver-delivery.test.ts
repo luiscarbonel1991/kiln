@@ -312,6 +312,38 @@ describe.skipIf(!hasMagick)("buildDelivery", { timeout: 30_000 }, () => {
     });
   });
 
+  it("says what Kiln's check read in each approved scene", async () => {
+    const result = await buildDelivery(
+      input({
+        sourceOf: (url: string) =>
+          url === HERO
+            ? {
+                prompt: "a hero",
+                model: "gpt-image-2",
+                costMicros: 63_000,
+                generatedAt: "2026-11-02T12:00:00.000Z",
+                check: {
+                  status: "failed" as const,
+                  problems: ['missing "Rivera"'],
+                  scale: "4 x 4 in, about the size of a coaster",
+                },
+              }
+            : undefined,
+      }),
+    );
+    const files = unzipSync(result.zip);
+    const folder = "botanical-coaster-launch-etsy";
+    expect(strFromU8(files[`${folder}/README.txt`])).toContain(
+      `gpt-image-2; Kiln's check failed: missing "Rivera"`,
+    );
+    const manifest = JSON.parse(strFromU8(files[`${folder}/manifest.json`]));
+    expect(manifest.files[1].source.check).toEqual({
+      status: "failed",
+      problems: ['missing "Rivera"'],
+      scale: "4 x 4 in, about the size of a coaster",
+    });
+  });
+
   it("delivers the maker's own photos as they are, numbered in their place; a WebP as a JPEG", async () => {
     const LIVE_1 = "https://storage.test/listings/live-1.png";
     const LIVE_3 = "https://storage.test/listings/live-3.webp";

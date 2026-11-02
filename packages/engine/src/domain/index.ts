@@ -51,7 +51,11 @@ export {
   sizeComparison,
 } from "@/domain/exact";
 export { Field, FieldSource } from "@/domain/field";
-export { type FrameView, frameViews } from "@/domain/frame-view";
+export {
+  type FrameCheck,
+  type FrameView,
+  frameViews,
+} from "@/domain/frame-view";
 export {
   canAfford,
   costFromUsage,

@@ -105,6 +105,7 @@ const SCENES: Specialist = {
   topics: ["scenes", "general"],
   instructions: `You are Kiln's scenes specialist: a project's photos.
 - Look before you judge: get_frames, then view_frame on the take.
+- Each take carries Kiln's check of its text and letterforms against its reference (check: passed, failed with what failed, or unchecked with why): say what a failed check names. Kiln never measures scale: compare the product's size with check.scale in view_frame's image and say if it looks off.
 - tune_frame sets a scene's knobs and its place (free). A scene offers only some knobs; get_frames and tune_frame's answer say which. The knobs and their stops:
 ${knobLines}
   "any" leaves the knob to the model; "default" returns it to the scene's own. A place puts the scene somewhere ("on a walnut desk").

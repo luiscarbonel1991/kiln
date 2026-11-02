@@ -108,7 +108,7 @@ export const getFrames = defineTool({
   name: "get_frames",
   title: "Get a project's frames",
   description:
-    "Each frame of a project as the board shows it: its state (queued, generating, to-review, approved, exact, ...), the take an approval approves (output), the approved one, whether it failed and why, and, after a fallback, the model it ran on. Exact frames are drawn from the product at delivery and cost nothing.",
+    "Each frame of a project as the board shows it: its state (queued, generating, to-review, approved, exact, ...), the take an approval approves (output), the approved one, whether it failed and why, Kiln's check of a scene's take (its text and letterforms against the reference: passed, failed with what, or unchecked with why; scale is the size the scene asked for, never measured), and, after a fallback, the model it ran on. Exact frames are drawn from the product at delivery and cost nothing.",
   input: z.object({ project: ProjectId }),
   hints: { readOnly: true },
   run: async ({ project }) => {
@@ -121,7 +121,7 @@ export const viewFrame = defineTool({
   name: "view_frame",
   title: "Look at a frame's take",
   description:
-    "The take a frame shows now, as an image to look at before approving or rejecting it, with the output to pass back to approve_frame or reject_frame.",
+    "The take a frame shows now, as an image to look at before approving or rejecting it, with the output to pass back to approve_frame or reject_frame, and Kiln's check of it. Kiln never measures scale: compare the product with check.scale in the image.",
   input: FrameRef,
   hints: { readOnly: true, showsImages: true },
   run: async ({ project, frame }) => {
@@ -140,6 +140,7 @@ export const viewFrame = defineTool({
       output: view.output,
       approvedOutput: view.approvedOutput,
       ...(view.ranOn ? { ranOn: view.ranOn } : {}),
+      ...(view.check !== undefined ? { check: view.check } : {}),
     };
     const asset = await fetchAsset(view.output);
     if (!asset.mime.startsWith("image/")) {

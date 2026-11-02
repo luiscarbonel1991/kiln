@@ -7,8 +7,12 @@ import {
 } from "@/domain/frame-view";
 import { type CardLike, ProjectPlan } from "@/domain/plan";
 import { Product } from "@/domain/product";
+import type { TakeCheck } from "@/domain/qc";
 import { assertDatabaseUrl, db } from "@/lib/db";
-import { projectGenerationState } from "@/server/generation-repository";
+import {
+  outputFacts,
+  projectGenerationState,
+} from "@/server/generation-repository";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
 
@@ -71,12 +75,21 @@ async function loadFrames(projectId: string) {
       rowToProduct(link.product) ??
       undefined)
     : undefined;
+  // What Kiln read in each shown take (null: the job left no check).
+  const shown = Object.values(cards).flatMap((c) => c.outputs.slice(0, 1));
+  const facts = await outputFacts(projectId, shown);
+  const checks: Record<string, TakeCheck | null> = {};
+  for (const [id, card] of Object.entries(cards)) {
+    const fact = card.outputs[0] ? facts.get(card.outputs[0]) : undefined;
+    if (fact) checks[id] = fact.check;
+  }
   return {
     project: summary,
     plan: plan.data,
     product,
     cards,
     jobs: state.jobs,
+    checks,
     reference: master !== null,
   };
 }
@@ -86,8 +99,8 @@ export async function projectFrames(
 ): Promise<ProjectFrames | null> {
   const loaded = await loadFrames(projectId);
   if (!loaded) return null;
-  const { project, plan, cards, jobs, product } = loaded;
-  return { project, frames: frameViews(plan, cards, jobs, product) };
+  const { project, plan, cards, jobs, product, checks } = loaded;
+  return { project, frames: frameViews(plan, cards, jobs, product, checks) };
 }
 
 // The scene frames a batch would generate now, as the board's Generate picks
