@@ -361,6 +361,7 @@ export {
   Recipe,
   RecipePreset,
 } from "@/domain/recipe";
+export { drawnIn, paintColours, recolourSvg } from "@/domain/recolour";
 export {
   GENERIC_USE,
   inSentence,
@@ -393,6 +394,7 @@ export {
 } from "@/domain/scene-knobs";
 export {
   kilnPick,
+  LookReference,
   looksDown,
   PlanReferences,
   sceneReference,

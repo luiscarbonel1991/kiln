@@ -18,8 +18,23 @@ export const ThreeQuarterView = z.object({
 });
 export type ThreeQuarterView = z.infer<typeof ThreeQuarterView>;
 
+// A look Kiln drew for the project (ROADMAP P2-9): the design redrawn in the
+// look's colour (for exact frames), its plate (the reference a scene in that
+// look edits) and its view from above when the product has one.
+export const LookReference = z.object({
+  colour: z.string().min(1),
+  // Absent: the product's own drawing.
+  style: z.string().min(1).optional(),
+  design: z.string().min(1),
+  front: z.string().min(1),
+  threeQuarter: ThreeQuarterView.optional(),
+});
+export type LookReference = z.infer<typeof LookReference>;
+
 export const PlanReferences = z.object({
   threeQuarter: ThreeQuarterView.optional(),
+  // Every look in use, the project's included.
+  looks: z.array(LookReference).max(40).optional(),
 });
 export type PlanReferences = z.infer<typeof PlanReferences>;
 
