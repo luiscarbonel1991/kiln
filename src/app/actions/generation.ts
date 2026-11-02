@@ -21,6 +21,8 @@ const Enqueue = z.object({
   // The estimated max the maker approved; the server refuses if its own is
   // higher (the cards changed since the estimate was shown).
   shownMaxMicros: z.number().int().min(0).optional(),
+  // Test takes: each scene at its model's low quality, never approved.
+  test: z.boolean().optional(),
 });
 
 export async function enqueueGenerationAction(

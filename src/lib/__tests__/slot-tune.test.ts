@@ -358,3 +358,44 @@ describe("a scene whose provider cannot take a paid call", () => {
     expect(plan.destinations).toHaveLength(1);
   });
 });
+
+describe("a test take", () => {
+  it("is offered at the model's low quality, priced, and not on a model without one", () => {
+    const { slot, card } = setup();
+    const view = slotState(slot, card);
+    const gpt = tuneView({
+      slot,
+      card: {
+        ...card,
+        model: { ...card.model, provider: "openai", model: "gpt-image-2" },
+      },
+      view,
+    });
+    expect(gpt?.testTake?.max).toBeGreaterThan(0);
+    expect(gpt?.testTake?.max).toBeLessThan(0.05);
+    const gemini = tuneView({
+      slot,
+      card: {
+        ...card,
+        model: {
+          ...card.model,
+          provider: "google",
+          model: "gemini-nano-banana-2.1",
+        },
+      },
+      view,
+    });
+    expect(gemini?.testTake).toBeNull();
+    expect(
+      tuneView({
+        slot,
+        card: {
+          ...card,
+          model: { ...card.model, provider: "openai", model: "gpt-image-2" },
+        },
+        view,
+        blocked: "no key",
+      })?.testTake,
+    ).toBeNull();
+  });
+});

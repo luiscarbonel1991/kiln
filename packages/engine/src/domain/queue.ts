@@ -34,6 +34,8 @@ export interface JobView {
   attempt: number;
   error?: string;
   ranOn?: RanOn;
+  // A finished test take (low quality, never approved).
+  test?: boolean;
 }
 
 export function isActiveJob(job: { status: JobStatus } | undefined): boolean {

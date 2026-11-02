@@ -823,9 +823,11 @@ export async function projectGenerationState(
       attempt: number;
       error: string | null;
       route: unknown;
+      test: boolean | null;
     }[]
   >`
-    SELECT DISTINCT ON ("cardId") "cardId", "status", "attempt", "error", "route"
+    SELECT DISTINCT ON ("cardId") "cardId", "status", "attempt", "error", "route",
+           ("request" ->> 'test') = 'true' AS "test"
     FROM "GenerationJob"
     WHERE "projectId" = ${projectId} AND "makerId" = ${makerId}
       AND "batchId" IS NOT NULL
@@ -866,6 +868,8 @@ export async function projectGenerationState(
           attempt: j.attempt,
           ...(j.error ? { error: readableFailure(j.error) } : {}),
           ...withRanOn(j.route),
+          // Its take is a test take (low quality, never approved).
+          ...(j.test && j.status === "done" ? { test: true } : {}),
         },
       ]),
     ),

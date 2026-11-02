@@ -17,6 +17,7 @@ import {
 import {
   checkModel,
   type ModelKind,
+  modelEntry,
   modelLabel,
   PROVIDER_LABELS,
   type ProviderId,
@@ -229,6 +230,8 @@ export async function scenePrompts(
 export async function estimateProjectCards(
   projectId: string,
   cardIds: string[],
+  // Test takes: each scene at its model's low quality, on that model alone.
+  options: { test?: boolean } = {},
 ): Promise<{
   cards: CardEstimate[];
   // Every model the cards run (not only the first card's), and the batch's
@@ -337,7 +340,19 @@ export async function estimateProjectCards(
         `Approve "${source?.slot.label ?? slot.versionOf}" first: "${slot.label}" re-frames it.`,
       );
     }
-    const request =
+    if (options.test && (slot?.fill !== "scene" || slot.versionOf)) {
+      throw new QueueRefusal(
+        "model",
+        `${card.id}: a test take is for a scene, not a version or a video.`,
+      );
+    }
+    if (options.test && !modelEntry(card.model)?.qualities?.includes("low")) {
+      throw new QueueRefusal(
+        "model",
+        `${modelLabel(card.model)} has no low quality: a test take runs a GPT Image model at low quality.`,
+      );
+    }
+    const built =
       slot?.versionOf && source?.slot.approvedOutput && board?.product && plan
         ? buildVersionRequest({
             product: slotProduct(board.product, plan, source.slot),
@@ -356,6 +371,13 @@ export async function estimateProjectCards(
             recipe: findRecipe(card.recipeId) ?? SEED_RECIPES[0],
             brand: SEED_BRAND,
           });
+    const request = options.test
+      ? {
+          ...built,
+          model: { ...built.model, quality: "low" as const },
+          test: true,
+        }
+      : built;
     const estimate = estimateGeneration(
       request.model,
       request.model.aspect,
@@ -367,7 +389,10 @@ export async function estimateProjectCards(
         `No pinned price for ${modelLabel(request.model)}.`,
       );
     }
-    const route = cardRoute(request, routes, unlisted);
+    // A test take stays on its model: a cheap check never moves.
+    const route = options.test
+      ? { next: [], maxMicros: undefined }
+      : cardRoute(request, routes, unlisted);
     cards.push({
       cardId: id,
       request,
@@ -422,6 +447,8 @@ export async function enqueueProjectCards(input: {
   shownMaxMicros?: number;
   // The chat conversation whose paid tool queues them.
   sessionId?: string;
+  // Test takes (estimateProjectCards).
+  test?: boolean;
 }) {
   const maker = await getCurrentMaker();
   const planned = await db.project.findFirst({
@@ -436,6 +463,7 @@ export async function enqueueProjectCards(input: {
   const { cards, model } = await estimateProjectCards(
     input.projectId,
     input.cardIds,
+    { test: input.test },
   );
   const result = await enqueueBatch({
     makerId: maker.id,

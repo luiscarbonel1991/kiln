@@ -23,6 +23,9 @@ export const ImageGenerationRequest = z.object({
   imageInputs: z.array(z.string()).default([]),
   negative: z.string().default(""),
   model: ModelConfig,
+  // A test take (DOGFOOD #53): the scene at its model's low quality, a cheap
+  // check of the direction, never approved for a listing.
+  test: z.boolean().optional(),
 });
 export type ImageGenerationRequest = z.infer<typeof ImageGenerationRequest>;
 

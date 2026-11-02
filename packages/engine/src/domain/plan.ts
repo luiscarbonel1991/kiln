@@ -628,6 +628,8 @@ export interface SlotView {
   error?: string;
   // Queued or running in the background generation queue.
   inBatch?: boolean;
+  // The take to review is a test take: a check, never approved.
+  test?: boolean;
 }
 
 export interface JobLike {
@@ -636,6 +638,8 @@ export interface JobLike {
   error?: string;
   // After a move down its route: the model it ran on, from which, and why.
   ranOn?: { label: string; from: string; reason: string };
+  // A finished test take.
+  test?: boolean;
 }
 
 // The state the board shows for a slot, from its card and its latest job. A
@@ -689,7 +693,11 @@ export function slotState(
     return { state: "queued", failed: true, ...why };
   }
   if (slot.approvedOutput !== output) {
-    return { state: "to-review", failed: false };
+    return {
+      state: "to-review",
+      failed: false,
+      ...(job?.test && job.status === "done" ? { test: true } : {}),
+    };
   }
   return { state: slot.deliveredAt ? "delivered" : "approved", failed: false };
 }

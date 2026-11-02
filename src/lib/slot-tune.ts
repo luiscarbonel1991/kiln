@@ -1,4 +1,5 @@
 import type { Card } from "@/domain/card";
+import { modelEntry } from "@/domain/model-defaults";
 import { type Route, takeEstimate } from "@/domain/model-routing";
 import type { PlanSlot, ProjectPlan, SlotView } from "@/domain/plan";
 import { projectLook } from "@/domain/plan-look";
@@ -73,6 +74,9 @@ export interface TuneView {
   // Why the scene's provider cannot take a paid call now (no key, a rejected
   // key), shown in place of the take; else null.
   blocked: string | null;
+  // A test take (DOGFOOD #53): the scene at its model's low quality, priced;
+  // null when its model has no low quality, or it cannot run now.
+  testTake: { typical: number; max: number } | null;
   // Why the last take failed, even when an earlier one still shows.
   error: string | null;
   // Where the scene stands: its own place (the maker's) or null for the
@@ -244,6 +248,17 @@ export function tuneView(input: {
         })
       : [],
     take: input.blocked ? null : price,
+    testTake:
+      card &&
+      locked === null &&
+      !input.blocked &&
+      modelEntry(card.model)?.qualities?.includes("low")
+        ? takeEstimate(
+            { ...card.model, quality: "low" },
+            card.references.length,
+            null,
+          )
+        : null,
     blocked: reviewing ? (input.blocked ?? null) : null,
     error:
       view.error ?? (job?.status === "failed" ? (job.error ?? null) : null),

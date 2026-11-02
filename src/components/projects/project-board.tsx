@@ -1095,7 +1095,15 @@ function SlotActions({
       )}
       {ordering}
       {keep(
-        view.state === "to-review" || view.state === "approved" ? (
+        view.state === "to-review" && view.test ? (
+          <span
+            data-testid={`slot-test-${cardId}`}
+            title="A test take checks the direction at low quality: make a full take (Tune → New take) to approve."
+            className="font-mono text-[0.6rem] text-prov-brand"
+          >
+            test take · low quality
+          </span>
+        ) : view.state === "to-review" || view.state === "approved" ? (
           <ApproveButton
             projectId={projectId}
             destinationId={destinationId}

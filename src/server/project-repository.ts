@@ -611,6 +611,20 @@ export async function setSlotApproval(
           : "That take is not the frame's latest: it has no finished take now.",
       );
     }
+    // A test take checks the direction at low quality: it never goes on a
+    // listing (DOGFOOD #53).
+    if (approved && current) {
+      const test = await tx.$queryRaw<{ n: bigint }[]>`
+        SELECT COUNT(*) AS "n" FROM "GenerationJob"
+        WHERE "projectId" = ${projectId} AND "outputUrl" = ${current}
+          AND ("request" ->> 'test') = 'true'`;
+      if (Number(test[0]?.n ?? 0) > 0) {
+        throw new SlotRefusal(
+          "refused",
+          "That is a test take, at low quality: make a full take to approve.",
+        );
+      }
+    }
     const next = approved
       ? approveSlot(plan, ref, card?.success ? card.data : undefined)
       : unapproveSlot(plan, ref);

@@ -56,6 +56,18 @@ export function SlotTune({
       });
       setError(result?.error ?? null);
     });
+  // A test take: low quality, on the scene's model alone, never approved.
+  const testTake = () =>
+    startTransition(async () => {
+      if (!tune.testTake) return;
+      const result = await enqueueGenerationAction({
+        projectId,
+        cardIds: [cardId],
+        test: true,
+        shownMaxMicros: toMicros(tune.testTake.max),
+      });
+      setError("error" in result ? result.error : null);
+    });
   const take = () =>
     startTransition(async () => {
       if (!tune.take) return;
@@ -319,6 +331,26 @@ export function SlotTune({
                   New take
                   <span className="font-mono text-[0.625rem] font-normal opacity-80">
                     ≈ ${tune.take.typical.toFixed(2)}–{tune.take.max.toFixed(2)}
+                  </span>
+                </button>
+              </div>
+            ) : null}
+            {tune.testTake ? (
+              <div className="flex items-center justify-between gap-3 border-border-soft border-t pt-3">
+                <span className={cn(NOTE, "text-on-surface-mid")}>
+                  Low quality, to check the direction first. A test take is
+                  never approved.
+                </span>
+                <button
+                  type="button"
+                  data-testid={`tune-${destinationId}-${slotKey}-test-take`}
+                  disabled={pending}
+                  onClick={testTake}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-field border border-border bg-secondary px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-foreground transition-opacity hover:border-primary disabled:opacity-60"
+                >
+                  Test take
+                  <span className="font-mono text-[0.625rem] font-normal opacity-80">
+                    ≈ ${tune.testTake.max.toFixed(3)}
                   </span>
                 </button>
               </div>

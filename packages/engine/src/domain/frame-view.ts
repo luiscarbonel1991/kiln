@@ -35,8 +35,10 @@ export interface FrameView {
   // and while a take is on its way.
   output: string | null;
   approvedOutput: string | null;
-  // A finished take waiting for a decision.
+  // A finished take waiting for a decision (never a test take).
   approvable: boolean;
+  // The take is a test take: low quality, a check of the direction.
+  test?: boolean;
   // The frame this one re-frames (a version) or repeats (a shared frame).
   versionOf?: string;
   // After a move down its route (Settings → Models): the model its latest
@@ -86,7 +88,8 @@ export function frameViews(
         ...(view.error ? { error: view.error } : {}),
         output: outputOf(slot, card),
         approvedOutput: slot.approvedOutput ?? null,
-        approvable: view.state === "to-review",
+        approvable: view.state === "to-review" && !view.test,
+        ...(view.test ? { test: true } : {}),
         ...(slot.versionOf ? { versionOf: slot.versionOf } : {}),
         ...(jobs[frame]?.ranOn ? { ranOn: jobs[frame].ranOn } : {}),
         ...(looks && look

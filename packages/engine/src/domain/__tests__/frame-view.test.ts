@@ -157,3 +157,18 @@ describe("waitingFrames", () => {
     expect(waitingFrames(frameSlots(plan, {}, {}))).toEqual([]);
   });
 });
+
+describe("a test take", () => {
+  it("shows to review, marked as a test, and is never approvable", () => {
+    const frames = frameViews(
+      launch(),
+      { "etsy.hero": take("https://x/hero-test.png") },
+      { "etsy.hero": { status: "done", attempt: 1, test: true } },
+    );
+    expect(frames.find((f) => f.frame === "etsy.hero")).toMatchObject({
+      state: "to-review",
+      test: true,
+      approvable: false,
+    });
+  });
+});

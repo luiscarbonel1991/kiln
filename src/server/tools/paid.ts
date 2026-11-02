@@ -43,6 +43,7 @@ const usd = (micros: number) =>
 const GenerateQuote = z.object({
   project: z.string(),
   frames: z.array(z.string()).min(1),
+  test: z.boolean().optional(),
 });
 const DrawQuote = z.object({
   project: z.string(),
@@ -87,6 +88,7 @@ interface Priced {
 async function priceGenerate(
   project: string,
   frames?: string[],
+  test?: boolean,
 ): Promise<Priced> {
   const state = await waitingProjectFrames(project);
   if (!state) {
@@ -103,13 +105,17 @@ async function priceGenerate(
       "Nothing waits to be generated: every scene has a take, is in the queue, or waits for the scene it re-frames. Name frames to take again.",
     );
   }
-  const { cards } = await estimateProjectCards(project, [
-    ...new Set(asked),
-  ]).catch((error) => {
+  const { cards } = await estimateProjectCards(project, [...new Set(asked)], {
+    test,
+  }).catch((error) => {
     throw asRefusal(error);
   });
   return {
-    input: { project, frames: cards.map((c) => c.cardId) },
+    input: {
+      project,
+      frames: cards.map((c) => c.cardId),
+      ...(test ? { test: true } : {}),
+    },
     typicalMicros: cards.reduce((t, c) => t + c.typicalMicros, 0),
     maxMicros: cards.reduce((t, c) => t + c.maxMicros, 0),
     lines: cards.map((c) => ({
@@ -233,6 +239,12 @@ const QuoteInput = z.object({
     .min(1)
     .optional()
     .describe("review_product: the product's Kiln id."),
+  test: z
+    .boolean()
+    .optional()
+    .describe(
+      "generate: test takes, each scene at its GPT Image model's low quality, a cheap check of the direction; a test take is never approved.",
+    ),
 });
 
 function needs<T>(value: T | undefined, action: QuoteAction, field: string): T {
@@ -245,7 +257,11 @@ function needs<T>(value: T | undefined, action: QuoteAction, field: string): T {
 async function priceOf(input: z.output<typeof QuoteInput>): Promise<Priced> {
   const { action } = input;
   if (action === "generate") {
-    return priceGenerate(needs(input.project, action, "project"), input.frames);
+    return priceGenerate(
+      needs(input.project, action, "project"),
+      input.frames,
+      input.test,
+    );
   }
   if (action === "draw") {
     return priceDraw(needs(input.project, action, "project"), input.cards);
@@ -323,11 +339,12 @@ export const generate = defineTool({
   hints: {},
   run: async ({ quote: id }, ctx) => {
     const quoted = await takeQuote(ctx, id, "generate");
-    const { project, frames } = GenerateQuote.parse(quoted.input);
+    const { project, frames, test } = GenerateQuote.parse(quoted.input);
     const queued = await enqueueProjectCards({
       projectId: project,
       cardIds: frames,
       shownMaxMicros: quoted.maxMicros,
+      ...(test ? { test } : {}),
       ...spentIn(ctx),
     }).catch((error) => {
       throw asRefusal(error);
