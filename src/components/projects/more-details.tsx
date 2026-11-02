@@ -27,6 +27,7 @@ const RELIEF: Partial<Record<Treatment, string>> = {
   engraved: "How deep the engraving goes",
   inlaid: "How deep the inlay goes",
   reveal: "How thick the top layer is",
+  letters: "How far they stand off the surface",
 };
 
 // What a product may also say, folded until the maker wants it (open on its

@@ -292,3 +292,21 @@ describe("a layered product's listing", () => {
     expect(draft.tags.value.some((t) => t.startsWith("reveal "))).toBe(false);
   });
 });
+
+describe("a loose-letters product's listing", () => {
+  it("says each letter is its own piece, and tags it as a buyer searches", () => {
+    const letters = {
+      ...CUTTING_BOARD,
+      name: "Door numbers",
+      shape: "door numbers",
+      treatment: "letters" as const,
+    };
+    const draft = listingDraft(letters, rules);
+    expect(draft.description.value).toContain(
+      "Each letter a separate piece, no backing",
+    );
+    expect(draft.description.value).not.toContain("Loose letters finish");
+    expect(draft.tags.value.some((t) => t.startsWith("loose "))).toBe(true);
+    expect(draft.tags.value.some((t) => t.startsWith("letters "))).toBe(false);
+  });
+});

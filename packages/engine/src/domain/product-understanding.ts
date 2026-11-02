@@ -17,10 +17,16 @@ import type { BaseUnderstanding } from "@/domain/understanding";
 // spec gives one ("white raised elements ...") and with its relief: without
 // them a model guesses — a macro once rendered white letters as brushed
 // silver, and raised letters flush with the face. The treatment decides how
-// the product looks, never the model's default.
+// the product looks, never the model's default. Loose letters also say how
+// thick each piece is, and stand off the surface by the relief when there is
+// one.
 const TREATMENT_DETAIL: Record<
   Treatment,
-  (ink: string | null, relief: string | null) => string
+  (
+    ink: string | null,
+    relief: string | null,
+    thickness: string | null,
+  ) => string
 > = {
   raised: (ink, relief) =>
     `${ink ? `${ink} ` : ""}raised elements standing ${relief ?? "clearly"} proud of the face, their side walls visible, a short soft shadow under each`,
@@ -33,6 +39,8 @@ const TREATMENT_DETAIL: Record<
   cut: () => "a cut-out silhouette",
   reveal: (ink, relief) =>
     `a two-layer build: the design cut cleanly through the top layer${relief ? ` (${relief} thick)` : ""}, so every mark shows the ${ink ? `${ink} ` : "contrasting "}base layer beneath, the marks recessed below the face with crisp vertical cut walls, nothing painted or printed`,
+  letters: (_ink, relief, thickness) =>
+    `each letter and digit cut out on its own with crisp edges${thickness ? `, ${thickness} thick` : ""}, ${relief ? `standing ${relief} off the surface it is mounted on` : "fixed flat on the surface it is mounted on"}, a short soft shadow behind each piece`,
 };
 
 // What each treatment must never be rendered as: its opposite.
@@ -43,6 +51,8 @@ const TREATMENT_AVOID: Record<Treatment, string> = {
   printed: "raised lettering, engraved lettering",
   cut: "",
   reveal: "painted lettering, printed lettering, raised lettering",
+  letters:
+    "a backing plate, a panel or board behind the letters, letters joined into one piece, lettering printed or painted on the surface",
 };
 
 // A glossy counter mirrored a plate's wording upside down, and QC cannot read
@@ -54,6 +64,10 @@ function reliefOf(dimensions: Dimensions): string | null {
   return dimensions.relief
     ? reliefLabel(dimensions.relief, dimensions.unit)
     : null;
+}
+
+function thicknessOf(dimensions: Dimensions): string | null {
+  return dimensions.d ? reliefLabel(dimensions.d, dimensions.unit) : null;
 }
 
 function inkOf(colour: ColourOption): string | null {
@@ -122,12 +136,18 @@ export function productUnderstanding(
       : "";
   // With parts, the product's own size is the whole assembly's.
   const size = `${dimensionsLabel(product.dimensions)}${named.length > 0 ? " overall" : ""}`;
+  // Loose letters are the wording itself: their size is the whole set's,
+  // and nothing holds them together.
+  const what =
+    product.treatment === "letters"
+      ? `${product.shape} in ${material}, ${dimensionsLabel(product.dimensions)} overall, each letter and digit its own separate piece with no backing plate, panel or board behind or between them`
+      : `a ${size} ${product.shape} in ${material}${pieces}`;
   return {
-    subject: `${product.name}: a ${size} ${product.shape} in ${material}${pieces}${wording}; keep every letter, mark and proportion exactly as in the master image${views}${forbidden}`,
+    subject: `${product.name}: ${what}${wording}; keep every letter, mark and proportion exactly as in the master image${views}${forbidden}`,
     productType: `${product.family.toLowerCase()}, ${product.shape}`,
     useContext: product.useContexts[0] ?? "",
     sceneProps: "",
-    materials: `${material}, ${TREATMENT_DETAIL[product.treatment](inkOf(colour), reliefOf(product.dimensions))}${sample}`,
+    materials: `${material}, ${TREATMENT_DETAIL[product.treatment](inkOf(colour), reliefOf(product.dimensions), thicknessOf(product.dimensions))}${sample}`,
     avoid: [TREATMENT_AVOID[product.treatment], wording ? MIRRORED : ""]
       .filter(Boolean)
       .join(", "),

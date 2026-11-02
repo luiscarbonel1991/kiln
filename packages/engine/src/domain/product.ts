@@ -149,7 +149,11 @@ export type Typography = z.infer<typeof Typography>;
 
 // How the marks are made. `reveal` is a layered build: the marks are cut
 // through a top layer (the colour's face) down to a base of another colour
-// (its inlay), the relief being the top layer's thickness.
+// (its inlay), the relief being the top layer's thickness. `letters` has no
+// face at all: each letter and digit of the wording is its own piece, fixed
+// straight on the surface it is sold for, `d` its thickness and the relief
+// how far it stands off that surface (DOGFOOD #85: a template that assumed a
+// panel drew one behind them).
 export const Treatment = z.enum([
   "raised",
   "inlaid",
@@ -157,6 +161,7 @@ export const Treatment = z.enum([
   "printed",
   "cut",
   "reveal",
+  "letters",
 ]);
 export type Treatment = z.infer<typeof Treatment>;
 

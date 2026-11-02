@@ -48,6 +48,11 @@ export const FINISHES: { value: Treatment; label: string; hint: string }[] = [
     label: "Layered",
     hint: "A top layer cut through, showing a base of another colour",
   },
+  {
+    value: "letters",
+    label: "Loose letters",
+    hint: "Each letter or digit is its own piece, no backing",
+  },
 ];
 
 export const ProductFile = z.discriminatedUnion("kind", [

@@ -87,6 +87,41 @@ describe("the treatment drives the prompt", () => {
     expect(unknown.materials).toContain("shows the contrasting base layer");
   });
 
+  it("loose letters are separate pieces on the surface, never on a panel", () => {
+    const letters = {
+      ...plate,
+      name: "Door numbers",
+      shape: "door numbers",
+      treatment: "letters" as const,
+      dimensions: { w: 15, h: 6, d: 0.125, unit: "in" as const },
+      colours: [{ ...plate.colours[0], inlay: undefined }],
+    };
+    const u = productUnderstanding(letters);
+    expect(u.subject).toContain(
+      "Door numbers: door numbers in black matte panel, 15 x 6 in overall, each letter and digit its own separate piece with no backing plate, panel or board behind or between them",
+    );
+    expect(u.materials).toContain(
+      "each letter and digit cut out on its own with crisp edges, 1/8 in thick, fixed flat on the surface it is mounted on, a short soft shadow behind each piece",
+    );
+    expect(u.avoid).toBe(
+      "a backing plate, a panel or board behind the letters, letters joined into one piece, lettering printed or painted on the surface, mirrored or reflected lettering",
+    );
+    // On standoffs, the relief is how far they float.
+    const floating = productUnderstanding({
+      ...letters,
+      dimensions: { ...letters.dimensions, relief: 0.5 },
+    });
+    expect(floating.materials).toContain(
+      "standing 1/2 in off the surface it is mounted on",
+    );
+    expect(sceneCues(letters, "an apartment door")).toContain(
+      "each letter and digit a separate piece fixed straight on the surface, nothing behind or between them",
+    );
+    expect(sceneCues(plate, "an apartment door").join(" ")).not.toContain(
+      "separate piece",
+    );
+  });
+
   it("the negative prompt carries what the treatment must never look like", () => {
     const { negative } = assemblePrompt(
       undefined,

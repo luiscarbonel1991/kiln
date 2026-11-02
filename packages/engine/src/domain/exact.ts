@@ -21,6 +21,7 @@ export const TREATMENT_LABEL: Record<Treatment, string> = {
   printed: "Printed",
   cut: "Cut-out",
   reveal: "Layered",
+  letters: "Loose letters",
 };
 
 // The call to action when the product names none: invite personalization only

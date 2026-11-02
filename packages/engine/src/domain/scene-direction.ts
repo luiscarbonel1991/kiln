@@ -184,6 +184,12 @@ export function sceneCues(
     dark
       ? "its dark face set against a lighter background, so it stands out"
       : "its light face set against a darker background, so it stands out",
+    // Loose letters on a door came back on a panel (DOGFOOD #85).
+    ...(product.treatment === "letters"
+      ? [
+          "each letter and digit a separate piece fixed straight on the surface, nothing behind or between them",
+        ]
+      : []),
     // The objects named for scale invite their brands and labels.
     "everything around it plain and unbranded",
     // A polished counter mirrored a plate's wording (DOGFOOD #46).
@@ -211,6 +217,8 @@ export function surfaceCue(product: Product): string {
       return "the cut edges sharp and in focus";
     case "reveal":
       return "seen at a slight angle, so the cut walls of the top layer show and the base colour lies at the bottom of every mark";
+    case "letters":
+      return "seen at a slight angle, so each piece's edges and its short shadow on the surface show";
   }
 }
 

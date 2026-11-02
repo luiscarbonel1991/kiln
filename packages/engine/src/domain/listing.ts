@@ -136,7 +136,9 @@ function draftDescription(product: Product): string {
   const gets = [
     ...brief,
     ...sizes,
-    `${TREATMENT_LABEL[product.treatment]} finish`,
+    product.treatment === "letters"
+      ? "Each letter a separate piece, no backing"
+      : `${TREATMENT_LABEL[product.treatment]} finish`,
     ...(product.colours.length > 1 ? [`In ${colours}`] : []),
     ...product.variants.map(
       (axis) => `${axis.name}: ${axis.values.map((v) => v.label).join(", ")}`,
@@ -201,7 +203,10 @@ function heads(product: Product): string[] {
 }
 
 // A treatment as a buyer searches for it.
-const TAG_WORD: Partial<Record<Treatment, string>> = { reveal: "layered" };
+const TAG_WORD: Partial<Record<Treatment, string>> = {
+  reveal: "layered",
+  letters: "loose",
+};
 
 // Phrases from the spec that fit a tag; the text model writes better ones.
 function draftTags(product: Product, rules?: DestinationText): string[] {
