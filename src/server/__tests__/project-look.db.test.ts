@@ -231,4 +231,3 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
     expect(Object.keys(prompts)).not.toContain("etsy.size");
   });
 });
-
