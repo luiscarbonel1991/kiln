@@ -75,6 +75,8 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
       },
     });
     expect(g.lastOkAt).not.toBeNull();
+    // A spend cap may pass; only a rejected key blocks the next call.
+    expect(g.keyRejected).toBe(false);
     expect(o).toMatchObject({ provider: "openai", lastError: null });
     expect(typeof o.keyPresent).toBe("boolean");
 
@@ -89,6 +91,7 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
     expect(raw.lastError?.message).toBe(
       "Google rejected the API key — check GOOGLE_API_KEY or use OpenAI.",
     );
+    expect(raw.keyRejected).toBe(true);
 
     // The key replaced and checked from Settings: the error clears, and the
     // check costs nothing.
@@ -97,6 +100,7 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
     await recordKeyCheck({ makerId, provider: "google", error: null });
     const [, checked] = await providerHealth(makerId);
     expect(checked.lastError).toBeNull();
+    expect(checked.keyRejected).toBe(false);
     expect((await budget(makerId)).spentMicros).toBe(before);
     // A check the provider refuses shows as its error.
     await new Promise((r) => setTimeout(r, 5));
@@ -110,6 +114,7 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
     expect(refused.lastError?.message).toBe(
       "Google rejected the API key (400) — check GOOGLE_API_KEY or use OpenAI.",
     );
+    expect(refused.keyRejected).toBe(true);
   });
 
   it("a move down a route counts as a failure of the provider it left", async () => {

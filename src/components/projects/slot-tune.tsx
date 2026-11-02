@@ -293,6 +293,17 @@ export function SlotTune({
                 </button>
               </div>
             ) : null}
+            {tune.blocked ? (
+              <p
+                data-testid={`tune-${destinationId}-${slotKey}-blocked`}
+                className={cn(
+                  NOTE,
+                  "border-border-soft border-t pt-3 text-prov-local",
+                )}
+              >
+                {tune.blocked}
+              </p>
+            ) : null}
             {tune.error ? (
               <p className="font-mono text-[0.6rem] text-prov-local [overflow-wrap:anywhere]">
                 Last take failed: {tune.error}

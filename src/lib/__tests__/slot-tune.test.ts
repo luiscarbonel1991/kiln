@@ -337,3 +337,24 @@ describe("a scene's look in Tune", () => {
     );
   });
 });
+
+describe("a scene whose provider cannot take a paid call", () => {
+  it("says why in place of the new take", () => {
+    const { plan, slot, card } = setup();
+    const taken = {
+      ...card,
+      status: "done" as const,
+      outputs: ["https://x/1.png"],
+    };
+    const view = slotState(slot, taken);
+    const why =
+      "Google rejected the API key on its last call: replace GOOGLE_API_KEY.";
+    const blocked = tuneView({ slot, card: taken, view, blocked: why });
+    expect(blocked?.take).toBeNull();
+    expect(blocked?.blocked).toBe(why);
+    const open = tuneView({ slot, card: taken, view });
+    expect(open?.take).not.toBeNull();
+    expect(open?.blocked).toBeNull();
+    expect(plan.destinations).toHaveLength(1);
+  });
+});

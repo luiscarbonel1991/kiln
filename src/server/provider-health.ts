@@ -3,7 +3,7 @@ import {
   type ProviderId,
   unlistedModels,
 } from "@/domain/model-defaults";
-import { readableFailure } from "@/domain/queue";
+import { isKeyRejectedText, readableFailure } from "@/domain/queue";
 import { db, hasDatabase } from "@/lib/db";
 import { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 import { hasProviderKey } from "@/providers/keys";
@@ -23,6 +23,9 @@ export interface ProviderHealth {
   label: string;
   keyPresent: boolean;
   lastError: { at: string; message: string } | null;
+  // The last error is the provider rejecting the key: no call can work until
+  // it is replaced (and checked again in Settings → Providers).
+  keyRejected: boolean;
   lastOkAt: string | null;
   // The offered models its latest key check found it no longer lists.
   unlisted: { models: string[]; at: string } | null;
@@ -76,17 +79,19 @@ export async function providerHealth(
   return PROVIDERS.map((provider) => {
     const lastOk = ok.get(provider);
     const lastFailed = failed.get(provider);
+    const current =
+      lastFailed && (!lastOk || lastFailed.at > lastOk) ? lastFailed : null;
     return {
       provider,
       label: PROVIDER_LABELS[provider],
       keyPresent: hasProviderKey(provider),
-      lastError:
-        lastFailed && (!lastOk || lastFailed.at > lastOk)
-          ? {
-              at: lastFailed.at.toISOString(),
-              message: readableFailure(lastFailed.message, provider),
-            }
-          : null,
+      lastError: current
+        ? {
+            at: current.at.toISOString(),
+            message: readableFailure(current.message, provider),
+          }
+        : null,
+      keyRejected: current !== null && isKeyRejectedText(current.message),
       lastOkAt: lastOk?.toISOString() ?? null,
       unlisted: unlisted[provider] ?? null,
     };

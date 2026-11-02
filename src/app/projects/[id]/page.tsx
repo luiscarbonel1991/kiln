@@ -13,6 +13,7 @@ import { modelLabel } from "@/domain/model-defaults";
 import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
 import { projectCost } from "@/domain/project-cost";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
+import { providerBlock } from "@/lib/provider-block";
 import { providerMode } from "@/providers/mode";
 import { chatPanelData } from "@/server/chat/chat-view";
 import { estimateProjectCards } from "@/server/generation-queue";
@@ -58,6 +59,15 @@ async function batchEstimate(
           ?.slots.find((s) => s.key === ref?.slotKey)?.label ?? cardId
       );
     };
+    // A provider that cannot take a paid call now (no key, a rejected key)
+    // refuses the batch before the click, with why (DOGFOOD #44).
+    const blocked = [
+      ...new Set(cards.map((c) => c.request.model.provider)),
+    ].flatMap((provider) => {
+      const why = providerBlock(health, provider, providerMode());
+      return why ? [why] : [];
+    });
+    if (blocked.length > 0) return { refusal: blocked.join(" ") };
     const warnings = health.flatMap((h) => {
       const count = cards.filter(
         (c) => c.request.model.provider === h.provider,

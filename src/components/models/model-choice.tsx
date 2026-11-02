@@ -28,6 +28,8 @@ export interface ProviderNote {
   provider: ProviderId;
   keyPresent: boolean;
   lastError: { message: string } | null;
+  // The last error was the provider rejecting the key.
+  keyRejected?: boolean;
   unlisted?: { models: string[] } | null;
 }
 
@@ -37,6 +39,7 @@ const SELECT =
 function groupNote(note: ProviderNote | undefined): string {
   if (!note) return "";
   if (!note.keyPresent) return " — no API key";
+  if (note.keyRejected) return " — key rejected";
   if (note.lastError) return " — last call failed";
   return "";
 }

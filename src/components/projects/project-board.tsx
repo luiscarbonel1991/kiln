@@ -96,6 +96,7 @@ import { planChangeLines } from "@/lib/plan-changes";
 import { plateHref } from "@/lib/plate-href";
 import { plural } from "@/lib/plural";
 import { projectTypeLabel } from "@/lib/project-types";
+import { providerBlock } from "@/lib/provider-block";
 import { CATALOG } from "@/lib/recipes";
 import { dayLabel, resultsView } from "@/lib/results-view";
 import {
@@ -493,9 +494,17 @@ export function ProjectBoard({
                             ),
                             route: takeRoutes.final,
                             look: tuneLook(product, board.plan, slot),
+                            blocked: card
+                              ? providerBlock(notes, card.model.provider, mode)
+                              : null,
                           })}
                           hasReference={board.master !== null}
                           look={frameLookOf(slot)}
+                          blocked={
+                            card
+                              ? providerBlock(notes, card.model.provider, mode)
+                              : null
+                          }
                           model={card ? (card.model as ModelValue) : null}
                           notes={notes}
                           video={
@@ -929,6 +938,7 @@ function SlotActions({
   tune,
   hasReference,
   look,
+  blocked,
   order,
   video,
   model,
@@ -946,6 +956,8 @@ function SlotActions({
   // The scene's look when it is not the project's, and its colour when
   // nothing real backs it; else null.
   look: { own: string | null; unverified: string | null };
+  // Why the card's provider cannot take a paid call now; else null.
+  blocked: string | null;
   order: { place: number; last: number; firstLabel: string } | null;
   video: {
     settings: VideoSettings;
@@ -972,6 +984,17 @@ function SlotActions({
     ) : (
       node
     );
+  // Why the last take failed, in the provider's words (DOGFOOD #43), on the
+  // frame itself rather than only in its badge's title.
+  const failure =
+    !off && actual.failed && actual.error ? (
+      <p
+        data-testid={`slot-error-${cardId}`}
+        className="w-full font-mono text-[0.6rem] leading-snug text-prov-local [overflow-wrap:anywhere]"
+      >
+        Failed: {actual.error}
+      </p>
+    ) : null;
   const toggle = (
     <SlotSwitch
       projectId={projectId}
@@ -1018,6 +1041,7 @@ function SlotActions({
               rendered={video.rendered}
               budgetLine={video.budgetLine}
               route={video.route}
+              blocked={blocked}
             />
           ) : (
             <span className="font-mono text-[0.6rem] text-on-surface-dim">
@@ -1025,6 +1049,7 @@ function SlotActions({
             </span>
           ),
         )}
+        {failure}
         {view.inBatch && !off ? null : toggle}
       </div>
     );
@@ -1118,6 +1143,7 @@ function SlotActions({
           </span>
         ) : null,
       )}
+      {failure}
       {keep(
         slot.key === "scale" ? (
           // Plans from before M4 kept an AI scale scene; its size cue can lie

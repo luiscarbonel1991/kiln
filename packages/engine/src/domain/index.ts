@@ -362,6 +362,7 @@ export {
   errorMessage,
   hadResponse,
   isActiveJob,
+  isKeyRejectedText,
   JobStatus,
   type JobView,
   MAX_ATTEMPTS,

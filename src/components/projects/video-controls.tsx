@@ -47,6 +47,7 @@ export function VideoControls({
   rendered,
   budgetLine,
   route = null,
+  blocked = null,
 }: {
   projectId: string;
   destinationId: string;
@@ -61,6 +62,8 @@ export function VideoControls({
   budgetLine: string;
   // The video route's models that may run here: the price is the dearest.
   route?: Route | null;
+  // Why the model's provider cannot take a paid call now (providerBlock).
+  blocked?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
@@ -161,13 +164,28 @@ export function VideoControls({
         variant="secondary"
         size="xs"
         data-testid={`video-${destinationId}-${slotKey}-generate`}
-        disabled={pending || busy || !settings.startFrame || usd === null}
+        disabled={
+          pending ||
+          busy ||
+          !settings.startFrame ||
+          usd === null ||
+          blocked !== null
+        }
+        title={blocked ?? undefined}
         onClick={() => setConfirming(true)}
       >
         {pending ? <Loader2 className="animate-spin" /> : <Film />}
         {rendered ? "Re-roll video" : "Generate video"}
         {usd === null ? "" : ` · ${money(usd)}`}
       </Button>
+      {blocked ? (
+        <span
+          data-testid={`video-${destinationId}-${slotKey}-blocked`}
+          className="font-sans text-[0.68rem] leading-snug text-prov-local"
+        >
+          {blocked}
+        </span>
+      ) : null}
       {error ? (
         <span className="font-mono text-[0.6rem] text-prov-local">{error}</span>
       ) : null}

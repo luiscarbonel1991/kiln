@@ -204,6 +204,12 @@ export function noQuotaReason(
 // Google answers a bad key with a 400, not a 401.
 const KEY_REJECTED = /API_KEY_INVALID|API key not valid/i;
 
+// A stored failure that was the provider rejecting the key (its raw words
+// or Kiln's own).
+export function isKeyRejectedText(text: string): boolean {
+  return KEY_REJECTED.test(text) || /rejected the API key/.test(text);
+}
+
 export function isKeyRejected(error: unknown): boolean {
   const status = (error as { status?: unknown } | null)?.status;
   return (

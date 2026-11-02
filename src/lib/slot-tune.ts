@@ -67,6 +67,9 @@ export interface TuneView {
   // One more take of this scene (it replaces the one shown), with its price
   // in USD; null unless there is a take to review and nothing queued.
   take: { typical: number; max: number } | null;
+  // Why the scene's provider cannot take a paid call now (no key, a rejected
+  // key), shown in place of the take; else null.
+  blocked: string | null;
   // Why the last take failed, even when an earlier one still shows.
   error: string | null;
   // Where the scene stands: its own place (the maker's) or null for the
@@ -175,6 +178,8 @@ export function tuneView(input: {
   route?: Route | null;
   // The scene's colour and style (tuneLook).
   look?: TuneLook | null;
+  // Why its provider cannot take a paid call now (providerBlock).
+  blocked?: string | null;
 }): TuneView | null {
   const { slot, card, view, job, places = [], above = null } = input;
   if (slot.fill !== "scene" || !slot.knobs) return null;
@@ -233,7 +238,8 @@ export function tuneView(input: {
           return move ? [{ key, label: REASONS[key].label, move }] : [];
         })
       : [],
-    take: price,
+    take: input.blocked ? null : price,
+    blocked: reviewing ? (input.blocked ?? null) : null,
     error:
       view.error ?? (job?.status === "failed" ? (job.error ?? null) : null),
     startsFrom: above
