@@ -8,7 +8,6 @@ import {
   withThreeQuarter,
 } from "@/domain/plan";
 import { Product } from "@/domain/product";
-import { productUnderstanding } from "@/domain/product-understanding";
 import { slotCards } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { tuneView } from "@/lib/slot-tune";
@@ -50,7 +49,7 @@ function setup(
   }),
 ) {
   const slot = plan.destinations[0].slots.find((s) => s.key === "in-use");
-  const card = slotCards(plan, master, productUnderstanding(plate), plate).find(
+  const card = slotCards(plan, master, plate).find(
     (c) => c.id === "etsy.in-use",
   );
   if (!slot || !card) throw new Error("no in-use");

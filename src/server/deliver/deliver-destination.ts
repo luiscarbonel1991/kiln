@@ -1,5 +1,6 @@
 import { listingDraft } from "@/domain/listing";
 import { slotCardId } from "@/domain/plan";
+import { projectProduct } from "@/domain/plan-look";
 import { projectCost } from "@/domain/project-cost";
 import { plateHref } from "@/lib/plate-href";
 import { CATALOG } from "@/lib/recipes";
@@ -49,14 +50,16 @@ export async function deliverDestination(
     !s.off && s.approvedOutput ? [s.approvedOutput] : [],
   );
   try {
-    const plate = plateHref(loaded.product);
+    // Exact frames draw the product as the project shows it (its look).
+    const shown = projectProduct(loaded.product, fullPlan);
+    const plate = plateHref(shown);
     const sources = await outputSources(projectId, outputs);
     const now = new Date();
     // resvg fetches nothing: the colour sheet's material samples go inline.
     const product = {
-      ...loaded.product,
+      ...shown,
       colours: await Promise.all(
-        loaded.product.colours.map(async (c) =>
+        shown.colours.map(async (c) =>
           c.swatchUrl ? { ...c, swatchUrl: await dataUrl(c.swatchUrl) } : c,
         ),
       ),

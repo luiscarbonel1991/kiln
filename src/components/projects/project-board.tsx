@@ -74,6 +74,7 @@ import {
   type VideoSettings,
   videoSettings,
 } from "@/domain/plan";
+import { projectProduct } from "@/domain/plan-look";
 import {
   buyerSizeLabel,
   colourOf,
@@ -282,9 +283,11 @@ export function ProjectBoard({
   // the plate it was drawn beside.
   const above = threeQuarterFor(board.plan.references, board.master?.assetUrl);
   const waiting = waitingCardIds(rows);
-  // Scenes show the default colour: nothing real backs a look without a
-  // material photo or a supplier page.
-  const sceneColour = colourOf(product, product.defaultColour);
+  // The product as the project shows it (its colour and style): exact
+  // frames draw it, and scenes are made in it. Nothing real backs a look
+  // without a material photo or a supplier page.
+  const shown = projectProduct(product, board.plan);
+  const sceneColour = colourOf(shown, shown.defaultColour);
   const unverified = lookVerified(sceneColour) ? null : sceneColour.name;
   const labelOf = new Map(
     rows.flatMap((r) => r.slots.map((s) => [s.cardId, s.slot.label] as const)),
@@ -517,7 +520,7 @@ export function ProjectBoard({
                             slot={slot}
                             cardId={cardId}
                             output={card?.outputs[0]}
-                            product={product}
+                            product={shown}
                             brand={brand}
                           />
                         </BeforeAfter>
@@ -525,12 +528,12 @@ export function ProjectBoard({
                         <ExactSlotArt
                           view={exactView(
                             slot.exact,
-                            product,
+                            shown,
                             slot.textTemplate,
                             brand,
                           )}
                           aspect={slot.aspect}
-                          plate={plateHref(product)}
+                          plate={plateHref(shown)}
                         />
                       ) : (
                         <SceneArt
@@ -542,7 +545,7 @@ export function ProjectBoard({
                           }
                           text={
                             slot.textTemplate
-                              ? renderTextTemplate(slot.textTemplate, product)
+                              ? renderTextTemplate(slot.textTemplate, shown)
                               : undefined
                           }
                           band={textLayerColours(brand)}
@@ -663,7 +666,7 @@ export function ProjectBoard({
               </p>
             </div>
           ) : null}
-          <BoardColours product={product} />
+          <BoardColours product={product} scenes={sceneColour.key} />
         </div>
 
         {board.master ? (

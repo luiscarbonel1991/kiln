@@ -25,8 +25,7 @@ vi.mock("@/server/product-repository", () => ({
   getProduct: async (id: string) => (id === board.id ? board : null),
 }));
 vi.mock("@/server/product-reference", () => ({
-  productReference: async () => null,
-  threeQuarterReference: async () => null,
+  lookedReference: async () => ({ master: null, drawn: null }),
 }));
 const remembered: Record<string, "sweep" | "place"> = {};
 const rememberHeroSetting = vi.fn(

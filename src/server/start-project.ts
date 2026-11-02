@@ -16,7 +16,9 @@ import {
   withSlotOff,
   withThreeQuarter,
 } from "@/domain/plan";
+import { chosenLook, projectLook, withLookReference } from "@/domain/plan-look";
 import type { Product } from "@/domain/product";
+import { Look } from "@/domain/product-look";
 import { ProjectType } from "@/domain/project";
 import { startEditorState } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
@@ -27,10 +29,7 @@ import {
   getMakerPreferences,
   rememberHeroSetting,
 } from "@/server/maker-repository";
-import {
-  productReference,
-  threeQuarterReference,
-} from "@/server/product-reference";
+import { lookedReference } from "@/server/product-reference";
 import { getProduct } from "@/server/product-repository";
 import { createProject, latestBriefs } from "@/server/project-repository";
 
@@ -42,7 +41,9 @@ import { createProject, latestBriefs } from "@/server/project-repository";
 // kit from a live listing: its address and its photos (already in Kiln's
 // storage), each kept or replaced by a frame; the plan is rebuilt from them
 // too. `heroSettings` is each destination's hero setting as the plan step
-// showed it; one left out takes Kiln's proposal.
+// showed it; one left out takes Kiln's proposal. `look` is the colour and
+// style the project shows; left out, the product's default (which never
+// changes for it).
 export const StartProject = z.object({
   productId: z.string().min(1),
   type: ProjectType.exclude(["design"]),
@@ -55,6 +56,7 @@ export const StartProject = z.object({
     })
     .optional(),
   heroSettings: z.record(z.string().min(1), HeroSetting).default({}),
+  look: Look.optional(),
 });
 export type StartProject = z.output<typeof StartProject>;
 
@@ -66,6 +68,8 @@ export async function startingPlan(
   input: Omit<StartProject, "productId">,
 ): Promise<{ plan: ProjectPlan; proposed: (id: string) => HeroSetting }> {
   const { type, destinationIds, offSlots, live, heroSettings } = input;
+  const chosen = chosenLook(product, input.look);
+  if ("refused" in chosen) throw new Error(chosen.refused);
   const planned = offSlots.reduce(
     (p, id) => {
       const ref = parseSlotCardId(id);
@@ -84,7 +88,8 @@ export async function startingPlan(
   );
   // The frames start with the knobs the maker's kept lessons set for the
   // family.
-  const learned = withLearned(planned, await keptMoves(product.family));
+  const looked = chosen.look ? { ...planned, look: chosen.look } : planned;
+  const learned = withLearned(looked, await keptMoves(product.family));
   const { heroSetting: remembered } = await getMakerPreferences();
   const proposed = (id: string) =>
     heroProposal(product, id, remembered).setting;
@@ -105,8 +110,8 @@ export async function startingPlan(
 }
 
 // Start a project: plan (with the product's last market brief per
-// destination), the product's reference (if Kiln can make one for free),
-// draft cards for the scene slots. No model is called. Answers the new
+// destination), the product's reference in the project's look (if Kiln can
+// make one for free), draft cards for the scene slots. No model is called. Answers the new
 // project's id, or the reason it was refused.
 export async function startProject(
   input: unknown,
@@ -129,12 +134,15 @@ export async function startProject(
   if (!product) return { error: "That product no longer exists." };
   try {
     const { plan: shaped, proposed } = await startingPlan(product, parsed.data);
-    // A product with a part lying flat also gets its view from above.
-    const master = await productReference(product);
-    const plan = withThreeQuarter(
-      shaped,
-      await threeQuarterReference(product, master),
+    // The reference in the project's look; a product with a part lying flat
+    // also gets its view from above.
+    const { master, drawn, refused } = await lookedReference(
+      product,
+      projectLook(shaped, product),
     );
+    if (refused && shaped.look) return { error: refused };
+    const viewed = withThreeQuarter(shaped, drawn?.threeQuarter ?? null);
+    const plan = drawn ? withLookReference(viewed, drawn) : viewed;
     const editor = startEditorState({
       product,
       type,

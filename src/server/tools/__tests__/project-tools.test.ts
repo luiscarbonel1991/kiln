@@ -30,8 +30,7 @@ vi.mock("@/server/project-repository", () => ({
 }));
 vi.mock("@/server/lessons", () => ({ keptMoves: async () => [] }));
 vi.mock("@/server/product-reference", () => ({
-  productReference: async () => null,
-  threeQuarterReference: async () => null,
+  lookedReference: async () => ({ master: null, drawn: null }),
 }));
 vi.mock("@/server/project-frames", () => ({
   framedProjects: async () => [],

@@ -4,7 +4,10 @@ import { ArrowRight, Eye, EyeOff, Loader2, PenLine, Plus } from "lucide-react";
 import Link from "next/link";
 import { ToggleGroup } from "radix-ui";
 import { useMemo, useState, useTransition } from "react";
-import { createProjectAction } from "@/app/actions/new-project";
+import {
+  createProjectAction,
+  lookDesignAction,
+} from "@/app/actions/new-project";
 import { importProductsAction } from "@/app/actions/products";
 import { BeforeAfter } from "@/components/projects/before-after";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
@@ -18,6 +21,7 @@ import {
   LiveListingStep,
   type LiveRow,
 } from "@/components/projects/live-listing-step";
+import { LookPicker } from "@/components/projects/look-picker";
 import { PhotoArt } from "@/components/projects/photo-art";
 import { ProductEditor } from "@/components/projects/product-editor";
 import { SceneArt } from "@/components/projects/scene-art";
@@ -59,7 +63,23 @@ import {
   replacementFrames,
   slotCardId,
 } from "@/domain/plan";
-import { buyerSizeLabel, type Product, productImages } from "@/domain/product";
+import {
+  buyerSizeLabel,
+  colourOf,
+  type Product,
+  productImages,
+} from "@/domain/product";
+import {
+  type Look,
+  lookLabel,
+  ORIGINAL,
+  productInLook,
+  productStyles,
+  resolveLook,
+  sameLook,
+  storedLook,
+  styleName,
+} from "@/domain/product-look";
 import type { ProjectType } from "@/domain/project";
 import { plateHref } from "@/lib/plate-href";
 import { plural } from "@/lib/plural";
@@ -161,8 +181,29 @@ export function NewProjectFlow({
   const [importing, setImporting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [starting, startTransition] = useTransition();
+  // The colour and style the project shows, for the product picked (else
+  // its default, which the project never changes), and the design Kiln
+  // redrew for each look, so the exact frames preview in it.
+  const [lookChoice, setLookChoice] = useState<{
+    productId: string;
+    look: Look;
+  } | null>(null);
+  const [designs, setDesigns] = useState<Record<string, string>>({});
+  const [lookError, setLookError] = useState<string | null>(null);
+  const [drawingLook, startDrawingLook] = useTransition();
 
   const product = products.find((p) => p.id === productId) ?? null;
+  const asked =
+    lookChoice && lookChoice.productId === product?.id
+      ? lookChoice.look
+      : undefined;
+  const look = product ? resolveLook(product, asked) : null;
+  const ownLook = product && look && !sameLook(look, resolveLook(product));
+  const designKey =
+    product && look ? `${product.id}/${look.colour}/${look.style ?? ""}` : "";
+  // The product as the project would show it: exact frames preview in it.
+  const shown =
+    product && look ? productInLook(product, look, designs[designKey]) : null;
   const offered = type ? offeredDestinations(type, CATALOG) : [];
   const live = type === "listing-kit" && startFrom === "live";
   const frames =
@@ -235,13 +276,39 @@ export function NewProjectFlow({
   const estimate = estimateScenes(
     scenes,
     model,
-    product ? productImages(product).length : 0,
+    shown ? productImages(shown).length : 0,
   );
   // A video is paid like a scene, so the plan prices it too.
   const videoModel = defaultVideoModel(makerModels);
   const videos = plan
     ? planVideos(plan, CATALOG.destinations, videoModel, off)
     : { count: 0, seconds: [], usd: 0 };
+
+  // A look apart from the product's default is redrawn for the preview
+  // (free, stored by its bytes); one Kiln cannot draw says why and is not
+  // taken.
+  function chooseLook(next: Look) {
+    if (!product || !look) return;
+    const merged = { ...storedLook(look), ...next };
+    const resolved = resolveLook(product, merged);
+    const key = `${product.id}/${resolved.colour}/${resolved.style ?? ""}`;
+    const before = lookChoice;
+    setLookChoice({ productId: product.id, look: merged });
+    setLookError(null);
+    if (designs[key] || sameLook(resolved, resolveLook(product))) return;
+    startDrawingLook(async () => {
+      const result = await lookDesignAction({
+        productId: product.id,
+        look: merged,
+      });
+      if ("error" in result) {
+        setLookError(result.error);
+        setLookChoice(before);
+        return;
+      }
+      setDesigns((all) => ({ ...all, [key]: result.design }));
+    });
+  }
 
   function toggleSlot(id: string) {
     setOffSlots((ids) =>
@@ -326,6 +393,7 @@ export function NewProjectFlow({
             h.setting,
           ]),
         ),
+        ...(ownLook && look ? { look: storedLook(look) } : {}),
         ...(live
           ? {
               live: {
@@ -629,6 +697,14 @@ export function NewProjectFlow({
       <Step n={live ? 5 : 4} title="Plan" muted={!plan}>
         {plan && product ? (
           <div className="flex flex-col gap-6">
+            <ProjectLook
+              product={product}
+              look={look ?? resolveLook(product)}
+              own={Boolean(ownLook)}
+              pending={drawingLook}
+              error={lookError}
+              onLook={chooseLook}
+            />
             {plan.destinations.map((d) => {
               const destination = CATALOG.destinations.find(
                 (x) => x.id === d.destinationId,
@@ -730,12 +806,12 @@ export function NewProjectFlow({
                               <ExactSlotArt
                                 view={exactView(
                                   slot.exact,
-                                  product,
+                                  shown ?? product,
                                   slot.textTemplate,
                                   brand,
                                 )}
                                 aspect={slot.aspect}
-                                plate={plateHref(product)}
+                                plate={plateHref(shown ?? product)}
                               />
                             ) : (
                               <SceneArt
@@ -744,7 +820,7 @@ export function NewProjectFlow({
                                   slot.textTemplate
                                     ? renderTextTemplate(
                                         slot.textTemplate,
-                                        product,
+                                        shown ?? product,
                                       )
                                     : undefined
                                 }
@@ -889,6 +965,78 @@ function Step({
         </span>
       </h2>
       {children}
+    </section>
+  );
+}
+
+// The colour and style the project shows (ROADMAP P2-9). Only a product drawn
+// from an SVG can be shown in another: Kiln redraws its design. The
+// product's own default never changes for it.
+function ProjectLook({
+  product,
+  look,
+  own,
+  pending,
+  error,
+  onLook,
+}: {
+  product: Product;
+  look: { colour: string; style: string | null };
+  own: boolean;
+  pending: boolean;
+  error: string | null;
+  onLook: (look: Look) => void;
+}) {
+  const styles = productStyles(product);
+  if (product.colours.length < 2 && styles.length === 0) return null;
+  const NOTE = "font-sans text-[0.75rem] text-on-surface-mid";
+  if (product.source.kind !== "vector") {
+    return product.colours.length > 1 ? (
+      <p className={NOTE} data-testid="project-look-fixed">
+        Scenes show {colourOf(product, product.defaultColour).name}: Kiln draws
+        other colours from a design file.
+      </p>
+    ) : null;
+  }
+  return (
+    <section className="flex flex-col gap-2">
+      <LookPicker
+        testId="project-look"
+        label="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim"
+        disabled={pending}
+        colours={product.colours.map((c) => ({
+          key: c.key,
+          label: c.name,
+          face: c.face,
+          ...(c.inStock ? {} : { refused: `${c.name} is out of stock` }),
+        }))}
+        styles={[
+          { key: ORIGINAL, label: styleName(product, null) },
+          ...styles.map((s) => ({ key: s.key, label: s.name })),
+        ]}
+        colour={look.colour}
+        style={look.style ?? ORIGINAL}
+        onColour={(colour) => colour && onLook({ colour })}
+        onStyle={(style) => style && onLook({ style })}
+      />
+      <p className={NOTE} data-testid="project-look-note">
+        {pending ? (
+          <Loader2 className="mr-1 inline size-3 animate-spin" />
+        ) : null}
+        Scenes and exact frames show {lookLabel(product, look)}
+        {own
+          ? `; the product's default stays ${colourOf(product, product.defaultColour).name}.`
+          : "."}
+      </p>
+      {error ? (
+        <p
+          role="alert"
+          className="font-sans text-[0.75rem] text-prov-local"
+          data-testid="project-look-error"
+        >
+          {error}
+        </p>
+      ) : null}
     </section>
   );
 }

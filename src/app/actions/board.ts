@@ -22,6 +22,12 @@ import {
   withSlotTuning,
   withThreeQuarter,
 } from "@/domain/plan";
+import {
+  lookReference,
+  projectLook,
+  projectProduct,
+  withLookReferences,
+} from "@/domain/plan-look";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { KnobChoice, ReasonKey } from "@/domain/scene-knobs";
 import { threeQuarterFor } from "@/domain/scene-reference";
@@ -33,10 +39,7 @@ import { getStorageProvider } from "@/providers/registry";
 import { noteApproval, noteReason } from "@/server/lessons";
 import { writeProjectListing } from "@/server/listing-write";
 import { getMakerModels, rememberHeroSetting } from "@/server/maker-repository";
-import {
-  productReference,
-  threeQuarterReference,
-} from "@/server/product-reference";
+import { lookedReference, redrawnLooks } from "@/server/product-reference";
 import {
   addVideoToPlan,
   loadProjectBoard,
@@ -200,13 +203,7 @@ export async function addReferenceAction(formData: FormData): Promise<void> {
   const { plan } = loaded.board;
   const { product } = loaded;
   const write = async () =>
-    slotCards(
-      plan,
-      master,
-      productUnderstanding(product),
-      product,
-      await getMakerModels(),
-    );
+    slotCards(plan, master, product, await getMakerModels());
   const first = loaded.board.cards.length === 0;
   // The view from above was drawn beside Kiln's plate: with the maker's own
   // reference it no longer applies, so the scenes Kiln started a little above
@@ -239,26 +236,26 @@ export async function updateProjectProductAction(
   const plan = board.plan;
   if (!plan) return { error: "This project has no plan to update." };
   try {
-    const understanding = productUnderstanding(product);
-    const fresh = await productReference(product);
+    // Every look the project uses is drawn again from the product as it is
+    // now, its own first: its plate is the fresh reference.
+    const look = projectLook(plan, product);
+    const { master: fresh, drawn } = await lookedReference(product, look);
     const master = fresh ?? board.master;
+    const own = drawn ?? lookReference(plan, look);
+    const others = await redrawnLooks(product, plan, look);
     // A fresh plate gets its view from above drawn again beside it; a
     // maker's own reference keeps the plan's (it no longer applies).
-    const view = fresh
-      ? await threeQuarterReference(product, fresh)
-      : undefined;
-    const viewed = (p: ProjectPlan) =>
-      view === undefined ? p : withThreeQuarter(p, view);
+    const viewed = (p: ProjectPlan) => {
+      const kept = withLookReferences(p, [...(own ? [own] : []), ...others]);
+      return fresh ? withThreeQuarter(kept, drawn?.threeQuarter ?? null) : kept;
+    };
+    const understanding = productUnderstanding(
+      projectProduct(product, viewed(plan)),
+    );
     const cards = master
       ? refreshCards(
           board.cards,
-          slotCards(
-            viewed(plan),
-            master,
-            understanding,
-            product,
-            await getMakerModels(),
-          ),
+          slotCards(viewed(plan), master, product, await getMakerModels()),
           master.id,
         )
       : board.cards;

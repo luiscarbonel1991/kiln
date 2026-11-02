@@ -17,9 +17,6 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
     await import("@/app/actions/board");
   const { planProject } = await import("@/domain/plan");
   const { Product } = await import("@/domain/product");
-  const { productUnderstanding } = await import(
-    "@/domain/product-understanding"
-  );
   const { CATALOG } = await import("@/lib/recipes");
   const { photoReference, slotCards, startEditorState } = await import(
     "@/lib/project-start"
@@ -205,11 +202,7 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
       assetUrl: "https://stub.local/plate-reference.png",
       mime: "image/png",
     };
-    await repo.setProjectReference(
-      id,
-      master,
-      slotCards(plan, master, productUnderstanding(saved), saved),
-    );
+    await repo.setProjectReference(id, master, slotCards(plan, master, saved));
     expect(await composition(id)).toMatch(/^the camera high above/);
   });
 

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { MasterAsset } from "@/domain/master-asset";
 import { planProject, withThreeQuarter } from "@/domain/plan";
 import { Product } from "@/domain/product";
-import { productUnderstanding } from "@/domain/product-understanding";
 import {
   photoReference,
   projectName,
@@ -63,7 +62,7 @@ describe("findRecipe for planned slots", () => {
 });
 
 describe("slotCards", () => {
-  const cards = slotCards(plan, master, productUnderstanding(board), board);
+  const cards = slotCards(plan, master, board);
   const scene = (id: string) =>
     cards.find((c) => c.id === id)?.fields.scene.value ?? "";
 
@@ -124,7 +123,7 @@ describe("slotCards", () => {
   });
 
   it("the hook keeps the design in view, whatever its place of use holds", () => {
-    const coaster = slotCards(plan, master, productUnderstanding(board), {
+    const coaster = slotCards(plan, master, {
       ...board,
       useContexts: ["a coffee table, under a steaming mug"],
     });
@@ -195,12 +194,7 @@ describe("slotCards", () => {
           : c,
       ),
     };
-    const withSample = slotCards(
-      plan,
-      master,
-      productUnderstanding(sampled),
-      sampled,
-    );
+    const withSample = slotCards(plan, master, sampled);
     // A version re-frames an approved scene: it reads nothing else.
     const versions = ["instagram.story", "instagram.post"];
     const scenes = withSample.filter(
@@ -238,7 +232,7 @@ describe("slotCards", () => {
         },
       ],
     };
-    const built = slotCards(edited, master, productUnderstanding(board), {
+    const built = slotCards(edited, master, {
       ...board,
       useContexts: [],
     });
@@ -290,9 +284,7 @@ describe("slotCards with knobs", () => {
     ],
   };
   const inUse = (p: ReturnType<typeof withKnobs>, product: Product) =>
-    slotCards(p, master, productUnderstanding(product), product).find(
-      (c) => c.id === "etsy.in-use",
-    );
+    slotCards(p, master, product).find((c) => c.id === "etsy.in-use");
 
   it("applies the slot's stops", () => {
     const card = inUse(withKnobs(), board);
@@ -372,9 +364,8 @@ describe("slotCards with Kiln's view from above", () => {
       front: master.assetUrl,
     });
     const composition = (p: typeof plan, id: string) =>
-      slotCards(p, master, productUnderstanding(board), board).find(
-        (c) => c.id === id,
-      )?.fields.composition.value ?? "";
+      slotCards(p, master, board).find((c) => c.id === id)?.fields.composition
+        .value ?? "";
     expect(composition(plan, "etsy.in-use")).toContain("eye level");
     expect(composition(viewed, "etsy.in-use")).toContain(
       "the camera a little above",

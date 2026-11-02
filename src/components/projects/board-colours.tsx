@@ -8,12 +8,19 @@ export const UNVERIFIED_TITLE =
 // The product's colours beside the reference, to check scenes against
 // (DOGFOOD #65, #72): each colour's material photo or swatch, a layered
 // colour's face and the base its cuts show, the supplier's page, and which
-// colour scenes use. A colour with neither a photo nor a supplier page is
-// flagged: nothing real backs its look.
-export function BoardColours({ product }: { product: Product }) {
+// colour scenes use (the project's, which may not be the product's default).
+// A colour with neither a photo nor a supplier page is flagged: nothing real
+// backs its look.
+export function BoardColours({
+  product,
+  scenes = product.defaultColour,
+}: {
+  product: Product;
+  scenes?: string;
+}) {
   const layered = product.treatment === "reveal";
   const defaultSample = product.colours.find(
-    (c) => c.key === product.defaultColour,
+    (c) => c.key === scenes,
   )?.swatchUrl;
   return (
     <div
@@ -24,7 +31,7 @@ export function BoardColours({ product }: { product: Product }) {
         {product.colours.map((c) => {
           const sample = isRenderableUrl(c.swatchUrl) ? c.swatchUrl : null;
           const supplier = safeLink(c.supplierUrl);
-          const scenes = c.key === product.defaultColour;
+          const used = c.key === scenes;
           return (
             <li
               key={c.key}
@@ -49,7 +56,7 @@ export function BoardColours({ product }: { product: Product }) {
                   <span className="font-semibold text-foreground">
                     {c.name}
                   </span>
-                  {scenes ? " · scenes use this" : null}
+                  {used ? " · scenes use this" : null}
                 </span>
                 {layered && c.inlay ? (
                   <span className="flex flex-wrap items-center gap-1 text-on-surface-mid">

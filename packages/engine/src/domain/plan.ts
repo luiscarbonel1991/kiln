@@ -15,6 +15,7 @@ import {
 import { MarketBrief } from "@/domain/market-brief";
 import type { VideoResolution } from "@/domain/model-defaults";
 import type { Product } from "@/domain/product";
+import { Look } from "@/domain/product-look";
 import type { ProjectType } from "@/domain/project";
 import { type KnobChoice, SavedKnobs } from "@/domain/scene-knobs";
 import {
@@ -101,8 +102,12 @@ export type PlanDestination = z.infer<typeof PlanDestination>;
 
 export const ProjectPlan = z.object({
   destinations: z.array(PlanDestination).min(1),
+  // The colour and style the project shows, chosen at New project
+  // (plan-look.ts); absent, the product's default. Read leniently.
+  look: Look.optional().catch(undefined),
   // Images Kiln drew for the scenes besides the project's reference: the
-  // product seen from a little above (scene-reference.ts). Read leniently.
+  // product seen from a little above, and each look in use
+  // (scene-reference.ts). Read leniently.
   references: PlanReferences.optional().catch(undefined),
 });
 export type ProjectPlan = z.infer<typeof ProjectPlan>;
@@ -977,8 +982,10 @@ export function withThreeQuarter(
   plan: ProjectPlan,
   view: ThreeQuarterView | null,
 ): ProjectPlan {
-  const { references: _old, ...rest } = plan;
-  return view ? { ...rest, references: { threeQuarter: view } } : rest;
+  const { threeQuarter: _old, ...kept } = plan.references ?? {};
+  const references = view ? { ...kept, threeQuarter: view } : kept;
+  const { references: _references, ...rest } = plan;
+  return Object.keys(references).length > 0 ? { ...rest, references } : rest;
 }
 
 // A scene slot's own place, or back to the product's places (null). A

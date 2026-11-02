@@ -1079,6 +1079,42 @@ describe("the plan's references", () => {
     expect(withThreeQuarter(plan, null)).not.toHaveProperty("references");
   });
 
+  it("keep the project's look and its drawn looks through every change, and the view from above leaves the looks alone", () => {
+    const looked = {
+      ...withThreeQuarter(
+        planProject({
+          product: CUTTING_BOARD,
+          type: "launch",
+          destinationIds: ["shop", "social"],
+          catalog,
+        }),
+        view,
+      ),
+      look: { colour: "walnut", style: "original" },
+    };
+    const drawn = {
+      colour: "walnut",
+      design: "https://stub.local/products/walnut.svg",
+      front: "https://stub.local/plates/walnut.png",
+    };
+    const plan = {
+      ...looked,
+      references: { ...looked.references, looks: [drawn] },
+    };
+    const hero = { destinationId: "shop", slotKey: "hero" };
+    for (const next of [
+      withSlotOff(plan, hero, true),
+      replan(plan, CUTTING_BOARD, catalog.shotLists).plan,
+      ProjectPlan.parse(JSON.parse(JSON.stringify(plan))),
+    ]) {
+      expect(next.look).toEqual({ colour: "walnut", style: "original" });
+      expect(next.references?.looks).toEqual([drawn]);
+    }
+    expect(withThreeQuarter(plan, null).references).toEqual({
+      looks: [drawn],
+    });
+  });
+
   it("an unreadable reference reads as none, and the plan still parses", () => {
     const plan = planProject({
       product: CUTTING_BOARD,

@@ -274,6 +274,15 @@ export {
   withVideoChoice,
 } from "@/domain/plan";
 export {
+  chosenLook,
+  drawnLooks,
+  lookReference,
+  projectLook,
+  projectProduct,
+  withLookReference,
+  withLookReferences,
+} from "@/domain/plan-look";
+export {
   buyerSizeLabel,
   ColourOption,
   colourOf,

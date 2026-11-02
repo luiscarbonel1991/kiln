@@ -16,31 +16,44 @@ vi.mock("@/providers/plates/three-quarter", () => ({
     return render.result;
   },
 }));
+// Storage stubbed: what Kiln stores is kept in memory.
+const storage = vi.hoisted(() => new Map<string, Uint8Array>());
+vi.mock("@/providers/asset-bytes", async (original) => {
+  const real = await original<typeof import("@/providers/asset-bytes")>();
+  return {
+    ...real,
+    fetchAsset: async (url: string) => {
+      const bytes = storage.get(url);
+      if (!bytes) return real.fetchAsset(url);
+      return {
+        bytes: Buffer.from(bytes),
+        base64: "",
+        mime: url.endsWith(".svg") ? "image/svg+xml" : "image/png",
+      };
+    },
+    storeAsset: async (bytes: Uint8Array, mime: string, prefix: string) => {
+      const url = `https://stub.local/${prefix}/${storage.size}.${mime === "image/svg+xml" ? "svg" : "png"}`;
+      storage.set(url, bytes);
+      return url;
+    },
+  };
+});
 
-const { threeQuarterReference } = await import("@/server/product-reference");
+const { lookedReference, redrawnLooks } = await import(
+  "@/server/product-reference"
+);
 const { Product } = await import("@/domain/product");
+const { DOOR_TAG } = await import("@/domain/__tests__/fixtures/door-tag");
+const { CUTTING_BOARD } = await import(
+  "@/domain/__tests__/fixtures/cutting-board"
+);
 
-const product = Product.parse({
-  id: "prod-1",
-  sku: "DP-1",
-  name: "Desk plate on a base",
-  family: "Office",
-  dimensions: { w: 9, h: 2.78, d: 2.25, unit: "in" },
-  shape: "name plate",
-  material: "maple plywood",
-  treatment: "engraved",
-  colours: [{ key: "maple", name: "Maple", face: "#E8D2A6" }],
-  defaultColour: "maple",
-  typography: { family: "Fraunces" },
+const photoProduct = Product.parse({
+  ...CUTTING_BOARD,
   source: { kind: "photo", assetUrl: "https://stub.local/front.png" },
 });
-const plate = {
-  id: "plate-prod-1",
-  origin: "product" as const,
-  sourcePrompt: null,
-  assetUrl: "https://stub.local/plates/front.png",
-  mime: "image/png",
-};
+const black = { colour: "black-white", style: null };
+const gold = { colour: "gold-black", style: null };
 
 afterEach(() => {
   render.result = null;
@@ -48,34 +61,70 @@ afterEach(() => {
   render.calls = 0;
 });
 
-describe("threeQuarterReference", () => {
-  it("draws the view from above beside Kiln's own plate", async () => {
+describe("lookedReference", () => {
+  it("a photo product's reference is its photo, in any look", async () => {
+    const { master, drawn } = await lookedReference(photoProduct, {
+      colour: "walnut",
+      style: null,
+    });
+    expect(master?.assetUrl).toBe("https://stub.local/front.png");
+    expect(drawn).toBeNull();
+    expect(
+      await lookedReference(CUTTING_BOARD, { colour: "maple", style: null }),
+    ).toEqual({ master: null, drawn: null });
+  });
+
+  it("a vector product's is Kiln's plate in the look, with its view from above", async () => {
     render.result = {
       assetUrl: "https://stub.local/plates/above.png",
       mime: "image/png",
       angleDeg: 30,
     };
-    expect(await threeQuarterReference(product, plate)).toEqual({
-      assetUrl: "https://stub.local/plates/above.png",
-      angleDeg: 30,
-      front: plate.assetUrl,
+    const { master, drawn } = await lookedReference(DOOR_TAG, gold);
+    expect(master).toMatchObject({
+      id: "plate-pkg:DT-01",
+      origin: "product",
+      assetUrl: drawn?.front,
+      mime: "image/png",
+    });
+    expect(drawn).toMatchObject({
+      colour: "gold-black",
+      threeQuarter: {
+        assetUrl: "https://stub.local/plates/above.png",
+        angleDeg: 30,
+        front: drawn?.front,
+      },
     });
   });
 
-  it("none beside a photo or a maker's reference, and none when the drawing is refused or fails", async () => {
-    render.result = {
-      assetUrl: "https://stub.local/plates/above.png",
-      mime: "image/png",
-      angleDeg: 30,
-    };
-    expect(
-      await threeQuarterReference(product, { ...plate, id: "product-prod-1" }),
-    ).toBeNull();
-    expect(await threeQuarterReference(product, null)).toBeNull();
-    expect(render.calls).toBe(0);
-    render.result = null;
-    expect(await threeQuarterReference(product, plate)).toBeNull();
+  it("draws the plate without a view from above when that drawing fails", async () => {
     render.fail = true;
-    expect(await threeQuarterReference(product, plate)).toBeNull();
+    const { master, drawn } = await lookedReference(DOOR_TAG, black);
+    expect(master?.assetUrl).toBe(drawn?.front);
+    expect(drawn).not.toHaveProperty("threeQuarter");
+  });
+});
+
+describe("redrawnLooks", () => {
+  it("draws every other look again, leaving out one the product no longer offers", async () => {
+    const stale = {
+      design: "https://stub.local/old.svg",
+      front: "https://stub.local/old.png",
+    };
+    const plan = {
+      destinations: [],
+      references: {
+        looks: [
+          { colour: "black-white", ...stale },
+          { colour: "gold-black", style: "do-not-disturb", ...stale },
+          { colour: "copper", ...stale },
+        ],
+      },
+    };
+    const looks = await redrawnLooks(DOOR_TAG, plan as never, black);
+    expect(looks.map((l) => [l.colour, l.style])).toEqual([
+      ["gold-black", "do-not-disturb"],
+    ]);
+    expect(looks[0].front).not.toBe(stale.front);
   });
 });

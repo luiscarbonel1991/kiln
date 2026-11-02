@@ -15,6 +15,7 @@ import {
   slotCardId,
   slotRecipeId,
 } from "@/domain/plan";
+import { projectProduct } from "@/domain/plan-look";
 import { type Product, productImages } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
 import type { ProjectType } from "@/domain/project";
@@ -64,10 +65,13 @@ export function photoReference(product: Product): MasterAsset | null {
 export function slotCards(
   plan: ProjectPlan,
   master: MasterAsset,
-  understanding: BaseUnderstanding,
-  product: Product,
+  stored: Product,
   models: MakerModels = DEFAULT_MAKER_MODELS,
 ): Card[] {
+  // Every card is written for the product as the project shows it: in its
+  // colour and style (plan-look.ts).
+  const product = projectProduct(stored, plan);
+  const understanding = productUnderstanding(product);
   return plan.destinations.flatMap((d) => {
     const recipe = findRecipe(slotRecipeId(d.shotListId, d.destinationId));
     if (!recipe) {
@@ -236,7 +240,7 @@ export function startEditorState(input: {
   models?: MakerModels;
 }): PersistedProject {
   const { product, plan, master } = input;
-  const understanding = productUnderstanding(product);
+  const understanding = productUnderstanding(projectProduct(product, plan));
   const first = plan.destinations[0];
   return {
     name: projectName(product, input.type),
@@ -245,8 +249,6 @@ export function startEditorState(input: {
     understanding,
     recipeId: slotRecipeId(first.shotListId, first.destinationId),
     planning: null,
-    cards: master
-      ? slotCards(plan, master, understanding, product, input.models)
-      : [],
+    cards: master ? slotCards(plan, master, product, input.models) : [],
   };
 }

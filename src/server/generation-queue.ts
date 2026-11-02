@@ -34,6 +34,7 @@ import {
   versionSource,
   videoSettings,
 } from "@/domain/plan";
+import { projectProduct } from "@/domain/plan-look";
 import { SEED_BRAND } from "@/domain/seed";
 import { cardReference } from "@/lib/card-reference";
 import { db, hasDatabase } from "@/lib/db";
@@ -233,7 +234,9 @@ export async function estimateProjectCards(
     let request: GenerationRequest;
     try {
       request = buildVideoRequest({
-        product: board.product,
+        product: board.board.plan
+          ? projectProduct(board.product, board.board.plan)
+          : board.product,
         settings,
         scene: source?.fields.scene.value,
         model: card.model,
@@ -288,9 +291,9 @@ export async function estimateProjectCards(
       );
     }
     const request =
-      slot?.versionOf && source?.slot.approvedOutput && board?.product
+      slot?.versionOf && source?.slot.approvedOutput && board?.product && plan
         ? buildVersionRequest({
-            product: board.product,
+            product: projectProduct(board.product, plan),
             sourceOutput: source.slot.approvedOutput,
             aspect: slot.aspect ?? card.model.aspect,
             text: Boolean(slot.textTemplate),

@@ -1,6 +1,5 @@
 import type { ProjectPlan, SlotRef } from "@/domain/plan";
 import { slotCardId } from "@/domain/plan";
-import { productUnderstanding } from "@/domain/product-understanding";
 import { slotCards } from "@/lib/project-start";
 import { setSlotTuning } from "@/server/project-repository";
 
@@ -22,7 +21,6 @@ export function retuneSlot(
         ),
       },
       master,
-      productUnderstanding(product),
       product,
     ).find((card) => card.id === cardId),
   );

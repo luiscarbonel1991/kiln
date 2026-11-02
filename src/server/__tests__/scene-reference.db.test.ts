@@ -30,9 +30,6 @@ describe.skipIf(!enabled)(
       "@/lib/project-start"
     );
     const { refreshCards } = await import("@/lib/project-refresh");
-    const { productUnderstanding } = await import(
-      "@/domain/product-understanding"
-    );
 
     const sku = `SR-${Date.now()}`;
     const created: string[] = [];
@@ -134,7 +131,7 @@ describe.skipIf(!enabled)(
         [],
         refreshCards(
           loaded.board.cards,
-          slotCards(current, own, productUnderstanding(product), product),
+          slotCards(current, own, product),
           own.id,
         ),
       );
