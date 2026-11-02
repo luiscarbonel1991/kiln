@@ -170,6 +170,12 @@ colour, and every design (wording) it comes in. A look is one colour and one sty
 - The export names each photo's look in `manifest.json` and the README, so each photo
   is linked to its variation. Only a product drawn from an SVG takes another look; a
   photo or a typed-in product shows its default colour.
+- A product whose text names its colours ("engraved black & white", "no gold finish")
+  gives each other colour its own text: `productName`, `material` and `forbidden` on
+  the colour in the package, or "Its own name and material" on the form. A scene in
+  that colour reads them instead of the product's. Until it has them, Kiln says where
+  the text contradicts the colour: at import (and `kiln validate`), under the look
+  picker, on each scene in it ("text names another colour"), and on the colour's row.
 
 **Parts and views.**
 - A product made of several pieces lists them in `parts`: a plate standing in a base,
