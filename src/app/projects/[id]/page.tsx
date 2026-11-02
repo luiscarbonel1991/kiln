@@ -16,7 +16,7 @@ import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerBlock } from "@/lib/provider-block";
 import { providerMode } from "@/providers/mode";
 import { chatPanelData } from "@/server/chat/chat-view";
-import { estimateProjectCards } from "@/server/generation-queue";
+import { estimateProjectCards, scenePrompts } from "@/server/generation-queue";
 import {
   outputVersions,
   projectGenerationState,
@@ -193,6 +193,7 @@ export default async function ProjectBoardPage({
         shop={(await resultsConnector())?.label ?? null}
         cost={cost}
         takeRoutes={await takeRoutes()}
+        prompts={board.master ? await scenePrompts(board.id) : {}}
       />
     ) : (
       <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">

@@ -62,6 +62,9 @@ export interface TuneView {
   inert: { prompt: boolean; fields: Direction[] };
   // The direction the model reads now; null before the reference exists.
   reads: Record<Direction, string> | null;
+  // The whole prompt the next take sends, what it must never show and how
+  // many images go with the reference (DOGFOOD #42); null when unknown.
+  prompt: { text: string; negative: string; images: number } | null;
   // What may be off about the take to review, each with the knob it moves.
   reasons: { key: ReasonKey; label: string; move: KnobChoice }[];
   // One more take of this scene (it replaces the one shown), with its price
@@ -180,6 +183,8 @@ export function tuneView(input: {
   look?: TuneLook | null;
   // Why its provider cannot take a paid call now (providerBlock).
   blocked?: string | null;
+  // What the next take sends (scenePrompts).
+  prompt?: { prompt: string; negative: string; images: number } | null;
 }): TuneView | null {
   const { slot, card, view, job, places = [], above = null } = input;
   if (slot.fill !== "scene" || !slot.knobs) return null;
@@ -255,5 +260,12 @@ export function tuneView(input: {
         }
       : null,
     look: input.look ?? null,
+    prompt: input.prompt
+      ? {
+          text: input.prompt.prompt,
+          negative: input.prompt.negative,
+          images: input.prompt.images,
+        }
+      : null,
   };
 }

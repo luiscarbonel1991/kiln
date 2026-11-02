@@ -249,6 +249,36 @@ export function SlotTune({
                       </dd>
                     </div>
                   ))}
+                  {tune.prompt ? (
+                    <>
+                      <div>
+                        <dt className={LABEL}>The whole prompt</dt>
+                        <dd
+                          data-testid={`tune-${destinationId}-${slotKey}-prompt`}
+                          className="whitespace-pre-wrap font-mono text-[0.625rem] leading-relaxed text-foreground [overflow-wrap:anywhere]"
+                        >
+                          {tune.prompt.text}
+                        </dd>
+                      </div>
+                      {tune.prompt.negative ? (
+                        <div>
+                          <dt className={LABEL}>Never</dt>
+                          <dd className="font-mono text-[0.625rem] leading-relaxed text-foreground [overflow-wrap:anywhere]">
+                            {tune.prompt.negative}
+                          </dd>
+                        </div>
+                      ) : null}
+                      <div>
+                        <dt className={LABEL}>Images</dt>
+                        <dd className="font-mono text-[0.625rem] leading-relaxed text-foreground">
+                          the reference
+                          {tune.prompt.images > 0
+                            ? ` and ${tune.prompt.images} more (the material sample and views, in the order the prompt names them)`
+                            : " alone"}
+                        </dd>
+                      </div>
+                    </>
+                  ) : null}
                 </dl>
               </details>
             ) : null}

@@ -218,4 +218,17 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
       back?.board.plan?.destinations[0].slots.find((s) => s.key === "hero"),
     ).not.toHaveProperty("look");
   });
+
+  it("reads each scene's whole prompt for free, as the queue would build it", async () => {
+    const { scenePrompts } = await import("@/server/generation-queue");
+    const [id] = created;
+    const prompts = await scenePrompts(id);
+    const hero = prompts["etsy.hero"];
+    expect(hero.prompt).toContain("gold/black");
+    expect(hero.prompt).toContain('"Do not disturb"');
+    expect(hero.negative).not.toBe("");
+    expect(hero.images).toBe(1);
+    expect(Object.keys(prompts)).not.toContain("etsy.size");
+  });
 });
+

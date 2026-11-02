@@ -181,6 +181,49 @@ function assertRunnable(
   }
 }
 
+// What each scene card's next take would send, free to read (DOGFOOD #42):
+// the whole prompt, what it must never show, and how many images go with the
+// reference, built exactly as the queue builds a request. A version is built
+// at queue time from its source's approval, so it has none here.
+export async function scenePrompts(
+  projectId: string,
+): Promise<
+  Record<string, { prompt: string; negative: string; images: number }>
+> {
+  const project = await loadProject(projectId);
+  if (!project?.master || !project.understanding) return {};
+  const board = await loadProjectBoard(projectId);
+  const plan = board?.board.plan;
+  const prompts: Record<
+    string,
+    { prompt: string; negative: string; images: number }
+  > = {};
+  for (const card of project.cards) {
+    if (card.type !== "image") continue;
+    const ref = parseSlotCardId(card.id);
+    const slot = plan?.destinations
+      .find((d) => d.destinationId === ref?.destinationId)
+      ?.slots.find((s) => s.key === ref?.slotKey);
+    if (slot?.fill !== "scene" || slot.versionOf) continue;
+    const request = buildGenerationRequest({
+      card,
+      master:
+        plan && board?.product
+          ? cardReference(plan, card.id, project.master, board.product)
+          : project.master,
+      understanding: project.understanding,
+      recipe: findRecipe(card.recipeId) ?? SEED_RECIPES[0],
+      brand: SEED_BRAND,
+    });
+    prompts[card.id] = {
+      prompt: request.prompt,
+      negative: request.negative,
+      images: request.imageInputs.length,
+    };
+  }
+  return prompts;
+}
+
 // Build the exact request each card would pay for, from the saved project
 // (the client flushes its autosave first), with its estimate.
 export async function estimateProjectCards(

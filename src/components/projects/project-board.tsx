@@ -249,6 +249,7 @@ export function ProjectBoard({
   shop,
   cost,
   takeRoutes = NO_TAKE_ROUTES,
+  prompts = {},
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -280,6 +281,11 @@ export function ProjectBoard({
   // The scenes' and the video's routes, with only the models that may run
   // here: a new take is priced at the dearest one, as the queue reserves it.
   takeRoutes?: TakeRoutes;
+  // What each scene's next take sends (scenePrompts), for Tune.
+  prompts?: Record<
+    string,
+    { prompt: string; negative: string; images: number }
+  >;
 }) {
   const rows = boardRows(board, jobs);
   const frameCosts = new Map(
@@ -497,6 +503,7 @@ export function ProjectBoard({
                             blocked: card
                               ? providerBlock(notes, card.model.provider, mode)
                               : null,
+                            prompt: prompts[cardId] ?? null,
                           })}
                           hasReference={board.master !== null}
                           look={frameLookOf(slot)}
