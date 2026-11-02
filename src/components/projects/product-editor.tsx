@@ -274,6 +274,9 @@ export function ProductEditor({
   );
   const [styleName, setStyleName] = useState(start?.styleName ?? "");
   const [error, setError] = useState<string | null>(null);
+  // The colours a replacing design file paints, offered: taking them
+  // replaces the product's colours and their material photos.
+  const [designColours, setDesignColours] = useState<Colour[] | null>(null);
   // After the first Save, each field shows its problem as it is fixed.
   const [attempted, setAttempted] = useState(false);
   const [degraded, setDegraded] = useState<Degraded | null>(null);
@@ -329,11 +332,30 @@ export function ProductEditor({
         setError(result.error);
         return;
       }
+      // A first file prefills a new product's colours and height. A file
+      // replacing one, or arriving after colours were written, changes
+      // nothing on its own (DOGFOOD #49): its colours are offered, and its
+      // height is a click beside the proportions note.
+      const untouched =
+        !start &&
+        !file &&
+        colours.length === 1 &&
+        colours[0].name === STARTER_COLOUR.name &&
+        colours[0].hex === STARTER_COLOUR.hex;
       setFile(result);
-      if (result.colours.length > 0) setColours(result.colours);
-      const w = Number(width);
-      if (result.kind === "vector" && w > 0) {
-        setHeight(String(round(w / result.ratio)));
+      setDesignColours(null);
+      if (untouched) {
+        if (result.colours.length > 0) setColours(result.colours);
+        const w = Number(width);
+        if (result.kind === "vector" && w > 0) {
+          setHeight(String(round(w / result.ratio)));
+        }
+      } else if (
+        result.colours.length > 0 &&
+        result.colours.map((c) => c.hex).join() !==
+          colours.map((c) => c.hex.toUpperCase()).join()
+      ) {
+        setDesignColours(result.colours);
       }
     });
   }
@@ -707,6 +729,59 @@ export function ProductEditor({
         </Button>
       </div>
 
+      {designColours ? (
+        <div
+          data-testid="product-design-colours"
+          className="flex flex-col gap-2 rounded-field bg-surface-soft px-4 py-3"
+        >
+          <span className="flex flex-wrap items-center gap-1.5 font-sans text-[0.8rem] text-foreground">
+            The new design paints
+            {designColours.map((c) => (
+              <span
+                key={c.hex}
+                className="inline-flex items-center gap-1 font-mono text-[0.7rem] text-on-surface-mid"
+              >
+                <span
+                  className="inline-block size-3 rounded-pill border border-border"
+                  style={{ background: c.hex }}
+                />
+                {c.name}
+              </span>
+            ))}
+            . Your colours stay as they are.
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="xs"
+              variant="outline"
+              data-testid="product-design-colours-use"
+              onClick={() => {
+                setColours(designColours);
+                setDefaultColour(0);
+                setDesignColours(null);
+              }}
+            >
+              Use the design's colours
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              data-testid="product-design-colours-keep"
+              onClick={() => setDesignColours(null)}
+            >
+              Keep mine
+            </Button>
+          </div>
+          <span className="font-sans text-[0.72rem] text-on-surface-mid">
+            Using them replaces {colours.map((c) => c.name).join(", ")}
+            {colours.some((c) => c.swatchUrl)
+              ? ` and ${plural(colours.filter((c) => c.swatchUrl).length, "material photo")}`
+              : ""}
+            . Nothing is saved until Save.
+          </span>
+        </div>
+      ) : null}
+
       {/* The file: optional. */}
       <div className="flex flex-wrap items-center gap-4">
         {file ? (
@@ -884,8 +959,20 @@ export function ProductEditor({
             </span>
           ) : null}
           {ratioNote ? (
-            <span className="font-sans text-[0.75rem] text-prov-local">
+            <span className="flex flex-wrap items-center gap-x-2 font-sans text-[0.75rem] text-prov-local">
               {ratioNote}
+              {ratio && Number(width) > 0 ? (
+                <button
+                  type="button"
+                  data-testid="product-height-from-design"
+                  onClick={() =>
+                    setHeight(String(round(Number(width) / ratio)))
+                  }
+                  className="font-semibold text-primary hover:underline"
+                >
+                  Use its height ({round(Number(width) / ratio)} {unit})
+                </button>
+              ) : null}
             </span>
           ) : null}
           {note("size")}
