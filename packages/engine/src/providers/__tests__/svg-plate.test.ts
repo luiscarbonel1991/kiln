@@ -65,6 +65,21 @@ describe("measureOutline", () => {
     expect("mismatch" in off && off.mismatch).toContain("9.50 wide");
   });
 
+  it("measures what the drawing shows: a grain clipped to its outline, or a guide never seen, is left out", () => {
+    // A 5 x 10 board whose grain streaks run 10 units past each side,
+    // clipped to the outline (DOGFOOD #59).
+    const board = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 0 540 1000"><defs><clipPath id="o"><rect x="0" y="0" width="500" height="1000"/></clipPath></defs><rect x="0" y="0" width="500" height="1000" fill="#C8A165"/><g clip-path="url(#o)"><rect x="-10" y="100" width="520" height="8" fill="#8A6A40"/><rect x="-10" y="400" width="520" height="8" fill="#8A6A40"/></g></svg>`;
+    const measured = measureOutline(board, { w: 5, h: 10 });
+    expect("box" in measured).toBe(true);
+    if ("box" in measured) {
+      expect(measured.box.w).toBeCloseTo(500 / 540, 2);
+      expect(measured.box.x).toBeCloseTo(20 / 540, 2);
+    }
+    const guide = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect x="0" y="0" width="200" height="100" fill="none" stroke="none"/><rect x="50" y="25" width="100" height="50" fill="#333"/></svg>`;
+    const seen = measureOutline(guide, { w: 2, h: 1 });
+    expect("box" in seen && seen.box.w).toBeCloseTo(0.5, 2);
+  });
+
   it("an empty drawing has no outline", () => {
     const empty = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"></svg>`;
     expect(measureOutline(empty, { w: 1, h: 1 })).toEqual({

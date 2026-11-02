@@ -128,7 +128,13 @@ describe("threeQuarterPlateSvg", () => {
   });
 
   it("refuses a drawing that does not match the product, and odd angles", () => {
-    const tall = DRAWING.replace('height="250" rx', 'height="400" rx');
+    // Drawn twice as tall as the product: its frame and drawing both.
+    const tall = DRAWING.replace(
+      'viewBox="0 0 900 278"',
+      'viewBox="0 0 900 556"',
+    )
+      .replace('height="250" rx', 'height="528" rx')
+      .replace('y="250"', 'y="528"');
     expect(threeQuarterPlateSvg(tall, STAND)).toBeNull();
     expect(() =>
       threeQuarterPlateSvg(DRAWING, STAND, { angleDeg: 60 }),

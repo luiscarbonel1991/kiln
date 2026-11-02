@@ -41,16 +41,78 @@ export function svgBox(svg: string): SvgBox {
   throw new Error("SVG has neither a viewBox nor px width/height");
 }
 
-// The size of everything an SVG draws (strokes included), in its own pixels;
+interface DrawnBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const MEASURE_PX = 1200;
+
+// The box of what an SVG shows, in its frame's units: the geometry's box,
+// unless part of it is never seen (clipped, masked, transparent, outside the
+// frame), then the box of the pixels it renders. A wood grain run past its
+// outline and clipped to it measured 520 wide for a 500 drawing (DOGFOOD
+// #59); the geometry stays exact for everything else.
+function drawnBox(svg: string): DrawnBox | null {
+  const resvg = new Resvg(svg, {
+    fitTo: { mode: "width", value: MEASURE_PX },
+  });
+  const geometry = resvg.getBBox() ?? resvg.innerBBox();
+  if (!geometry || geometry.width <= 0 || geometry.height <= 0) return null;
+  const image = resvg.render();
+  const { width, height, pixels } = image;
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (pixels[(y * width + x) * 4 + 3] > 8) {
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+    }
+  }
+  if (right < 0) return null;
+  const frame = svgBox(svg);
+  const sx = frame.w / width;
+  const sy = frame.h / height;
+  const seen = {
+    x: frame.x + left * sx,
+    y: frame.y + top * sy,
+    width: (right - left + 1) * sx,
+    height: (bottom - top + 1) * sy,
+  };
+  // Anti-aliasing reaches a pixel past the geometry; more than that is a
+  // part never seen.
+  const slack = 2;
+  const hidden =
+    seen.x - geometry.x > slack * sx ||
+    seen.y - geometry.y > slack * sy ||
+    geometry.x + geometry.width - (seen.x + seen.width) > slack * sx ||
+    geometry.y + geometry.height - (seen.y + seen.height) > slack * sy;
+  return hidden
+    ? seen
+    : {
+        x: geometry.x,
+        y: geometry.y,
+        width: geometry.width,
+        height: geometry.height,
+      };
+}
+
+// The size of everything an SVG shows (strokes included), in its own pixels;
 // null when it draws nothing. A product made from a design takes its height
 // from these proportions and its scale from the width the maker gives.
 export function measureDrawing(
   svg: string,
 ): { width: number; height: number } | null {
-  const resvg = new Resvg(svg);
-  const drawn = resvg.getBBox() ?? resvg.innerBBox();
-  if (!drawn || drawn.width <= 0 || drawn.height <= 0) return null;
-  return { width: drawn.width, height: drawn.height };
+  const drawn = drawnBox(svg);
+  return drawn ? { width: drawn.width, height: drawn.height } : null;
 }
 
 // How far a drawing's proportions (or its calibrated width) may stray from the
@@ -69,11 +131,8 @@ export function measureOutline(
   scalePxPerUnit?: number,
 ): { box: OutlineBox } | { mismatch: string } {
   const frame = svgBox(svg);
-  const resvg = new Resvg(svg);
-  const drawn = resvg.getBBox() ?? resvg.innerBBox();
-  if (!drawn || drawn.width <= 0 || drawn.height <= 0) {
-    return { mismatch: "its SVG draws nothing" };
-  }
+  const drawn = drawnBox(svg);
+  if (!drawn) return { mismatch: "its SVG draws nothing" };
   const drawnRatio = drawn.width / drawn.height;
   const declaredRatio = dimensions.w / dimensions.h;
   if (Math.abs(drawnRatio / declaredRatio - 1) > OUTLINE_TOLERANCE) {
