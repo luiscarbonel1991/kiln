@@ -138,6 +138,21 @@ describe("kiln validate", () => {
     ]);
   });
 
+  it("notes a colour shown with text written for another, without setting it aside", async () => {
+    const tag = {
+      ...product("DT-01", "Door tag, black & white", ["black", "gold"]),
+      forbidden: ["gold finish"],
+    };
+    tag.colours[0].name = "Black/White";
+    tag.colours[1].name = "Gold/Black";
+    const c = cli({ "/work/pkg.json": JSON.stringify([tag]) });
+    expect(await c.run("validate", "pkg.json")).toBe(0);
+    expect(c.out).toContain(
+      'note: "DT-01" Door tag, black & white: its name says white and its forbidden list has "gold finish", written for Black/White; give the colour Gold/Black its own productName and forbidden, or its scenes will say both.',
+    );
+    expect(c.out.at(-1)).toBe("1 ready, 0 set aside.");
+  });
+
   it("says when a file is not JSON or not a package", async () => {
     const c = cli({ "/work/a.json": "{", "/work/b.json": "[]" });
     expect(await c.run("validate", "a.json")).toBe(1);

@@ -106,6 +106,24 @@ describe("parseProductPackage", () => {
     ]);
   });
 
+  it("notes each colour shown with text written for the default, and imports it", () => {
+    const clean = parseProductPackage(pkg);
+    expect(clean.ok && clean.notes).toEqual([]);
+    const maple = parseProductPackage({
+      ...board,
+      name: "Engraved maple cutting board",
+      colours: board.colours.map((c) =>
+        c.key === "cherry"
+          ? { ...c, productName: "Engraved cherry cutting board" }
+          : c,
+      ),
+    });
+    expect(maple.ok && maple.products.length).toBe(1);
+    expect(maple.ok && maple.notes).toEqual([
+      '"CB-01" Engraved maple cutting board: its name says maple, written for Maple; give the colour Walnut its own productName, or its scenes will say both.',
+    ]);
+  });
+
   it("reads the maker's brand kit from the maker block", () => {
     const result = parseProductPackage(pkg);
     expect(result.ok && result.brand).toEqual({

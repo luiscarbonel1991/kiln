@@ -90,6 +90,39 @@ describe("productInLook", () => {
     });
   });
 
+  it("reads the colour's own name, material and things never shown, where it has them", () => {
+    const own = Product.parse({
+      ...DOOR_TAG,
+      name: "Engraved door tag, black & white",
+      material: "two-tone laminate, a satin BLACK face reading WHITE",
+      forbidden: ["other text", "gold or metallic finish"],
+      colours: DOOR_TAG.colours.map((c) =>
+        c.key === "gold-black"
+          ? {
+              ...c,
+              productName: "Engraved door tag, brushed gold",
+              material: "two-tone laminate, a brushed GOLD face reading BLACK",
+              forbidden: ["other text", "black face"],
+            }
+          : c,
+      ),
+    });
+    const gold = productInLook(own, { colour: "gold-black", style: null });
+    expect(gold).toMatchObject({
+      name: "Engraved door tag, brushed gold",
+      material: "two-tone laminate, a brushed GOLD face reading BLACK",
+      forbidden: ["other text", "black face"],
+    });
+    const u = productUnderstanding(gold);
+    expect(u.subject).toContain("Engraved door tag, brushed gold:");
+    expect(u.subject).toContain("no black face");
+    expect(`${u.subject} ${u.materials}`).not.toMatch(/WHITE|metallic/);
+    // A colour without text of its own reads the product's.
+    expect(
+      productInLook(own, { colour: "black-white", style: null }),
+    ).toMatchObject({ name: own.name, material: own.material });
+  });
+
   it("writes the understanding in the look's colour, with that colour's sample", () => {
     const u = productUnderstanding(
       productInLook(DOOR_TAG, { colour: "gold-black", style: null }),

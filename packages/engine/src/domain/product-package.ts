@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BrandKit } from "@/domain/brand";
+import { colourTextNotes } from "@/domain/colour-text";
 import { Product } from "@/domain/product";
 
 // The product package contract (ROADMAP Phase 8, PRODUCT-MODEL.md): what a
@@ -28,6 +29,9 @@ export type PackageResult =
       rejected: RejectedProduct[];
       brand?: BrandKit;
       brandErrors: string[];
+      // What imports but would read wrong, product by product: a colour shown
+      // with text written for another (colourTextNotes).
+      notes: string[];
     }
   // Nothing in it reads as a package (no products at all).
   | { ok: false; errors: string[] };
@@ -238,5 +242,8 @@ export function parseProductPackage(input: unknown): PackageResult {
     rejected,
     ...(brand ? { brand } : {}),
     brandErrors,
+    notes: products.flatMap((p) =>
+      colourTextNotes(p).map((note) => `${productLabel(p)}: ${note}.`),
+    ),
   };
 }

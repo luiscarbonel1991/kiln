@@ -50,6 +50,41 @@ export function colourWord(hex: string): string {
   return best[0];
 }
 
+// Everyday colour words a maker's text may name (the palette above, and wood
+// and metal finishes), to tell which colours a name or a sentence speaks of.
+const VOCABULARY = new Set([
+  ...NAMED.flatMap(([name]) => name.split(" ")).filter((w) => w !== "dark"),
+  "ivory",
+  "bronze",
+  "copper",
+  "brass",
+  "rose",
+  "olive",
+  "sage",
+  "mint",
+  "burgundy",
+  "maroon",
+  "walnut",
+  "oak",
+  "maple",
+  "cherry",
+  "birch",
+  "ebony",
+  "chrome",
+]);
+
+// The colour words a text names, lower case ("Two-tone Black/White" -> black,
+// white); "gray" reads as "grey".
+export function colourWordsIn(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^a-z]+/)
+      .map((w) => (w === "gray" ? "grey" : w))
+      .filter((w) => VOCABULARY.has(w)),
+  );
+}
+
 const word = (w: string) => w.toLowerCase().replace(/[^a-z0-9-]/g, "");
 
 // "Matte Black" + "matte powder-coated steel" reads "matte black powder-coated

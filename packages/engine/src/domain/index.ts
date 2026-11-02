@@ -17,6 +17,13 @@ export {
   resolveField,
 } from "@/domain/cascade";
 export {
+  type ColourTextConflict,
+  colourTextConflict,
+  colourTextNotes,
+  colourTextWarning,
+  type ProductText,
+} from "@/domain/colour-text";
+export {
   Aspect,
   Delivery,
   DestinationFormat,

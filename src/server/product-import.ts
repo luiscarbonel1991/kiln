@@ -248,6 +248,7 @@ export async function importPackage(
       const warning = outOfStockDefault(p);
       return warning ? [warning] : [];
     }),
+    ...parsed.notes,
   ];
   let imported: ImportedProduct[] = [];
   if (measured.length > 0 || parsed.brand) {

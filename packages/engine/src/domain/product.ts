@@ -89,6 +89,10 @@ export type ProductView = z.infer<typeof ProductView>;
 // plastic, and a real photo carries the grain better than a drawn texture.
 // `supplierUrl` is the supplier's page for this colour; with a sample, it is
 // what makes the colour's look verified (`lookVerified`).
+// `productName`, `material` and `forbidden` are the product's own text in
+// this colour, for a product whose text names its colours ("engraved black
+// & white", "no gold finish"): a scene in this colour reads them in place of
+// the product's (productInLook), so it never says two colours at once.
 export const ColourOption = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
@@ -107,6 +111,28 @@ export const ColourOption = z.object({
     .string()
     .describe(
       "The supplier's page for this colour (http or https). Kiln never opens it: the maker does, to compare it with the scenes.",
+    )
+    .optional(),
+  productName: z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      "The product's name in this colour, when its own name names another colour (\"Desk name plate, engraved brushed gold\"). Scenes in this colour read it in place of the product's name.",
+    )
+    .optional(),
+  material: z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      "The material in this colour, when the product's material names another colour (\"a satin brushed GOLD surface; the lettering reads matte BLACK\"). Scenes in this colour read it in place of the product's material.",
+    )
+    .optional(),
+  forbidden: z
+    .array(z.string().trim().min(1))
+    .describe(
+      "What scenes in this colour must never show, in place of the product's list (the product's may forbid this colour's finish).",
     )
     .optional(),
   inStock: z.boolean().default(true),

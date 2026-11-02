@@ -73,11 +73,27 @@ export function lookLabel(product: Product, look: ResolvedLook): string {
     : colour;
 }
 
-// The product in a look: that colour as its default, and that style's
-// drawing and wording. `design` is the drawing already redrawn in the look's
-// colour (drawLook), so a plate rendered from the result is in that colour.
-// Every reader of the product (its understanding, its sample, its scene
-// cues, the view from above, the exact frames) then follows the look.
+// The product's text in a colour: the colour's own name, material and things
+// never shown where it has them (a product whose text names its colours),
+// else the product's.
+function textInColour(
+  product: Product,
+  key: string,
+): Pick<Product, "name" | "material" | "forbidden"> {
+  const colour = product.colours.find((c) => c.key === key);
+  return {
+    name: colour?.productName ?? product.name,
+    material: colour?.material ?? product.material,
+    forbidden: colour?.forbidden ?? product.forbidden,
+  };
+}
+
+// The product in a look: that colour as its default, with its own text, and
+// that style's drawing and wording. `design` is the drawing already redrawn
+// in the look's colour (drawLook), so a plate rendered from the result is in
+// that colour. Every reader of the product (its understanding, its sample,
+// its scene cues, the view from above, the exact frames) then follows the
+// look.
 export function productInLook(
   product: Product,
   look: ResolvedLook,
@@ -93,14 +109,16 @@ export function productInLook(
         return example ? { ...line, example } : line;
       })
     : product.wording;
+  const text = textInColour(product, look.colour);
   if (product.source.kind !== "vector") {
-    return { ...product, defaultColour: look.colour, wording };
+    return { ...product, ...text, defaultColour: look.colour, wording };
   }
   // A style's drawing keeps its own outline; its scale is not the source's.
   const { outlineBox, scalePxPerUnit, ...rest } = product.source;
   const box = style ? style.outlineBox : outlineBox;
   return {
     ...product,
+    ...text,
     defaultColour: look.colour,
     wording,
     source: {

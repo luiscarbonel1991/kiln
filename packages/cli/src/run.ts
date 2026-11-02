@@ -134,6 +134,8 @@ type Checked =
       ready: Product[];
       rejected: RejectedProduct[];
       brandErrors: string[];
+      // What imports but would read wrong; never a reason to set aside.
+      notes: string[];
     };
 
 // The package checked as the import checks it: the products that pass, those
@@ -151,7 +153,13 @@ function check(engine: Engine, json: unknown): Checked {
       ready.push(product);
     }
   }
-  return { ok: true, ready, rejected, brandErrors: parsed.brandErrors };
+  return {
+    ok: true,
+    ready,
+    rejected,
+    brandErrors: parsed.brandErrors,
+    notes: parsed.notes,
+  };
 }
 
 const isClean = (c: Checked) =>
@@ -292,6 +300,7 @@ async function validate(io: Io, file: string, flags: Flags): Promise<number> {
               ready: result.ready.map((p) => ({ sku: p.sku, name: p.name })),
               rejected: result.rejected,
               brandErrors: result.brandErrors,
+              notes: result.notes,
             }
           : { ok: false, errors: result.errors },
         null,
@@ -307,6 +316,7 @@ async function validate(io: Io, file: string, flags: Flags): Promise<number> {
     }
     printRejected(io.out, result.rejected);
     for (const e of result.brandErrors) io.out(`maker block not saved: ${e}`);
+    for (const n of result.notes) io.out(`note: ${n}`);
     io.out(
       `${result.ready.length} ready, ${result.rejected.length} set aside${result.brandErrors.length > 0 ? ", maker block refused" : ""}.`,
     );
