@@ -658,6 +658,32 @@ alone. Its take reads "test take · low quality" in place of Approve and is neve
 approved (board, API and agents alike); a full take replaces it. An agent quotes test
 takes with `generate`'s `test`.
 
+**Kiln's check of each take.** Every image take of a scene is read before it lands,
+free and local, and lands with what was read (`GenerationJob.takeCheck`,
+`src/server/qc/`):
+- *Text.* Apple Vision (macOS) reads the reference the take edited and the take
+  itself. The take is held only to the product's wording that the reference also
+  reads: a line the reference does not read is noted, never failed. Each line must
+  read at 1.5 % of the frame height or more.
+- *Stacked pieces.* A column of one-character pieces (a 2, a 0 and a 5) is something
+  the OCR drops. Kiln finds them by their ink and reads them again, re-laid in a row.
+- *Letterforms.* The stroke over the letters' height, against the reference's. A
+  stroke 25 % off is another weight and fails, since a font product's buyers notice.
+  The width is only noted, because an angled camera narrows letters too. Letters
+  with a stroke under 4 px are not compared.
+- *Scale.* Never measured: nothing local sees the door. "scale unverified · 6 x 3
+  in, about 1/6 as wide as the door" carries the size the scene asked for, and the
+  agents compare it in the image.
+- *On the board.* The chip reads "checked · text 1/1 · letters match", "check
+  failed · …" (its title lists every problem), or "unchecked · …" with "Check ·
+  free" (a take from before the check, or one with nothing to read).
+- *What a failure does.* A failed take is never re-rolled on its own, and approving
+  is never blocked (Luis, 2026-11-02). A text read too small marks Tune's "Product
+  too small".
+- *When the check cannot run.* A check that throws, or takes over 20 s, lands the
+  take unchecked. Off macOS it says "no OCR engine on this machine".
+- *Elsewhere.* `get_frames`, `view_frame` and the export's manifest carry the check.
+
 **Scene knobs.** A scene planned on the Etsy shot list (hero, in-use, lifestyle,
 gift) is tuned with knobs, never with prose: camera (eye level, a little above,
 from above), distance (close, medium, wide), light (window, studio, warm), shadow
@@ -798,7 +824,7 @@ An approved scene is made once and reused in every size:
   for free: in a Launch, Instagram's "in place" and "detail" are Etsy's in-use and
   material detail (slots of the same `role`). It is approved with its source.
 
-## System dependencies (vectorize, Deliver, stills in motion)
+## System dependencies (vectorize, Deliver, stills in motion, take checks)
 
 The line-art **Centerline** trace — a single path per drawn stroke — shells out to two
 native binaries, **Deliver** upscales scenes with one of them, and **stills in motion**
@@ -808,6 +834,8 @@ renders with ffmpeg. Install them on any machine or deploy image that runs the a
 - **ImageMagick** (`magick`) — flattens the raster to a clean B&W bitmap first, and
   upscales scenes for delivery (`brew install imagemagick` · `apt-get install imagemagick`)
 - **ffmpeg** — the free stills-in-motion video (`brew install ffmpeg` · `apt-get install ffmpeg`)
+- **Xcode command line tools** (`swiftc`, macOS only) — compile the Apple Vision helper that
+  reads each take's text (`xcode-select --install`); without them, takes land unchecked
 
 The **Outline** trace (and everything else) is pure-npm via `@neplex/vectorizer` and needs
 nothing extra; if the binaries are missing, only the Centerline button fails (it's caught,
