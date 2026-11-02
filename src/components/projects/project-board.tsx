@@ -61,6 +61,7 @@ import { destinationImageSize } from "@/domain/image-size";
 import { checkListing, listingDraft } from "@/domain/listing";
 import { etsyListingId } from "@/domain/live-listing";
 import type { SearchColumns } from "@/domain/market-brief";
+import type { ImageSize } from "@/domain/model-defaults";
 import {
   NO_TAKE_ROUTES,
   type Route,
@@ -459,6 +460,11 @@ export function ProjectBoard({
               />
               <SlotGrid>
                 {slots.map(({ slot, cardId, card, view, onView }, i) => {
+                  // The size its destination asks the next take at (2K for
+                  // Etsy), as the queue will.
+                  const size = card
+                    ? destinationImageSize(card.model.aspect, destination)
+                    : undefined;
                   const video =
                     slot.fill === "video"
                       ? videoSettings(
@@ -522,12 +528,7 @@ export function ProjectBoard({
                               : null,
                             prompt: prompts[cardId] ?? null,
                             check: checks[cardId] ?? null,
-                            size: card
-                              ? destinationImageSize(
-                                  card.model.aspect,
-                                  destination,
-                                )
-                              : undefined,
+                            size,
                           })}
                           hasReference={board.master !== null}
                           look={frameLookOf(slot)}
@@ -538,6 +539,11 @@ export function ProjectBoard({
                               : null
                           }
                           model={card ? (card.model as ModelValue) : null}
+                          frame={
+                            card
+                              ? { aspect: card.model.aspect, size }
+                              : undefined
+                          }
                           notes={notes}
                           video={
                             video && card
@@ -975,6 +981,7 @@ function SlotActions({
   order,
   video,
   model,
+  frame,
   notes,
 }: {
   projectId: string;
@@ -1008,6 +1015,9 @@ function SlotActions({
     route: Route | null;
   } | null;
   model: ModelValue | null;
+  // The frame its model picker prices at: its aspect and the size its
+  // destination asks for.
+  frame?: { aspect?: string; size?: ImageSize };
   notes: ProviderNote[];
 }) {
   // A slot switched off keeps the caption it has when on, its other actions
@@ -1163,6 +1173,7 @@ function SlotActions({
             kind="image"
             value={model}
             notes={notes}
+            frame={frame}
             disabled={
               view.inBatch === true ||
               view.state === "generating" ||

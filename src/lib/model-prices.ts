@@ -5,8 +5,10 @@ import {
   videoCost,
   videoRate,
 } from "@/domain/generation-cost";
+import { sizeOn } from "@/domain/image-size";
 import type {
   ImageQuality,
+  ImageSize,
   ModelKind,
   VideoResolution,
 } from "@/domain/model-defaults";
@@ -17,7 +19,8 @@ const money = (usd: number) =>
 
 // A model's price as a picker shows it, beside its name: per image, per
 // second of video, per photo read. Null when it has no pinned price (it then
-// cannot run).
+// cannot run). An image is priced at a portrait 1K unless the picker is a
+// frame's, which prices it at that frame's aspect and size ("at 2K").
 export function priceHint(
   model: {
     provider: string;
@@ -26,10 +29,14 @@ export function priceHint(
     resolution?: VideoResolution;
   },
   kind: ModelKind,
+  frame?: { aspect?: string; size?: ImageSize },
 ): string | null {
   if (kind === "image") {
-    const e = estimateGeneration(model, "4:5");
-    return e ? `≈ ${money(e.typical)}/image` : null;
+    const aspect = frame?.aspect ?? "4:5";
+    const sized = { ...model, size: frame?.size };
+    const e = estimateGeneration(sized, aspect);
+    if (!e) return null;
+    return `≈ ${money(e.typical)}/image${sizeOn(sized, aspect) === "2k" ? " at 2K" : ""}`;
   }
   if (kind === "video") {
     const perSecond = videoRate(model);

@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { fromMicros, toMicros } from "@/domain/generation-cost";
-import type { GenerationRequest } from "@/domain/generation-request";
+import { requestModelLabel } from "@/domain/generation-request";
 import { modelLabel } from "@/domain/model-defaults";
 import { editLimits, formFromProduct } from "@/lib/product-form";
 import { cleanReview, ReviewForm, reviewFields } from "@/lib/product-review";
@@ -58,15 +58,6 @@ const ESTIMATE_ROSE = "The estimate rose since the quote: quote again.";
 const spentIn = (ctx: ToolContext) =>
   ctx.sessionId ? { sessionId: ctx.sessionId } : {};
 
-function requestModel(request: GenerationRequest): string {
-  const detail =
-    request.kind === "video"
-      ? (request.model.resolution ?? null)
-      : (request.model.quality ??
-        (request.model.provider === "openai" ? "medium" : null));
-  return [modelLabel(request.model), detail].filter(Boolean).join(" ");
-}
-
 // A refusal of the queue's in an agent's words; anything else it threw while
 // building the requests, as a refusal too (no reference yet, not a frame).
 function asRefusal(error: unknown): Error {
@@ -120,7 +111,7 @@ async function priceGenerate(
     maxMicros: cards.reduce((t, c) => t + c.maxMicros, 0),
     lines: cards.map((c) => ({
       frame: c.cardId,
-      model: requestModel(c.request),
+      model: requestModelLabel(c.request),
       fallbacks: c.next.map(modelLabel),
       typicalUsd: usd(c.typicalMicros),
       atMostUsd: usd(c.maxMicros),
@@ -167,7 +158,7 @@ async function priceDraw(project: string, cards?: string[]): Promise<Priced> {
     lines: priced.map((c) => ({
       card: c.cardId,
       drawing: byCard.get(c.cardId)?.label,
-      model: requestModel(c.request),
+      model: requestModelLabel(c.request),
       fallbacks: c.next.map(modelLabel),
       typicalUsd: usd(c.typicalMicros),
       atMostUsd: usd(c.maxMicros),

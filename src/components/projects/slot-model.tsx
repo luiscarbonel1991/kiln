@@ -7,7 +7,7 @@ import {
   type ModelValue,
   type ProviderNote,
 } from "@/components/models/model-choice";
-import type { ModelKind } from "@/domain/model-defaults";
+import type { ImageSize, ModelKind } from "@/domain/model-defaults";
 
 // A slot's own model on the board: the next generation runs on it (a job
 // already queued keeps its request). Refusals come back as the reason.
@@ -18,6 +18,7 @@ export function SlotModel({
   value,
   notes,
   disabled = false,
+  frame,
 }: {
   projectId: string;
   cardId: string;
@@ -25,6 +26,8 @@ export function SlotModel({
   value: ModelValue;
   notes: ProviderNote[];
   disabled?: boolean;
+  // The frame its models are priced at (aspect and size).
+  frame?: { aspect?: string; size?: ImageSize };
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +37,7 @@ export function SlotModel({
         kind={kind}
         value={value}
         notes={notes}
+        frame={frame}
         disabled={disabled || pending}
         onChange={(model) =>
           startTransition(async () => {

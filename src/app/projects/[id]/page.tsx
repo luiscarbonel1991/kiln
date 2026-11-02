@@ -9,6 +9,7 @@ import {
   waitingCardIds,
 } from "@/components/projects/project-board";
 import { ProjectsHeader } from "@/components/projects/projects-header";
+import { requestModelLabel } from "@/domain/generation-request";
 import { modelLabel } from "@/domain/model-defaults";
 import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
 import { projectCost } from "@/domain/project-cost";
@@ -89,15 +90,7 @@ async function batchEstimate(
       cards: cards.map((c) => ({
         cardId: c.cardId,
         label: labelOf(c.cardId),
-        model: [
-          modelLabel(c.request.model),
-          c.request.model.quality ??
-            (c.request.kind === "image" && c.request.model.provider === "openai"
-              ? "medium"
-              : null),
-        ]
-          .filter(Boolean)
-          .join(" "),
+        model: requestModelLabel(c.request),
         fallbacks: c.next.map(modelLabel),
         typicalMicros: c.typicalMicros,
         maxMicros: c.maxMicros,

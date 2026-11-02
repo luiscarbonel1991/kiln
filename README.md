@@ -664,8 +664,9 @@ Etsy (2000 px) and Amazon (1600), not Instagram (1080).
 - Gemini Nano Banana 2.1, 3 Pro Image and 3.1 Flash Image are asked for "2K". GPT Image
   1.5, 1 Mini and Flash-Lite stay at 1K, and so does a test take.
 
-The estimate and the Generate dialog say it ("GPT Image 2 medium 2K"), and a fallback
-model is priced at the size it would run at. The size is read from the destination at
+The estimate, the Generate dialog and the agents' quotes say it ("GPT Image 2 medium
+2K"). A frame's model picker prices each model at that frame's size ("≈ $0.081/image at
+2K"), and a fallback model is priced at the size it would run at. The size is read from the destination at
 each take, so an older Etsy project goes to 2K from its next take.
 
 **Test takes.** Tune offers "Test take" on a scene whose model has a low quality (the

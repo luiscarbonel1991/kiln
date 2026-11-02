@@ -79,6 +79,7 @@ export {
   buildGenerationRequest,
   buildVersionRequest,
   GenerationRequest,
+  requestModelLabel,
 } from "@/domain/generation-request";
 export {
   HeroSetting,

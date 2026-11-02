@@ -5,6 +5,7 @@ import {
   DEFAULT_IMAGE_QUALITY,
   DEFAULT_VIDEO_RESOLUTION,
   type ImageQuality,
+  type ImageSize,
   type ModelKind,
   modelEntry,
   modelLabel,
@@ -58,6 +59,7 @@ export function ModelChoice({
   className,
   testId = `model-${kind}`,
   label = `${kind} model`,
+  frame,
 }: {
   kind: ModelKind;
   value: ModelValue;
@@ -67,6 +69,8 @@ export function ModelChoice({
   className?: string;
   testId?: string;
   label?: string;
+  // A frame's picker prices each model at that frame's aspect and size.
+  frame?: { aspect?: string; size?: ImageSize };
 }) {
   const catalog = catalogFor(kind);
   const entry = modelEntry(value);
@@ -123,6 +127,7 @@ export function ModelChoice({
                     resolution: value.resolution,
                   },
                   kind,
+                  frame,
                 );
                 return (
                   <option key={m.id} value={`${m.provider}/${m.id}`}>

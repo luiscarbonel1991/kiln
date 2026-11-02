@@ -2,9 +2,10 @@ import { z } from "zod";
 import type { BrandProfile } from "@/domain/brand";
 import type { Card } from "@/domain/card";
 import { assemblePrompt } from "@/domain/cascade";
+import { sizeOn } from "@/domain/image-size";
 import type { MasterAsset } from "@/domain/master-asset";
 import { ModelConfig } from "@/domain/model-config";
-import { defaultVideoModel } from "@/domain/model-defaults";
+import { defaultVideoModel, modelLabel } from "@/domain/model-defaults";
 import type { VideoSettings } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
@@ -47,6 +48,20 @@ export const GenerationRequest = z.discriminatedUnion("kind", [
   VideoGenerationRequest,
 ]);
 export type GenerationRequest = z.infer<typeof GenerationRequest>;
+
+// A request's model as the maker reads it before spending: "GPT Image 2
+// medium 2K", "Gemini Omni Flash 720p".
+export function requestModelLabel(request: GenerationRequest): string {
+  const detail =
+    request.kind === "video"
+      ? [request.model.resolution ?? null]
+      : [
+          request.model.quality ??
+            (request.model.provider === "openai" ? "medium" : null),
+          sizeOn(request.model, request.model.aspect) === "2k" ? "2K" : null,
+        ];
+  return [modelLabel(request.model), ...detail].filter(Boolean).join(" ");
+}
 
 export function buildGenerationRequest(input: {
   card: Card;

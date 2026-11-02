@@ -17,4 +17,19 @@ describe("priceHint", () => {
       priceHint({ provider: "google", model: "veo-9" }, "video"),
     ).toBeNull();
   });
+
+  it("prices an image at a portrait 1K, or at a frame's aspect and size", () => {
+    const gpt2 = { provider: "openai", model: "gpt-image-2" };
+    expect(priceHint(gpt2, "image")).toBe("≈ $0.051/image");
+    expect(priceHint(gpt2, "image", { aspect: "4:5", size: "2k" })).toBe(
+      "≈ $0.081/image at 2K",
+    );
+    // A model without 2K is priced as it would run, at 1K.
+    expect(
+      priceHint({ provider: "openai", model: "gpt-image-1.5" }, "image", {
+        aspect: "4:5",
+        size: "2k",
+      }),
+    ).not.toContain("2K");
+  });
 });

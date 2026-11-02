@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { requestModelLabel } from "@/domain/generation-request";
 import {
   destinationImageSize,
   destinationTargetPx,
@@ -51,5 +52,32 @@ describe("the size a scene is asked for", () => {
       expect(width % 16, aspect).toBe(0);
       expect(height % 16, aspect).toBe(0);
     }
+  });
+});
+
+describe("a request's model, as the maker reads it", () => {
+  it("says 2K when the request runs at 2K", () => {
+    const image = (model: string, size?: "2k") => ({
+      kind: "image" as const,
+      masterAssetUrl: "https://stub.local/p.png",
+      prompt: "",
+      imageInputs: [],
+      negative: "",
+      model: {
+        provider: "openai" as const,
+        model,
+        aspect: "1:1",
+        guidance: 7.5,
+        strength: 0.65,
+        size,
+      },
+    });
+    expect(requestModelLabel(image("gpt-image-2", "2k"))).toBe(
+      "GPT Image 2 medium 2K",
+    );
+    expect(requestModelLabel(image("gpt-image-2"))).toBe("GPT Image 2 medium");
+    expect(requestModelLabel(image("gpt-image-1.5", "2k"))).toBe(
+      "GPT Image 1.5 medium",
+    );
   });
 });
