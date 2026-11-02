@@ -60,10 +60,13 @@ import {
   stillNeeded,
 } from "@/lib/product-checks";
 import {
+  colourTextWarnings,
   FINISHES,
   FORM_LIMITS,
+  type FormAvoid,
   type FormLimits,
   formIssues,
+  NEW_AVOID,
   type ProductForm,
 } from "@/lib/product-form";
 import {
@@ -132,6 +135,10 @@ interface Colour {
   base?: string;
   // The supplier's page for this colour.
   supplierUrl?: string;
+  // The product's name and material in this colour, when its own text names
+  // another colour.
+  productName?: string;
+  material?: string;
 }
 
 // A layered colour's base until the maker picks one: readable on its face.
@@ -160,6 +167,69 @@ function storedFile(form: ProductForm): StoredProductFile | null {
 const text = (n: number | undefined | null) => (n ? String(n) : "");
 
 // "GPT-6.1 Sol: 2 suggestions and 1 check, under their fields."
+// A colour's own name and material, for a product whose text names another
+// colour: the warning says what contradicts, the fields answer it, and a
+// scene in this colour reads them in place of the product's.
+function ColourText({
+  row,
+  colour,
+  warning,
+  limits,
+  onChange,
+}: {
+  row: number;
+  colour: Colour;
+  warning: string | null;
+  limits: FormLimits;
+  onChange: (change: Partial<Colour>) => void;
+}) {
+  const own = Boolean(colour.productName || colour.material);
+  const field = cn(FIELD, "h-7 max-w-[420px] text-[0.75rem]");
+  return (
+    <div className="flex flex-col gap-1.5 pl-11">
+      {warning ? (
+        <output
+          data-testid={`colour-${row + 1}-text-warning`}
+          className="block font-sans text-[0.75rem] text-prov-local"
+        >
+          {warning}
+        </output>
+      ) : null}
+      <details className="group" open={own || warning !== null}>
+        <summary className="cursor-pointer font-sans text-[0.72rem] font-semibold text-on-surface-mid">
+          Its own name and material
+        </summary>
+        <div className="mt-1.5 flex flex-col gap-1.5">
+          <input
+            aria-label={`Colour ${row + 1} own name`}
+            data-testid={`colour-${row + 1}-own-name`}
+            data-field={`colours.${row}.productName`}
+            placeholder="The product's name in this colour (optional)"
+            maxLength={limits.name}
+            value={colour.productName ?? ""}
+            onChange={(e) =>
+              onChange({ productName: e.target.value || undefined })
+            }
+            className={field}
+          />
+          <input
+            aria-label={`Colour ${row + 1} own material`}
+            data-testid={`colour-${row + 1}-own-material`}
+            data-field={`colours.${row}.material`}
+            placeholder="Its material in this colour (optional)"
+            maxLength={limits.material}
+            value={colour.material ?? ""}
+            onChange={(e) =>
+              onChange({ material: e.target.value || undefined })
+            }
+            className={field}
+          />
+        </div>
+      </details>
+    </div>
+  );
+}
+
 function reviewSummary(model: string, suggestions: number, checks: number) {
   if (suggestions + checks === 0)
     return `${model} has nothing more to suggest.`;
@@ -208,7 +278,13 @@ export function ProductEditor({
   onCreated?: (product: Product, warning?: string) => void;
   onCancel: () => void;
   // A saved product being edited: its form and its text limits.
-  editing?: { productId: string; form: ProductForm; limits: FormLimits };
+  editing?: {
+    productId: string;
+    form: ProductForm;
+    limits: FormLimits;
+    // The product's things to avoid, and each colour's own (not in the form).
+    avoid: FormAvoid;
+  };
   onSaved?: (saved: SavedProduct) => void;
 }) {
   const start = editing?.form;
@@ -315,6 +391,12 @@ export function ProductEditor({
     setColours((all) =>
       all.map((x, j) => (j === row ? { ...x, ...change } : x)),
     );
+  // A colour whose product text names another one (DP-E in gold said
+  // "black & white"): said on its row, with its own name and material there.
+  const textWarnings = colourTextWarnings(
+    { name, material, colours, defaultColour },
+    editing?.avoid ?? NEW_AVOID,
+  );
 
   function setWidthFollowing(value: string) {
     setWidth(value);
@@ -1215,6 +1297,15 @@ export function ProductEditor({
                 <span className="pl-11 font-sans text-[0.75rem] text-prov-local">
                   {problems[`colours.${i}.supplierUrl`]}
                 </span>
+              ) : null}
+              {colours.length > 1 && i !== defaultColour ? (
+                <ColourText
+                  row={i}
+                  colour={c}
+                  warning={textWarnings[i]}
+                  limits={limits}
+                  onChange={(change) => setRow(i, change)}
+                />
               ) : null}
               {note(`colours.${i}.name`)}
             </div>

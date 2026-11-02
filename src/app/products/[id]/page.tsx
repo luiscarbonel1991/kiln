@@ -2,7 +2,12 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ProductEditPage } from "@/components/projects/product-edit-page";
 import { ProjectsHeader } from "@/components/projects/projects-header";
-import { editLimits, formFromProduct, keptWords } from "@/lib/product-form";
+import {
+  avoidOf,
+  editLimits,
+  formFromProduct,
+  keptWords,
+} from "@/lib/product-form";
 import {
   getProduct,
   listProducts,
@@ -51,6 +56,7 @@ export default async function ProductPage({
         catalog={product.source.kind === "catalog"}
         form={formFromProduct(product)}
         limits={editLimits(product)}
+        avoid={avoidOf(product)}
         kept={keptWords(product)}
         uses={uses}
         materials={[...new Set(products.map((p) => p.material))].sort()}

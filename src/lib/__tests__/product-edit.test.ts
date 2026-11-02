@@ -6,10 +6,13 @@ import { Product } from "@/domain/product";
 import { parseProductPackage } from "@/domain/product-package";
 import { canonicalJson } from "@/lib/product-diff";
 import {
+  avoidOf,
+  colourTextWarnings,
   editLimits,
   formFromProduct,
   keptWords,
   mergeForm,
+  NEW_AVOID,
   productFromForm,
 } from "@/lib/product-form";
 import pkg from "../__fixtures__/product-package.json";
@@ -251,5 +254,74 @@ describe("editing a product", () => {
     expect(edited.colours[1].supplierUrl).toBe(
       "https://supplier.example/walnut",
     );
+  });
+
+  it("edits a colour's own name and material; its own things to avoid stay as imported", () => {
+    const own = Product.parse({
+      ...DOOR_TAG,
+      name: "Engraved door tag, black & white",
+      colours: DOOR_TAG.colours.map((c) =>
+        c.key === "gold-black"
+          ? {
+              ...c,
+              productName: "Engraved door tag, brushed gold",
+              forbidden: ["black face"],
+            }
+          : c,
+      ),
+    });
+    const form = formFromProduct(own);
+    expect(form.colours[1]).toMatchObject({
+      productName: "Engraved door tag, brushed gold",
+    });
+    expect(canonicalJson(merged(own))).toBe(canonicalJson(own));
+    const edited = merged(own, {
+      colours: form.colours.map((c, i) =>
+        i === 1
+          ? { ...c, productName: "", material: "a brushed GOLD face" }
+          : c,
+      ),
+    });
+    expect(edited.colours[1]).not.toHaveProperty("productName");
+    expect(edited.colours[1]).toMatchObject({
+      material: "a brushed GOLD face",
+      forbidden: ["black face"],
+    });
+    expect(keptWords(own)).toContain("Gold/Black's own things to avoid");
+  });
+
+  it("warns on each colour row whose product text names another colour", () => {
+    const own = Product.parse({
+      ...DOOR_TAG,
+      name: "Engraved door tag, black & white",
+      forbidden: ["gold finish"],
+    });
+    const form = formFromProduct(own);
+    const [base, gold] = colourTextWarnings(form, avoidOf(own));
+    expect(base).toBeNull();
+    expect(gold).toContain(
+      'its name says white, and it must never show "gold finish"',
+    );
+    // Its own name and things to avoid answer it.
+    const fixed = colourTextWarnings(
+      {
+        ...form,
+        colours: form.colours.map((c, i) =>
+          i === 1 ? { ...c, productName: "Engraved door tag, gold" } : c,
+        ),
+      },
+      { ...avoidOf(own), colours: { "gold-black": ["black face"] } },
+    );
+    expect(fixed).toEqual([null, null]);
+    // A new row has no key yet; a new product avoids only the defaults.
+    expect(
+      colourTextWarnings(
+        {
+          ...form,
+          colours: [...form.colours, { name: "Silver/Black", hex: "#C0C0C0" }],
+        },
+        NEW_AVOID,
+      )[2],
+    ).toContain("its name says white");
   });
 });

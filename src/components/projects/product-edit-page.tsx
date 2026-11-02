@@ -11,7 +11,7 @@ import {
   type SavedProduct,
 } from "@/components/projects/product-editor";
 import { Button } from "@/components/ui/button";
-import type { FormLimits, ProductForm } from "@/lib/product-form";
+import type { FormAvoid, FormLimits, ProductForm } from "@/lib/product-form";
 
 const NOTE = "font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid";
 
@@ -46,6 +46,7 @@ export function ProductEditPage({
   catalog,
   form,
   limits,
+  avoid,
   kept,
   uses,
   materials,
@@ -61,6 +62,8 @@ export function ProductEditPage({
   catalog: boolean;
   form: ProductForm;
   limits: FormLimits;
+  // What the form does not edit that a colour's text is checked against.
+  avoid: FormAvoid;
   kept: string[];
   uses: Use[];
   materials: string[];
@@ -143,7 +146,7 @@ export function ProductEditPage({
           families={families}
           draftPrice={draftPrice}
           reviewPrice={reviewPrice}
-          editing={{ productId, form, limits }}
+          editing={{ productId, form, limits, avoid }}
           onSaved={(result) => {
             setSaved(result);
             router.refresh();

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { colourTextWarning } from "@/domain/colour-text";
 import { colourWord } from "@/domain/colour-words";
 import {
   type ColourOption,
@@ -123,6 +124,10 @@ export function productFormSchema(limits: FormLimits = FORM_LIMITS) {
             // A layered finish: the base layer's colour, which shows through
             // the cuts (the colour's inlay).
             base: Hex.optional(),
+            // The product's name and material in this colour, for a product
+            // whose own text names another colour; empty reads the product's.
+            productName: z.string().trim().max(limits.name).optional(),
+            material: z.string().trim().max(limits.material).optional(),
             // The supplier's page for this colour, opened by the maker to
             // compare; Kiln never fetches it.
             supplierUrl: z
@@ -370,6 +375,8 @@ export function productFromForm(input: ProductForm, suffix: string): Product {
       ...(c.base ? { inlay: c.base.toUpperCase() } : {}),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
       ...(c.supplierUrl ? { supplierUrl: c.supplierUrl } : {}),
+      ...(c.productName ? { productName: c.productName } : {}),
+      ...(c.material ? { material: c.material } : {}),
     })),
     defaultColour: keys[form.defaultColour] ?? keys[0],
     typography: { family: "Hanken Grotesk" },
@@ -451,10 +458,16 @@ export function editLimits(product: Product): FormLimits {
   const longest = (values: (string | undefined)[]) =>
     Math.max(0, ...values.map((v) => v?.length ?? 0));
   return {
-    name: Math.max(FORM_LIMITS.name, product.name.length),
+    name: Math.max(
+      FORM_LIMITS.name,
+      longest([product.name, ...product.colours.map((c) => c.productName)]),
+    ),
     whatItIs: Math.max(FORM_LIMITS.whatItIs, product.shape.length),
     family: Math.max(FORM_LIMITS.family, product.family.length),
-    material: Math.max(FORM_LIMITS.material, product.material.length),
+    material: Math.max(
+      FORM_LIMITS.material,
+      longest([product.material, ...product.colours.map((c) => c.material)]),
+    ),
     colourName: Math.max(
       FORM_LIMITS.colourName,
       longest(product.colours.map((c) => c.name)),
@@ -507,6 +520,8 @@ export function formFromProduct(product: Product): ProductForm {
       ...(c.inlay ? { base: c.inlay } : {}),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
       ...(safeLink(c.supplierUrl) ? { supplierUrl: c.supplierUrl } : {}),
+      ...(c.productName ? { productName: c.productName } : {}),
+      ...(c.material ? { material: c.material } : {}),
     })),
     defaultColour: Math.max(
       0,
@@ -549,8 +564,8 @@ function freshKey(name: string, taken: Set<string>): string {
 // The form laid over the stored product: what the form shows is replaced
 // (an optional field left empty is removed), everything else is kept as it
 // was — the sku (even when renamed), typography, parts, icons,
-// variants, things to avoid, and each kept colour's edge, inlay and stock (a
-// layered finish's base is the inlay the form edits).
+// variants, things to avoid, and each kept colour's edge, inlay, stock and
+// own things to avoid (a layered finish's base is the inlay the form edits).
 // Opening and saving without a change gives the same product.
 export function mergeForm(
   stored: Product,
@@ -576,6 +591,8 @@ export function mergeForm(
     const {
       swatchUrl: _swatch,
       supplierUrl: stored,
+      productName: _productName,
+      material: _material,
       inlayName,
       ...rest
     }: Partial<ColourOption> = kept ?? {};
@@ -600,6 +617,8 @@ export function mergeForm(
       ...(base ? { inlay: base } : {}),
       ...(c.swatchUrl ? { swatchUrl: c.swatchUrl } : {}),
       ...(supplierUrl ? { supplierUrl } : {}),
+      ...(c.productName ? { productName: c.productName } : {}),
+      ...(c.material ? { material: c.material } : {}),
     };
   });
   const old = stored.source;
@@ -693,6 +712,60 @@ export function keptWords(product: Product): string[] {
     ...(extras
       ? [layered ? "each colour's edge" : "each colour's edge and inlay"]
       : []),
+    ...product.colours.flatMap((c) =>
+      c.forbidden ? [`${c.name}'s own things to avoid`] : [],
+    ),
     `typeface ${product.typography.family}`,
   ];
+}
+
+// What the form does not edit but a colour's text is checked against: the
+// product's things to avoid, and each colour's own (by key).
+export interface FormAvoid {
+  product: string[];
+  colours: Record<string, string[]>;
+}
+
+export const NEW_AVOID: FormAvoid = {
+  product: [...DEFAULT_FORBIDDEN],
+  colours: {},
+};
+
+export function avoidOf(product: Product): FormAvoid {
+  return {
+    product: product.forbidden,
+    colours: Object.fromEntries(
+      product.colours.flatMap((c) =>
+        c.forbidden ? [[c.key, c.forbidden]] : [],
+      ),
+    ),
+  };
+}
+
+// Each colour row's warning, as the form stands: the product's name or
+// material saying the default's colours, or its things to avoid naming this
+// one (colourTextWarning); null for a row with nothing to fix.
+export function colourTextWarnings(
+  form: Pick<ProductForm, "name" | "material" | "colours" | "defaultColour">,
+  avoid: FormAvoid,
+): (string | null)[] {
+  const keys = form.colours.map((c, i) => c.key ?? `row-${i}`);
+  const text = {
+    name: form.name,
+    material: form.material,
+    forbidden: avoid.product,
+    defaultColour: keys[form.defaultColour ?? 0] ?? keys[0],
+    colours: form.colours.map((c, i) => ({
+      key: keys[i],
+      name: c.name,
+      face: c.hex,
+      inStock: true,
+      ...(c.productName?.trim() ? { productName: c.productName } : {}),
+      ...(c.material?.trim() ? { material: c.material } : {}),
+      ...(c.key && avoid.colours[c.key]
+        ? { forbidden: avoid.colours[c.key] }
+        : {}),
+    })),
+  };
+  return keys.map((key) => colourTextWarning(text, key));
 }
