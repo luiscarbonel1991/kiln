@@ -302,6 +302,9 @@ describe("editing a product", () => {
     expect(gold).toContain(
       'its name says white, and it must never show "gold finish"',
     );
+    expect(gold).toContain(
+      "Its things to avoid come from its package: give Gold/Black its own forbidden list there.",
+    );
     // Its own name and things to avoid answer it.
     const fixed = colourTextWarnings(
       {

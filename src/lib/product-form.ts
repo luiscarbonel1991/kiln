@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { colourTextWarning } from "@/domain/colour-text";
+import { colourTextConflict, colourTextWarning } from "@/domain/colour-text";
 import { colourWord } from "@/domain/colour-words";
 import {
   type ColourOption,
@@ -767,5 +767,12 @@ export function colourTextWarnings(
         : {}),
     })),
   };
-  return keys.map((key) => colourTextWarning(text, key));
+  // The form edits a colour's name and material; its things to avoid come
+  // from its package, so the warning says where to give it its own.
+  return keys.map((key, i) => {
+    const warning = colourTextWarning(text, key);
+    return warning && colourTextConflict(text, key)?.forbids.length
+      ? `${warning} Its things to avoid come from its package: give ${form.colours[i].name} its own forbidden list there.`
+      : warning;
+  });
 }
