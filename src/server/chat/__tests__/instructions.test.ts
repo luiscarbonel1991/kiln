@@ -53,6 +53,14 @@ const { SPECIALISTS } = await import("@/server/chat/specialists");
 const NOW = new Date("2026-10-30T12:00:00Z");
 
 describe("chatInstructions", () => {
+  it("offers to import a product Kiln does not have, never another in its place", async () => {
+    const own = await chatInstructions(null, SPECIALISTS.kiln, NOW);
+    expect(own).toContain(
+      "A product the maker names that list_products does not have: say so and never stand another product in for it.",
+    );
+    expect(own).toContain("you import it with import_products");
+  });
+
   it("names a project's frames, a design's drawings, or the maker's own conversation", async () => {
     const project = await chatInstructions("p1", SPECIALISTS.kiln, NOW);
     expect(project).toContain('the project "Planter" (Project id: p1;');

@@ -18,7 +18,7 @@ import {
 
 const INSTRUCTIONS = `Kiln prepares a maker's products for sale: each project is a board of frames (photos, video, exact renders) for its destinations.
 The maker's lessons say what they want: read them first with list_lessons (for the product's family) and follow them; propose_lesson proposes one they stated, which counts once they keep it.
-Import products with import_products; see a project's frames before starting it with plan_project, then create_project (free).
+Import products with import_products; see a project's frames before starting it with plan_project, then create_project (free). A product the person names that list_products lacks is never replaced by another: ask for its product package and import it, then go on.
 Read with list_products, list_projects and get_frames; look at a take with view_frame before deciding on it, then approve_frame or reject_frame with a reason, naming the take you looked at. Each take's check says what Kiln read in it (its text and letterforms against the reference); scale is never measured, so compare the product with check.scale yourself.
 Designs (an image drawn as line art, then traced into SVG): list_designs and get_design read them, view_design shows a drawing or its vector, vectorize traces one (free); a vector becomes a product in the maker's product form.
 Paid work takes two calls: quote prices it (free) and answers an id; generate, draw, write_listing or review_product take only that id and run what was quoted, once, within the month's cap, and only for a token the maker lets spend. Tell the person what a quote costs before running it.
