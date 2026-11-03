@@ -1,14 +1,18 @@
-import { PenLine, Plus } from "lucide-react";
+import { ArrowDown, PenLine, Plus } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
+import { HomeHero } from "@/components/home/home-hero";
 import { HomeProjects } from "@/components/home/home-projects";
 import { HomeResults } from "@/components/home/home-results";
+import { Story } from "@/components/home/story";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { fromMicros } from "@/domain/generation-cost";
-import { buyerSizeLabel } from "@/domain/product";
+import { buyerSizeLabel, type Product } from "@/domain/product";
+import { hasDatabase } from "@/lib/db";
 import { providerMode } from "@/providers/mode";
 import { budget } from "@/server/generation-repository";
 import { homeStats, type ProjectStats } from "@/server/home-repository";
+import { homeStory } from "@/server/home-story";
 import { followedListings } from "@/server/listing-results";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { listProducts } from "@/server/product-repository";
@@ -30,12 +34,26 @@ function projectDetail(stats: ProjectStats): string {
   return `${kept} · ${money(stats.spentMicros)} spent${each}`;
 }
 
-// Home (ROADMAP screen 1): where a returning maker lands — the projects in
-// progress, the products, and this month's spend with its cost per approved
-// output (what a maker measures, not cost per output made). Nothing here
-// calls a model. Rendered per request.
+// Home (ROADMAP screen 1; "Toward a stable version", step 3): what Kiln does,
+// told as one product's way through it, with the maker's own work when they
+// have some (the sample product when they do not), and for a returning maker
+// where they left off, their projects and their products. Nothing here calls
+// a model or a shop. Rendered per request.
 export default async function HomePage() {
   await connection();
+  const story = await homeStory();
+  if (!hasDatabase()) {
+    return (
+      <div className="flex min-h-full flex-col">
+        <ProjectsHeader />
+        <main className={MAIN}>
+          <HomeHero story={story} eyebrow="Kiln" next={null} />
+          <Story story={story} />
+          <Closing returning={false} />
+        </main>
+      </div>
+    );
+  }
   const maker = await getCurrentMaker();
   const [projects, products, stats, spend, listings] = await Promise.all([
     listProjects(),
@@ -52,6 +70,16 @@ export default async function HomePage() {
       return p.planned && s ? [[p.id, projectDetail(s)]] : [];
     }),
   );
+  const returning = projects.length > 0 || products.length > 0;
+  const latest = projects[0];
+  const next = latest
+    ? {
+        href: latest.planned
+          ? `/projects/${latest.id}`
+          : `/studio?open=${encodeURIComponent(latest.id)}`,
+        label: `Continue ${short(latest.name)}`,
+      }
+    : null;
 
   const tiles = [
     {
@@ -79,141 +107,207 @@ export default async function HomePage() {
   return (
     <div className="flex min-h-full flex-col">
       <ProjectsHeader />
-      <main className="mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-6 py-10 sm:px-8">
-        <div>
-          <p className="font-sans text-[0.656rem] font-bold uppercase tracking-[0.18em] text-prov-brand">
-            {maker.name}
-          </p>
-          <h1
-            className="mt-2 font-serif text-[1.875rem] font-semibold leading-tight text-foreground"
-            style={{ fontVariationSettings: "'opsz' 144" }}
+      <main className={MAIN}>
+        <HomeHero story={story} eyebrow={maker.name} next={next} />
+
+        {returning ? (
+          <section
+            className="flex flex-col gap-6"
+            data-testid="home-continue"
+            aria-labelledby="home-continue-title"
           >
-            Your products and what's in progress.
-          </h1>
-        </div>
-
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {tiles.map((t) => (
-            <div
-              key={t.label}
-              className="flex flex-col gap-1 rounded-card bg-card p-5 shadow-card"
-            >
-              <span className="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
-                {t.label}
-              </span>
-              <span className="font-serif text-2xl italic text-foreground">
-                {t.value}
-              </span>
-              <span className="font-mono text-[0.65rem] text-on-surface-mid">
-                {t.note}
-              </span>
-            </div>
-          ))}
-        </section>
-
-        {followed.length > 0 ? (
-          <section className="flex flex-col gap-4" data-testid="home-results">
-            <div className="flex flex-col gap-1">
-              <h2 className="font-serif text-xl italic text-foreground">
-                Results
-              </h2>
-              <p className="font-sans text-[0.8125rem] text-on-surface-mid">
-                Each delivered listing, read from your shop's stats before the
-                new photos and 14 and 30 days after.
-              </p>
-            </div>
-            <HomeResults listings={followed} />
-          </section>
-        ) : null}
-
-        <section className="flex flex-col gap-4">
-          <h2 className="font-serif text-xl italic text-foreground">
-            Projects
-          </h2>
-          {projects.length > 0 ? (
-            <HomeProjects projects={projects} details={details} />
-          ) : (
-            <div className="flex flex-col items-start gap-3 rounded-card bg-card p-6 shadow-card">
-              <p className="font-sans text-sm text-on-surface-mid">
-                No projects yet. Start from a product: the plan shows every
-                frame and what it costs before anything is paid.
-              </p>
-              <Link
-                href="/projects/new"
-                className="font-sans text-sm font-semibold text-primary hover:underline"
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h2
+                id="home-continue-title"
+                className="font-serif text-xl italic text-foreground"
               >
-                Start your first project
-              </Link>
-            </div>
-          )}
-        </section>
-
-        <section className="flex flex-col gap-4">
-          <h2 className="font-serif text-xl italic text-foreground">
-            Products
-          </h2>
-          {products.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {products.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex flex-col gap-2 rounded-card bg-card p-5 shadow-card"
+                Where you left off
+              </h2>
+              {projects.length > RECENT ? (
+                <a
+                  href="#projects"
+                  className="inline-flex items-center gap-1 font-sans text-[0.8rem] font-semibold text-primary hover:underline"
                 >
-                  <span className="font-mono text-[0.625rem] text-on-surface-dim">
-                    {p.sku}
+                  All {projects.length} projects{" "}
+                  <ArrowDown className="size-3.5" />
+                </a>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {tiles.map((t) => (
+                <div
+                  key={t.label}
+                  className="flex flex-col gap-1 rounded-card bg-card p-5 shadow-card"
+                >
+                  <span className="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
+                    {t.label}
                   </span>
-                  <span className="font-serif text-lg italic leading-tight text-foreground">
-                    {p.name}
+                  <span className="font-serif text-2xl italic text-foreground">
+                    {t.value}
                   </span>
-                  <span className="font-sans text-[0.8rem] text-on-surface-mid">
-                    {buyerSizeLabel(p)} · {p.material}
-                  </span>
-                  <span className="flex gap-1.5 pt-1">
-                    {p.colours.map((c) => (
-                      <span
-                        key={c.key}
-                        title={c.inStock ? c.name : `${c.name} (out of stock)`}
-                        className="size-4 rounded-swatch border border-border"
-                        style={{
-                          backgroundColor: c.face,
-                          opacity: c.inStock ? 1 : 0.35,
-                        }}
-                      />
-                    ))}
-                  </span>
-                  <span className="flex flex-wrap items-center gap-4 pt-1">
-                    <Link
-                      href={`/projects/new?product=${encodeURIComponent(p.id)}`}
-                      className="inline-flex items-center gap-1 font-sans text-[0.75rem] font-semibold text-primary hover:underline"
-                    >
-                      <Plus className="size-3" /> New project
-                    </Link>
-                    <Link
-                      href={`/products/${encodeURIComponent(p.id)}`}
-                      className="inline-flex items-center gap-1 font-sans text-[0.75rem] font-semibold text-on-surface-mid hover:text-foreground hover:underline"
-                    >
-                      <PenLine className="size-3" /> Edit
-                    </Link>
+                  <span className="font-mono text-[0.65rem] text-on-surface-mid">
+                    {t.note}
                   </span>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="flex flex-col items-start gap-3 rounded-card bg-card p-6 shadow-card">
-              <p className="font-sans text-sm text-on-surface-mid">
-                No products yet: type one in, start from a photo or a design
-                file, or import your catalog.
-              </p>
-              <Link
-                href="/projects/new"
-                className="font-sans text-sm font-semibold text-primary hover:underline"
-              >
-                Add a product
-              </Link>
-            </div>
-          )}
-        </section>
+            {projects.length > 0 ? (
+              <HomeProjects
+                projects={projects.slice(0, RECENT)}
+                details={details}
+              />
+            ) : null}
+            {followed.length > 0 ? (
+              <div className="flex flex-col gap-3" data-testid="home-results">
+                <div className="flex flex-col gap-1">
+                  <h3 className="font-serif text-lg italic text-foreground">
+                    Results
+                  </h3>
+                  <p className="font-sans text-[0.8125rem] text-on-surface-mid">
+                    Each delivered listing, read from your shop's stats before
+                    the new photos and 14 and 30 days after.
+                  </p>
+                </div>
+                <HomeResults listings={followed} />
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        <Story story={story} />
+
+        <Closing returning={returning} />
+
+        {returning ? (
+          <>
+            <section id="projects" className="flex scroll-mt-20 flex-col gap-4">
+              <h2 className="font-serif text-xl italic text-foreground">
+                Projects
+              </h2>
+              {projects.length > 0 ? (
+                <HomeProjects projects={projects} details={details} />
+              ) : (
+                <div className="flex flex-col items-start gap-3 rounded-card bg-card p-6 shadow-card">
+                  <p className="font-sans text-sm text-on-surface-mid">
+                    No projects yet. Start from a product: the plan shows every
+                    frame and what it costs before anything is paid.
+                  </p>
+                  <Link
+                    href="/projects/new"
+                    className="font-sans text-sm font-semibold text-primary hover:underline"
+                  >
+                    Start your first project
+                  </Link>
+                </div>
+              )}
+            </section>
+            <Products products={products} />
+          </>
+        ) : null}
       </main>
     </div>
+  );
+}
+
+const MAIN =
+  "mx-auto flex w-full max-w-[1120px] flex-col gap-20 px-6 py-10 sm:gap-28 sm:px-8";
+const RECENT = 3;
+
+const short = (name: string) =>
+  name.length > 36 ? `${name.slice(0, 35).trimEnd()}…` : name;
+
+// The close of the story: one way in.
+function Closing({ returning }: { returning: boolean }) {
+  return (
+    <section className="flex flex-col items-center gap-4 rounded-card bg-card px-6 py-12 text-center shadow-card">
+      <h2
+        className="max-w-[560px] font-serif text-[1.9rem] font-semibold leading-tight text-foreground"
+        style={{ fontVariationSettings: "'opsz' 144" }}
+      >
+        {returning
+          ? "Start another product's story."
+          : "Start with one product."}
+      </h2>
+      <p className="max-w-[520px] font-sans text-[0.9375rem] leading-relaxed text-on-surface-mid">
+        Type it in, start from a photo or a design file, or import your catalog.
+        The plan shows every frame and what it costs before anything is paid.
+      </p>
+      <Link
+        href="/projects/new"
+        data-testid="home-start"
+        className="inline-flex h-10 items-center gap-2 rounded-field bg-primary px-4 font-sans text-[0.875rem] font-semibold text-primary-foreground shadow-button transition-colors hover:bg-primary/85"
+      >
+        <Plus className="size-4" />{" "}
+        {returning ? "New project" : "Add a product"}
+      </Link>
+    </section>
+  );
+}
+
+function Products({ products }: { products: Product[] }) {
+  return (
+    <section className="flex flex-col gap-4">
+      <h2 className="font-serif text-xl italic text-foreground">Products</h2>
+      {products.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {products.map((p) => (
+            <div
+              key={p.id}
+              className="flex flex-col gap-2 rounded-card bg-card p-5 shadow-card"
+            >
+              <span className="font-mono text-[0.625rem] text-on-surface-dim">
+                {p.sku}
+              </span>
+              <span className="font-serif text-lg italic leading-tight text-foreground">
+                {p.name}
+              </span>
+              <span className="font-sans text-[0.8rem] text-on-surface-mid">
+                {buyerSizeLabel(p)} · {p.material}
+              </span>
+              <span className="flex gap-1.5 pt-1">
+                {p.colours.map((c) => (
+                  <span
+                    key={c.key}
+                    title={c.inStock ? c.name : `${c.name} (out of stock)`}
+                    className="size-4 rounded-swatch border border-border"
+                    style={{
+                      backgroundColor: c.face,
+                      opacity: c.inStock ? 1 : 0.35,
+                    }}
+                  />
+                ))}
+              </span>
+              <span className="flex flex-wrap items-center gap-4 pt-1">
+                <Link
+                  href={`/projects/new?product=${encodeURIComponent(p.id)}`}
+                  className="inline-flex items-center gap-1 font-sans text-[0.75rem] font-semibold text-primary hover:underline"
+                >
+                  <Plus className="size-3" /> New project
+                </Link>
+                <Link
+                  href={`/products/${encodeURIComponent(p.id)}`}
+                  className="inline-flex items-center gap-1 font-sans text-[0.75rem] font-semibold text-on-surface-mid hover:text-foreground hover:underline"
+                >
+                  <PenLine className="size-3" /> Edit
+                </Link>
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-start gap-3 rounded-card bg-card p-6 shadow-card">
+          <p className="font-sans text-sm text-on-surface-mid">
+            No products yet: type one in, start from a photo or a design file,
+            or import your catalog.
+          </p>
+          <Link
+            href="/projects/new"
+            className="font-sans text-sm font-semibold text-primary hover:underline"
+          >
+            Add a product
+          </Link>
+        </div>
+      )}
+    </section>
   );
 }
