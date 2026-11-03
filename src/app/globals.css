@@ -145,8 +145,122 @@
   }
 }
 
+/* Home's story (DESIGN.md "Motion"): each chapter plays one staggered
+   sequence the first time it comes into view. A chapter is armed (its parts
+   held at their start) by StoryChapter only when it starts below the fold and
+   motion is allowed, so without script, or with reduced motion, every part
+   simply shows. Each part takes its kind from a class and its place from
+   --i (90 ms apart). */
+.story-part {
+  --story-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --story-anim: story-rise;
+  --story-time: 600ms;
+}
+.story-deal {
+  --story-anim: story-deal;
+  --story-time: 700ms;
+}
+.story-develop {
+  --story-anim: story-develop;
+  --story-time: 1100ms;
+}
+.story-wipe {
+  --story-anim: story-wipe;
+  --story-time: 900ms;
+}
+.story-stamp {
+  --story-anim: story-stamp;
+  --story-time: 500ms;
+}
+.story-draw {
+  --story-anim: story-draw;
+  --story-time: 1400ms;
+}
+[data-story="armed"] .story-part {
+  opacity: 0;
+}
+[data-story="played"] .story-part {
+  animation: var(--story-anim) var(--story-time) var(--story-ease) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+@keyframes story-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* A frame slides out of the stack and settles at its tilt. */
+@keyframes story-deal {
+  from {
+    opacity: 0;
+    transform: translate(var(--deal-x, -48px), 36px) rotate(-9deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) rotate(var(--tilt, 0deg));
+  }
+}
+
+/* A take comes up out of its blur, like a print in the tray. */
+@keyframes story-develop {
+  from {
+    opacity: 0.4;
+    filter: blur(12px) saturate(0.1) brightness(1.18);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+@keyframes story-wipe {
+  from {
+    opacity: 1;
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* A check chip lands on its take. */
+@keyframes story-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.7) rotate(-8deg);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-2deg);
+  }
+}
+
+/* A line drawn stroke by stroke (paths with pathLength 1, dasharray 1). */
+@keyframes story-draw {
+  from {
+    opacity: 1;
+    stroke-dashoffset: 1;
+  }
+  to {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
 /* Respect reduced motion: no entrance animation, no breathing glow, no parallax
-   (the parallax handler also checks this). */
+   (the parallax handler also checks this), and the story shows every part in
+   its final place (StoryChapter never arms it). */
 @media (prefers-reduced-motion: reduce) {
   .animate-hero-rise {
     animation: none;
@@ -156,6 +270,13 @@
   .animate-ember,
   .animate-drift {
     animation: none;
+  }
+  .story-part {
+    animation: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+    clip-path: none !important;
+    stroke-dashoffset: 0 !important;
   }
 }
 
