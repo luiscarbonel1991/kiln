@@ -16,8 +16,12 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-`/` is Home: the projects in progress (what each kept and spent), the products, and
-this month's spend with its cost per approved output. The image-first studio is at
+`/` is Home: what Kiln does, told as one product's way through it (its spec, its designs
+to SVG, its exact frames, its checked scenes, its looks, its listing text, everywhere it
+sells), with the maker's showcase project, or with a sample product on a first visit.
+A returning maker also finds where they left off (this month's spend with its cost per
+approved output, the latest projects, results due), then every project and product. Each
+chapter plays one sequence as it comes into view; with reduced motion it shows still. The image-first studio is at
 `/studio` (`?open=<id>` opens a studio project, `?new=1` starts empty).
 
 ## Database (Prisma Migrate)
