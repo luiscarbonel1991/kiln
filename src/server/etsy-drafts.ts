@@ -171,6 +171,33 @@ async function logWrite(data: {
   });
 }
 
+// One write to a draft, logged with Etsy's answer: refused (it did not run)
+// or unanswered (it may have). A failure reaches the maker in words.
+async function loggedWrite(
+  etsy: ConnectedEtsy,
+  makerId: string,
+  listingId: number,
+  write: {
+    action: WriteAction;
+    by: DraftWriter;
+    sent: Record<string, unknown>;
+  },
+  run: () => Promise<unknown>,
+): Promise<void> {
+  const row = { makerId, shopId: etsy.shopId, listingId, ...write };
+  try {
+    await run();
+  } catch (error) {
+    await logWrite({
+      ...row,
+      status: refusedByEtsy(error) ? "failed" : "unanswered",
+      error: said(error),
+    });
+    throw new DraftRefusal(said(error));
+  }
+  await logWrite({ ...row, status: "done" });
+}
+
 const viewOf = (row: {
   id: string;
   action: string;
@@ -874,36 +901,11 @@ export async function updateDraft(
   };
   const changes = draftChanges(before, { ...text, ...change });
   if (changes.length === 0) return { changes, readBack: [] };
-  const write = async (
+  const write = (
     action: WriteAction,
     sent: Record<string, unknown>,
     run: () => Promise<unknown>,
-  ) => {
-    try {
-      await run();
-      await logWrite({
-        makerId: maker.id,
-        shopId: etsy.shopId,
-        listingId,
-        action,
-        by,
-        sent,
-        status: "done",
-      });
-    } catch (error) {
-      await logWrite({
-        makerId: maker.id,
-        shopId: etsy.shopId,
-        listingId,
-        action,
-        by,
-        sent,
-        status: refusedByEtsy(error) ? "failed" : "unanswered",
-        error: said(error),
-      });
-      throw new DraftRefusal(said(error));
-    }
-  };
+  ) => loggedWrite(etsy, maker.id, listingId, { action, by, sent }, run);
   // Only what differs is sent.
   const changed: DraftTextEdit = Object.fromEntries(
     Object.entries(text).filter(([f]) => changes.some((c) => c.field === f)),
@@ -951,34 +953,21 @@ export async function addDraftPhoto(
   if (count >= ETSY_MAX_PHOTOS) {
     throw new DraftRefusal(`Etsy takes ${ETSY_MAX_PHOTOS} photos at most.`);
   }
-  const sent = { file: photo.filename, rank: count + 1 };
-  try {
-    await etsy.drafts.addPhoto(etsy.shopId, listingId, {
-      ...photo,
-      rank: count + 1,
-    });
-  } catch (error) {
-    await logWrite({
-      makerId: maker.id,
-      shopId: etsy.shopId,
-      listingId,
+  await loggedWrite(
+    etsy,
+    maker.id,
+    listingId,
+    {
       action: "photo-add",
       by,
-      sent,
-      status: refusedByEtsy(error) ? "failed" : "unanswered",
-      error: said(error),
-    });
-    throw new DraftRefusal(said(error));
-  }
-  await logWrite({
-    makerId: maker.id,
-    shopId: etsy.shopId,
-    listingId,
-    action: "photo-add",
-    by,
-    sent,
-    status: "done",
-  });
+      sent: { file: photo.filename, rank: count + 1 },
+    },
+    () =>
+      etsy.drafts.addPhoto(etsy.shopId, listingId, {
+        ...photo,
+        rank: count + 1,
+      }),
+  );
 }
 
 export async function removeDraftPhoto(
@@ -992,31 +981,13 @@ export async function removeDraftPhoto(
   if (!listing.images?.some((i) => i.listing_image_id === imageId)) {
     throw new DraftRefusal("That photo is not on this draft.");
   }
-  const sent = { imageId };
-  try {
-    await etsy.drafts.removePhoto(etsy.shopId, listingId, imageId);
-  } catch (error) {
-    await logWrite({
-      makerId: maker.id,
-      shopId: etsy.shopId,
-      listingId,
-      action: "photo-remove",
-      by,
-      sent,
-      status: refusedByEtsy(error) ? "failed" : "unanswered",
-      error: said(error),
-    });
-    throw new DraftRefusal(said(error));
-  }
-  await logWrite({
-    makerId: maker.id,
-    shopId: etsy.shopId,
+  await loggedWrite(
+    etsy,
+    maker.id,
     listingId,
-    action: "photo-remove",
-    by,
-    sent,
-    status: "done",
-  });
+    { action: "photo-remove", by, sent: { imageId } },
+    () => etsy.drafts.removePhoto(etsy.shopId, listingId, imageId),
+  );
 }
 
 // The projects a draft can be made from: those with a destination that takes
