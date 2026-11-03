@@ -384,7 +384,7 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 | The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do), `tune_frame` (any of a scene's knobs, its place, and its colour and style, as Tune does; free), `switch_frame` (a frame off or back on; free), `make_stills_video` (a video frame's free stills in motion) |
 | Designs | `list_designs`, `get_design` (each drawing's state, line art and vector, and the link where the maker makes a vector into a product), `view_design` (a drawing's line art, or its vector rendered), `vectorize` (free: outline or centerline, detail fine, balanced or clean; kept as the drawing's vector) |
 | Paid work | `quote`, then `generate`, `draw` (a design's line art, through the queue), `write_listing` or `review_product` with its id |
-| Selling | `get_listing` (the listing's fields, who wrote each, its problems and tag ideas), `edit_listing` (free; a field the maker wrote only with `overwriteMakerText`, after asking), `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only) |
+| Selling | `get_listing` (the listing's fields, who wrote each, its problems and tag ideas), `edit_listing` (free; a field the maker wrote only with `overwriteMakerText`, after asking), `save_brief`, `list_results`, `save_read`, `best_sellers`, `watched_shops`, `find_shops`, `shop_favourites` (Etsy's API, read-only), `list_drafts`, `get_draft` (the shop's drafts, read-only) |
 | Lessons | `list_lessons` (the maker's kept lessons, for a family and every family, by topic), `propose_lesson` (one English sentence; it counts once the maker keeps it) |
 
 - **Paid work takes two calls.** `quote` (free) prices a task: the models each line
@@ -504,7 +504,10 @@ stored, beyond the shops the maker compares and the listings they left out,
 by id. Shops carries Etsy's notice in the words its terms ask for.
 
 **Connecting.** The maker approves Kiln on Etsy's own page (OAuth 2.0 with
-PKCE, read-only scopes `shops_r listings_r transactions_r`): no key to paste.
+PKCE, scopes `shops_r listings_r transactions_r listings_w`): no key to paste.
+`listings_w` is for drafts (below); Kiln never asks for `listings_d`, so it
+cannot delete a listing. A shop connected before drafts is asked again for
+the one new scope ("Allow drafts").
 Kiln itself is an app Etsy knows, registered once by whoever runs Kiln (Etsy's
 terms forbid asking users to make keys of their own):
 
@@ -528,6 +531,33 @@ Serving sellers at large needs Etsy's commercial access (a review: terms,
 privacy policy, the "not endorsed by Etsy" notice). In a mock run
 (`pnpm dev:mock`), Connect links a mock shop with a year of orders, and Other
 shops finds a few mock shops by name.
+
+**Drafts.** Shops → Drafts (`/shops/drafts`) lists every draft of the
+connected shop and makes a new one from a project's Etsy destination: its
+listing text, its approved photos in order (the same files Deliver zips) and
+the product's price. The page shows all of it before anything is sent,
+with the choices Etsy needs that the kit does not hold: the category (a
+search over Etsy's taxonomy), quantity, who and when made, and the shipping
+and processing profiles, prefilled from the product's last draft or what the
+shop's live listings use most. Variations, personalization and the video
+are named as not sent yet. A draft's own page changes its text, category,
+price and quantity, and adds or removes photos; "Save to Etsy" shows what
+changes first. Etsy has no drafts-only scope, so the rules are Kiln's:
+
+- Kiln never publishes: no request carries a listing's state (a draft set
+  to active would go live); the maker publishes in Etsy's editor.
+- A live listing is never changed: right before each change Kiln reads the
+  listing from Etsy and refuses one that is not a draft of the connected
+  shop. Nothing is deleted but a draft's photo.
+- A draft is made once per preview (its request key is claimed before Etsy
+  is called), and a create Etsy did not answer is never sent again.
+- A draft with variations keeps them: Kiln does not rewrite its price.
+- Every write is logged (`ShopWrite`: what was sent, by whom, the answer)
+  and read back against what was sent; the draft's page shows both.
+
+In the chat, `make_draft` and `edit_draft` wait for the maker's click; the
+MCP server does not offer them. A mock run keeps the mock shop's drafts in
+memory.
 
 ## Models and providers
 
