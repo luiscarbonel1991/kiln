@@ -72,8 +72,9 @@ export function EtsyConnection({
 
   const reads = (
     <p className={NOTE}>
-      Read-only: your shop, its listings and its orders. Kiln never changes your
-      shop, and keeps nothing it reads from Etsy beyond ten minutes.
+      Kiln reads your shop, its listings and its orders, and keeps nothing it
+      reads beyond ten minutes. It writes drafts only when you send one: it
+      never publishes, never changes a live listing and never deletes one.
     </p>
   );
 
@@ -99,6 +100,18 @@ export function EtsyConnection({
           </span>
         </div>
         {reads}
+        {connection.draftsAllowed ? null : (
+          <p className={NOTE} data-testid="etsy-drafts-not-allowed">
+            Connected before drafts: to let Kiln write them,{" "}
+            <a
+              href={CONNECT_HREF}
+              className="font-semibold text-primary hover:underline"
+            >
+              connect it again
+            </a>{" "}
+            and allow it on Etsy.
+          </p>
+        )}
         {manage ? (
           <div className="flex flex-wrap items-center gap-3">
             <DisconnectShop shopName={connection.shopName} />

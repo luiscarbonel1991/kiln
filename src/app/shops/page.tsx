@@ -1,5 +1,6 @@
-import { CircleAlert, CircleCheck } from "lucide-react";
+import { ArrowRight, CircleAlert, CircleCheck, FilePen } from "lucide-react";
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { connection as dynamic } from "next/server";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { BestSellers } from "@/components/shops/best-sellers";
@@ -138,7 +139,8 @@ export default async function ShopsPage({
             aria-live="polite"
           >
             <CircleCheck className="size-4 text-prov-recipe" />
-            Connected {live.shopName}. Kiln reads its orders from here on.
+            Connected {live.shopName}. Kiln reads its orders
+            {live.draftsAllowed ? " and may write drafts" : ""} from here on.
           </p>
         ) : null}
         {problem ? (
@@ -187,6 +189,29 @@ export default async function ShopsPage({
             </div>
           )}
         </section>
+
+        {live ? (
+          <Link
+            href="/shops/drafts"
+            className="flex items-center gap-3 rounded-card bg-card p-5 shadow-card transition-colors hover:bg-secondary sm:p-6"
+            data-testid="shops-drafts"
+          >
+            <FilePen className="size-5 flex-shrink-0 text-primary" />
+            <span className="min-w-0 flex-1">
+              <span
+                className={`block ${HEADING}`}
+                style={{ fontVariationSettings: "'opsz' 40" }}
+              >
+                Drafts
+              </span>
+              <span className="block font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
+                Make a draft from a project, or change one already in{" "}
+                {live.shopName}. Kiln never publishes: you do, in Etsy.
+              </span>
+            </span>
+            <ArrowRight className="size-4 flex-shrink-0 text-on-surface-dim" />
+          </Link>
+        ) : null}
 
         <section className="rounded-card bg-card p-5 shadow-card sm:p-6">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">

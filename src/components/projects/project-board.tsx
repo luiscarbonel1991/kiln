@@ -1,4 +1,4 @@
-import { ImageIcon, PenLine } from "lucide-react";
+import { FilePen, ImageIcon, PenLine } from "lucide-react";
 import Link from "next/link";
 import type {
   ModelValue,
@@ -258,6 +258,7 @@ export function ProjectBoard({
   takeRoutes = NO_TAKE_ROUTES,
   prompts = {},
   checks = {},
+  drafts = [],
 }: {
   projectId: string;
   board: Board & { plan: ProjectPlan };
@@ -297,6 +298,8 @@ export function ProjectBoard({
   // What Kiln read in each scene's shown take, by card: null when the job
   // that made it left no check; absent when no job made it.
   checks?: Record<string, TakeCheck | null>;
+  // The Etsy drafts Kiln made from this project's destinations, newest first.
+  drafts?: { destinationId: string; listingId: number }[];
 }) {
   const rows = boardRows(board, jobs);
   const frameCosts = new Map(
@@ -918,6 +921,16 @@ export function ProjectBoard({
                   on.length > 0 && on.every((s) => s.view.state === "delivered")
                 }
               />
+              {destination.delivery.mode === "draft-api" && destination.text ? (
+                <DraftLink
+                  projectId={projectId}
+                  destinationId={plan.destinationId}
+                  listingId={
+                    drafts.find((d) => d.destinationId === plan.destinationId)
+                      ?.listingId
+                  }
+                />
+              ) : null}
             </div>
           );
         })}
@@ -928,6 +941,39 @@ export function ProjectBoard({
         active={generation.batch !== null}
       />
     </main>
+  );
+}
+
+// A sale destination that takes drafts through its API: make one from the
+// project, or open the last one Kiln made (ROADMAP Phase 11).
+function DraftLink({
+  projectId,
+  destinationId,
+  listingId,
+}: {
+  projectId: string;
+  destinationId: string;
+  listingId: number | undefined;
+}) {
+  return (
+    <div className="flex flex-col gap-1 font-sans text-[0.75rem]">
+      <Link
+        href={`/shops/drafts/new?project=${projectId}&destination=${destinationId}`}
+        className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
+        data-testid={`draft-make-${destinationId}`}
+      >
+        <FilePen className="size-3.5" />
+        {listingId ? "Make another Etsy draft" : "Make an Etsy draft"}
+      </Link>
+      {listingId ? (
+        <Link
+          href={`/shops/drafts/${listingId}`}
+          className="text-on-surface-mid hover:text-foreground hover:underline"
+        >
+          Etsy draft {listingId}
+        </Link>
+      ) : null}
+    </div>
   );
 }
 

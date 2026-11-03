@@ -83,6 +83,10 @@ export const DraftSettings = z.object({
 });
 export type DraftSettings = z.infer<typeof DraftSettings>;
 
+// The blockers the maker clears on the draft's own form.
+export const NEEDS_CATEGORY = "Choose the Etsy category.";
+export const NEEDS_QUANTITY = "Set the quantity.";
+
 export interface DraftPhoto {
   file: string;
   slot: string;
@@ -115,10 +119,8 @@ export function draftProposal(input: {
   if (input.photos.length === 0) {
     blockers.push("No photo is ready: approve the frames first.");
   }
-  if (settings.taxonomyId === undefined) {
-    blockers.push("Choose the Etsy category.");
-  }
-  if (settings.quantity === undefined) blockers.push("Set the quantity.");
+  if (settings.taxonomyId === undefined) blockers.push(NEEDS_CATEGORY);
+  if (settings.quantity === undefined) blockers.push(NEEDS_QUANTITY);
   for (const [field, words] of [
     ["tag", listing.tags.value],
     ["material", listing.materials.value],

@@ -18,8 +18,8 @@ function redirect(to: string | URL, cookie?: string): Response {
 }
 
 // GET /api/shops/etsy/connect — Settings' and Shops' Connect: sends the maker
-// to Etsy to approve Kiln (read-only), the handshake kept in a sealed cookie
-// for ten minutes. Etsy sends them back to ETSY_REDIRECT_URI, so the
+// to Etsy to approve Kiln (its reads, and drafts), the handshake kept in a
+// sealed cookie for ten minutes. Etsy sends them back to ETSY_REDIRECT_URI, so the
 // connection starts on that address's origin (the cookie must be there).
 export async function GET(request: Request) {
   const here = new URL(request.url);

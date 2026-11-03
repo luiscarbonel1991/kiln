@@ -13,6 +13,7 @@ import {
 import { deliveryBlockers, type PlanDestination } from "@/domain/plan";
 import { etsyText } from "@/domain/shop-ranking";
 import { db, hasDatabase } from "@/lib/db";
+import { CATALOG } from "@/lib/recipes";
 import { allPages, EtsyError } from "@/providers/shop/etsy";
 import {
   type DraftEdit as DraftTextEdit,
@@ -477,6 +478,14 @@ export interface DraftPreview {
   projectName: string;
   productName: string;
   settings: DraftSettings;
+  // The listing as it would be sent, shown even while a blocker stands.
+  text: {
+    title: string;
+    description: string;
+    tags: string[];
+    materials: string[];
+    price?: number;
+  };
   fields: DraftFields | null;
   photos: (DraftPhoto & { thumb?: string })[];
   blockers: string[];
@@ -539,6 +548,15 @@ export async function previewDraft(
     projectName: delivery.input.projectName,
     productName: delivery.product.name,
     settings,
+    text: {
+      title: listing.title.value.trim(),
+      description: listing.description.value.trim(),
+      tags: listing.tags.value,
+      materials: listing.materials.value,
+      ...(delivery.product.price !== undefined
+        ? { price: delivery.product.price }
+        : {}),
+    },
     fields: blockers.length === 0 ? proposal.fields : null,
     photos: proposal.photos as (DraftPhoto & { thumb?: string })[],
     blockers,
@@ -998,5 +1016,43 @@ export async function removeDraftPhoto(
     by,
     sent,
     status: "done",
+  });
+}
+
+// The projects a draft can be made from: those with a destination that takes
+// a listing through Etsy's draft API, newest first.
+export async function draftableProjects(): Promise<
+  {
+    projectId: string;
+    name: string;
+    destinationId: string;
+    updatedAt: string;
+  }[]
+> {
+  if (!hasDatabase()) return [];
+  const maker = await getCurrentMaker();
+  const rows = await db.project.findMany({
+    where: { makerId: maker.id, plan: { not: Prisma.DbNull } },
+    select: { id: true, name: true, plan: true, updatedAt: true },
+    orderBy: { updatedAt: "desc" },
+    take: 60,
+  });
+  const drafted = new Set(
+    CATALOG.destinations
+      .filter((d) => d.delivery.mode === "draft-api" && d.text)
+      .map((d) => d.id),
+  );
+  return rows.flatMap((row) => {
+    const destinations =
+      (row.plan as { destinations?: { destinationId?: string }[] } | null)
+        ?.destinations ?? [];
+    return destinations
+      .filter((d) => d.destinationId && drafted.has(d.destinationId))
+      .map((d) => ({
+        projectId: row.id,
+        name: row.name,
+        destinationId: d.destinationId as string,
+        updatedAt: row.updatedAt.toISOString(),
+      }));
   });
 }
