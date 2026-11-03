@@ -539,7 +539,10 @@ the product's price. The page shows all of it before anything is sent,
 with the choices Etsy needs that the kit does not hold: the category (a
 search over Etsy's taxonomy), quantity, who and when made, and the shipping
 and processing profiles, prefilled from the product's last draft or what the
-shop's live listings use most. Variations, personalization and the video
+shop's live listings use most. Etsy refuses a physical listing, a draft too,
+without a shipping and a processing profile; a calculated shipping profile
+also needs the item's weight with its packaging and its packed size, which
+the form asks for (the product's own size is the hint). Variations, personalization and the video
 are named as not sent yet. A draft's own page changes its text, category,
 price and quantity, and adds or removes photos; "Save to Etsy" shows what
 changes first. Etsy has no drafts-only scope, so the rules are Kiln's:
