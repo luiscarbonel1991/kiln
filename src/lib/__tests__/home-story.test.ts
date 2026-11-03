@@ -15,6 +15,7 @@ import {
   projectStory,
   sampleStory,
 } from "@/lib/home-story";
+import { LEAK } from "../../../packages/engine/src/__tests__/leak";
 import pkg from "../__fixtures__/product-package.json";
 
 const scene = (key: string, approvedOutput?: string, off = false) => ({
@@ -109,12 +110,10 @@ describe("the sample story", () => {
   });
 
   it("is generic: nothing of a maker's catalog", () => {
-    const words =
-      /maker1|\bsigns?\b|acrylic|laser|hanger|plaque|house.?numbers?|no.?soliciting/i;
-    expect(JSON.stringify(SAMPLE_PRODUCT)).not.toMatch(words);
-    expect(JSON.stringify(SAMPLE_DESIGN)).not.toMatch(words);
-    expect(JSON.stringify(sampleStory())).not.toMatch(words);
-    expect(JSON.stringify(SAMPLE_SCENES)).not.toMatch(words);
+    expect(JSON.stringify(SAMPLE_PRODUCT)).not.toMatch(LEAK);
+    expect(JSON.stringify(SAMPLE_DESIGN)).not.toMatch(LEAK);
+    expect(JSON.stringify(sampleStory())).not.toMatch(LEAK);
+    expect(JSON.stringify(SAMPLE_SCENES)).not.toMatch(LEAK);
   });
 });
 

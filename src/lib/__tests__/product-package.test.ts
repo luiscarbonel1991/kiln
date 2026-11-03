@@ -4,6 +4,7 @@ import {
   parseProductPackage,
 } from "@/domain/product-package";
 import pkg from "@/lib/__fixtures__/product-package.json";
+import { MAKER } from "../../../packages/engine/src/__tests__/leak";
 
 const [board] = pkg.products;
 
@@ -160,7 +161,7 @@ describe("parseProductPackage", () => {
 
   it("the example package is generic: no maker's catalog, no signs", () => {
     expect(JSON.stringify(pkg).toLowerCase()).not.toMatch(
-      /maker1|\bsigns?\b|acrylic/,
+      new RegExp(`${MAKER}|\\bsigns?\\b|acrylic`),
     );
   });
 

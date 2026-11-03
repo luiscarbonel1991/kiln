@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import { LEAK } from "../../../packages/engine/src/__tests__/leak";
 
 // Kiln's core is generic too (CLAUDE.md "Boundaries"): outside the optional
 // modules (src/modules, off unless KILN_MODULES lists them), no app source
@@ -8,8 +9,6 @@ import { describe, expect, it } from "vitest";
 // words as the engine's guard. The only exception is the wiring that names
 // the laser-pricing module by its id.
 const root = join(import.meta.dirname, "..", "..");
-const LEAK =
-  /maker1|\bsigns?\b|acrylic|laser|hanger|plaque|house.?numbers?|no.?soliciting/i;
 const MODULE_WIRING = /laser-pricing/;
 const SKIP = new Set(["__tests__", "__fixtures__", "modules"]);
 

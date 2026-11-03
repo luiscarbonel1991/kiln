@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import { LEAK } from "./leak";
 
 // The engine is generic (CLAUDE.md "Boundaries", ROADMAP "Domain model":
 // nothing in Kiln's code may know about signs or a particular maker). Its
@@ -8,8 +9,6 @@ import { describe, expect, it } from "vitest";
 // (plaques, door hangers, house numbers, "no soliciting"), acrylic or laser
 // work. "Engraved" stays: a generic treatment (wood, metal, jewellery).
 const root = join(import.meta.dirname, "..");
-const LEAK =
-  /maker1|\bsigns?\b|acrylic|laser|hanger|plaque|house.?numbers?|no.?soliciting/i;
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
