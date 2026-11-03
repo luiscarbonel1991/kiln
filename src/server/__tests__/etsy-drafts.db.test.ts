@@ -212,24 +212,25 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     const preview = await drafts.previewDraft(PROJECT, "etsy");
     expect(preview.settings).toMatchObject({
       quantity: 10,
-      shippingProfileId: 7001,
       readinessStateId: 8001,
       whoMade: "i_did",
       whenMade: "made_to_order",
     });
-    expect(preview.blockers).toEqual(["Choose the Etsy category."]);
+    // Two shipping profiles and no live listing naming one: the maker picks.
+    expect(preview.settings.shippingProfileId).toBeUndefined();
+    expect(preview.blockers).toEqual([
+      "Choose the Etsy category.",
+      "Choose the shipping profile: Etsy needs one for a physical item.",
+    ]);
     expect(preview.fields).toBeNull();
     expect(preview.photos.map((p) => p.file)).toEqual([
       "01-colours",
       "02-scale",
     ]);
     expect(preview.notSent).toContain("The video: upload it in Etsy's editor.");
-    // A calculated shipping profile needs the item's weight: never preselected.
-    expect(preview.notSent).toContain(
-      `Shipping: "USPS calculated" is calculated from the item's weight and size; choose it in Etsy's editor and add them there.`,
-    );
     const chosen = await drafts.previewDraft(PROJECT, "etsy", {
       taxonomyId: 1063,
+      shippingProfileId: 7001,
     });
     expect(chosen.blockers).toEqual([]);
     expect(chosen.fields).toMatchObject({ price: 24, taxonomyId: 1063 });
@@ -240,6 +241,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     const settings = DraftSettings.parse({
       taxonomyId: 1063,
       quantity: 10,
+      shippingProfileId: 7001,
       readinessStateId: 8001,
     });
     const made = await drafts.createDraftFromProject({
@@ -304,6 +306,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
         settings: DraftSettings.parse({
           taxonomyId: 1063,
           quantity: 10,
+          shippingProfileId: 7001,
           readinessStateId: 8001,
         }),
         requestKey: "key-5",
@@ -324,6 +327,46 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     ]);
   });
 
+  it("sends the item's weight and packed size with a calculated shipping profile", async () => {
+    const settings = {
+      taxonomyId: 1063,
+      quantity: 10,
+      shippingProfileId: 7002,
+      readinessStateId: 8001,
+    };
+    const send = (extra: object, requestKey: string) =>
+      drafts.createDraftFromProject({
+        projectId: PROJECT,
+        destinationId: "etsy",
+        settings: DraftSettings.parse({ ...settings, ...extra }),
+        requestKey,
+        by: "Drafts page",
+      });
+    await expect(send({}, "key-6")).rejects.toThrow(
+      "Add the item's weight and packed size",
+    );
+    expect(writes()).toEqual([]);
+    await send(
+      {
+        weight: { value: 3, unit: "oz" },
+        size: { length: 7, width: 5, height: 1, unit: "in" },
+      },
+      "key-7",
+    );
+    const create = writes().find(
+      (c) => c.init?.method === "POST" && c.url.pathname.endsWith("/listings"),
+    );
+    expect(await sentBody(create?.init)).toMatchObject({
+      shipping_profile_id: "7002",
+      item_weight: "3",
+      item_weight_unit: "oz",
+      item_length: "7",
+      item_width: "5",
+      item_height: "1",
+      item_dimensions_unit: "in",
+    });
+  });
+
   it("never sends a create again when Etsy did not answer", async () => {
     failing = (method, path) =>
       method === "POST" && path.endsWith("/listings")
@@ -336,6 +379,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
         settings: DraftSettings.parse({
           taxonomyId: 1063,
           quantity: 10,
+          shippingProfileId: 7001,
           readinessStateId: 8001,
         }),
         requestKey: "key-2",
@@ -364,6 +408,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       settings: DraftSettings.parse({
         taxonomyId: 1063,
         quantity: 10,
+        shippingProfileId: 7001,
         readinessStateId: 8001,
       }),
       requestKey: "key-3",
@@ -453,6 +498,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       settings: DraftSettings.parse({
         taxonomyId: 1063,
         quantity: 3,
+        shippingProfileId: 7001,
         readinessStateId: 8001,
       }),
       requestKey: "key-4",

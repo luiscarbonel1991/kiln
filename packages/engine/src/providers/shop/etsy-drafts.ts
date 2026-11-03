@@ -228,6 +228,12 @@ export function draftForm(
     materials: list(fields.materials),
     shipping_profile_id: fields.shippingProfileId,
     readiness_state_id: fields.readinessStateId,
+    item_weight: fields.weight?.value,
+    item_weight_unit: fields.weight?.unit,
+    item_length: fields.size?.length,
+    item_width: fields.size?.width,
+    item_height: fields.size?.height,
+    item_dimensions_unit: fields.size?.unit,
   };
 }
 

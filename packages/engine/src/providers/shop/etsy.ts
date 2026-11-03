@@ -59,6 +59,7 @@ export const EtsyListing = z.object({
   quantity: z.number().int().min(0).optional(),
   taxonomy_id: z.number().int().nullable().optional(),
   readiness_state_id: z.number().int().nullable().optional(),
+  shipping_profile_id: z.number().int().nullable().optional(),
   // Older answers carried a daily tally of views; today's spec has none.
   views: z.number().int().min(0).optional(),
 });

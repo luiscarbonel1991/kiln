@@ -43,7 +43,10 @@ const fields: DraftFields = {
   taxonomyId: 1063,
   tags: ["oak", "kitchen gift"],
   materials: ["oak"],
+  shippingProfileId: 3,
   readinessStateId: 5,
+  weight: { value: 3, unit: "oz" },
+  size: { length: 6, width: 4, height: 1, unit: "in" },
 };
 
 function stub(answer: () => Response) {
@@ -198,7 +201,14 @@ describe("the draft writer", () => {
       taxonomy_id: "1063",
       tags: "oak,kitchen gift",
       materials: "oak",
+      shipping_profile_id: "3",
       readiness_state_id: "5",
+      item_weight: "3",
+      item_weight_unit: "oz",
+      item_length: "6",
+      item_width: "4",
+      item_height: "1",
+      item_dimensions_unit: "in",
       type: "physical",
       is_supply: "false",
     });

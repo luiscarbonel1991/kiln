@@ -472,9 +472,6 @@ async function defaultSettings(
   shipping: { id: number; calculated?: boolean }[],
   processing: { id: number }[],
 ): Promise<DraftSettings> {
-  // A calculated profile needs the item's weight, which the kit does not
-  // hold: it is set in Etsy's editor, never sent with a draft.
-  const sendable = shipping.filter((p) => !p.calculated);
   const last = await db.shopWrite.findFirst({
     where: { makerId, productId, action: "create", status: "done" },
     orderBy: { at: "desc" },
@@ -482,12 +479,7 @@ async function defaultSettings(
   const before = DraftSettings.safeParse(
     (last?.sent as { settings?: unknown } | null)?.settings ?? {},
   );
-  if (last && before.success) {
-    const kept = before.data.shippingProfileId;
-    return sendable.some((p) => p.id === kept)
-      ? before.data
-      : { ...before.data, shippingProfileId: undefined };
-  }
+  if (last && before.success) return before.data;
   const live = await etsy.reader
     .activeListings(etsy.shopId, { limit: 100, offset: 0 })
     .then((p) => p.results)
@@ -498,7 +490,15 @@ async function defaultSettings(
   const quantity = mode(
     live.flatMap((l) => (l.quantity && l.quantity > 0 ? [l.quantity] : [])),
   );
-  // The processing profile the live listings use most, when Etsy says it.
+  // The profiles the live listings use most, when Etsy says them.
+  const shippingProfileId = mode(
+    live.flatMap((l) =>
+      l.shipping_profile_id &&
+      shipping.some((p) => p.id === l.shipping_profile_id)
+        ? [l.shipping_profile_id]
+        : [],
+    ),
+  );
   const readiness = mode(
     live.flatMap((l) =>
       l.readiness_state_id &&
@@ -510,7 +510,11 @@ async function defaultSettings(
   return DraftSettings.parse({
     ...(taxonomyId ? { taxonomyId } : {}),
     quantity: quantity ?? 1,
-    ...(sendable.length === 1 ? { shippingProfileId: sendable[0].id } : {}),
+    ...(shippingProfileId
+      ? { shippingProfileId }
+      : shipping.length === 1
+        ? { shippingProfileId: shipping[0].id }
+        : {}),
     ...(readiness
       ? { readinessStateId: readiness }
       : processing.length === 1
@@ -518,6 +522,10 @@ async function defaultSettings(
         : {}),
   });
 }
+
+const calculatedIn =
+  (profiles: { id: number; calculated?: boolean }[]) => (id: number) =>
+    profiles.some((p) => p.id === id && p.calculated === true);
 
 export interface DraftPreview {
   shopName: string;
@@ -533,6 +541,9 @@ export interface DraftPreview {
     tags: string[];
     materials: string[];
     price?: number;
+    // The product's own size (w across, h up, d deep), a hint for the
+    // packed size a calculated shipping profile needs.
+    size: { w: number; h: number; d?: number; unit: string };
   };
   fields: DraftFields | null;
   photos: (DraftPhoto & { thumb?: string })[];
@@ -578,6 +589,7 @@ export async function previewDraft(
     photos,
     settings,
     hasVideo: plan.slots.some((s) => !s.off && s.fill === "video"),
+    calculated: calculatedIn(choices.shipping),
   });
   const blockers = [
     ...(notReady.length > 0
@@ -604,19 +616,12 @@ export async function previewDraft(
       ...(delivery.product.price !== undefined
         ? { price: delivery.product.price }
         : {}),
+      size: delivery.product.dimensions,
     },
     fields: blockers.length === 0 ? proposal.fields : null,
     photos: proposal.photos as (DraftPhoto & { thumb?: string })[],
     blockers,
-    notSent: [
-      ...proposal.notSent,
-      ...choices.shipping
-        .filter((p) => p.calculated)
-        .map(
-          (p) =>
-            `Shipping: "${p.label}" is calculated from the item's weight and size; choose it in Etsy's editor and add them there.`,
-        ),
-    ],
+    notSent: proposal.notSent,
     requestKey: randomUUID(),
     made,
   };
@@ -694,6 +699,7 @@ export async function createDraftFromProject(input: {
       `Approve every photo first: ${notReady.join(", ")}.`,
     );
   }
+  const shipping = await etsy.drafts.shippingProfiles(etsy.shopId);
   const proposal = draftProposal({
     product: delivery.product,
     listing,
@@ -701,6 +707,7 @@ export async function createDraftFromProject(input: {
     photos: plannedPhotos(delivery.input.plan),
     settings: input.settings,
     hasVideo: false,
+    calculated: calculatedIn(shipping),
   });
   if (!proposal.fields) throw new DraftRefusal(proposal.blockers.join(" "));
   const fields = proposal.fields;
@@ -896,7 +903,7 @@ export async function sendMissingPhotos(
 
 // --- Changing a draft --------------------------------------------------------
 
-export type DraftChange = DraftTextEdit & {
+export type DraftChange = Omit<DraftTextEdit, "weight" | "size"> & {
   price?: number;
   quantity?: number;
 };
@@ -921,7 +928,7 @@ export async function updateDraft(
   const etsy = await writableShop();
   const maker = await getCurrentMaker();
   const listing = await editableDraft(etsy, listingId);
-  const text: DraftTextEdit = Object.fromEntries(
+  const text: DraftChange = Object.fromEntries(
     TEXT_FIELDS.flatMap((f) =>
       change[f] === undefined ? [] : [[f, change[f]]],
     ),
@@ -962,7 +969,7 @@ export async function updateDraft(
     run: () => Promise<unknown>,
   ) => loggedWrite(etsy, maker.id, listingId, { action, by, sent }, run);
   // Only what differs is sent.
-  const changed: DraftTextEdit = Object.fromEntries(
+  const changed: DraftChange = Object.fromEntries(
     Object.entries(text).filter(([f]) => changes.some((c) => c.field === f)),
   );
   if (Object.keys(changed).length > 0) {

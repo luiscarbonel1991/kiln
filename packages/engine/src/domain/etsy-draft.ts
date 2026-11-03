@@ -68,9 +68,27 @@ export interface DraftFields {
   taxonomyId: number;
   tags: string[];
   materials: string[];
-  shippingProfileId?: number;
+  shippingProfileId: number;
   readinessStateId: number;
+  // With a calculated shipping profile: the item as shipped, packaging in.
+  weight?: ItemWeight;
+  size?: ItemSize;
 }
+
+export const WeightUnit = z.enum(["oz", "lb", "g", "kg"]);
+export const SizeUnit = z.enum(["in", "ft", "mm", "cm", "m", "yd"]);
+export const ItemWeight = z.object({
+  value: z.number().positive().max(10_000),
+  unit: WeightUnit,
+});
+export type ItemWeight = z.infer<typeof ItemWeight>;
+export const ItemSize = z.object({
+  length: z.number().positive().max(10_000),
+  width: z.number().positive().max(10_000),
+  height: z.number().positive().max(10_000),
+  unit: SizeUnit,
+});
+export type ItemSize = z.infer<typeof ItemSize>;
 
 // The choices Etsy needs that the listing kit does not hold.
 export const DraftSettings = z.object({
@@ -80,6 +98,8 @@ export const DraftSettings = z.object({
   whenMade: WhenMade.default("made_to_order"),
   shippingProfileId: z.number().int().positive().optional(),
   readinessStateId: z.number().int().positive().optional(),
+  weight: ItemWeight.optional(),
+  size: ItemSize.optional(),
 });
 export type DraftSettings = z.infer<typeof DraftSettings>;
 
@@ -91,6 +111,39 @@ export const NEEDS_QUANTITY = "Set the quantity.";
 // physical listings").
 export const NEEDS_PROCESSING =
   "Choose the processing profile: Etsy needs one for a physical item.";
+// And a shipping profile; a calculated one prices by the item's weight and
+// size, which Etsy then needs on the listing (2026-11-02).
+export const NEEDS_SHIPPING =
+  "Choose the shipping profile: Etsy needs one for a physical item.";
+export const NEEDS_WEIGHT_SIZE =
+  "Add the item's weight and packed size: the shipping profile is calculated from them.";
+
+// The blockers the draft's form settles, from its settings alone.
+export function settingsBlockers(
+  settings: DraftSettings,
+  calculated: (shippingProfileId: number) => boolean,
+): string[] {
+  const out: string[] = [];
+  if (settings.taxonomyId === undefined) out.push(NEEDS_CATEGORY);
+  if (settings.quantity === undefined) out.push(NEEDS_QUANTITY);
+  if (settings.shippingProfileId === undefined) out.push(NEEDS_SHIPPING);
+  else if (
+    calculated(settings.shippingProfileId) &&
+    (!settings.weight || !settings.size)
+  ) {
+    out.push(NEEDS_WEIGHT_SIZE);
+  }
+  if (settings.readinessStateId === undefined) out.push(NEEDS_PROCESSING);
+  return out;
+}
+
+export const SETTINGS_BLOCKERS = [
+  NEEDS_CATEGORY,
+  NEEDS_QUANTITY,
+  NEEDS_SHIPPING,
+  NEEDS_WEIGHT_SIZE,
+  NEEDS_PROCESSING,
+];
 
 export interface DraftPhoto {
   file: string;
@@ -116,6 +169,8 @@ export function draftProposal(input: {
   photos: DraftPhoto[];
   settings: DraftSettings;
   hasVideo: boolean;
+  // Whether a shipping profile prices by weight and size.
+  calculated?: (shippingProfileId: number) => boolean;
 }): DraftProposal {
   const { product, listing, settings } = input;
   const blockers = checkListing(listing, product, input.rules)
@@ -124,11 +179,8 @@ export function draftProposal(input: {
   if (input.photos.length === 0) {
     blockers.push("No photo is ready: approve the frames first.");
   }
-  if (settings.taxonomyId === undefined) blockers.push(NEEDS_CATEGORY);
-  if (settings.quantity === undefined) blockers.push(NEEDS_QUANTITY);
-  if (settings.readinessStateId === undefined) {
-    blockers.push(NEEDS_PROCESSING);
-  }
+  const calculated = input.calculated ?? (() => false);
+  blockers.push(...settingsBlockers(settings, calculated));
   for (const [field, words] of [
     ["tag", listing.tags.value],
     ["material", listing.materials.value],
@@ -160,7 +212,12 @@ export function draftProposal(input: {
     product.price !== undefined &&
     settings.taxonomyId !== undefined &&
     settings.quantity !== undefined &&
+    settings.shippingProfileId !== undefined &&
     settings.readinessStateId !== undefined;
+  const shipped =
+    ready && calculated(settings.shippingProfileId as number)
+      ? { weight: settings.weight, size: settings.size }
+      : {};
   return {
     fields: ready
       ? {
@@ -173,10 +230,9 @@ export function draftProposal(input: {
           taxonomyId: settings.taxonomyId as number,
           tags: listing.tags.value,
           materials: listing.materials.value,
-          ...(settings.shippingProfileId
-            ? { shippingProfileId: settings.shippingProfileId }
-            : {}),
+          shippingProfileId: settings.shippingProfileId as number,
           readinessStateId: settings.readinessStateId as number,
+          ...shipped,
         }
       : null,
     photos,

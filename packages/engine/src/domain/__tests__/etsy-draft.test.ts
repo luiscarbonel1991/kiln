@@ -27,6 +27,7 @@ const photo = (n: number): DraftPhoto => ({
 const settings = DraftSettings.parse({
   taxonomyId: 1063,
   quantity: 10,
+  shippingProfileId: 3,
   readinessStateId: 5,
 });
 
@@ -52,6 +53,7 @@ describe("an Etsy draft from the listing kit", () => {
       taxonomyId: 1063,
       tags: listing.tags.value,
       materials: listing.materials.value,
+      shippingProfileId: 3,
       readinessStateId: 5,
     });
     expect(proposal.fields).not.toHaveProperty("state");
@@ -77,8 +79,45 @@ describe("an Etsy draft from the listing kit", () => {
       "No photo is ready: approve the frames first.",
       "Choose the Etsy category.",
       "Set the quantity.",
+      "Choose the shipping profile: Etsy needs one for a physical item.",
       "Choose the processing profile: Etsy needs one for a physical item.",
     ]);
+  });
+
+  it("asks for the item's weight and packed size when shipping is calculated, and sends them", () => {
+    const listing = listingDraft(board, rules);
+    const input = {
+      product: board,
+      listing,
+      rules,
+      photos: [photo(1)],
+      hasVideo: false,
+      calculated: (id: number) => id === 3,
+    };
+    expect(draftProposal({ ...input, settings }).blockers).toEqual([
+      "Add the item's weight and packed size: the shipping profile is calculated from them.",
+    ]);
+    const shipped = draftProposal({
+      ...input,
+      settings: {
+        ...settings,
+        weight: { value: 3, unit: "oz" },
+        size: { length: 6, width: 4, height: 1, unit: "in" },
+      },
+    });
+    expect(shipped.fields).toMatchObject({
+      shippingProfileId: 3,
+      weight: { value: 3, unit: "oz" },
+      size: { length: 6, width: 4, height: 1, unit: "in" },
+    });
+    // A manual profile takes no weight: none is sent.
+    expect(
+      draftProposal({
+        ...input,
+        calculated: () => false,
+        settings: { ...settings, weight: { value: 3, unit: "oz" } },
+      }).fields,
+    ).not.toHaveProperty("weight");
   });
 
   it("refuses a tag Etsy would split at its comma", () => {

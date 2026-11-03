@@ -23,9 +23,12 @@ import { Input } from "@/components/ui/input";
 import {
   type DraftSettings,
   ETSY_MAX_QUANTITY,
-  NEEDS_CATEGORY,
-  NEEDS_PROCESSING,
-  NEEDS_QUANTITY,
+  type ItemSize,
+  type ItemWeight,
+  SETTINGS_BLOCKERS,
+  SizeUnit,
+  settingsBlockers,
+  WeightUnit,
   WHO_MADE_LABEL,
   WhenMade,
   WhoMade,
@@ -65,14 +68,11 @@ export function DraftPreviewForm({
   const [pending, startTransition] = useTransition();
   const set = (change: Partial<DraftSettings>) =>
     setSettings((s) => ({ ...s, ...change }));
+  const calculated = (id: number) =>
+    shipping.some((p) => p.id === id && p.calculated === true);
   const blockers = [
-    ...preview.blockers.filter(
-      (b) =>
-        b !== NEEDS_CATEGORY && b !== NEEDS_QUANTITY && b !== NEEDS_PROCESSING,
-    ),
-    ...(settings.taxonomyId === undefined ? [NEEDS_CATEGORY] : []),
-    ...(settings.quantity === undefined ? [NEEDS_QUANTITY] : []),
-    ...(settings.readinessStateId === undefined ? [NEEDS_PROCESSING] : []),
+    ...preview.blockers.filter((b) => !SETTINGS_BLOCKERS.includes(b)),
+    ...settingsBlockers(settings, calculated),
   ];
   const text = preview.text;
 
@@ -239,10 +239,20 @@ export function DraftPreviewForm({
           <ProfileSelect
             label={FIELD_LABEL.shippingProfileId}
             testId="draft-shipping"
+            empty="Choose one"
             options={shipping}
             value={settings.shippingProfileId}
             onChange={(id) => set({ shippingProfileId: id })}
           />
+          {settings.shippingProfileId !== undefined &&
+          calculated(settings.shippingProfileId) ? (
+            <ShippedFields
+              weight={settings.weight}
+              size={settings.size}
+              product={text.size}
+              onChange={(change) => set(change)}
+            />
+          ) : null}
           <ProfileSelect
             label={FIELD_LABEL.readinessStateId}
             testId="draft-processing"
@@ -367,6 +377,130 @@ export function DraftPreviewForm({
   );
 }
 
+// A calculated shipping profile prices by the item as shipped: its weight
+// with packaging, and its packed size. The product's own size is the hint.
+function ShippedFields({
+  weight,
+  size,
+  product,
+  onChange,
+}: {
+  weight: ItemWeight | undefined;
+  size: ItemSize | undefined;
+  product: { w: number; h: number; d?: number; unit: string };
+  onChange: (change: { weight?: ItemWeight; size?: ItemSize }) => void;
+}) {
+  const id = useId();
+  const [w, setW] = useState({
+    value: weight ? String(weight.value) : "",
+    unit: weight?.unit ?? "oz",
+  });
+  const [s, setS] = useState({
+    length: size ? String(size.length) : "",
+    width: size ? String(size.width) : "",
+    height: size ? String(size.height) : "",
+    unit: size?.unit ?? (product.unit === "mm" ? "cm" : "in"),
+  });
+  const positive = (v: string) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  const report = (nw: typeof w, ns: typeof s) => {
+    const value = positive(nw.value);
+    const [length, width, height] = [ns.length, ns.width, ns.height].map(
+      positive,
+    );
+    onChange({
+      weight: value ? { value, unit: WeightUnit.parse(nw.unit) } : undefined,
+      size:
+        length && width && height
+          ? { length, width, height, unit: SizeUnit.parse(ns.unit) }
+          : undefined,
+    });
+  };
+  const setWeight = (change: Partial<typeof w>) => {
+    const next = { ...w, ...change };
+    setW(next);
+    report(next, s);
+  };
+  const setSize = (change: Partial<typeof s>) => {
+    const next = { ...s, ...change };
+    setS(next);
+    report(w, next);
+  };
+  const own = [product.w, product.h, product.d]
+    .filter((n) => n !== undefined)
+    .join(" × ");
+  return (
+    <div className="flex flex-col gap-3 rounded-render border border-border-soft bg-card p-3">
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`${id}-weight`} className={LABEL}>
+          Weight, packaging in
+        </label>
+        <div className="flex gap-2">
+          <Input
+            id={`${id}-weight`}
+            type="number"
+            min="0"
+            step="0.01"
+            value={w.value}
+            data-testid="draft-weight"
+            onChange={(e) => setWeight({ value: e.target.value })}
+          />
+          <select
+            className={`${SELECT} w-20`}
+            value={w.unit}
+            aria-label="Weight unit"
+            data-testid="draft-weight-unit"
+            onChange={(e) =>
+              setWeight({ unit: WeightUnit.parse(e.target.value) })
+            }
+          >
+            {WeightUnit.options.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className={LABEL}>Packed size (length × width × height)</span>
+        <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-1.5">
+          {(["length", "width", "height"] as const).map((k) => (
+            <Input
+              key={k}
+              type="number"
+              min="0"
+              step="0.01"
+              aria-label={`Packed ${k}`}
+              value={s[k]}
+              data-testid={`draft-size-${k}`}
+              onChange={(e) => setSize({ [k]: e.target.value })}
+            />
+          ))}
+          <select
+            className={`${SELECT} w-16`}
+            value={s.unit}
+            aria-label="Size unit"
+            data-testid="draft-size-unit"
+            onChange={(e) => setSize({ unit: SizeUnit.parse(e.target.value) })}
+          >
+            {SizeUnit.options.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        </div>
+        <span className="font-sans text-[0.7rem] text-on-surface-mid">
+          The product is {own} {product.unit}; add its packaging.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function QuantityField({
   value,
   onChange,
@@ -430,10 +564,8 @@ function ProfileSelect({
       >
         <option value="">{empty}</option>
         {options.map((o) => (
-          <option key={o.id} value={o.id} disabled={o.calculated}>
-            {o.calculated
-              ? `${o.label} (calculated: set it in Etsy, with the weight)`
-              : o.label}
+          <option key={o.id} value={o.id}>
+            {o.calculated ? `${o.label} (calculated)` : o.label}
           </option>
         ))}
       </select>
