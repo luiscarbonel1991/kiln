@@ -275,11 +275,12 @@ function readme(
   return `${lines.join("\n")}\n`;
 }
 
-export async function buildDelivery(input: DeliveryInput): Promise<{
-  zip: Uint8Array;
-  filename: string;
-  files: DeliveredFile[];
-  delivered: { key: string; approvedOutput?: string }[];
+// Each file of a destination as delivered, with its bytes, in the plan's
+// order: the zip carries them, and an Etsy draft takes its photos from them,
+// so both show the same frames.
+export async function deliveredFiles(input: DeliveryInput): Promise<{
+  folder: string;
+  files: { meta: DeliveredFile; bytes: Uint8Array }[];
 }> {
   const blockers = deliveryBlockers(input.plan, input.cardOf);
   if (blockers.notReady.length > 0) {
@@ -439,6 +440,28 @@ export async function buildDelivery(input: DeliveryInput): Promise<{
       ...costOf(slot.key),
     });
   }
+  return {
+    folder,
+    files: files.map((meta) => ({
+      meta,
+      bytes: entries[`${folder}/${meta.file}`],
+    })),
+  };
+}
+
+export async function buildDelivery(input: DeliveryInput): Promise<{
+  zip: Uint8Array;
+  filename: string;
+  files: DeliveredFile[];
+  delivered: { key: string; approvedOutput?: string }[];
+}> {
+  const made = await deliveredFiles(input);
+  const folder = made.folder;
+  const on = input.plan.slots.filter((s) => !s.off);
+  const entries: Record<string, Uint8Array> = Object.fromEntries(
+    made.files.map((f) => [`${folder}/${f.meta.file}`, f.bytes]),
+  );
+  const files = made.files.map((f) => f.meta);
   const manifest = {
     project: input.projectName,
     product: { sku: input.product.sku, name: input.product.name },

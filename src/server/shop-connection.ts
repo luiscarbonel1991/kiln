@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
 import { env } from "@/lib/env";
+import { storeAsset } from "@/providers/asset-bytes";
 import { providerMode } from "@/providers/mode";
 import {
   type EtsyApp,
@@ -9,10 +10,13 @@ import {
   type EtsyReader,
   etsyApi,
 } from "@/providers/shop/etsy";
+import { type EtsyDraftWriter, etsyDrafts } from "@/providers/shop/etsy-drafts";
+import { mockEtsyDrafts } from "@/providers/shop/etsy-drafts-mock";
 import { MOCK_USER_ID, mockEtsy } from "@/providers/shop/etsy-mock";
 import {
   callbackUrlProblem,
   connectUrl,
+  draftsAllowed,
   ETSY_SCOPES,
   type EtsyTokens,
   exchangeCode,
@@ -166,6 +170,9 @@ export interface ShopConnectionView {
   shopUrl: string;
   connectedAt: string;
   needsReconnect: boolean;
+  // The maker approved Kiln to write drafts (listings_w); a shop connected
+  // before drafts existed approves it by connecting again.
+  draftsAllowed: boolean;
 }
 
 // Etsy sent the maker back: check the handshake, trade the code for the
@@ -253,6 +260,7 @@ function view(row: {
   shopUrl: string;
   connectedAt: Date;
   needsReconnect: boolean;
+  scopes: string;
 }): ShopConnectionView {
   return {
     platform: PLATFORM,
@@ -261,6 +269,7 @@ function view(row: {
     shopUrl: row.shopUrl,
     connectedAt: row.connectedAt.toISOString(),
     needsReconnect: row.needsReconnect,
+    draftsAllowed: draftsAllowed(row.scopes),
   };
 }
 
@@ -270,6 +279,7 @@ const VIEW = {
   shopUrl: true,
   connectedAt: true,
   needsReconnect: true,
+  scopes: true,
 } as const;
 
 async function keepConnection(input: {
@@ -333,6 +343,10 @@ async function markNeedsReconnect(makerId: string): Promise<void> {
 
 export interface ConnectedEtsy {
   reader: EtsyReader;
+  // The shop's drafts; a write needs draftsAllowed (etsy-drafts.ts holds the
+  // rules around every write).
+  drafts: EtsyDraftWriter;
+  draftsAllowed: boolean;
   shopId: number;
   shopName: string;
   shopUrl: string;
@@ -417,15 +431,20 @@ export async function connectedEtsy(
     if (!row) throw new ShopNeedsReconnect(shopName);
   }
   const shop = row;
-  const reader =
+  const token =
     live && app
-      ? etsyApi(app, {
-          accessToken: unseal(shop.accessToken, ACCESS),
-          fetch: options.fetch,
-        })
-      : mockEtsy(() => now);
+      ? { accessToken: unseal(shop.accessToken, ACCESS), fetch: options.fetch }
+      : null;
   return {
-    reader,
+    reader: app && token ? etsyApi(app, token) : mockEtsy(() => now),
+    drafts:
+      app && token
+        ? etsyDrafts(app, token)
+        : mockEtsyDrafts({
+            now: () => now,
+            keepPhoto: (bytes, mime) => storeAsset(bytes, mime, "mock-etsy"),
+          }),
+    draftsAllowed: draftsAllowed(shop.scopes),
     shopId: Number(shop.shopId),
     shopName: shop.shopName,
     shopUrl: shop.shopUrl,

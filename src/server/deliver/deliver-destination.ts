@@ -1,7 +1,7 @@
 import { listingDraft } from "@/domain/listing";
 import { type PlanSlot, slotCardId } from "@/domain/plan";
 import { projectLook, projectProduct, slotLook } from "@/domain/plan-look";
-import { colourOf } from "@/domain/product";
+import { colourOf, type Product } from "@/domain/product";
 import { lookLabel, productStyles, styleName } from "@/domain/product-look";
 import { projectCost } from "@/domain/project-cost";
 import { plateHref } from "@/lib/plate-href";
@@ -9,7 +9,11 @@ import { CATALOG } from "@/lib/recipes";
 import { versionMark } from "@/lib/version-mark";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
 import { providerMode } from "@/providers/mode";
-import { buildDelivery, DeliveryRefusal } from "@/server/deliver/delivery";
+import {
+  buildDelivery,
+  type DeliveryInput,
+  DeliveryRefusal,
+} from "@/server/deliver/delivery";
 import { outputSources, projectSpend } from "@/server/generation-repository";
 import { readBeforeAtDelivery } from "@/server/listing-results";
 import { getMakerBrand } from "@/server/maker-repository";
@@ -31,42 +35,42 @@ async function dataUrl(url: string): Promise<string> {
   return `data:${mime};base64,${base64}`;
 }
 
-export async function deliverDestination(
+// What a destination of a planned project delivers, ready for buildDelivery
+// (or deliveredFiles): the product as the project shows it, its frames and
+// their sources. Null when the destination is not part of a planned project.
+export async function destinationDelivery(
   projectId: string,
   destinationId: string,
-): Promise<DeliverResult> {
+  now = new Date(),
+): Promise<{ input: DeliveryInput; product: Product } | null> {
   const loaded = await loadProjectBoard(projectId);
   const plan = loaded?.board.plan?.destinations.find(
     (d) => d.destinationId === destinationId,
   );
   const destination = CATALOG.destinations.find((d) => d.id === destinationId);
-  if (!loaded?.product || !plan || !destination) {
-    return { error: "This destination is not part of a planned project." };
-  }
-  const fullPlan = loaded.board.plan;
-  if (!fullPlan) {
-    return { error: "This destination is not part of a planned project." };
-  }
+  const fullPlan = loaded?.board.plan;
+  if (!loaded?.product || !plan || !destination || !fullPlan) return null;
   const cards = new Map(loaded.board.cards.map((c) => [c.id, c]));
   const outputs = plan.slots.flatMap((s) =>
     !s.off && s.approvedOutput ? [s.approvedOutput] : [],
   );
-  try {
-    // Exact frames draw the product as the project shows it (its look).
-    const shown = projectProduct(loaded.product, fullPlan);
-    const plate = plateHref(shown);
-    const sources = await outputSources(projectId, outputs);
-    const now = new Date();
-    // resvg fetches nothing: the colour sheet's material samples go inline.
-    const product = {
-      ...shown,
-      colours: await Promise.all(
-        shown.colours.map(async (c) =>
-          c.swatchUrl ? { ...c, swatchUrl: await dataUrl(c.swatchUrl) } : c,
-        ),
+  // Exact frames draw the product as the project shows it (its look).
+  const shown = projectProduct(loaded.product, fullPlan);
+  const plate = plateHref(shown);
+  const sources = await outputSources(projectId, outputs);
+  // resvg fetches nothing: the colour sheet's material samples go inline.
+  const product = {
+    ...shown,
+    colours: await Promise.all(
+      shown.colours.map(async (c) =>
+        c.swatchUrl ? { ...c, swatchUrl: await dataUrl(c.swatchUrl) } : c,
       ),
-    };
-    const result = await buildDelivery({
+    ),
+  };
+  const stored = loaded.product;
+  return {
+    product: stored,
+    input: {
       projectName: loaded.board.name,
       product,
       brand: await getMakerBrand(),
@@ -79,17 +83,11 @@ export async function deliverDestination(
       markOf: (slot) => versionMark(fullPlan, slot, { waits: false }),
       // Each frame's colour and style, for a product in more than one look:
       // exact frames are drawn in the project's, scenes in their own.
-      ...(loaded.product.colours.length > 1 ||
-      productStyles(loaded.product).length > 0
+      ...(stored.colours.length > 1 || productStyles(stored).length > 0
         ? {
             lookOf: (slot: PlanSlot) => {
-              const stored = loaded.product;
               // The colour sheet shows every colour; a text card none.
-              if (
-                !stored ||
-                slot.exact === "colour-grid" ||
-                slot.exact === "text-card"
-              ) {
+              if (slot.exact === "colour-grid" || slot.exact === "text-card") {
                 return undefined;
               }
               const look =
@@ -120,13 +118,24 @@ export async function deliverDestination(
           }
         : {}),
       ...(destination.text
-        ? {
-            listing:
-              plan.listing ?? listingDraft(loaded.product, destination.text),
-          }
+        ? { listing: plan.listing ?? listingDraft(stored, destination.text) }
         : {}),
       now,
-    });
+    },
+  };
+}
+
+export async function deliverDestination(
+  projectId: string,
+  destinationId: string,
+): Promise<DeliverResult> {
+  try {
+    const now = new Date();
+    const delivery = await destinationDelivery(projectId, destinationId, now);
+    if (!delivery) {
+      return { error: "This destination is not part of a planned project." };
+    }
+    const result = await buildDelivery(delivery.input);
     const url = await storeAsset(result.zip, "application/zip", "deliveries");
     await setDelivered(
       projectId,

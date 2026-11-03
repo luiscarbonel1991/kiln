@@ -42,6 +42,7 @@ model Maker {
   moduleSettings  ModuleSettings[]
   accessTokens    AccessToken[]
   shopConnections ShopConnection[]
+  shopWrites      ShopWrite[]
   chatSessions    ChatSession[]
   lessons         Lesson[]
   tasteSignals    TasteSignal[]
@@ -224,6 +225,35 @@ model ShopConnection {
   refreshedAt    DateTime? @db.Timestamptz(3)
 
   @@unique([makerId, platform])
+}
+
+// Everything Kiln sent to a shop (ROADMAP Phase 11, Etsy drafts), one row per
+// write: a draft made, its text, price and quantity, a photo added or removed.
+// `sent` holds the fields as sent, never a token. A create claims its
+// `requestKey` before calling Etsy, so the same preview cannot make two
+// drafts; `status` is pending until Etsy answers, then done, failed, or
+// unanswered (it may have run: look in the shop before trying again).
+model ShopWrite {
+  id            String   @id @default(cuid())
+  makerId       String
+  maker         Maker    @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  platform      String
+  shopId        String
+  listingId     String?
+  action        String
+  requestKey    String?
+  projectId     String?
+  destinationId String?
+  productId     String?
+  sent          Json
+  by            String
+  status        String
+  error         String?
+  at            DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([makerId, requestKey])
+  @@index([makerId, listingId])
+  @@index([makerId, projectId])
 }
 
 // An optional module's saved settings for a maker (src/modules; an instance

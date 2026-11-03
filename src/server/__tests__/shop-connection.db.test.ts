@@ -114,7 +114,7 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
     expect(row.accessToken).not.toContain("access-1");
     expect(row.refreshToken).not.toContain("refresh-1");
     expect(unseal(row.accessToken, "etsy-access")).toBe("90001.access-1");
-    expect(row.scopes).toBe("shops_r listings_r transactions_r");
+    expect(row.scopes).toBe("shops_r listings_r transactions_r listings_w");
     expect(await shops.shopConnection()).toEqual(view);
   });
 

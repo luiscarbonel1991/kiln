@@ -57,6 +57,7 @@ export const EtsyListing = z.object({
   num_favorers: z.number().int().min(0).default(0),
   price: EtsyMoney,
   quantity: z.number().int().min(0).optional(),
+  taxonomy_id: z.number().int().nullable().optional(),
   // Older answers carried a daily tally of views; today's spec has none.
   views: z.number().int().min(0).optional(),
 });
