@@ -221,8 +221,15 @@ async function draftRoute(
     return {
       status: 200,
       body: {
-        count: 1,
-        results: [{ shipping_profile_id: 7001, title: "Standard shipping" }],
+        count: 2,
+        results: [
+          { shipping_profile_id: 7001, title: "Standard shipping" },
+          {
+            shipping_profile_id: 7002,
+            title: "USPS calculated",
+            profile_type: "calculated",
+          },
+        ],
       },
     };
   }

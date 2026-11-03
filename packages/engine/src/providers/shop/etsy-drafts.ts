@@ -104,6 +104,7 @@ const ShippingProfiles = z.object({
       shipping_profile_id: Id,
       title: z.string().nullable().optional(),
       is_deleted: z.boolean().optional(),
+      profile_type: z.string().optional(),
     }),
   ),
 });
@@ -122,6 +123,10 @@ const ProcessingProfiles = z.object({
 export interface ShopProfile {
   id: number;
   label: string;
+  // A calculated shipping profile prices by the item's weight and size,
+  // which Etsy then needs on the listing (2026-11-02: "Could not set a
+  // calculated shipping profile to the listing").
+  calculated?: boolean;
 }
 
 export type DraftEdit = Partial<Omit<DraftFields, "price" | "quantity">>;
@@ -273,6 +278,7 @@ export function etsyDrafts(
         .map((p) => ({
           id: p.shipping_profile_id,
           label: p.title?.trim() || `Profile ${p.shipping_profile_id}`,
+          ...(p.profile_type === "calculated" ? { calculated: true } : {}),
         })),
     processingProfiles: async (shopId) =>
       (

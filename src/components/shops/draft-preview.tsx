@@ -55,7 +55,7 @@ export function DraftPreviewForm({
   destinationId: string;
   preview: DraftPreview;
   categories: CategoryChoice[];
-  shipping: { id: number; label: string }[];
+  shipping: { id: number; label: string; calculated?: boolean }[];
   processing: { id: number; label: string }[];
 }) {
   const [settings, setSettings] = useState<DraftSettings>(preview.settings);
@@ -413,7 +413,7 @@ function ProfileSelect({
   // The choice of none: the shipping profile may wait for Etsy's editor;
   // Etsy needs the processing profile on the draft.
   empty?: string;
-  options: { id: number; label: string }[];
+  options: { id: number; label: string; calculated?: boolean }[];
   value: number | undefined;
   onChange: (id: number | undefined) => void;
 }) {
@@ -430,8 +430,10 @@ function ProfileSelect({
       >
         <option value="">{empty}</option>
         {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
+          <option key={o.id} value={o.id} disabled={o.calculated}>
+            {o.calculated
+              ? `${o.label} (calculated: set it in Etsy, with the weight)`
+              : o.label}
           </option>
         ))}
       </select>

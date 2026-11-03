@@ -410,7 +410,7 @@ export async function draftDetail(listingId: number): Promise<DraftDetail> {
 // The categories and the shop's profiles a draft's form offers.
 export async function draftChoices(): Promise<{
   categories: TaxonomyChoice[];
-  shipping: { id: number; label: string }[];
+  shipping: { id: number; label: string; calculated?: boolean }[];
   processing: { id: number; label: string }[];
 }> {
   const etsy = await shopOrRefuse();
@@ -469,9 +469,12 @@ async function defaultSettings(
   etsy: ConnectedEtsy,
   makerId: string,
   productId: string,
-  shipping: { id: number }[],
+  shipping: { id: number; calculated?: boolean }[],
   processing: { id: number }[],
 ): Promise<DraftSettings> {
+  // A calculated profile needs the item's weight, which the kit does not
+  // hold: it is set in Etsy's editor, never sent with a draft.
+  const sendable = shipping.filter((p) => !p.calculated);
   const last = await db.shopWrite.findFirst({
     where: { makerId, productId, action: "create", status: "done" },
     orderBy: { at: "desc" },
@@ -479,7 +482,12 @@ async function defaultSettings(
   const before = DraftSettings.safeParse(
     (last?.sent as { settings?: unknown } | null)?.settings ?? {},
   );
-  if (last && before.success) return before.data;
+  if (last && before.success) {
+    const kept = before.data.shippingProfileId;
+    return sendable.some((p) => p.id === kept)
+      ? before.data
+      : { ...before.data, shippingProfileId: undefined };
+  }
   const live = await etsy.reader
     .activeListings(etsy.shopId, { limit: 100, offset: 0 })
     .then((p) => p.results)
@@ -502,7 +510,7 @@ async function defaultSettings(
   return DraftSettings.parse({
     ...(taxonomyId ? { taxonomyId } : {}),
     quantity: quantity ?? 1,
-    ...(shipping.length === 1 ? { shippingProfileId: shipping[0].id } : {}),
+    ...(sendable.length === 1 ? { shippingProfileId: sendable[0].id } : {}),
     ...(readiness
       ? { readinessStateId: readiness }
       : processing.length === 1
@@ -600,7 +608,15 @@ export async function previewDraft(
     fields: blockers.length === 0 ? proposal.fields : null,
     photos: proposal.photos as (DraftPhoto & { thumb?: string })[],
     blockers,
-    notSent: proposal.notSent,
+    notSent: [
+      ...proposal.notSent,
+      ...choices.shipping
+        .filter((p) => p.calculated)
+        .map(
+          (p) =>
+            `Shipping: "${p.label}" is calculated from the item's weight and size; choose it in Etsy's editor and add them there.`,
+        ),
+    ],
     requestKey: randomUUID(),
     made,
   };

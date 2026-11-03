@@ -224,6 +224,10 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       "02-scale",
     ]);
     expect(preview.notSent).toContain("The video: upload it in Etsy's editor.");
+    // A calculated shipping profile needs the item's weight: never preselected.
+    expect(preview.notSent).toContain(
+      `Shipping: "USPS calculated" is calculated from the item's weight and size; choose it in Etsy's editor and add them there.`,
+    );
     const chosen = await drafts.previewDraft(PROJECT, "etsy", {
       taxonomyId: 1063,
     });

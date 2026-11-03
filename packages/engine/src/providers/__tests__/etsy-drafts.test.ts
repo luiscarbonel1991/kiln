@@ -264,12 +264,20 @@ describe("the draft writer", () => {
         results: [
           { shipping_profile_id: 3, title: "US standard" },
           { shipping_profile_id: 4, title: null, is_deleted: true },
+          {
+            shipping_profile_id: 6,
+            title: "USPS",
+            profile_type: "calculated",
+          },
         ],
       }),
     );
     expect(
       await etsyDrafts(app, { ...token, fetch: shipping }).shippingProfiles(7),
-    ).toEqual([{ id: 3, label: "US standard" }]);
+    ).toEqual([
+      { id: 3, label: "US standard" },
+      { id: 6, label: "USPS", calculated: true },
+    ]);
     const processing = stub(() =>
       json(200, {
         count: 1,
