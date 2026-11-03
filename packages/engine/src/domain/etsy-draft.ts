@@ -69,7 +69,7 @@ export interface DraftFields {
   tags: string[];
   materials: string[];
   shippingProfileId?: number;
-  readinessStateId?: number;
+  readinessStateId: number;
 }
 
 // The choices Etsy needs that the listing kit does not hold.
@@ -86,6 +86,11 @@ export type DraftSettings = z.infer<typeof DraftSettings>;
 // The blockers the maker clears on the draft's own form.
 export const NEEDS_CATEGORY = "Choose the Etsy category.";
 export const NEEDS_QUANTITY = "Set the quantity.";
+// Etsy refuses a physical listing, a draft too, without a processing profile
+// (2026-11-02, the first real draft: "A readiness_state_id is required for
+// physical listings").
+export const NEEDS_PROCESSING =
+  "Choose the processing profile: Etsy needs one for a physical item.";
 
 export interface DraftPhoto {
   file: string;
@@ -121,6 +126,9 @@ export function draftProposal(input: {
   }
   if (settings.taxonomyId === undefined) blockers.push(NEEDS_CATEGORY);
   if (settings.quantity === undefined) blockers.push(NEEDS_QUANTITY);
+  if (settings.readinessStateId === undefined) {
+    blockers.push(NEEDS_PROCESSING);
+  }
   for (const [field, words] of [
     ["tag", listing.tags.value],
     ["material", listing.materials.value],
@@ -151,7 +159,8 @@ export function draftProposal(input: {
     blockers.length === 0 &&
     product.price !== undefined &&
     settings.taxonomyId !== undefined &&
-    settings.quantity !== undefined;
+    settings.quantity !== undefined &&
+    settings.readinessStateId !== undefined;
   return {
     fields: ready
       ? {
@@ -167,9 +176,7 @@ export function draftProposal(input: {
           ...(settings.shippingProfileId
             ? { shippingProfileId: settings.shippingProfileId }
             : {}),
-          ...(settings.readinessStateId
-            ? { readinessStateId: settings.readinessStateId }
-            : {}),
+          readinessStateId: settings.readinessStateId as number,
         }
       : null,
     photos,

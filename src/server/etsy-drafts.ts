@@ -490,11 +490,24 @@ async function defaultSettings(
   const quantity = mode(
     live.flatMap((l) => (l.quantity && l.quantity > 0 ? [l.quantity] : [])),
   );
+  // The processing profile the live listings use most, when Etsy says it.
+  const readiness = mode(
+    live.flatMap((l) =>
+      l.readiness_state_id &&
+      processing.some((p) => p.id === l.readiness_state_id)
+        ? [l.readiness_state_id]
+        : [],
+    ),
+  );
   return DraftSettings.parse({
     ...(taxonomyId ? { taxonomyId } : {}),
     quantity: quantity ?? 1,
     ...(shipping.length === 1 ? { shippingProfileId: shipping[0].id } : {}),
-    ...(processing.length === 1 ? { readinessStateId: processing[0].id } : {}),
+    ...(readiness
+      ? { readinessStateId: readiness }
+      : processing.length === 1
+        ? { readinessStateId: processing[0].id }
+        : {}),
   });
 }
 
@@ -676,32 +689,20 @@ export async function createDraftFromProject(input: {
   if (!proposal.fields) throw new DraftRefusal(proposal.blockers.join(" "));
   const fields = proposal.fields;
   // The key is claimed before Etsy is called: the same preview makes one
-  // draft, however often it is sent.
-  let row: { id: string };
-  try {
-    row = await logWrite({
-      makerId: maker.id,
-      shopId: etsy.shopId,
-      action: "create",
-      by: input.by,
-      sent: { ...fields, settings: input.settings },
-      status: "pending",
-      requestKey: input.requestKey,
-      projectId: input.projectId,
-      destinationId: input.destinationId,
-      productId: delivery.product.id,
-    });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      throw new DraftRefusal(
-        "This draft was already sent: look for it in your drafts.",
-      );
-    }
-    throw error;
-  }
+  // draft, however often it is sent. A send Etsy refused (or that never
+  // reached it) made nothing, so its key may be sent again.
+  const row = await claimKey({
+    makerId: maker.id,
+    shopId: etsy.shopId,
+    action: "create",
+    by: input.by,
+    sent: { ...fields, settings: input.settings },
+    status: "pending",
+    requestKey: input.requestKey,
+    projectId: input.projectId,
+    destinationId: input.destinationId,
+    productId: delivery.product.id,
+  });
   const settle = (status: ShopWriteView["status"], extra: object = {}) =>
     db.shopWrite.update({ where: { id: row.id }, data: { status, ...extra } });
   let files: Awaited<ReturnType<typeof deliveredFiles>>;
@@ -758,6 +759,44 @@ export async function createDraftFromProject(input: {
       after,
     ),
   };
+}
+
+async function claimKey(
+  write: Parameters<typeof logWrite>[0] & { requestKey: string },
+): Promise<{ id: string }> {
+  try {
+    return await logWrite(write);
+  } catch (error) {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== "P2002"
+    ) {
+      throw error;
+    }
+  }
+  const retried = await db.shopWrite.updateMany({
+    where: {
+      makerId: write.makerId,
+      requestKey: write.requestKey,
+      status: "failed",
+    },
+    data: {
+      status: "pending",
+      error: null,
+      at: new Date(),
+      sent: write.sent as Prisma.InputJsonValue,
+    },
+  });
+  const row = await db.shopWrite.findFirst({
+    where: { makerId: write.makerId, requestKey: write.requestKey },
+    select: { id: true },
+  });
+  if (retried.count === 0 || !row) {
+    throw new DraftRefusal(
+      "This draft was already sent: look for it in your drafts.",
+    );
+  }
+  return row;
 }
 
 // Each photo in order from `rank`; the files Etsy did not take.

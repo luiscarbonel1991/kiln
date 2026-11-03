@@ -233,7 +233,11 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
   });
 
   it("makes the draft once, with its photos, logged and read back", async () => {
-    const settings = DraftSettings.parse({ taxonomyId: 1063, quantity: 10 });
+    const settings = DraftSettings.parse({
+      taxonomyId: 1063,
+      quantity: 10,
+      readinessStateId: 8001,
+    });
     const made = await drafts.createDraftFromProject({
       projectId: PROJECT,
       destinationId: "etsy",
@@ -278,6 +282,44 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     expect(next.made.map((m) => m.listingId)).toEqual([made.listingId]);
   });
 
+  it("sends again a draft Etsy refused: nothing was made, its key is free", async () => {
+    let refusals = 1;
+    failing = (method, path) =>
+      method === "POST" && path.endsWith("/listings") && refusals-- > 0
+        ? new Response(
+            JSON.stringify({
+              error: "A readiness_state_id is required for physical listings.",
+            }),
+            { status: 400 },
+          )
+        : undefined;
+    const send = () =>
+      drafts.createDraftFromProject({
+        projectId: PROJECT,
+        destinationId: "etsy",
+        settings: DraftSettings.parse({
+          taxonomyId: 1063,
+          quantity: 10,
+          readinessStateId: 8001,
+        }),
+        requestKey: "key-5",
+        by: "Drafts page",
+      });
+    await expect(send()).rejects.toThrow(
+      "Etsy said: A readiness_state_id is required",
+    );
+    const made = await send();
+    expect(made.photos).toBe(2);
+    await expect(send()).rejects.toThrow("already sent");
+    const maker = await getCurrentMaker();
+    const rows = await db.shopWrite.findMany({
+      where: { makerId: maker.id, requestKey: "key-5" },
+    });
+    expect(rows.map((r) => [r.status, r.listingId])).toEqual([
+      ["done", String(made.listingId)],
+    ]);
+  });
+
   it("never sends a create again when Etsy did not answer", async () => {
     failing = (method, path) =>
       method === "POST" && path.endsWith("/listings")
@@ -287,7 +329,11 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       drafts.createDraftFromProject({
         projectId: PROJECT,
         destinationId: "etsy",
-        settings: DraftSettings.parse({ taxonomyId: 1063, quantity: 10 }),
+        settings: DraftSettings.parse({
+          taxonomyId: 1063,
+          quantity: 10,
+          readinessStateId: 8001,
+        }),
         requestKey: "key-2",
         by: "Board",
       }),
@@ -311,7 +357,11 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     const made = await drafts.createDraftFromProject({
       projectId: PROJECT,
       destinationId: "etsy",
-      settings: DraftSettings.parse({ taxonomyId: 1063, quantity: 10 }),
+      settings: DraftSettings.parse({
+        taxonomyId: 1063,
+        quantity: 10,
+        readinessStateId: 8001,
+      }),
       requestKey: "key-3",
       by: "Drafts page",
     });
@@ -396,7 +446,11 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     await drafts.createDraftFromProject({
       projectId: PROJECT,
       destinationId: "etsy",
-      settings: DraftSettings.parse({ taxonomyId: 1063, quantity: 3 }),
+      settings: DraftSettings.parse({
+        taxonomyId: 1063,
+        quantity: 3,
+        readinessStateId: 8001,
+      }),
       requestKey: "key-4",
       by: "Chat",
     });

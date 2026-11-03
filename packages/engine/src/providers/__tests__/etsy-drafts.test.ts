@@ -43,6 +43,7 @@ const fields: DraftFields = {
   taxonomyId: 1063,
   tags: ["oak", "kitchen gift"],
   materials: ["oak"],
+  readinessStateId: 5,
 };
 
 function stub(answer: () => Response) {
@@ -197,6 +198,7 @@ describe("the draft writer", () => {
       taxonomy_id: "1063",
       tags: "oak,kitchen gift",
       materials: "oak",
+      readiness_state_id: "5",
       type: "physical",
       is_supply: "false",
     });

@@ -24,6 +24,7 @@ import {
   type DraftSettings,
   ETSY_MAX_QUANTITY,
   NEEDS_CATEGORY,
+  NEEDS_PROCESSING,
   NEEDS_QUANTITY,
   WHO_MADE_LABEL,
   WhenMade,
@@ -66,10 +67,12 @@ export function DraftPreviewForm({
     setSettings((s) => ({ ...s, ...change }));
   const blockers = [
     ...preview.blockers.filter(
-      (b) => b !== NEEDS_CATEGORY && b !== NEEDS_QUANTITY,
+      (b) =>
+        b !== NEEDS_CATEGORY && b !== NEEDS_QUANTITY && b !== NEEDS_PROCESSING,
     ),
     ...(settings.taxonomyId === undefined ? [NEEDS_CATEGORY] : []),
     ...(settings.quantity === undefined ? [NEEDS_QUANTITY] : []),
+    ...(settings.readinessStateId === undefined ? [NEEDS_PROCESSING] : []),
   ];
   const text = preview.text;
 
@@ -243,6 +246,7 @@ export function DraftPreviewForm({
           <ProfileSelect
             label={FIELD_LABEL.readinessStateId}
             testId="draft-processing"
+            empty="Choose one"
             options={processing}
             value={settings.readinessStateId}
             onChange={(id) => set({ readinessStateId: id })}
@@ -399,12 +403,16 @@ function QuantityField({
 function ProfileSelect({
   label,
   testId,
+  empty = "Set it in Etsy",
   options,
   value,
   onChange,
 }: {
   label: string;
   testId: string;
+  // The choice of none: the shipping profile may wait for Etsy's editor;
+  // Etsy needs the processing profile on the draft.
+  empty?: string;
   options: { id: number; label: string }[];
   value: number | undefined;
   onChange: (id: number | undefined) => void;
@@ -420,7 +428,7 @@ function ProfileSelect({
           onChange(e.target.value ? Number(e.target.value) : undefined)
         }
       >
-        <option value="">Set it in Etsy</option>
+        <option value="">{empty}</option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>
             {o.label}

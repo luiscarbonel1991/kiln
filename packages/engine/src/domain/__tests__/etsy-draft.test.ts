@@ -24,7 +24,11 @@ const photo = (n: number): DraftPhoto => ({
   width: 2000,
   height: 2000,
 });
-const settings = DraftSettings.parse({ taxonomyId: 1063, quantity: 10 });
+const settings = DraftSettings.parse({
+  taxonomyId: 1063,
+  quantity: 10,
+  readinessStateId: 5,
+});
 
 describe("an Etsy draft from the listing kit", () => {
   it("carries the listing's text, the maker's price and the choices Etsy needs", () => {
@@ -48,6 +52,7 @@ describe("an Etsy draft from the listing kit", () => {
       taxonomyId: 1063,
       tags: listing.tags.value,
       materials: listing.materials.value,
+      readinessStateId: 5,
     });
     expect(proposal.fields).not.toHaveProperty("state");
     expect(proposal.photos.map((p) => p.file)).toEqual([
@@ -56,7 +61,7 @@ describe("an Etsy draft from the listing kit", () => {
     ]);
   });
 
-  it("is held back without a price, a category, a quantity or a photo", () => {
+  it("is held back without a price, a category, a quantity, a processing profile or a photo", () => {
     const product = { ...CUTTING_BOARD, price: undefined };
     const proposal = draftProposal({
       product,
@@ -72,6 +77,7 @@ describe("an Etsy draft from the listing kit", () => {
       "No photo is ready: approve the frames first.",
       "Choose the Etsy category.",
       "Set the quantity.",
+      "Choose the processing profile: Etsy needs one for a physical item.",
     ]);
   });
 
