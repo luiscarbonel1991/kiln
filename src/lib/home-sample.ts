@@ -1,4 +1,5 @@
 import { Product } from "@/domain/product";
+import type { StoryScene } from "@/lib/home-story";
 
 // The sample product Home tells its story with when the maker has nothing of
 // their own yet (or a chapter has nothing to show): generic, a maker of
@@ -39,6 +40,46 @@ export const SAMPLE_PRODUCT: Product = Product.parse({
   price: 48,
   source: { kind: "form" },
 });
+
+// The sample's scenes, made once by Kiln as a maker's would be: a Listing kit
+// for Etsy from the sample product (its reference, the board's face drawn
+// flat), GPT Image 2 at 2K, 2026-11-03. Each keeps what its check read, and
+// they are served as fixed files (public/home/sample).
+const PASSED = {
+  label: "checked · text 2/2 · letters match",
+  status: "passed",
+} as const;
+
+export const SAMPLE_SCENES: StoryScene[] = [
+  {
+    url: "/home/sample/hero.jpg",
+    label: "Marketplace hero",
+    aspect: "1:1",
+    check: PASSED,
+  },
+  {
+    url: "/home/sample/in-use.jpg",
+    label: "In-use mockup",
+    aspect: "4:5",
+    check: PASSED,
+  },
+  {
+    url: "/home/sample/lifestyle.jpg",
+    label: "Lifestyle scene",
+    aspect: "4:5",
+    check: PASSED,
+  },
+  {
+    url: "/home/sample/detail.jpg",
+    label: "Material detail",
+    aspect: "4:5",
+    check: {
+      label:
+        'check failed · "The Riveras" letters thinner than the reference: stroke 0.08 vs 0.17 of their height',
+      status: "failed",
+    },
+  },
+];
 
 // The sample design: a leaf drawn as line art, its paths as the vector.
 export const SAMPLE_DESIGN = {

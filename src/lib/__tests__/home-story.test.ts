@@ -1,8 +1,14 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ProjectPlan } from "@/domain/plan";
 import { Product } from "@/domain/product";
 import type { TakeCheck } from "@/domain/qc";
-import { SAMPLE_DESIGN, SAMPLE_PRODUCT } from "@/lib/home-sample";
+import {
+  SAMPLE_DESIGN,
+  SAMPLE_PRODUCT,
+  SAMPLE_SCENES,
+} from "@/lib/home-sample";
 import {
   MAX_SCENES,
   pickShowcase,
@@ -78,7 +84,7 @@ describe("the sample story", () => {
       "size-spec",
       "scale",
     ]);
-    expect(story.scenes).toEqual([]);
+    expect(story.scenes).toEqual(SAMPLE_SCENES);
     expect(story.looks.map((l) => l.name)).toEqual([
       "Maple",
       "Walnut",
@@ -93,12 +99,22 @@ describe("the sample story", () => {
     expect(story.design).toBeNull();
   });
 
+  it("shows scenes Kiln made of it, served from public/, each with what its check read", () => {
+    expect(SAMPLE_SCENES).toHaveLength(MAX_SCENES);
+    for (const scene of SAMPLE_SCENES) {
+      expect(scene.url).toMatch(/^\/home\/sample\/[a-z-]+\.jpg$/);
+      expect(existsSync(join(process.cwd(), "public", scene.url))).toBe(true);
+      expect(scene.check?.label).toBeTruthy();
+    }
+  });
+
   it("is generic: nothing of a maker's catalog", () => {
     const words =
       /maker1|\bsigns?\b|acrylic|laser|hanger|plaque|house.?numbers?|no.?soliciting/i;
     expect(JSON.stringify(SAMPLE_PRODUCT)).not.toMatch(words);
     expect(JSON.stringify(SAMPLE_DESIGN)).not.toMatch(words);
     expect(JSON.stringify(sampleStory())).not.toMatch(words);
+    expect(JSON.stringify(SAMPLE_SCENES)).not.toMatch(words);
   });
 });
 

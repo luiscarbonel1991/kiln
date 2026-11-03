@@ -2,7 +2,7 @@ import { ArrowRight, Check } from "lucide-react";
 import type { CSSProperties } from "react";
 import { at } from "@/components/home/story-part";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
-import { SAMPLE_DESIGN } from "@/lib/home-sample";
+import { SAMPLE_DESIGN, SAMPLE_SCENES } from "@/lib/home-sample";
 import type {
   StoryDesign,
   StoryFrame,
@@ -352,52 +352,20 @@ const CHECK_TONE: Record<string, string> = {
   unchecked: "bg-card text-on-surface-mid",
 };
 
-// Soft room tones for the scenes to come: linen, terracotta haze, sage, sand.
-const BACKDROPS = [
-  "radial-gradient(120% 90% at 30% 20%, #f6efe3 0%, #e9dcc6 55%, #d9c6a8 100%)",
-  "radial-gradient(110% 90% at 70% 30%, #f3e4d3 0%, #e2c2a3 60%, #c99d78 100%)",
-  "radial-gradient(120% 100% at 40% 70%, #eef0e4 0%, #d8dcc4 55%, #b9c0a0 100%)",
-  "linear-gradient(160deg, #f4ede2 0%, #e6d8c3 50%, #cdb69a 100%)",
-];
-
-// A scene to come, for a maker who has none yet: the product on a warm
-// backdrop, never passed off as a photo.
-function SceneToCome({ n, product }: { n: number; product: StoryProduct }) {
-  const colour = product.colours[0];
-  return (
-    <div
-      className="flex size-full items-center justify-center"
-      style={{ background: BACKDROPS[n % BACKDROPS.length] }}
-    >
-      <div
-        className="flex aspect-[8/5] w-[58%] items-center justify-center rounded-[14%/22%] shadow-[0_18px_30px_-12px_rgba(50,32,18,0.45)]"
-        style={{ backgroundColor: colour?.face ?? "#E8D2A6" }}
-      >
-        <span className="px-2 text-center font-serif text-[0.8rem] italic text-[#3b2a1e] opacity-80 sm:text-[0.95rem]">
-          {product.wording[0]?.example ?? product.name}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-const TO_COME = ["In use", "Lifestyle", "Detail", "Gift"];
-
 // 4. Scenes developing, each stamped with its check.
 export function ScenesStage({
   scenes,
-  product,
+  sample,
 }: {
   scenes: StoryScene[];
-  product: StoryProduct;
+  sample: boolean;
 }) {
-  const sample = scenes.length === 0;
-  const shown: StoryScene[] = sample
-    ? TO_COME.map((label) => ({ label, aspect: "4:5", url: "" }))
-    : scenes;
+  // A maker with no approved scene yet sees the sample's, marked so.
+  const shown = scenes.length > 0 ? scenes : SAMPLE_SCENES;
+  const marked = sample || scenes.length === 0;
   return (
     <div className={STAGE}>
-      <SampleMark shown={sample} />
+      <SampleMark shown={marked} />
       <div className="grid grid-cols-2 gap-3 sm:gap-5">
         {shown.map((s, n) => (
           <figure
@@ -411,27 +379,24 @@ export function ScenesStage({
                   aspectRatio: s.aspect.replace(":", " / "),
                 })}
               >
-                {sample ? (
-                  <SceneToCome n={n} product={product} />
-                ) : (
-                  // biome-ignore lint/performance/noImgElement: the maker's approved take, as stored
-                  <img
-                    src={s.url}
-                    alt={s.label}
-                    loading="lazy"
-                    className="size-full object-cover"
-                  />
-                )}
+                {/* biome-ignore lint/performance/noImgElement: an approved take, as stored */}
+                <img
+                  src={s.url}
+                  alt={s.label}
+                  loading="lazy"
+                  className="size-full object-cover"
+                />
               </div>
               {s.check ? (
                 <span
-                  className={`story-part story-stamp absolute bottom-2 left-2 ${CHIP} shadow-[0_6px_14px_-6px_rgba(50,32,18,0.5)] ${CHECK_TONE[s.check.status] ?? CHECK_TONE.unchecked}`}
+                  className={`story-part story-stamp absolute bottom-2 left-2 max-w-[calc(100%-1rem)] ${CHIP} shadow-[0_6px_14px_-6px_rgba(50,32,18,0.5)] ${CHECK_TONE[s.check.status] ?? CHECK_TONE.unchecked}`}
                   style={at(8 + n)}
+                  title={s.check.label}
                 >
                   {s.check.status === "passed" ? (
-                    <Check className="size-3" />
+                    <Check className="size-3 shrink-0" />
                   ) : null}
-                  {s.check.label}
+                  <span className="truncate">{s.check.label}</span>
                 </span>
               ) : null}
             </div>
@@ -445,8 +410,8 @@ export function ScenesStage({
         className="story-part mt-5 flex flex-wrap items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid"
         style={at(12)}
       >
-        {sample
-          ? "Your scenes appear here, each checked before you see it."
+        {marked
+          ? "Sample scenes. Yours are set with your own product, each checked before you see it."
           : null}
         <span className={`${CHIP} bg-surface-soft text-on-surface-mid`}>
           reject with a reason <ArrowRight className="size-3" /> a new take

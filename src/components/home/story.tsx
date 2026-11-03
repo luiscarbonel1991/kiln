@@ -103,7 +103,7 @@ export function Story({ story }: { story: HomeStory }) {
         eyebrow="Scenes"
         title="Scenes only a photo can show, each take checked."
         flip
-        stage={<ScenesStage scenes={story.scenes} product={story.product} />}
+        stage={<ScenesStage scenes={story.scenes} sample={sample} />}
       >
         <p>
           Where a buyer needs to see it at home, an image model sets the scene

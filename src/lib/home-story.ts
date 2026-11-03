@@ -8,7 +8,7 @@ import { productInLook } from "@/domain/product-look";
 import { type TakeCheck, takeCheckLabel } from "@/domain/qc";
 import type { ExactKind } from "@/domain/shot-list";
 import { isRenderableUrl } from "@/lib/asset-url";
-import { SAMPLE_PRODUCT } from "@/lib/home-sample";
+import { SAMPLE_PRODUCT, SAMPLE_SCENES } from "@/lib/home-sample";
 import { type PlateImage, plateHref } from "@/lib/plate-href";
 import { CATALOG } from "@/lib/recipes";
 
@@ -80,7 +80,7 @@ export interface HomeStory {
   product: StoryProduct;
   plate: PlateImage | null;
   exact: StoryFrame[];
-  // Empty: the scenes chapter shows where the maker's will appear.
+  // Empty: the scenes chapter shows the sample's, marked so.
   scenes: StoryScene[];
   looks: StoryLook[];
   words: StoryWords | null;
@@ -309,7 +309,7 @@ export function sampleStory(design: StoryDesign | null = null): HomeStory {
     product: storyProduct(SAMPLE_PRODUCT),
     plate: null,
     exact: storyExact(SAMPLE_PRODUCT, undefined, null),
-    scenes: [],
+    scenes: SAMPLE_SCENES,
     looks: storyLooks(SAMPLE_PRODUCT),
     words: storyWords(SAMPLE_PRODUCT, undefined),
     destinations: storyDestinations(null, []),
