@@ -271,12 +271,12 @@
   .animate-drift {
     animation: none;
   }
-  .story-part {
-    animation: none !important;
-    opacity: 1 !important;
-    filter: none !important;
-    clip-path: none !important;
-    stroke-dashoffset: 0 !important;
+  [data-story] .story-part {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    clip-path: none;
+    stroke-dashoffset: 0;
   }
 }
 
