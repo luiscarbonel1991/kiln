@@ -41,6 +41,8 @@ const LABEL =
   "font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim";
 const SELECT =
   "h-9 w-full rounded-field border border-input bg-card px-2.5 font-sans text-[0.85rem] text-foreground";
+const UNIT =
+  "h-9 w-[4.5rem] flex-shrink-0 rounded-field border border-input bg-card px-2 font-sans text-[0.85rem] text-foreground";
 
 // Everything a draft from a project carries, before it is sent: the photos
 // in order, the listing's text, the maker's price, and the choices Etsy needs
@@ -448,7 +450,7 @@ function ShippedFields({
             onChange={(e) => setWeight({ value: e.target.value })}
           />
           <select
-            className={`${SELECT} w-20`}
+            className={UNIT}
             value={w.unit}
             aria-label="Weight unit"
             data-testid="draft-weight-unit"
@@ -464,12 +466,14 @@ function ShippedFields({
           </select>
         </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <span className={LABEL}>Packed size (length × width × height)</span>
-        <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-1.5">
-          {(["length", "width", "height"] as const).map((k) => (
+      <div className="flex flex-col gap-1.5">
+        <span className={LABEL}>Packed size</span>
+        {(["length", "width", "height"] as const).map((k) => (
+          <div key={k} className="flex items-center gap-2">
+            <span className="w-12 flex-shrink-0 font-sans text-[0.75rem] text-on-surface-mid">
+              {k[0].toUpperCase() + k.slice(1)}
+            </span>
             <Input
-              key={k}
               type="number"
               min="0"
               step="0.01"
@@ -478,9 +482,14 @@ function ShippedFields({
               data-testid={`draft-size-${k}`}
               onChange={(e) => setSize({ [k]: e.target.value })}
             />
-          ))}
+          </div>
+        ))}
+        <div className="flex items-center gap-2">
+          <span className="w-12 flex-shrink-0 font-sans text-[0.75rem] text-on-surface-mid">
+            Unit
+          </span>
           <select
-            className={`${SELECT} w-16`}
+            className={UNIT}
             value={s.unit}
             aria-label="Size unit"
             data-testid="draft-size-unit"
