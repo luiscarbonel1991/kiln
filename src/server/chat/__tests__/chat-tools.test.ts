@@ -99,7 +99,8 @@ describe("the chat's approval card", () => {
     const { PAID } = await import("@/components/chat/chat-parts");
     expect([...PAID].sort()).toEqual(
       NEEDS_CLICK.filter(
-        (t) => t !== "approve_frame" && t !== "deliver",
+        (t) =>
+          !["approve_frame", "deliver", "make_draft", "edit_draft"].includes(t),
       ).sort(),
     );
   });

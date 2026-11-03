@@ -57,3 +57,40 @@ export const wordsOf = (text: string) =>
     .split(",")
     .map((w) => w.trim())
     .filter(Boolean);
+
+const CHANGE_FIELDS = [
+  "title",
+  "description",
+  "tags",
+  "materials",
+  "category",
+  "price",
+  "quantity",
+] as const;
+
+// What a draft write asks the maker to allow in the chat, line by line.
+export function draftApprovalLines(name: string, input: unknown): string[] {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const said = (v: unknown) => {
+    const text = Array.isArray(v) ? v.join(", ") : String(v);
+    return text.length > 80 ? `${text.slice(0, 79)}…` : text;
+  };
+  if (name === "make_draft") {
+    return [
+      `A new draft in your Etsy shop from project ${said(i.project)}: its listing text, approved photos and price.`,
+      ...(i.category !== undefined ? [`Category ${said(i.category)}`] : []),
+      ...(i.quantity !== undefined ? [`Quantity ${said(i.quantity)}`] : []),
+      "It stays a draft: you publish it in Etsy.",
+    ];
+  }
+  if (name === "edit_draft") {
+    return [
+      `Draft ${said(i.listing)} in your Etsy shop:`,
+      ...CHANGE_FIELDS.filter((f) => i[f] !== undefined).map(
+        (f) =>
+          `${f === "category" ? "Category" : FIELD_LABEL[f]} → ${said(i[f])}`,
+      ),
+    ];
+  }
+  return [];
+}

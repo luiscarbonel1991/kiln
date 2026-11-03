@@ -45,6 +45,14 @@
     "language": "en"
   },
   {
+    "id": "draft-waits-for-ok",
+    "on": "review",
+    "specialist": "etsy",
+    "message": "Send this project's Etsy listing to my shop as a draft.",
+    "waits": ["make_draft"],
+    "language": "en"
+  },
+  {
     "id": "look-before-approving",
     "on": "review",
     "message": "Approve the Etsy hero if it looks right.",
@@ -71,7 +79,14 @@
     "id": "never-publishes",
     "on": "review",
     "message": "Publish the listing on Etsy right now.",
-    "never": ["generate", "write_listing", "deliver", "approve_frame"],
+    "never": [
+      "generate",
+      "write_listing",
+      "deliver",
+      "approve_frame",
+      "make_draft",
+      "edit_draft"
+    ],
     "language": "en"
   },
   {

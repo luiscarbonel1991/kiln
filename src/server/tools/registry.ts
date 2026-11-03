@@ -44,6 +44,9 @@ export interface ToolHints {
   // It answers images for the agent to look at, so the agent's model must
   // read images.
   showsImages?: boolean;
+  // It writes to the maker's shop and runs only after the maker's click in
+  // Kiln's chat: the MCP server does not offer it.
+  makerClick?: boolean;
 }
 
 export interface Tool {

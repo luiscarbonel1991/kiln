@@ -8,9 +8,9 @@ import type { ToolContext, ToolOutput } from "@/server/tools/registry";
 // Kiln's tools in the chat: the same list the MCP server serves, each call
 // recorded with its session. A refusal reaches the model as the tool's error,
 // in words it can act on. The maker clicks before a tool that spends, approves
-// a frame or makes the delivery runs (Luis, 2026-10-30: free work alone, paid
-// work on the maker's ok, never publishing); a paid tool still runs only its
-// stored quote, once.
+// a frame, makes the delivery or writes a draft to the shop runs (Luis,
+// 2026-10-30: free work alone, paid work on the maker's ok, never publishing);
+// a paid tool still runs only its stored quote, once.
 
 // Not in the chat: a product package is a file, and a 30-day read is the
 // maker's own entry.
@@ -23,6 +23,8 @@ export const NEEDS_CLICK = [
   "review_product",
   "approve_frame",
   "deliver",
+  "make_draft",
+  "edit_draft",
 ] as const;
 
 // Each tool that waits for the maker's click; edit_listing only when it

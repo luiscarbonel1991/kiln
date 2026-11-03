@@ -7,7 +7,7 @@ import {
 } from "@/server/http-api";
 import { handleMcp } from "@/server/mcp/server";
 import { callAndRecord } from "@/server/tool-calls";
-import { TOOLS } from "@/server/tools";
+import { MCP_TOOLS } from "@/server/tools";
 
 // POST /api/mcp — Kiln's MCP server (README "MCP server"): JSON-RPC over the
 // Streamable HTTP transport, stateless, with the same personal access token as
@@ -42,8 +42,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  return handleMcp(request, message, TOOLS, (name, args) =>
-    callAndRecord(TOOLS, name, args, caller),
+  return handleMcp(request, message, MCP_TOOLS, (name, args) =>
+    callAndRecord(MCP_TOOLS, name, args, caller),
   );
 }
 

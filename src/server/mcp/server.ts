@@ -22,7 +22,7 @@ Import products with import_products; see a project's frames before starting it 
 Read with list_products, list_projects and get_frames; look at a take with view_frame before deciding on it, then approve_frame or reject_frame with a reason, naming the take you looked at. Each take's check says what Kiln read in it (its text and letterforms against the reference); scale is never measured, so compare the product with check.scale yourself.
 Designs (an image drawn as line art, then traced into SVG): list_designs and get_design read them, view_design shows a drawing or its vector, vectorize traces one (free); a vector becomes a product in the maker's product form.
 Paid work takes two calls: quote prices it (free) and answers an id; generate, draw, write_listing or review_product take only that id and run what was quoted, once, within the month's cap, and only for a token the maker lets spend. Tell the person what a quote costs before running it.
-Selling: save_brief keeps a destination's market brief; list_results and save_read follow a delivered listing's numbers; best_sellers, watched_shops, find_shops and shop_favourites read Etsy's API (never a page).
+Selling: save_brief keeps a destination's market brief; list_results and save_read follow a delivered listing's numbers; best_sellers, watched_shops, find_shops and shop_favourites read Etsy's API (never a page). list_drafts and get_draft read the shop's drafts; a draft is made or changed by the maker's click in Kiln (its Drafts page or its chat), not here.
 Exact frames are drawn from the product at delivery and cost nothing. deliver exports a destination's approved frames as a zip; publishing is the maker's: no tool publishes.`;
 
 export function listedTool(tool: Tool): ListedTool {

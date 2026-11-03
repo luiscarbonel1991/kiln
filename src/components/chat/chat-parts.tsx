@@ -23,6 +23,7 @@ import {
   MessageContent,
   MessageFooter,
 } from "@/components/ui/message";
+import { draftApprovalLines } from "@/lib/drafts-view";
 import type { KilnMessage } from "@/server/chat/messages";
 import type { SpecialistId } from "@/server/chat/specialists";
 
@@ -50,8 +51,8 @@ export interface QuoteView {
   lines?: { model?: string; fallbacks?: string[] }[];
 }
 
-// The tools that spend (the server's NEEDS_CLICK, less approve_frame and
-// deliver): their card shows the quote's cost.
+// The tools that spend (the server's NEEDS_CLICK, less approve_frame,
+// deliver and the draft writes): their card shows the quote's cost.
 export const PAID = new Set([
   "generate",
   "draw",
@@ -129,6 +130,16 @@ function ApprovalCard({
           </span>
         ) : null}
       </div>
+      {draftApprovalLines(name, tool.input).length > 0 ? (
+        <ul
+          className="flex flex-col gap-0.5 font-sans text-[0.75rem] text-foreground [overflow-wrap:anywhere]"
+          data-testid={`chat-approval-lines-${name}`}
+        >
+          {draftApprovalLines(name, tool.input).map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
       {take ? (
         // biome-ignore lint/performance/noImgElement: a take from Kiln's own storage
         <img

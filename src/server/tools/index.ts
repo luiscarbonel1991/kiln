@@ -15,6 +15,12 @@ import {
   vectorizeTool,
   viewDesign,
 } from "@/server/tools/designs";
+import {
+  editDraftTool,
+  getDraftTool,
+  listDraftsTool,
+  makeDraftTool,
+} from "@/server/tools/drafts";
 import { listLessonsTool, proposeLessonTool } from "@/server/tools/lessons";
 import {
   bestSellersTool,
@@ -78,4 +84,14 @@ export const TOOLS: readonly Tool[] = [
   shopFavouritesTool,
   listLessonsTool,
   proposeLessonTool,
+  listDraftsTool,
+  getDraftTool,
+  makeDraftTool,
+  editDraftTool,
 ];
+
+// What the MCP server (and so `kiln call`) offers: every tool but those that
+// wait for the maker's click in Kiln's chat.
+export const MCP_TOOLS: readonly Tool[] = TOOLS.filter(
+  (t) => !t.hints.makerClick,
+);

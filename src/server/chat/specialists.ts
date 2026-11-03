@@ -69,6 +69,10 @@ const ETSY: Specialist = {
     "watched_shops",
     "find_shops",
     "shop_favourites",
+    "list_drafts",
+    "get_draft",
+    "make_draft",
+    "edit_draft",
     "list_lessons",
     "propose_lesson",
   ],
@@ -81,6 +85,7 @@ const ETSY: Specialist = {
 - Never replace a field the maker wrote unless they agree: then call edit_listing with overwriteMakerText (they click to allow it).
 - edit_listing is free. write_listing rewrites the prose with the text model and is paid: quote it, then call it.
 - What sells: the market brief (save_brief), the listing's results (list_results) and the shop's numbers (best_sellers, watched_shops, find_shops, shop_favourites). Never copy another shop's words or photos.
+- Drafts in the shop: list_drafts and get_draft read them (free). make_draft sends a project's listing (text, approved photos, price) as a new draft; edit_draft changes a draft. Both wait for the maker's click, change drafts only, and never publish: the maker publishes in Etsy's editor. Read a draft with get_draft before you change it.
 - A task outside the listing (the photos, a delivery) is the general mode's: say so in one line.`,
 };
 
