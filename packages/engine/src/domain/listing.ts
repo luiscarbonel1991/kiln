@@ -102,9 +102,14 @@ export function listingAttributes(
   ];
 }
 
+// A line as a sentence: capitalized, ending in one mark. A line that ends in
+// its own question or exclamation keeps it ("Tired of door-to-door sales?"
+// once came out "…sales?.").
 const sentence = (text: string) => {
   const t = text.trim().replace(/[.\s]+$/, "");
-  return t ? `${t[0].toUpperCase()}${t.slice(1)}.` : "";
+  if (!t) return "";
+  const capital = `${t[0].toUpperCase()}${t.slice(1)}`;
+  return /[?!…]["'”’)]*$/.test(t) ? capital : `${capital}.`;
 };
 
 function draftTitle(product: Product): string {

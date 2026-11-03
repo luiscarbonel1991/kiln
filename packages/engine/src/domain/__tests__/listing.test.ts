@@ -121,6 +121,23 @@ describe("listingDraft", () => {
     expect(d.materials.value).toEqual([]);
   });
 
+  it("keeps a hook's own question or exclamation, with no period after it", () => {
+    const asked = listingDraft(
+      { ...board, hook: "Tired of soggy counters?" },
+      rules,
+    ).description.value;
+    expect(asked.startsWith("Tired of soggy counters?\n")).toBe(true);
+    expect(asked).not.toContain("?.");
+    const cried = listingDraft({ ...board, hook: "made to last!" }, rules)
+      .description.value;
+    expect(cried.startsWith("Made to last!\n")).toBe(true);
+    const plain = listingDraft(
+      { ...board, hook: "a board for every day" },
+      rules,
+    ).description.value;
+    expect(plain.startsWith("A board for every day.\n")).toBe(true);
+  });
+
   it("is generic: nothing of a maker's catalog", () => {
     expect(JSON.stringify(draft).toLowerCase()).not.toMatch(
       /sign|acrylic|laser/,
