@@ -326,7 +326,7 @@ export function etsyDrafts(
       const form = new FormData();
       form.set(
         "image",
-        new Blob([photo.bytes as BlobPart], { type: photo.mime }),
+        new Blob([Buffer.from(photo.bytes)], { type: photo.mime }),
         photo.filename,
       );
       form.set("rank", String(photo.rank));
