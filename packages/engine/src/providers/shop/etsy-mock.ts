@@ -71,13 +71,13 @@ function mockShop(id: number, nowSec: number): EtsyShop {
 }
 
 // A photo for a mock listing: a warm tile with its initial, drawn inline.
-function mockPhoto(listingId: number, title: string): string {
+export function mockPhoto(listingId: number, title: string): string {
   const hue = Math.round(unit(`${listingId}|hue`) * 40) + 15;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 135"><rect width="170" height="135" fill="hsl(${hue} 45% 78%)"/><text x="85" y="84" font-family="Georgia" font-size="56" text-anchor="middle" fill="hsl(${hue} 40% 34%)">${title.charAt(0)}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-function mockListings(shopId: number): EtsyListing[] {
+export function mockListings(shopId: number): EtsyListing[] {
   return Array.from({ length: 24 }, (_, i) => {
     const thing = THINGS[(i + shopId) % THINGS.length];
     const style = STYLES[Math.floor(unit(`${shopId}|${i}|s`) * STYLES.length)];

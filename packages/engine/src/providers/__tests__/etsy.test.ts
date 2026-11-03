@@ -203,7 +203,7 @@ describe("Etsy OAuth", () => {
     expect(challenge).toBe(pkceChallenge(verifier));
   });
 
-  it("the page where the maker approves Kiln asks for read-only scopes", () => {
+  it("the page where the maker approves Kiln asks to read and write drafts, never to delete", () => {
     const url = new URL(
       connectUrl({
         keystring: "kstr",
@@ -219,7 +219,7 @@ describe("Etsy OAuth", () => {
       response_type: "code",
       client_id: "kstr",
       redirect_uri: "https://localhost:3009/api/shops/etsy/callback",
-      scope: "shops_r listings_r transactions_r",
+      scope: "shops_r listings_r transactions_r listings_w",
       state: "st",
       code_challenge: "ch",
       code_challenge_method: "S256",
