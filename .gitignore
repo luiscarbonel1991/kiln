@@ -50,3 +50,14 @@ out/
 
 # compiled local OCR helper (scripts/ocr.mjs builds it on first use)
 scripts/ocr/.bin/
+
+# development material: kept on the maker's machine, never in git
+/docs/
+/CLAUDE.md
+/AGENTS.md
+/scripts/README.md
+/scripts/brief.mjs
+/scripts/briefs/
+/scripts/ocr.mjs
+/scripts/scenes.json
+/scripts/sign-prompt.mjs
