@@ -9,7 +9,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates tesseract-ocr imagemagick ffmpeg \
   && rm -rf /var/lib/apt/lists/*
-RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+# Node 25 and later no longer ship corepack: pnpm comes from npm, at the
+# version package.json names in packageManager.
+RUN npm install -g pnpm@10.33.0
 
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
