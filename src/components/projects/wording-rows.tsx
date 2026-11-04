@@ -26,8 +26,10 @@ export const emptyWordingRow = (): WordingRow => ({
 
 const HEAD =
   "font-sans text-[0.625rem] font-semibold text-on-surface-mid leading-tight";
+// On a phone a line takes two rows: what the buyer writes beside the example,
+// then Max, Optional and Remove under them.
 const GRID =
-  "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_5.5rem_2rem] items-center gap-2";
+  "grid grid-cols-2 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_5.5rem_2rem]";
 
 export function WordingRows({
   rows,
@@ -55,9 +57,11 @@ export function WordingRows({
         <div className={GRID} aria-hidden="true">
           <span className={HEAD}>What the buyer writes</span>
           <span className={HEAD}>Example</span>
-          <span className={HEAD}>Max</span>
-          <span className={HEAD}>Optional</span>
-          <span />
+          <div className="hidden sm:contents">
+            <span className={HEAD}>Max</span>
+            <span className={HEAD}>Optional</span>
+            <span />
+          </div>
         </div>
       ) : null}
       {rows.map((row, i) => {
@@ -89,43 +93,49 @@ export function WordingRows({
                 placeholder="Sofia"
                 onChange={(e) => set(i, { example: e.target.value })}
               />
-              <input
-                aria-label={`Line ${i + 1}: most characters`}
-                data-field={`wording.${i}.maxChars`}
-                data-testid={`wording-${i + 1}-max`}
-                className={cn(field, "px-2")}
-                inputMode="numeric"
-                value={row.maxChars}
-                placeholder="—"
-                onChange={(e) =>
-                  set(i, { maxChars: e.target.value.replace(/[^0-9]/g, "") })
-                }
-              />
-              <button
-                type="button"
-                aria-pressed={row.optional}
-                aria-label={`Line ${i + 1}: the buyer may leave it out`}
-                data-testid={`wording-${i + 1}-optional`}
-                onClick={() => set(i, { optional: !row.optional })}
-                className={cn(
-                  "inline-flex h-9 items-center justify-center gap-1 rounded-field px-2 font-sans text-[0.75rem] transition-colors",
-                  row.optional
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-on-surface-mid hover:bg-surface-soft",
-                )}
-              >
-                {row.optional ? <Check className="size-3" /> : null}
-                {row.optional ? "Optional" : "Required"}
-              </button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Remove line ${i + 1}`}
-                data-testid={`wording-${i + 1}-remove`}
-                onClick={() => onChange(rows.filter((_, j) => j !== i))}
-              >
-                <Trash2 />
-              </Button>
+              <div className="col-span-2 flex items-center gap-2 sm:contents">
+                <span className={cn(HEAD, "sm:hidden")} aria-hidden="true">
+                  Max
+                </span>
+                <input
+                  aria-label={`Line ${i + 1}: most characters`}
+                  data-field={`wording.${i}.maxChars`}
+                  data-testid={`wording-${i + 1}-max`}
+                  className={cn(field, "w-16 px-2")}
+                  inputMode="numeric"
+                  value={row.maxChars}
+                  placeholder="—"
+                  onChange={(e) =>
+                    set(i, { maxChars: e.target.value.replace(/[^0-9]/g, "") })
+                  }
+                />
+                <button
+                  type="button"
+                  aria-pressed={row.optional}
+                  aria-label={`Line ${i + 1}: the buyer may leave it out`}
+                  data-testid={`wording-${i + 1}-optional`}
+                  onClick={() => set(i, { optional: !row.optional })}
+                  className={cn(
+                    "inline-flex h-9 w-22 items-center justify-center gap-1 rounded-field px-2 font-sans text-[0.75rem] transition-colors",
+                    row.optional
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-on-surface-mid hover:bg-surface-soft",
+                  )}
+                >
+                  {row.optional ? <Check className="size-3" /> : null}
+                  {row.optional ? "Optional" : "Required"}
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Remove line ${i + 1}`}
+                  data-testid={`wording-${i + 1}-remove`}
+                  className="ml-auto sm:ml-0"
+                  onClick={() => onChange(rows.filter((_, j) => j !== i))}
+                >
+                  <Trash2 />
+                </Button>
+              </div>
             </div>
             {problem ? (
               <span className="font-sans text-[0.75rem] text-prov-local">
