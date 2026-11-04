@@ -3,11 +3,11 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LEAK } from "../../../packages/engine/src/__tests__/leak";
 
-// Kiln's core is generic too (CLAUDE.md "Boundaries"): outside the optional
-// modules (src/modules, off unless KILN_MODULES lists them), no app source
-// names a maker, signs and their formats, acrylic or laser work — the same
-// words as the engine's guard. The only exception is the wiring that names
-// the laser-pricing module by its id.
+// Kiln's core is generic too (CONTRIBUTING.md, "What Kiln leaves out"): outside
+// the optional modules (src/modules, off unless KILN_MODULES lists them), no
+// app source names a maker, signs and their formats, acrylic or laser work —
+// the same words as the engine's guard. The only exception is the wiring that
+// names the laser-pricing module by its id.
 const root = join(import.meta.dirname, "..", "..");
 const MODULE_WIRING = /laser-pricing/;
 const SKIP = new Set(["__tests__", "__fixtures__", "modules"]);
