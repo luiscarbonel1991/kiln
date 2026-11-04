@@ -42,10 +42,19 @@ pnpm dev            # http://127.0.0.1:3000
 `pnpm dev:mock` runs on mock providers with its own database (create it once with
 `pnpm db:mock:setup`). `pnpm test` and `pnpm typecheck` check the work.
 
+## Contributing
+
+Issues and pull requests are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) has the
+setup, the checks a change passes and what Kiln leaves out on purpose. Report a
+vulnerability privately, as [SECURITY.md](SECURITY.md) describes, never in a
+public issue. Everyone here follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## License
 
-Kiln is licensed under the [GNU AGPL v3](LICENSE). `packages/engine` and
-`packages/cli` carry their own license (FSL-1.1-Apache-2.0, in their folders).
+Copyright 2026 Luis Carbonel. Kiln, its engine (`packages/engine`) and its CLI
+(`packages/cli`) are free software under the
+[GNU Affero General Public License v3.0 only](LICENSE). If you run a modified
+Kiln for other people over a network, the AGPL asks you to offer them its source.
 
 ## Home
 
@@ -139,8 +148,8 @@ imports a catalog:
   not attach), or over HTTP from a script or another system (see "HTTP API and the
   `kiln` CLI"). Start from `public/templates/product-package.json` ("Download the
   template"). Every field and limit is in the JSON Schema served at
-  `/templates/product-package.schema.json`, generated from the engine's schema; the
-  model is in `docs/app-idea/PRODUCT-MODEL.md`.
+  `/templates/product-package.schema.json`, generated from the engine's schema
+  (`packages/engine/src/domain/product-package.ts`).
 
   Products are imported one by one. A product that does not pass is set aside with its
   fields in words ("colours › oak › inlayName: at most 40 characters (this one has
@@ -391,7 +400,7 @@ An agent or a test runner can also drive the pages, as a maker would:
 
 ## MCP server
 
-Kiln serves its actions as MCP tools (ROADMAP "Agents", stage 1), so an agent
+Kiln serves its actions as MCP tools, so an agent
 (Claude Code, Claude Desktop, any MCP client) can import products, start a project,
 generate, look at each take, approve or reject it and deliver, on the same server
 functions as the board. `POST /api/mcp` is the Streamable HTTP transport, stateless,
@@ -448,7 +457,7 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 
 ## Chat
 
-Kiln's own agent (ROADMAP "Agents", stage 2): the maker asks for the work in words, on
+Kiln's own agent: the maker asks for the work in words, on
 a project (the board's Chat link opens its conversation beside the board) or on the
 Chat page (their own conversations and each project's). The agent works only through
 the MCP server's tools, on the same server functions as the board.
