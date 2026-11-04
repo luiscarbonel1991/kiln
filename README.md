@@ -1,20 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kiln
 
-## Getting Started
+A product-first studio for makers, for the work before the sale. Describe a
+product once (its size, material, finish, colours and wording) and Kiln draws
+every exact frame from it at no cost: colour options, size and spec, scale, how
+to personalize. It turns drawings into clean SVG, writes listing text to each
+channel's rules, and calls image models only for the scenes a photo has to show.
+Each scene is checked against the product before you see it: the text it reads,
+its letterforms and the size it was asked for.
 
-First, run the development server:
+Kiln works before the sale. Production stays with the maker: no cut files,
+orders or job cards.
+
+![A scene Kiln made of its sample product, checked: text 2/2, letters match](public/home/sample/hero.jpg)
+
+## Quickstart (Docker)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose --profile app up -d --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. Without keys Kiln runs on mock providers, so nothing
+is paid and nothing is sent. To generate for real, copy `.env.example` to `.env`,
+add `OPENAI_API_KEY` and/or `GOOGLE_API_KEY`, set `KILN_PROVIDERS=live` and run
+the command again. Every paid call shows its estimate first, and the month's cap
+rules every attempt.
+
+The image carries Tesseract for the take check, plus ImageMagick and ffmpeg (see [System dependencies](#system-dependencies-vectorize-deliver-stills-in-motion-take-checks)).
+
+## Development
+
+Node 24 or later, pnpm 10 and Docker:
+
+```bash
+pnpm install
+cp .env.example .env
+pnpm db:up          # Postgres + MinIO
+pnpm db:deploy      # apply the migrations
+pnpm dev            # http://127.0.0.1:3000
+```
+
+`pnpm dev:mock` runs on mock providers with its own database (create it once with
+`pnpm db:mock:setup`). `pnpm test` and `pnpm typecheck` check the work.
+
+## License
+
+Kiln is licensed under the [GNU AGPL v3](LICENSE). `packages/engine` and
+`packages/cli` carry their own license (FSL-1.1-Apache-2.0, in their folders).
+
+## Home
 
 `/` is Home: what Kiln does, told as one product's way through it (its spec, its designs
 to SVG, its exact frames, its checked scenes, its looks, its listing text, everywhere it
@@ -888,29 +921,27 @@ The line-art **Centerline** trace — a single path per drawn stroke — shells 
 native binaries, **Deliver** upscales scenes with one of them, and **stills in motion**
 renders with ffmpeg. Install them on any machine or deploy image that runs the app:
 
-- **autotrace** — centerline tracing (`brew install autotrace` · `apt-get install autotrace`)
+- **autotrace** — centerline tracing (`brew install autotrace`; Debian no longer packages
+  it, so build it from source there, and the Docker image goes without it)
 - **ImageMagick** (`magick`) — flattens the raster to a clean B&W bitmap first, and
   upscales scenes for delivery (`brew install imagemagick` · `apt-get install imagemagick`)
 - **ffmpeg** — the free stills-in-motion video (`brew install ffmpeg` · `apt-get install ffmpeg`)
+- **Tesseract** — reads each take's text off macOS (`apt-get install tesseract-ocr` ·
+  `brew install tesseract`)
 - **Xcode command line tools** (`swiftc`, macOS only) — compile the Apple Vision helper that
-  reads each take's text (`xcode-select --install`); without them, takes land unchecked
+  reads each take's text on a Mac (`xcode-select --install`)
+
+`KILN_OCR` picks the take check's reader: `vision` (the default on macOS), `tesseract`
+(the default elsewhere) or `none`. Without one, takes land unchecked and say why.
+Tesseract reads each image three ways (as it is, in grey with its contrast raised, and
+that at half size) and keeps every line. Measured on 148 real takes (2026-11-03), it
+gave a verdict on 85 of the 94 that Apple Vision checked, agreed on 75, and failed 9
+that Vision passed. A check is a label, never a retake, so a doubtful one costs a look;
+Apple Vision stays the more accurate reader on a Mac.
 
 The **Outline** trace (and everything else) is pure-npm via `@neplex/vectorizer` and needs
 nothing extra; if the binaries are missing, only the Centerline button fails (it's caught,
 so the card stays usable).
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
 ## Hosting
 
