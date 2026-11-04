@@ -2,6 +2,8 @@
 # with the user's other local stacks. Host ports avoid taken ones (5432/5433/55432
 # Postgres, 4566 LocalStack, etc.). S3 is MinIO (free, tokenless, S3-compatible) —
 # the storage adapter is the same @aws-sdk/client-s3 regardless of backend.
+# Ports are published on 127.0.0.1 only: the credentials below are local
+# defaults, to change before Kiln runs anywhere else (SECURITY.md).
 services:
   db:
     image: postgres:17
@@ -12,7 +14,7 @@ services:
       POSTGRES_PASSWORD: kiln
       POSTGRES_DB: kiln
     ports:
-      - "5444:5432"
+      - "127.0.0.1:5444:5432"
     volumes:
       - kiln-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -30,8 +32,8 @@ services:
       MINIO_ROOT_USER: kiln
       MINIO_ROOT_PASSWORD: kiln-secret-key
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # web console
+      - "127.0.0.1:9000:9000" # S3 API
+      - "127.0.0.1:9001:9001" # web console
     volumes:
       - kiln-minio:/data
     healthcheck:
@@ -65,7 +67,7 @@ services:
       S3_SECRET_ACCESS_KEY: kiln-secret-key
       KILN_OCR: tesseract
     ports:
-      - "${KILN_PORT:-3000}:3000"
+      - "127.0.0.1:${KILN_PORT:-3000}:3000"
     depends_on:
       db:
         condition: service_healthy
