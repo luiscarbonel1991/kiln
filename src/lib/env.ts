@@ -42,6 +42,13 @@ const EnvSchema = z.object({
   ETSY_SHARED_SECRET: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
   ETSY_REDIRECT_URI: z.preprocess(unsetIfBlank, z.string().url().optional()),
 
+  // The take check's OCR: "vision" (Apple Vision, macOS), "tesseract" or
+  // "none"; default: Vision on macOS, Tesseract elsewhere.
+  KILN_OCR: z.preprocess(
+    unsetIfBlank,
+    z.enum(["vision", "tesseract", "none"]).optional(),
+  ),
+
   // Object storage — selectable provider (LocalStack S3 for local dev). Optional
   // with local defaults; the storage adapter asserts what it needs at runtime.
   STORAGE_PROVIDER: z.enum(["s3"]).default("s3"),

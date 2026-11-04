@@ -5,13 +5,23 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
 import type { OcrResult } from "@/domain/qc";
+import { env } from "@/lib/env";
+import { decodeImage } from "@/server/qc/decode";
+import {
+  contrasted,
+  halved,
+  mergeReadings,
+  pgm,
+  tesseractReading,
+} from "@/server/qc/tesseract";
 
 const execFileP = promisify(execFile);
 
-// Local OCR for the take check: Apple Vision on macOS, through the same Swift
-// helper the brief runner uses (scripts/ocr/vision-ocr.swift), compiled on
-// first use into scripts/ocr/.bin/ (gitignored). No network, no cost, about
-// 0.3 s an image. Elsewhere there is no engine, and the check says so.
+// Local OCR for the take check, free and offline: Apple Vision on macOS, a
+// Swift helper (scripts/ocr/vision-ocr.swift) compiled on first use into
+// scripts/ocr/.bin/ (gitignored), about 0.3 s an image; Tesseract elsewhere
+// (the Docker image installs it). KILN_OCR picks one; without an engine the
+// check says so.
 const SRC = join(process.cwd(), "scripts", "ocr", "vision-ocr.swift");
 const BIN = join(process.cwd(), "scripts", "ocr", ".bin", "vision-ocr");
 
@@ -75,15 +85,74 @@ async function readWithVision(image: Uint8Array): Promise<OcrResult> {
   }
 }
 
+async function tesseractTsv(path: string): Promise<string> {
+  // Sparse text: a scene's wording sits anywhere in the frame. One thread
+  // each, as the passes run side by side.
+  const { stdout } = await execFileP(
+    "tesseract",
+    [path, "stdout", "--psm", "11", "tsv"],
+    {
+      timeout: 30_000,
+      maxBuffer: 4 * 1024 * 1024,
+      env: { ...process.env, OMP_THREAD_LIMIT: "1" },
+    },
+  );
+  return stdout;
+}
+
+// The take as it is, then in grey with its contrast raised, then that at
+// half size (src/server/qc/tesseract.ts), every line kept.
+async function readWithTesseract(image: Uint8Array): Promise<OcrResult> {
+  const dir = await mkdtemp(join(tmpdir(), "kiln-ocr-"));
+  try {
+    const paths = [join(dir, "take")];
+    await writeFile(paths[0], image);
+    const mime = image[0] === 0x89 ? "image/png" : "image/jpeg";
+    const pixels = decodeImage(image, mime);
+    if (pixels) {
+      const grey = contrasted(pixels);
+      paths.push(join(dir, "grey.pgm"), join(dir, "half.pgm"));
+      await writeFile(paths[1], pgm(grey));
+      await writeFile(paths[2], pgm(halved(grey)));
+    }
+    const tsv = await Promise.all(paths.map(tesseractTsv));
+    return mergeReadings(tsv.map(tesseractReading));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function tesseract(): Promise<OcrEngine> {
+  try {
+    await execFileP("tesseract", ["--version"], { timeout: 10_000 });
+    return { read: readWithTesseract };
+  } catch {
+    return {
+      none: "Tesseract is not installed (apt-get install tesseract-ocr · brew install tesseract)",
+    };
+  }
+}
+
+async function vision(): Promise<OcrEngine> {
+  if (process.platform !== "darwin") {
+    return { none: "Apple Vision runs on macOS only" };
+  }
+  const failed = await compile();
+  return failed ? { none: failed } : { read: readWithVision };
+}
+
 let engine: Promise<OcrEngine> | undefined;
 
-// The OCR this machine offers, settled once per process.
+// The OCR this machine offers, settled once per process: KILN_OCR's, else
+// Apple Vision on macOS and Tesseract elsewhere.
 export function ocrEngine(): Promise<OcrEngine> {
-  if (process.platform !== "darwin") {
-    return Promise.resolve({ none: "no OCR engine on this machine" });
-  }
-  engine ??= compile().then((failed) =>
-    failed ? { none: failed } : { read: readWithVision },
-  );
+  const pick =
+    env.KILN_OCR ?? (process.platform === "darwin" ? "vision" : "tesseract");
+  engine ??=
+    pick === "none"
+      ? Promise.resolve({ none: "the take check is off (KILN_OCR=none)" })
+      : pick === "vision"
+        ? vision()
+        : tesseract();
   return engine;
 }
