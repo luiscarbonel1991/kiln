@@ -1134,123 +1134,128 @@ export function ProductEditor({
               key={i}
               className="flex flex-col gap-1"
             >
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  aria-label={`Colour ${i + 1}`}
-                  data-testid={`colour-${i + 1}`}
-                  value={c.hex}
-                  onChange={(e) =>
-                    setColours((all) =>
-                      all.map((x, j) =>
-                        j === i
-                          ? { ...x, hex: e.target.value.toUpperCase() }
-                          : x,
-                      ),
-                    )
-                  }
-                  className="size-9 flex-shrink-0 cursor-pointer rounded-swatch border border-border bg-transparent"
-                />
-                <input
-                  aria-label={`Colour ${i + 1} name`}
-                  data-testid={`colour-${i + 1}-name`}
-                  data-field={`colours.${i}.name`}
-                  className={cn(FIELD, "max-w-[260px]")}
-                  value={c.name}
-                  onFocus={(e) => {
-                    if (isStarter(i, c)) e.currentTarget.select();
-                  }}
-                  onMouseUp={(e) => {
-                    if (isStarter(i, c)) e.preventDefault();
-                  }}
-                  onChange={(e) => {
-                    if (i === 0) setStarterName(false);
-                    setColours((all) =>
-                      all.map((x, j) =>
-                        j === i ? { ...x, name: e.target.value } : x,
-                      ),
-                    );
-                  }}
-                />
-                {c.swatchUrl ? (
-                  <span className="relative flex-shrink-0">
-                    <button
-                      type="button"
-                      aria-label={`Check the material photo of ${c.name || `colour ${i + 1}`}`}
-                      title="Check the photo against the swatch"
-                      data-testid={`material-photo-${i + 1}-check`}
-                      disabled={busy}
-                      onClick={() => check(i)}
-                      className="block rounded-swatch"
-                    >
-                      {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
-                      <img
-                        src={c.swatchUrl}
-                        alt={`${c.name || `Colour ${i + 1}`} material`}
-                        className="size-9 rounded-swatch border border-border object-cover"
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Remove the material photo"
-                      data-testid={`material-photo-${i + 1}-remove`}
-                      onClick={() =>
-                        setColours((all) =>
-                          all.map((x, j) =>
-                            j === i ? { ...x, swatchUrl: undefined } : x,
-                          ),
-                        )
-                      }
-                      className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-pill bg-card text-on-surface-mid shadow-render hover:text-foreground"
-                    >
-                      <X className="size-2.5" />
-                    </button>
-                  </span>
-                ) : (
-                  <FilePick
-                    variant="ghost"
-                    size="xs"
-                    disabled={busy}
-                    accept="image/png,image/jpeg,image/webp"
-                    testId={`material-photo-${i + 1}`}
-                    label={`Material photo for ${c.name || `colour ${i + 1}`}`}
-                    title="A close photo of the material in this colour, even light, no text: scenes copy its look"
-                    onFiles={([chosen]) => uploadSample(i, chosen)}
-                  >
-                    <ImagePlus /> Material photo
-                  </FilePick>
-                )}
-                {i === defaultColour ? (
-                  <span className="font-mono text-[0.625rem] text-on-surface-dim">
-                    default
-                  </span>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    data-testid={`colour-${i + 1}-default`}
-                    onClick={() => setDefaultColour(i)}
-                  >
-                    Make default
-                  </Button>
-                )}
-                {colours.length > 1 ? (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Remove colour ${i + 1}`}
-                    data-testid={`colour-${i + 1}-remove`}
-                    onClick={() => {
-                      forget("colours");
-                      setColours((all) => all.filter((_, j) => j !== i));
-                      setDefaultColour((d) =>
-                        i === d ? 0 : i < d ? d - 1 : d,
+              {/* On a phone the name takes the line, its actions the next. */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 items-center gap-2">
+                  <input
+                    type="color"
+                    aria-label={`Colour ${i + 1}`}
+                    data-testid={`colour-${i + 1}`}
+                    value={c.hex}
+                    onChange={(e) =>
+                      setColours((all) =>
+                        all.map((x, j) =>
+                          j === i
+                            ? { ...x, hex: e.target.value.toUpperCase() }
+                            : x,
+                        ),
+                      )
+                    }
+                    className="size-9 flex-shrink-0 cursor-pointer rounded-swatch border border-border bg-transparent"
+                  />
+                  <input
+                    aria-label={`Colour ${i + 1} name`}
+                    data-testid={`colour-${i + 1}-name`}
+                    data-field={`colours.${i}.name`}
+                    className={cn(FIELD, "sm:w-[260px]")}
+                    value={c.name}
+                    onFocus={(e) => {
+                      if (isStarter(i, c)) e.currentTarget.select();
+                    }}
+                    onMouseUp={(e) => {
+                      if (isStarter(i, c)) e.preventDefault();
+                    }}
+                    onChange={(e) => {
+                      if (i === 0) setStarterName(false);
+                      setColours((all) =>
+                        all.map((x, j) =>
+                          j === i ? { ...x, name: e.target.value } : x,
+                        ),
                       );
                     }}
-                  >
-                    <Trash2 />
-                  </Button>
-                ) : null}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                  {c.swatchUrl ? (
+                    <span className="relative flex-shrink-0">
+                      <button
+                        type="button"
+                        aria-label={`Check the material photo of ${c.name || `colour ${i + 1}`}`}
+                        title="Check the photo against the swatch"
+                        data-testid={`material-photo-${i + 1}-check`}
+                        disabled={busy}
+                        onClick={() => check(i)}
+                        className="block rounded-swatch"
+                      >
+                        {/* biome-ignore lint/performance/noImgElement: durable storage URL, not using next/image in this studio */}
+                        <img
+                          src={c.swatchUrl}
+                          alt={`${c.name || `Colour ${i + 1}`} material`}
+                          className="size-9 rounded-swatch border border-border object-cover"
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Remove the material photo"
+                        data-testid={`material-photo-${i + 1}-remove`}
+                        onClick={() =>
+                          setColours((all) =>
+                            all.map((x, j) =>
+                              j === i ? { ...x, swatchUrl: undefined } : x,
+                            ),
+                          )
+                        }
+                        className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-pill bg-card text-on-surface-mid shadow-render hover:text-foreground"
+                      >
+                        <X className="size-2.5" />
+                      </button>
+                    </span>
+                  ) : (
+                    <FilePick
+                      variant="ghost"
+                      size="xs"
+                      disabled={busy}
+                      accept="image/png,image/jpeg,image/webp"
+                      testId={`material-photo-${i + 1}`}
+                      label={`Material photo for ${c.name || `colour ${i + 1}`}`}
+                      title="A close photo of the material in this colour, even light, no text: scenes copy its look"
+                      onFiles={([chosen]) => uploadSample(i, chosen)}
+                    >
+                      <ImagePlus /> Material photo
+                    </FilePick>
+                  )}
+                  {i === defaultColour ? (
+                    <span className="font-mono text-[0.625rem] text-on-surface-dim">
+                      default
+                    </span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      data-testid={`colour-${i + 1}-default`}
+                      onClick={() => setDefaultColour(i)}
+                    >
+                      Make default
+                    </Button>
+                  )}
+                  {colours.length > 1 ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Remove colour ${i + 1}`}
+                      data-testid={`colour-${i + 1}-remove`}
+                      onClick={() => {
+                        forget("colours");
+                        setColours((all) => all.filter((_, j) => j !== i));
+                        setDefaultColour((d) =>
+                          i === d ? 0 : i < d ? d - 1 : d,
+                        );
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               {treatment === "reveal" ? (
                 <label className="flex items-center gap-2 pl-11 font-sans text-[0.75rem] text-on-surface-mid">
