@@ -32,6 +32,7 @@ import { GenerationResult } from "@/providers/types";
 // marked by `beforeCall` right before it, bounded, never retried (the
 // Interactions client retries twice unless told not to; a retry after a
 // timeout could start a second render). It runs in the background, which
+// also keeps the SDK from continuing it in new interactions, and which
 // Google requires stored, so the polls and the download are free and tolerate
 // a blip, and Kiln deletes the stored interaction and clip once it has the
 // clip. A render that fails after it rendered, or outlives the deadline,
@@ -161,7 +162,7 @@ async function forget(id: string, uri?: string): Promise<void> {
 }
 
 async function render(
-  request: Interactions.CreateModelInteractionParamsNonStreaming,
+  request: Interactions.InteractionCreateParams.CreateModelInteractionParamsNonStreaming,
   beforeCall?: () => Promise<void>,
 ): Promise<Interaction> {
   const ai = getGenAI();

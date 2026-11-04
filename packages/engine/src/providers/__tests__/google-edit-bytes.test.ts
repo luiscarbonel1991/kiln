@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const generateContent = vi.fn();
 const storeAsset = vi.fn(async () => "https://store/x.png");
 
-vi.mock("@/providers/google/client", () => ({
+vi.mock("@/providers/google/client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   hasGoogleKey: () => true,
   getGenAI: () => ({ models: { generateContent } }),
 }));
@@ -74,6 +75,8 @@ describe("google editBytes (the queue's edit)", () => {
     expect(call.model).toBe("gemini-3.1-flash-image");
     expect(call.config.imageConfig).toEqual({ aspectRatio: "3:4" });
     expect(call.config.httpOptions).toEqual({ timeout: 180_000 });
+    // A continuation is another billed request; a paid call is one.
+    expect(call.config.automaticContinuation).toBe(false);
     expect(call.contents[0]).toEqual({ text: "a scene\nAvoid: text overlay" });
     expect(storeAsset).not.toHaveBeenCalled();
   });

@@ -12,7 +12,7 @@ import { Treatment } from "@/domain/product";
 import { BaseUnderstanding } from "@/domain/understanding";
 import { fetchAsset } from "@/providers/asset-bytes";
 import { ProviderKeyMissing } from "@/providers/errors";
-import { getGenAI, hasGoogleKey } from "@/providers/google/client";
+import { getGenAI, hasGoogleKey, ONE_REQUEST } from "@/providers/google/client";
 import { textUsage } from "@/providers/google/usage";
 import type { TextCallOptions, VisionProvider } from "@/providers/interfaces";
 import {
@@ -34,7 +34,7 @@ const THINKING = {
 } as const;
 
 // What a Gemini text call is sent for its effort: the thinking level, the
-// output cap (thinking included) and the time it may take.
+// output cap (thinking included) and the time it may take, in one request.
 export function geminiTextConfig(
   kind: TextCallKind,
   model: string,
@@ -46,6 +46,7 @@ export function geminiTextConfig(
     maxOutputTokens: textBudget(kind, entry, effort).outputTokens,
     thinkingConfig: { thinkingLevel: THINKING[googleThinking(effort)] },
     httpOptions: { timeout: textTimeoutMs(effort) },
+    ...ONE_REQUEST,
   };
 }
 

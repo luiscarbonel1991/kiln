@@ -129,6 +129,9 @@ describe("Gemini Omni animateBytes (the queue's video)", () => {
       },
       background: true,
     });
+    // In the background the SDK never continues a render in new interactions,
+    // and it refuses an explicit automatic_continuation: false beside it.
+    expect(request).not.toHaveProperty("automatic_continuation");
     expect(request.input[0]).toEqual({
       type: "image",
       data: Buffer.from("framed").toString("base64"),

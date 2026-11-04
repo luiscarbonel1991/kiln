@@ -10,7 +10,8 @@ vi.mock("@/providers/openai/client", () => ({
   hasOpenAIKey: () => true,
   getOpenAI: () => ({ responses: { parse } }),
 }));
-vi.mock("@/providers/google/client", () => ({
+vi.mock("@/providers/google/client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   hasGoogleKey: () => true,
   getGenAI: () => ({ models: { generateContent } }),
 }));

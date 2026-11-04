@@ -8,7 +8,7 @@ import {
   storeAsset,
 } from "@/providers/asset-bytes";
 import { assertCapability, GOOGLE_CAPS } from "@/providers/capabilities";
-import { getGenAI, hasGoogleKey } from "@/providers/google/client";
+import { getGenAI, hasGoogleKey, ONE_REQUEST } from "@/providers/google/client";
 import { imageUsage } from "@/providers/google/usage";
 import type {
   DirectCallOptions,
@@ -27,7 +27,7 @@ import {
 
 // Gemini images under the same money rules as OpenAI's: `beforeCall` right
 // before the one paid request (after the free reference fetches), no SDK retry
-// (the client sets no retryOptions), a timeout, and the usage it reports, so
+// or continuation (see client.ts), a timeout, and the usage it reports, so
 // the measured cost is recorded.
 
 // Mock fallback when GOOGLE_API_KEY is absent or KILN_PROVIDERS=mock. Each stub
@@ -125,6 +125,7 @@ async function callGemini(
           }
         : {}),
       httpOptions: { timeout: options.timeoutMs },
+      ...ONE_REQUEST,
     },
   });
   const usage = imageUsage(res.usageMetadata);

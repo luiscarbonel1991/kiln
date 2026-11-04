@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const generateContent = vi.fn();
 
-vi.mock("@/providers/google/client", () => ({
+vi.mock("@/providers/google/client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   hasGoogleKey: () => true,
   getGenAI: () => ({ models: { generateContent } }),
 }));
@@ -65,6 +66,7 @@ describe("Gemini text calls", () => {
       maxOutputTokens: 2000,
       thinkingConfig: { thinkingLevel: "LOW" },
       httpOptions: { timeout: 60_000 },
+      automaticContinuation: false,
     });
     expect(call.config.responseSchema.required).toContain("treatment");
   });

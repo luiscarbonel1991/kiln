@@ -17,7 +17,7 @@ export function googleApiKey(): string {
 }
 
 // No retryOptions: the SDK then makes a single request (checked on
-// @google/genai 2.7.0), so a paid call is never repeated behind the queue's
+// @google/genai 2.32.0), so a paid call is never repeated behind the queue's
 // back; the queue and the direct-spend row own retries.
 export function getGenAI(): GoogleGenAI {
   if (!env.GOOGLE_API_KEY) {
@@ -28,3 +28,7 @@ export function getGenAI(): GoogleGenAI {
   }
   return client;
 }
+
+// Since 2.29 the SDK continues a long answer in new requests, each billed,
+// unless a call's config says not to. Every paid generateContent spreads this.
+export const ONE_REQUEST = { automaticContinuation: false } as const;
