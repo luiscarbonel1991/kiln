@@ -14,8 +14,9 @@ Kiln leaves out on purpose.
 
 ## Setup
 
-You need Node 24 or later (`.nvmrc`), pnpm 10 (`corepack enable` picks the version
-in `package.json`) and Docker.
+You need Node 24 or later (`.nvmrc` names 26, the current LTS), pnpm 10 at the
+version `package.json` pins in `packageManager` (`npm install -g pnpm@10.33.0`;
+Node 25 and later no longer ship corepack) and Docker.
 
 ```bash
 pnpm install
