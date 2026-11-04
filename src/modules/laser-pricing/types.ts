@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Maker pricing — types + schemas. Lives in the APP (proprietary moat), never in
 // @kiln/engine. The geometry-from-svg -> machine-time derivation is the defensible
-// core; see docs/app-idea/PRICING.md.
+// core; see estimate.ts.
 
 // The three laser operations. Cut/score are length-driven; engrave is area-driven.
 export const Operation = z.enum(["cut", "score", "engrave"]);

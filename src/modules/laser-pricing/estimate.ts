@@ -8,7 +8,7 @@ import type {
 } from "@/modules/laser-pricing/types";
 
 // The cost model — pure and deterministic (the moat logic; unit-tested against the
-// real-SVG proof). See docs/app-idea/PRICING.md for the derivation.
+// real-SVG proof). The derivation, in one line:
 //
 //   machine time = cut_len/v_cut + score_len/v_score + engrave_area/v_engrave
 //

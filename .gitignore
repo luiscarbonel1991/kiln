@@ -51,7 +51,7 @@ next-env.d.ts
 packages/*/dist
 out/
 
-# compiled local OCR helper (scripts/ocr.mjs builds it on first use)
+# compiled local OCR helper (src/server/qc/ocr.ts builds it on first use)
 scripts/ocr/.bin/
 
 # development material: kept on the maker's machine, never in git
