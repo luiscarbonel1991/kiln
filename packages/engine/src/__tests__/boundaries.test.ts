@@ -3,11 +3,11 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LEAK } from "./leak";
 
-// The engine is generic (CLAUDE.md "Boundaries", ROADMAP "Domain model":
-// nothing in Kiln's code may know about signs or a particular maker). Its
-// sources, comments included, never name a maker, signs or their formats
-// (plaques, door hangers, house numbers, "no soliciting"), acrylic or laser
-// work. "Engraved" stays: a generic treatment (wood, metal, jewellery).
+// The engine is generic (CONTRIBUTING.md, "What Kiln leaves out"): nothing in
+// Kiln's code may know about signs or a particular maker. Its sources, comments
+// included, never name a maker, signs or their formats (plaques, door hangers,
+// house numbers, "no soliciting"), acrylic or laser work. "Engraved" stays: a
+// generic treatment (wood, metal, jewellery).
 const root = join(import.meta.dirname, "..");
 
 function sources(dir: string): string[] {
@@ -20,9 +20,9 @@ function sources(dir: string): string[] {
   });
 }
 
-// A provider SDK is imported only inside its own adapter folder (CLAUDE.md:
-// "never import an SDK outside its adapter"), in the engine and in the app.
-// The AI SDK's loop and UI (`ai`, `@ai-sdk/react`) stay in the chat.
+// A provider SDK is imported only inside its own adapter folder
+// (CONTRIBUTING.md, "What Kiln leaves out"), in the engine and in the app. The
+// AI SDK's loop and UI (`ai`, `@ai-sdk/react`) stay in the chat.
 const SDK = [
   { from: /from "openai(\/[^"]*)?"/, homes: ["providers/openai/"] },
   { from: /from "@google\/genai"/, homes: ["providers/google/"] },
