@@ -14,9 +14,9 @@ import {
   type VideoResolution,
 } from "@/domain/model-defaults";
 
-// What a generation costs before anything is generated (ROADMAP principle 8,
-// "cost before spend"). Prices are pinned with their date and source; a model
-// without one cannot be queued or run under the cap.
+// What a generation costs before anything is generated (cost before spend).
+// Prices are pinned with their date and source; a model without one cannot be
+// queued or run under the cap.
 //
 // Sources:
 // - Google, checked 2026-10-06: https://ai.google.dev/gemini-api/docs/pricing

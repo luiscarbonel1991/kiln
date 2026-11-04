@@ -1,8 +1,8 @@
-// Pixel measures for the take check (ROADMAP Phase 10). Pure: an RGBA image
-// in, numbers out; decoding and OCR live outside the engine. Two measures the
-// OCR cannot give: where pieces stand when each is one character (Apple Vision
-// drops a lone "0", DOGFOOD #84), and the letterforms' weight and width against
-// the reference's (a font product's buyers notice a thicker stroke, #82).
+// Pixel measures for the take check. Pure: an RGBA image in, numbers out;
+// decoding and OCR live outside the engine. Two measures the OCR cannot give:
+// where pieces stand when each is one character (Apple Vision drops a lone "0",
+// DOGFOOD #84), and the letterforms' weight and width against the reference's
+// (a font product's buyers notice a thicker stroke, #82).
 
 export interface RgbaImage {
   width: number;

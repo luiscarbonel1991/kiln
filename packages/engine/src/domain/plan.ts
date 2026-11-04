@@ -40,10 +40,10 @@ import {
   videoSecondsFor,
 } from "@/domain/video";
 
-// A project's plan (ROADMAP "Experience design"): one storyboard row per
-// destination, one slot per frame of its shot list, snapshotted at Start so the
-// project stays stable when seeds change. Board-owned state (approval, delivery)
-// lives here, never on the editor's cards — autosave rewrites the cards.
+// A project's plan: one storyboard row per destination, one slot per frame of
+// its shot list, snapshotted at Start so the project stays stable when seeds
+// change. Board-owned state (approval, delivery) lives here, never on the
+// editor's cards — autosave rewrites the cards.
 export const PlanSlot = ShotSlotFields.extend({
   approvedOutput: z.string().min(1).optional(),
   deliveredAt: z.string().optional(),
@@ -300,9 +300,9 @@ export function planProject(input: {
   const ids = [...new Set(input.destinationIds)];
   if (ids.length === 0) throw new Error("pick at least one destination");
   const allowed = destinationsFor(type, catalog.destinations);
-  // A Launch makes each scene once (ROADMAP "Scene vs version"): a later
-  // destination's scene with a role an earlier one already shows is that
-  // scene again — shared as it is at the same aspect, else re-framed.
+  // A Launch makes each scene once: a later destination's scene with a role an
+  // earlier one already shows is that scene again — shared as it is at the same
+  // aspect, else re-framed.
   const shown = new Map<string, { id: string; aspect?: string }>();
   return ProjectPlan.parse({
     destinations: ids.map((id) => {

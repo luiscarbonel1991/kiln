@@ -8,12 +8,12 @@ import {
   ReasonKey,
 } from "@/domain/scene-knobs";
 
-// What Kiln learns of a maker's taste (ROADMAP "Agents", stage 4; Phase 14):
-// a lesson is proposed from what the maker did (the reasons they gave for a
-// take, the knobs of the takes they approved, a 30-day read) or by an agent,
-// and counts only once the maker keeps it. Lessons are per product family
-// (or for every family) and read by every agent; a scene lesson also moves
-// a knob, which a new project of the family starts its frame with.
+// What Kiln learns of a maker's taste: a lesson is proposed from what the maker
+// did (the reasons they gave for a take, the knobs of the takes they approved,
+// a 30-day read) or by an agent, and counts only once the maker keeps it.
+// Lessons are per product family (or for every family) and read by every agent;
+// a scene lesson also moves a knob, which a new project of the family starts
+// its frame with.
 
 export const LessonTopic = z.enum(["scenes", "listing", "designs", "general"]);
 export type LessonTopic = z.infer<typeof LessonTopic>;

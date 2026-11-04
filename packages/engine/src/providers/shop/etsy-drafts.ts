@@ -11,13 +11,13 @@ import {
   etsySend,
 } from "@/providers/shop/etsy";
 
-// The draft listings of the maker's shop (ROADMAP Phase 11): read them, make
-// one, change one (scope listings_w). Etsy has no drafts-only scope, so the
-// rules are Kiln's: no request carries a listing's state (etsySend refuses
-// it), no listing is ever deleted, and the server checks a listing is still a
-// draft right before each change. Checked against Etsy's OpenAPI spec on
-// 2026-11-02: listing writes take a form (a list as one comma-joined value),
-// the inventory takes JSON, a photo goes as multipart.
+// The draft listings of the maker's shop: read them, make one, change one
+// (scope listings_w). Etsy has no drafts-only scope, so the rules are Kiln's:
+// no request carries a listing's state (etsySend refuses it), no listing is
+// ever deleted, and the server checks a listing is still a draft right before
+// each change. Checked against Etsy's OpenAPI spec on 2026-11-02: listing
+// writes take a form (a list as one comma-joined value), the inventory takes
+// JSON, a photo goes as multipart.
 
 const Id = z.number().int().positive();
 

@@ -311,10 +311,9 @@ export const SEED_SHOT_LISTS: ShotList[] = [
       },
     ],
   },
-  // An Instagram carousel is a sequence, not loose images (ROADMAP "Domain
-  // model"): hook -> product in place -> detail -> colours -> how to
-  // personalize -> call to action, one style across slides. Text is drawn by
-  // templates, never by the image model.
+  // An Instagram carousel is a sequence, not loose images: hook -> product in
+  // place -> detail -> colours -> how to personalize -> call to action, one
+  // style across slides. Text is drawn by templates, never by the image model.
   {
     id: "instagram-carousel",
     name: "Instagram carousel",

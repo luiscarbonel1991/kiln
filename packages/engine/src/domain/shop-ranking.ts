@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-// Rankings read from a shop's API (ROADMAP Phase 20; Luis, 2026-10-27: "el
-// ranking de Etsy por API oficial"). The maker's own shop: units sold per
-// listing, from its receipts (exact). Another shop: Etsy gives its lifetime
-// sales, its reviews and each listing's favourites, never what one listing
-// sold, so its listings rank by favourites and say so. Pure: the server reads
-// the API, these shape what it read.
+// Rankings read from a shop's API (Luis, 2026-10-27: "el ranking de Etsy por
+// API oficial"). The maker's own shop: units sold per listing, from its
+// receipts (exact). Another shop: Etsy gives its lifetime sales, its reviews
+// and each listing's favourites, never what one listing sold, so its listings
+// rank by favourites and say so. Pure: the server reads the API, these shape
+// what it read.
 
 export const RANK_WINDOWS = [30, 90, 365] as const;
 export const RankWindow = z.coerce

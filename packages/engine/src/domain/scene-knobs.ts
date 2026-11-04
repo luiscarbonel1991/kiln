@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-// Scene knobs (ROADMAP "Knobs, not prose"): a maker who is not a designer
-// tunes a scene by picking a stop, never by writing prose. Each stop carries a
-// curated clause for one prompt field; "any" adds nothing and leaves it to the
-// model. A slot offers the knobs it names, with its default stops.
+// Scene knobs: a maker who is not a designer tunes a scene by picking a stop,
+// never by writing prose. Each stop carries a curated clause for one prompt
+// field; "any" adds nothing and leaves it to the model. A slot offers the knobs
+// it names, with its default stops.
 
 export const KnobKey = z.enum([
   "setting",
@@ -15,9 +15,9 @@ export const KnobKey = z.enum([
 ]);
 export type KnobKey = z.infer<typeof KnobKey>;
 
-// A marketplace hero's setting (ROADMAP P0-3, DOGFOOD #63): a plain backdrop,
-// or the product in its place of use, as page-1 heroes show what is mounted
-// where it is used. It replaces the slot's scene instead of adding to it.
+// A marketplace hero's setting (DOGFOOD #63): a plain backdrop, or the product
+// in its place of use, as page-1 heroes show what is mounted where it is used.
+// It replaces the slot's scene instead of adding to it.
 export const SettingStop = z.enum(["any", "sweep", "place"]);
 export const CameraStop = z.enum(["any", "eye", "above", "overhead"]);
 export type CameraStop = z.infer<typeof CameraStop>;

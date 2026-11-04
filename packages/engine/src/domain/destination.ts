@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-// Where a deliverable lands (ROADMAP "Domain model"): a sale destination (Etsy,
-// Shopify, the maker's website) or a content destination (Instagram, Pinterest).
-// A profile is data, not code: formats with pixel targets, the rules an output
-// must follow, and how it is delivered. A human always publishes.
+// Where a deliverable lands: a sale destination (Etsy, Shopify, the maker's
+// website) or a content destination (Instagram, Pinterest). A profile is data,
+// not code: formats with pixel targets, the rules an output must follow, and
+// how it is delivered. A human always publishes.
 export const DestinationKind = z.enum(["sale", "content"]);
 export type DestinationKind = z.infer<typeof DestinationKind>;
 

@@ -1,12 +1,12 @@
 import { type ProjectPlan, slotCardId } from "@/domain/plan";
 
-// What a project's photo work cost (ROADMAP #68: the number a business prices
-// into a product): per frame, every take it took (re-rolls included); per
-// destination and for the project, the total and the cost per approved frame.
-// An exact frame, the maker's photo and a shared frame cost nothing; a frame
-// is approved when its current output is. Spend follows the budget's rule
-// (live jobs, a job's measured cost, else its estimate when the call went
-// out), measured by the caller.
+// What a project's photo work cost (the number a business prices into a
+// product): per frame, every take it took (re-rolls included); per destination
+// and for the project, the total and the cost per approved frame. An exact
+// frame, the maker's photo and a shared frame cost nothing; a frame is approved
+// when its current output is. Spend follows the budget's rule (live jobs, a
+// job's measured cost, else its estimate when the call went out), measured by
+// the caller.
 
 export interface CardSpend {
   spentMicros: number;

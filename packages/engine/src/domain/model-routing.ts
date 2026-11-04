@@ -33,12 +33,12 @@ import {
 
 export type { RanOn };
 
-// Model routing (ROADMAP "Agents and model routing", Luis 2026-10-29): a task
-// names a role, never a model; each role has a route the maker saved, an
-// ordered list of catalog models. A failure another model can fix moves to the
-// next one in the route; nothing outside the route ever runs, and nothing runs
-// on a route the maker has not saved. Pure: the queue, the text calls and the
-// settings page decide with these.
+// Model routing (Luis, 2026-10-29): a task names a role, never a model; each
+// role has a route the maker saved, an ordered list of catalog models. A
+// failure another model can fix moves to the next one in the route; nothing
+// outside the route ever runs, and nothing runs on a route the maker has not
+// saved. Pure: the queue, the text calls and the settings page decide with
+// these.
 
 export const ModelRole = z.enum(["fast", "deep", "draft", "final", "video"]);
 export type ModelRole = z.infer<typeof ModelRole>;

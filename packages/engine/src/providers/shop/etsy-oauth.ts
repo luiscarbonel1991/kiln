@@ -5,12 +5,12 @@ import { type EtsyApp, EtsyError, etsyApiKey } from "@/providers/shop/etsy";
 // Connecting a shop to Kiln (Etsy's OAuth 2.0, authorization code with PKCE):
 // the maker approves Kiln on Etsy's own page, Etsy sends them back with a
 // code, and Kiln trades it for the shop's tokens. Kiln reads the shop and
-// writes drafts (listings_w, ROADMAP Phase 11); it never asks for listings_d,
-// so it cannot delete a listing, and it never publishes one (etsySend).
-// Checked against developers.etsy.com on 2026-10-27: the access token lasts an
-// hour and starts with the user's id; the refresh token lasts 90 days; the
-// redirect address matches one of the app's callback URLs exactly; a new scope
-// needs the maker to approve Kiln again.
+// writes drafts (listings_w); it never asks for listings_d, so it cannot delete
+// a listing, and it never publishes one (etsySend). Checked against
+// developers.etsy.com on 2026-10-27: the access token lasts an hour and starts
+// with the user's id; the refresh token lasts 90 days; the redirect address
+// matches one of the app's callback URLs exactly; a new scope needs the maker
+// to approve Kiln again.
 
 export const ETSY_CONNECT_URL = "https://www.etsy.com/oauth/connect";
 export const ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token";

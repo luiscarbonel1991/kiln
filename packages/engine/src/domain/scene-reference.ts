@@ -1,13 +1,12 @@
 import { z } from "zod";
 import type { CameraStop, SceneKnobs } from "@/domain/scene-knobs";
 
-// The image a scene edits (ROADMAP 2026-10-20, the view from above). The model
-// keeps the reference's point of view, so a product with a part lying flat
-// (a plate on a base) drawn from the front comes out as a strip of base. Kiln
-// draws the same product seen from a little above, locally and for free, and
-// a scene whose camera looks down edits that view instead. Checked on 10/27:
-// the base in front of the plate went from 6-8 % of the plate's height to
-// 21-24 %.
+// The image a scene edits (the view from above). The model keeps the
+// reference's point of view, so a product with a part lying flat (a plate on a
+// base) drawn from the front comes out as a strip of base. Kiln draws the same
+// product seen from a little above, locally and for free, and a scene whose
+// camera looks down edits that view instead. Checked on 10/27: the base in
+// front of the plate went from 6-8 % of the plate's height to 21-24 %.
 
 export const ThreeQuarterView = z.object({
   assetUrl: z.string().min(1),
@@ -18,9 +17,9 @@ export const ThreeQuarterView = z.object({
 });
 export type ThreeQuarterView = z.infer<typeof ThreeQuarterView>;
 
-// A look Kiln drew for the project (ROADMAP P2-9): the design redrawn in the
-// look's colour (for exact frames), its plate (the reference a scene in that
-// look edits) and its view from above when the product has one.
+// A look Kiln drew for the project: the design redrawn in the look's colour
+// (for exact frames), its plate (the reference a scene in that look edits) and
+// its view from above when the product has one.
 export const LookReference = z.object({
   colour: z.string().min(1),
   // Absent: the product's own drawing.

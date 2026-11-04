@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-// Product-first model (ROADMAP Phase 8). The truth of a customizable physical
-// product is its spec, not a photo: dimensions, material, colour set, typography,
-// treatment and the wording the buyer types. A PlateRenderer turns (product,
-// request) into an exact reference image; the prompt fields are templated from
-// the same data so nobody hand-writes SUBJECT / MATERIALS again.
+// Product-first model. The truth of a customizable physical product is its
+// spec, not a photo: dimensions, material, colour set, typography, treatment
+// and the wording the buyer types. A PlateRenderer turns (product, request)
+// into an exact reference image; the prompt fields are templated from the same
+// data so nobody hand-writes SUBJECT / MATERIALS again.
 
 export const Hex = z
   .string()
@@ -242,8 +242,8 @@ export type ProductStyle = z.infer<typeof ProductStyle>;
 
 // Where the product definition comes from. `catalog` = a maker's code catalog,
 // exported as a product package; `vector` = a traced or drawn SVG
-// (the maker on-ramp, see PRODUCT-MODEL.md); `photo` = only a photo exists
-// (weakest guarantees); `form` = typed in by the maker.
+// (the maker on-ramp); `photo` = only a photo exists (weakest guarantees);
+// `form` = typed in by the maker.
 export const ProductSource = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("catalog"),

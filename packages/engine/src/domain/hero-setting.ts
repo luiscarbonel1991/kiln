@@ -2,9 +2,9 @@ import { z } from "zod";
 import type { ProjectPlan } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 
-// The marketplace hero's setting (ROADMAP P0-3, DOGFOOD #63): the plan
-// proposes it and remembers the maker's choice per destination and product
-// family, so the next product of that family starts where the maker left it.
+// The marketplace hero's setting (DOGFOOD #63): the plan proposes it and
+// remembers the maker's choice per destination and product family, so the next
+// product of that family starts where the maker left it.
 
 export const HeroSetting = z.enum(["sweep", "place"]);
 export type HeroSetting = z.infer<typeof HeroSetting>;

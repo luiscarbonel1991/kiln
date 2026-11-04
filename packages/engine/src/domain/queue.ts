@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { modelLabel } from "@/domain/model-defaults";
 
-// The background generation queue's vocabulary (ROADMAP "Experience design":
-// cost before spend, one approval per batch, work while away). Pure: the
-// worker and the repository decide with these, the UI reads them.
+// The background generation queue's vocabulary (cost before spend, one approval
+// per batch, work while away). Pure: the worker and the repository decide with
+// these, the UI reads them.
 
 export const JobStatus = z.enum([
   "queued",

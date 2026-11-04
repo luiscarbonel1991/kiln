@@ -3,13 +3,13 @@ import { BrandKit } from "@/domain/brand";
 import { colourTextNotes } from "@/domain/colour-text";
 import { Product } from "@/domain/product";
 
-// The product package contract (ROADMAP Phase 8, PRODUCT-MODEL.md): what a
-// maker's catalog exports and Kiln imports. A package is one Product, an array
-// of them, or { maker?, products: [...] }: each product validated by the
-// engine's Product schema, the optional `maker` block by BrandKit (the brand
-// kit for text layers). Example: the app's /templates/product-package.json.
-// In the engine so an exporter can check a package before uploading it (the
-// `kiln validate` CLI) with the very checks the import runs.
+// The product package contract: what a maker's catalog exports and Kiln
+// imports. A package is one Product, an array of them, or
+// { maker?, products: [...] }: each product validated by the engine's Product
+// schema, the optional `maker` block by BrandKit (the brand kit for text
+// layers). Example: the app's /templates/product-package.json. In the engine
+// so an exporter can check a package before uploading it (the `kiln validate`
+// CLI) with the very checks the import runs.
 //
 // Products are read one by one: a product that does not parse is set aside
 // with its reasons and the others still import, so one long field never

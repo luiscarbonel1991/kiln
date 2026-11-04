@@ -7,8 +7,7 @@ import type {
 } from "@kiln/engine/domain/product-package";
 
 // kiln — feed Kiln without a file picker, approve its frames without a
-// browser, and reach every tool Kiln serves to agents (ROADMAP 2026-10-26,
-// P0-1, P2-10 and "Agents", stage 1).
+// browser, and reach every tool Kiln serves to agents.
 //
 //   kiln validate <package.json>             the import's own checks, offline
 //   kiln import <package.json>               check, then POST /api/import

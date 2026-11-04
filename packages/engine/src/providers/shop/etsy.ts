@@ -1,11 +1,10 @@
 import { z } from "zod";
 
-// Etsy Open API v3 (ROADMAP Phase 20, "The Etsy connection"): the reads Kiln
-// makes, over plain fetch. Every request carries the app's identity as
-// `x-api-key: keystring:shared_secret`; a shop's private data (its receipts)
-// also needs that shop's OAuth token (etsy-oauth.ts). Only the fields Kiln
-// reads are kept; the rest of each answer is dropped. Checked against Etsy's
-// OpenAPI spec on 2026-10-27.
+// Etsy Open API v3: the reads Kiln makes, over plain fetch. Every request
+// carries the app's identity as `x-api-key: keystring:shared_secret`; a shop's
+// private data (its receipts) also needs that shop's OAuth token
+// (etsy-oauth.ts). Only the fields Kiln reads are kept; the rest of each answer
+// is dropped. Checked against Etsy's OpenAPI spec on 2026-10-27.
 
 export const ETSY_API = "https://api.etsy.com/v3/application";
 

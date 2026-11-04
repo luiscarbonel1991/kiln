@@ -3,11 +3,11 @@ import type { DestinationText } from "@/domain/destination";
 import type { ListingIssue, ListingText } from "@/domain/listing";
 import type { Product } from "@/domain/product";
 
-// A listing's market brief (ROADMAP Phase 20, DOGFOOD #67): the searches it
-// aims at, what page 1 shows for them, and where each number came from. The
-// maker brings it (a table pasted from their notes, a CSV of their research
-// tool, or typed); Kiln never reads a marketplace's pages. It feeds a frame's
-// place, the tags and the title, and a price guardrail; it never sets a price.
+// A listing's market brief (DOGFOOD #67): the searches it aims at, what page 1
+// shows for them, and where each number came from. The maker brings it (a table
+// pasted from their notes, a CSV of their research tool, or typed); Kiln never
+// reads a marketplace's pages. It feeds a frame's place, the tags and the
+// title, and a price guardrail; it never sets a price.
 
 export const Conversion = z.enum([
   "very-low",

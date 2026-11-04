@@ -2,11 +2,10 @@ import { z } from "zod";
 import { colourOf, type Product, type ProductStyle } from "@/domain/product";
 
 // A look: the product as one frame shows it, in one of its colours and one of
-// its styles (ROADMAP P2-9, the wording × colour matrix). A frame's own look
-// wins over its project's, and the project's over the product's default
-// colour and own drawing. A key the product no longer offers is passed over,
-// so a colour or style removed later reads as unset instead of breaking the
-// plan.
+// its styles (the wording × colour matrix). A frame's own look wins over its
+// project's, and the project's over the product's default colour and own
+// drawing. A key the product no longer offers is passed over, so a colour or
+// style removed later reads as unset instead of breaking the plan.
 export const Look = z.object({
   colour: z.string().min(1).max(64).optional(),
   // A style's key, or ORIGINAL for the product's own drawing.

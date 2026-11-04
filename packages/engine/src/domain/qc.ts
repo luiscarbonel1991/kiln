@@ -1,8 +1,9 @@
-// QC v2 — text fidelity (ROADMAP Phase 10). Pure: takes what the plate promised
-// (expectedText per piece, the layout) and what an OCR engine read from the
-// generated image, and says whether every promised line is there, legible and in
-// order. OCR engines live outside the engine (scripts/ocr.mjs: Apple Vision on
-// macOS); they only have to produce an OcrResult. Nothing here touches the network.
+// QC v2 — text fidelity. Pure: takes what the plate promised (expectedText per
+// piece, the layout) and what an OCR engine read from the generated image, and
+// says whether every promised line is there, legible and in order. OCR engines
+// live outside the engine (the app's src/server/qc/ocr.ts: Apple Vision on
+// macOS); they only have to produce an OcrResult. Nothing here touches the
+// network.
 
 import { z } from "zod";
 import type { LetterComparison } from "@/domain/qc-pixels";
@@ -322,10 +323,10 @@ export function checkExpectedText(
   };
 }
 
-// A take's check (ROADMAP Phase 10, on the board): what Kiln read in a
-// generated image against the reference it edited, written when the take
-// lands. Text and letterforms are measured; the scale is only said, since no
-// local check can see the door it is measured against.
+// A take's check on the board: what Kiln read in a generated image against the
+// reference it edited, written when the take lands. Text and letterforms are
+// measured; the scale is only said, since no local check can see the door it is
+// measured against.
 export const TakeCheckLine = z.object({
   expected: z.string(),
   found: z.boolean(),

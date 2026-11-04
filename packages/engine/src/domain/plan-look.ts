@@ -16,9 +16,9 @@ import {
   threeQuarterFor,
 } from "@/domain/scene-reference";
 
-// The look a project shows (ROADMAP P2-9): the colour and style New project
-// picked, else the product's default colour and own drawing. The product's
-// own default never changes for it (DOGFOOD #47).
+// The look a project shows: the colour and style New project picked, else the
+// product's default colour and own drawing. The product's own default never
+// changes for it (DOGFOOD #47).
 
 export function projectLook(
   plan: Pick<ProjectPlan, "look">,
@@ -116,8 +116,8 @@ export function chosenLook(
   return { look: storedLook(look) };
 }
 
-// The look a frame shows (ROADMAP P2-9, chosen per frame): its own over the
-// project's. A version re-frames its source scene, so it shows the source's.
+// The look a frame shows, chosen per frame: its own over the project's. A
+// version re-frames its source scene, so it shows the source's.
 export function slotLook(
   plan: ProjectPlan,
   slot: Pick<PlanSlot, "look" | "versionOf">,

@@ -1,10 +1,9 @@
 import type { ColourOption, Product } from "@/domain/product";
 
-// A design redrawn in another of its product's colours, free (ROADMAP P2-9):
-// a maker's drawing paints exactly its colour's face, edge and marks, so
-// swapping those hexes for another colour's draws the same product in that
-// colour. Paints that are not the colour's (a part in a fixed colour, a
-// strip, a shadow) stay as drawn.
+// A design redrawn in another of its product's colours, free: a maker's drawing
+// paints exactly its colour's face, edge and marks, so swapping those hexes for
+// another colour's draws the same product in that colour. Paints that are not
+// the colour's (a part in a fixed colour, a strip, a shadow) stay as drawn.
 
 // A paint in an attribute (fill="#1B1B1B") or a style declaration
 // (fill:#1B1B1B), six or three digits.

@@ -7,11 +7,11 @@ import {
 } from "@/domain/listing";
 import type { Product } from "@/domain/product";
 
-// An Etsy draft made from a product's listing kit (ROADMAP Phase 11, "Etsy
-// drafts"): what Kiln sends to the maker's shop, before it is sent. A draft is
-// never published by Kiln: the maker publishes it in Etsy's editor. The first
-// slice sends the text, the photos, one price and a quantity; whatever the
-// kit holds that is not sent yet is named, never dropped in silence.
+// An Etsy draft made from a product's listing kit: what Kiln sends to the
+// maker's shop, before it is sent. A draft is never published by Kiln: the
+// maker publishes it in Etsy's editor. The first slice sends the text, the
+// photos, one price and a quantity; whatever the kit holds that is not sent yet
+// is named, never dropped in silence.
 
 export const WhoMade = z.enum(["i_did", "someone_else", "collective"]);
 export type WhoMade = z.infer<typeof WhoMade>;

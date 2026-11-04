@@ -91,11 +91,11 @@ export function buildGenerationRequest(input: {
 
 export class VideoNeedsScene extends Error {}
 
-// A version of an approved scene at another aspect (ROADMAP "Scene vs
-// version"): the approved image is the reference, re-framed and never
-// cropped, so the product, the place and the light stay what the maker
-// approved; the scene is extended where the new frame needs room. A slot with
-// a text layer keeps calm space for it (a story's below the app's top bar).
+// A version of an approved scene at another aspect: the approved image is the
+// reference, re-framed and never cropped, so the product, the place and the
+// light stay what the maker approved; the scene is extended where the new frame
+// needs room. A slot with a text layer keeps calm space for it (a story's below
+// the app's top bar).
 export function buildVersionRequest(input: {
   product: Product;
   // The approved scene this version re-frames.

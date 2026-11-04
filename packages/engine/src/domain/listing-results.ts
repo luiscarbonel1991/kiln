@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-// The results loop (ROADMAP Phase 20): a delivered listing's numbers read
-// before its new photos went up and 14 and 30 days after, each with its
-// window, its source and the day it was read, so the maker sees whether the
-// refresh moved anything, and which frames it changed. Numbers come typed from
-// the shop's stats page, from an agent through the API, or from a shop
-// connector; Kiln never opens the listing's page.
+// The results loop: a delivered listing's numbers read before its new photos
+// went up and 14 and 30 days after, each with its window, its source and the
+// day it was read, so the maker sees whether the refresh moved anything, and
+// which frames it changed. Numbers come typed from the shop's stats page, from
+// an agent through the API, or from a shop connector; Kiln never opens the
+// listing's page.
 
 export const ReadKey = z.enum(["before", "day14", "day30"]);
 export type ReadKey = z.infer<typeof ReadKey>;

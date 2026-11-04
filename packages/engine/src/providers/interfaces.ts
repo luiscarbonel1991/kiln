@@ -92,9 +92,9 @@ export interface DirectCallOptions {
   beforeCall?: () => Promise<void>;
 }
 
-// The chat (ROADMAP "Agents", stage 2): a catalog text model as a streaming
-// language model the chat's loop drives, step by step. An error the provider
-// answered carries its HTTP `status` (hadResponse), like every adapter's.
+// The chat: a catalog text model as a streaming language model the chat's loop
+// drives, step by step. An error the provider answered carries its HTTP
+// `status` (hadResponse), like every adapter's.
 export interface ChatModels {
   model(id: string, effort?: Effort): LanguageModelV4;
 }

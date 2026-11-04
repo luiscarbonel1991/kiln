@@ -8,13 +8,13 @@ import {
   type Treatment,
 } from "@/domain/product";
 
-// A listing's text on a sale destination (ROADMAP Phases 16-17): what the
-// maker pastes into the channel's editor beside the photos. Kiln drafts every
-// field from the spec for free (listingDraft), a text model may rewrite the
-// prose (title, description, tags, materials), the maker edits, and
-// checkListing holds it to the channel's rules before anyone pastes it. The
-// variations and attributes come from the product alone and are never edited
-// here; prices are the maker's (Kiln never computes one).
+// A listing's text on a sale destination: what the maker pastes into the
+// channel's editor beside the photos. Kiln drafts every field from the spec for
+// free (listingDraft), a text model may rewrite the prose (title, description,
+// tags, materials), the maker edits, and checkListing holds it to the channel's
+// rules before anyone pastes it. The variations and attributes come from the
+// product alone and are never edited here; prices are the maker's (Kiln never
+// computes one).
 
 export const TextSource = z.enum(["spec", "model", "maker"]);
 export type TextSource = z.infer<typeof TextSource>;

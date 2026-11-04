@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { Aspect } from "@/domain/destination";
 
-// A live listing (ROADMAP 2026-10-26, P0-2): a listing already selling, whose
-// photos the maker refreshes. Its address is kept, so the plan says what it
-// refreshes and the results loop can read its numbers later; Kiln never opens
-// the page. Its photos come from the maker (uploaded), never fetched.
+// A live listing: a listing already selling, whose photos the maker refreshes.
+// Its address is kept, so the plan says what it refreshes and the results loop
+// can read its numbers later; Kiln never opens the page. Its photos come from
+// the maker (uploaded), never fetched.
 
 // Etsy shows up to 20 photos on a listing.
 export const MAX_LIVE_PHOTOS = 20;
