@@ -3,7 +3,7 @@
 # take's text, ImageMagick flattens line art and upscales scenes, ffmpeg
 # renders stills in motion. Debian no longer packages autotrace, so the
 # Centerline trace is off here (Outline works).
-FROM node:24-trixie-slim
+FROM node:26-trixie-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
