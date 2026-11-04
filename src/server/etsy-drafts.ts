@@ -219,9 +219,11 @@ const viewOf = (row: {
 export async function draftLog(listingId: number): Promise<ShopWriteView[]> {
   if (!hasDatabase()) return [];
   const maker = await getCurrentMaker();
+  // Writes in the same millisecond keep their order by id (a cuid runs in
+  // sequence within the process).
   const rows = await db.shopWrite.findMany({
     where: { makerId: maker.id, listingId: String(listingId) },
-    orderBy: { at: "desc" },
+    orderBy: [{ at: "desc" }, { id: "desc" }],
     take: 50,
   });
   return rows.map(viewOf);
