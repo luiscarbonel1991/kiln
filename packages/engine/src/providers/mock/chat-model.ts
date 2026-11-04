@@ -165,7 +165,7 @@ export function mockReply(prompt: LanguageModelV4Prompt): MockReply {
     const result = [...last.content]
       .reverse()
       .find((p) => p.type === "tool-result");
-    if (!result || result.type !== "tool-result") return { text: "Done." };
+    if (result?.type !== "tool-result") return { text: "Done." };
     const output = result.output;
     if (output.type === "execution-denied") {
       return { text: "Okay, nothing was spent." };

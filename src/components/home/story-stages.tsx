@@ -368,10 +368,7 @@ export function ScenesStage({
       <SampleMark shown={marked} />
       <div className="grid grid-cols-2 gap-3 sm:gap-5">
         {shown.map((s, n) => (
-          <figure
-            key={`${s.label}-${n}`}
-            className="flex min-w-0 flex-col gap-2"
-          >
+          <figure key={s.url} className="flex min-w-0 flex-col gap-2">
             <div className="relative">
               <div
                 className="story-part story-develop overflow-hidden rounded-render bg-surface-soft shadow-render"

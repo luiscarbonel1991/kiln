@@ -70,7 +70,7 @@ export async function relookSlot(
   const slot = plan.destinations
     .find((d) => d.destinationId === ref.destinationId)
     ?.slots.find((s) => s.key === ref.slotKey);
-  if (!slot || slot.fill !== "scene" || slot.versionOf) {
+  if (slot?.fill !== "scene" || slot.versionOf) {
     throw new Error("Only a scene takes a colour and style of its own.");
   }
   const chosen = frameLook(product, plan, slot.look, asked);

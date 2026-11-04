@@ -140,7 +140,7 @@ export function lastDeliveredAt(destination: {
   const stamps = destination.slots.flatMap((s) =>
     !s.off && s.deliveredAt ? [s.deliveredAt] : [],
   );
-  return stamps.length > 0 ? stamps.reduce((a, b) => (a > b ? a : b)) : null;
+  return stamps.sort().at(-1) ?? null;
 }
 
 export interface MetricChange {

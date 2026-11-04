@@ -58,7 +58,7 @@ export function ChatGenerate() {
     }
   }
 
-  function useAsMaster() {
+  function takeAsMaster() {
     if (!lastImage) return;
     setMaster(masterAssetFromGeneration(lastImage.result, lastImage.prompt));
   }
@@ -125,7 +125,7 @@ export function ChatGenerate() {
       {lastImage && !pending ? (
         <Button
           className="mx-4 mb-2.5 bg-prov-recipe text-primary-foreground hover:bg-prov-recipe/90"
-          onClick={useAsMaster}
+          onClick={takeAsMaster}
           data-testid="chat-use-as-master"
         >
           <Check /> Use this as master asset

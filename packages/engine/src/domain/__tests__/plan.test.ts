@@ -830,8 +830,11 @@ describe("video slots", () => {
   const video = { destinationId: "shop", slotKey: "video" };
   const card = { status: "done" as const, outputs: ["https://x/hero.png"] };
   const shopOf = (p: ReturnType<typeof withVideo>) => p.destinations[0];
-  const slotOf = (p: ReturnType<typeof withVideo>, key: string) =>
-    shopOf(p).slots.find((s) => s.key === key)!;
+  const slotOf = (p: ReturnType<typeof withVideo>, key: string) => {
+    const slot = shopOf(p).slots.find((s) => s.key === key);
+    if (!slot) throw new Error(key);
+    return slot;
+  };
 
   it("the queue may run scenes and videos switched on, never exact frames", () => {
     expect(generableCardIds(withVideo())).toEqual([
@@ -985,11 +988,10 @@ describe("video slots", () => {
   it("a plan made before video gets its slot added once", () => {
     const old = launch();
     const added = addVideoSlot(old, "shop", videoCatalog.shotLists);
-    expect(added?.slot).toMatchObject({ key: "video", fill: "video" });
-    expect(shopOf(added!.plan).slots.at(-1)?.key).toBe("video");
-    expect(
-      addVideoSlot(added!.plan, "shop", videoCatalog.shotLists),
-    ).toBeNull();
+    if (!added) throw new Error("no video slot added");
+    expect(added.slot).toMatchObject({ key: "video", fill: "video" });
+    expect(shopOf(added.plan).slots.at(-1)?.key).toBe("video");
+    expect(addVideoSlot(added.plan, "shop", videoCatalog.shotLists)).toBeNull();
     // A destination whose shot list has no video.
     expect(addVideoSlot(old, "social", videoCatalog.shotLists)).toBeNull();
   });

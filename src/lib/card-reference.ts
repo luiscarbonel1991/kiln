@@ -46,7 +46,7 @@ export function cardReference(
   const slot = plan.destinations
     .find((d) => d.destinationId === ref?.destinationId)
     ?.slots.find((s) => s.key === ref?.slotKey);
-  if (!slot || slot.fill !== "scene") return master;
+  if (slot?.fill !== "scene") return master;
   const look = slotLook(plan, slot, product);
   const own = sameLook(look, projectLook(plan, product))
     ? null

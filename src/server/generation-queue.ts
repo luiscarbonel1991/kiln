@@ -322,7 +322,7 @@ export async function estimateProjectCards(
       cards.push(await videoEstimate(card));
       continue;
     }
-    if (!card || card.type !== "image") {
+    if (card?.type !== "image") {
       throw new Error(`"${id}" is not an image card of this project.`);
     }
     assertRunnable(card.model, "image", card.id, unlisted);

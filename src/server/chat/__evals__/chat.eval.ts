@@ -34,7 +34,7 @@ interface Task {
 const SPANISH = /[áéíóúñ¿¡]|\b(el|los|las|del|que|está|están|hay|para|una?)\b/i;
 
 function grade(task: Task, reply: KilnMessage | undefined): string[] {
-  if (!reply || reply.role !== "assistant") return ["no reply"];
+  if (reply?.role !== "assistant") return ["no reply"];
   const tools = reply.parts
     .filter((p) => p.type.startsWith("tool-"))
     .map((p) => ({

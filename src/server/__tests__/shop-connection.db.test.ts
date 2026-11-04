@@ -173,9 +173,7 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
       c.url.pathname.endsWith("/users/me"),
     );
     expect(
-      reads.map(
-        (c) => (c.init?.headers as Record<string, string>).authorization,
-      ),
+      reads.map((c) => new Headers(c.init?.headers).get("authorization")),
     ).toEqual(["Bearer 90001.access-2", "Bearer 90001.access-2"]);
   });
 
