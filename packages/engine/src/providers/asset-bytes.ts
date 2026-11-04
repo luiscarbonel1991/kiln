@@ -53,6 +53,17 @@ function storageBase(): URL | null {
   }
 }
 
+// Where the server reads an allowed URL: a stored asset through storage's own
+// address, anything else as it is.
+function readUrl(url: string): string {
+  if (url.startsWith("data:")) return url;
+  try {
+    return getStorageProvider().readUrl?.(url) ?? url;
+  } catch {
+    return url;
+  }
+}
+
 // What an error may say about a URL: its origin, never its path or query.
 function describeUrl(url: string): string {
   if (url.startsWith("data:")) return "a data: URL that is not an image";
@@ -102,7 +113,7 @@ export async function fetchAsset(url: string): Promise<FetchedAsset> {
   if (url.startsWith("data:") && url.length > MAX_ASSET_BYTES * 1.4) {
     throw tooLarge();
   }
-  const res = await fetch(url, {
+  const res = await fetch(readUrl(url), {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     redirect: "error",
   });

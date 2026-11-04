@@ -9,6 +9,8 @@ vi.mock("../../env", () => ({
 vi.mock("@/providers/storage", () => ({
   getStorageProvider: () => ({
     publicUrl: (key: string) => `http://localhost:9000/kiln-assets/${key}`,
+    readUrl: (url: string) =>
+      url.replace("http://localhost:9000/", "http://s3:9000/"),
   }),
 }));
 
@@ -70,6 +72,17 @@ describe("fetchAsset", () => {
     vi.stubGlobal("fetch", fetchSpy);
     await fetchAsset("http://localhost:9000/kiln-assets/cards/a.png");
     expect(fetchSpy.mock.calls[0][1]).toMatchObject({ redirect: "error" });
+  });
+
+  it("reads a stored asset at storage's own address, others as they are", async () => {
+    const fetchSpy = vi.fn(async (_url: string) => new Response("png"));
+    vi.stubGlobal("fetch", fetchSpy);
+    await fetchAsset("http://localhost:9000/kiln-assets/cards/a.png");
+    await fetchAsset("https://cdn.maker.example/plates/x.svg");
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      "http://s3:9000/kiln-assets/cards/a.png",
+      "https://cdn.maker.example/plates/x.svg",
+    ]);
   });
 
   it("stops reading past the size cap, declared or not", async () => {

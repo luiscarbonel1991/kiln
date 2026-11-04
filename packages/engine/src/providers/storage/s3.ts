@@ -86,6 +86,12 @@ class S3StorageProvider implements StorageProvider {
     const base = env.S3_PUBLIC_URL ?? env.S3_ENDPOINT ?? "";
     return `${base}/${this.bucket}/${key}`;
   }
+
+  readUrl(url: string): string {
+    const shown = this.publicUrl("");
+    if (!env.S3_ENDPOINT || !url.startsWith(shown)) return url;
+    return `${env.S3_ENDPOINT}/${this.bucket}/${url.slice(shown.length)}`;
+  }
 }
 
 export const s3StorageProvider: StorageProvider = new S3StorageProvider();

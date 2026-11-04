@@ -17,4 +17,8 @@ export interface PutObjectResult {
 export interface StorageProvider {
   put(input: PutObjectInput): Promise<PutObjectResult>;
   publicUrl(key: string): string;
+  // The address the server reads a stored asset at, when it reaches storage
+  // somewhere else than browsers do (in Docker: S3_ENDPOINT http://s3:9000,
+  // S3_PUBLIC_URL http://localhost:9000).
+  readUrl?(url: string): string;
 }
