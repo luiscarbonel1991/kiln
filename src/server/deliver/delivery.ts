@@ -36,13 +36,12 @@ import {
 } from "@/server/deliver/frames";
 import { listingSheet } from "@/server/deliver/listing-sheet";
 
-// A destination's delivery (ROADMAP principle 10, "Finished means delivered";
-// Phase 11 export): every slot switched on, in the plan's order, as a file at
-// the destination's pixel target — exact frames rendered from the spec, scenes
-// the approved image upscaled — numbered like the destination's photos, plus
-// the listing video as rendered, with a README and a manifest that say what
-// produced each one. Zipped for the maker to post by hand; a human always
-// publishes.
+// A destination's delivery (finished means delivered): every slot switched on,
+// in the plan's order, as a file at the destination's pixel target — exact
+// frames rendered from the spec, scenes the approved image upscaled — numbered
+// like the destination's photos, plus the listing video as rendered, with a
+// README and a manifest that say what produced each one. Zipped for the maker
+// to post by hand; a human always publishes.
 
 export interface SceneSource {
   prompt: string;

@@ -3,12 +3,12 @@ import type { LessonTopic } from "@/domain/lesson";
 import { KNOBS, KnobKey, knobStops, REASONS } from "@/domain/scene-knobs";
 import { CATALOG } from "@/lib/recipes";
 
-// Kiln's specialists (ROADMAP "Agents", stage 3): modes of the one agent,
-// each its know-how and a subset of the tools, chosen by the maker with a chip
-// (Luis, 2026-10-30); the general mode may suggest one. Fewer tools per step
-// keep the model on the task and each step cheaper. A specialist becomes an
-// agent of its own only if one agent stops coping. The know-how is written
-// from Kiln's own data (the knobs, the channel's rules), so it stays true.
+// Kiln's specialists: modes of the one agent, each its know-how and a subset of
+// the tools, chosen by the maker with a chip (Luis, 2026-10-30); the general
+// mode may suggest one. Fewer tools per step keep the model on the task and
+// each step cheaper. A specialist becomes an agent of its own only if one agent
+// stops coping. The know-how is written from Kiln's own data (the knobs, the
+// channel's rules), so it stays true.
 
 export const SpecialistId = z.enum(["kiln", "etsy", "scenes", "svg"]);
 export type SpecialistId = z.infer<typeof SpecialistId>;

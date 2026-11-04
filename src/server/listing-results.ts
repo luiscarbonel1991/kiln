@@ -10,9 +10,9 @@ import { getCurrentMaker } from "@/server/maker-repository";
 import { changePlan, loadProjectBoard } from "@/server/project-repository";
 import { resultsConnector } from "@/server/shop-connector";
 
-// The results loop's server side (ROADMAP Phase 20): a read saved (typed on
-// the board, sent by an agent through the API, or read from the shop
-// connector), and the listings a maker follows, with what is due.
+// The results loop's server side: a read saved (typed on the board, sent by an
+// agent through the API, or read from the shop connector), and the listings a
+// maker follows, with what is due.
 
 export class ResultsRefusal extends Error {
   readonly name = "ResultsRefusal";

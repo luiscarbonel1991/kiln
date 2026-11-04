@@ -22,11 +22,11 @@ export type DrawnLook = LookReference | { refused: string };
 const NO_DESIGN =
   "Kiln draws other colours and styles from a design file; this product has none.";
 
-// A look's design, free (ROADMAP P2-9): its style's drawing or the product's
-// own, redrawn in the look's colour and stored by its bytes (the same look
-// is the same file). Refused, with why, for a product not drawn from an SVG
-// and for a colour Kiln cannot swap in: a drawing that paints none of the
-// product's colours is taken as it is, in the default colour only.
+// A look's design, free: its style's drawing or the product's own, redrawn in
+// the look's colour and stored by its bytes (the same look is the same file).
+// Refused, with why, for a product not drawn from an SVG and for a colour Kiln
+// cannot swap in: a drawing that paints none of the product's colours is taken
+// as it is, in the default colour only.
 export async function lookDesign(
   product: Product,
   look: ResolvedLook,

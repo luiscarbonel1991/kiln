@@ -5,10 +5,10 @@ import { mockShop, type ShopConnector } from "@/providers/shop";
 import { allPages, type EtsyReceipt } from "@/providers/shop/etsy";
 import { connectedEtsy, shopConnection } from "@/server/shop-connection";
 
-// The shop connector the results loop reads from (ROADMAP Phase 20): the mock
-// shop in a mock run; else the maker's connected Etsy shop, whose API gives a
-// listing's orders and revenue in a window (from its receipts) but not its
-// visits or views, which still come from the shop's stats; else none.
+// The shop connector the results loop reads from: the mock shop in a mock run;
+// else the maker's connected Etsy shop, whose API gives a listing's orders and
+// revenue in a window (from its receipts) but not its visits or views, which
+// still come from the shop's stats; else none.
 
 const DAY_SEC = 86_400;
 const MAX_RECEIPT_PAGES = 50;

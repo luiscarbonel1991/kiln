@@ -34,9 +34,9 @@ import {
   ShopNeedsReconnect,
 } from "@/server/shop-connection";
 
-// The maker's Etsy drafts (ROADMAP Phase 11; Luis, 2026-11-02: drafts first,
-// so nothing live is touched). Etsy's write scope is all-or-nothing, so the
-// rules are Kiln's, and each holds here:
+// The maker's Etsy drafts (Luis, 2026-11-02: drafts first, so nothing live is
+// touched). Etsy's write scope is all-or-nothing, so the rules are Kiln's, and
+// each holds here:
 // - a listing is changed only while it is a draft of the connected shop,
 //   checked against Etsy right before the change (editableDraft);
 // - nothing publishes (no request carries a state: etsySend) and nothing is

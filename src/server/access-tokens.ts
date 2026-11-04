@@ -3,12 +3,12 @@ import { z } from "zod";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { getCurrentMaker } from "@/server/maker-repository";
 
-// Personal access tokens for Kiln's HTTP API (ROADMAP 2026-10-26, P0-1): what
-// a script, an agent, a scheduled job or another system sends as
-// `Authorization: Bearer kiln_pat_...` to import a package or a material photo
-// without a file picker. A token acts for the maker it was made for. Only its
-// SHA-256 is stored: a token is 32 random bytes, so a fast hash is enough, and
-// a leaked table gives nothing to send. Shown once, when it is made.
+// Personal access tokens for Kiln's HTTP API: what a script, an agent, a
+// scheduled job or another system sends as `Authorization: Bearer kiln_pat_...`
+// to import a package or a material photo without a file picker. A token acts
+// for the maker it was made for. Only its SHA-256 is stored: a token is 32
+// random bytes, so a fast hash is enough, and a leaked table gives nothing to
+// send. Shown once, when it is made.
 
 export const TOKEN_PREFIX = "kiln_pat_";
 const TOKEN_PATTERN = /^kiln_pat_[A-Za-z0-9_-]{43}$/;

@@ -27,13 +27,12 @@ import {
 import { getCurrentMaker } from "@/server/maker-repository";
 import { seal, unseal } from "@/server/secret-box";
 
-// The maker's Etsy shop, connected to Kiln (ROADMAP Phase 20, "The Etsy
-// connection"; Luis, 2026-10-27: approve Kiln on Etsy, no key to paste). The
-// maker clicks Connect, approves Kiln on Etsy's own page, and Etsy sends them
-// back with a code that Kiln trades for the shop's tokens, kept sealed. The
-// handshake (state and PKCE verifier) rides in a sealed, short-lived cookie,
-// so the code is only taken from the browser that asked for it. A mock run
-// connects a mock shop without leaving Kiln.
+// The maker's Etsy shop, connected to Kiln (Luis, 2026-10-27: approve Kiln on
+// Etsy, no key to paste). The maker clicks Connect, approves Kiln on Etsy's own
+// page, and Etsy sends them back with a code that Kiln trades for the shop's
+// tokens, kept sealed. The handshake (state and PKCE verifier) rides in a
+// sealed, short-lived cookie, so the code is only taken from the browser that
+// asked for it. A mock run connects a mock shop without leaving Kiln.
 
 const PLATFORM = "etsy";
 export const CONNECT_COOKIE = "kiln_etsy_connect";

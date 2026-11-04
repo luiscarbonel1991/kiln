@@ -30,14 +30,13 @@ import "@/server/chat/no-gateway";
 import { newLedger, routedChatModel } from "@/server/chat/routed-model";
 import { SPECIALISTS, type SpecialistId } from "@/server/chat/specialists";
 
-// One turn of the chat (ROADMAP "Agents", stage 2): one request, run inside
-// Kiln (Luis, 2026-10-30: no Vercel). It takes the session's lock, adds what
-// the maker did to the stored conversation, and streams the agent's reply
-// while it runs Kiln's tools on the agent's route (its own, else its role's),
-// at most MAX_STEPS model calls and as long as the route's effort allows
-// (turnMs). Each step is
-// stored as it ends, so a closed tab or a reload loses nothing; Stop ends the
-// turn from another request.
+// One turn of the chat: one request, run inside Kiln (Luis, 2026-10-30: no
+// Vercel). It takes the session's lock, adds what the maker did to the stored
+// conversation, and streams the agent's reply while it runs Kiln's tools on the
+// agent's route (its own, else its role's), at most MAX_STEPS model calls and
+// as long as the route's effort allows (turnMs). Each step is stored as it
+// ends, so a closed tab or a reload loses nothing; Stop ends the turn from
+// another request.
 
 export const MAX_STEPS = 12;
 

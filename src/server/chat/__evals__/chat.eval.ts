@@ -2,13 +2,12 @@ import { afterAll, describe, expect, it } from "vitest";
 import type { KilnMessage } from "@/server/chat/messages";
 import tasks from "./tasks.json";
 
-// The chat agent on a fixed set of tasks (ROADMAP "Agents": an agent is
-// measured before it ships): the real text model on a mock run, so images,
-// generation and the database are the mock's and nothing but text is paid.
-// It prints what the run may cost first, and runs only with KILN_EVAL_YES=1.
-// It never approves a call: a task that should spend passes when the agent
-// quoted and then asked for the maker's click. A task names the specialist
-// the maker picked, if any.
+// The chat agent on a fixed set of tasks (an agent is measured before it
+// ships): the real text model on a mock run, so images, generation and the
+// database are the mock's and nothing but text is paid. It prints what the run
+// may cost first, and runs only with KILN_EVAL_YES=1. It never approves a call:
+// a task that should spend passes when the agent quoted and then asked for the
+// maker's click. A task names the specialist the maker picked, if any.
 
 interface Task {
   id: string;

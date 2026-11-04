@@ -12,7 +12,7 @@ const { callTool, defineTool, inputJsonSchema, ToolRefusal } = await import(
 
 const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
 // The tool list itself: names a client can call, inputs it can read, and no
-// tool that lets an agent pick a model (ROADMAP "Agents ask for roles").
+// tool that lets an agent pick a model (agents ask for roles).
 
 function keys(schema: unknown): string[] {
   if (!schema || typeof schema !== "object") return [];

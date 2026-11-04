@@ -31,15 +31,14 @@ import { appendChatEvent } from "@/server/chat/chat-repository";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { loadProjectBoard } from "@/server/project-repository";
 
-// The maker's lessons (ROADMAP "Agents", stage 4). Kiln records what the
-// maker does on the board that says something of their taste (a reason given
-// for a take, a take approved with a knob they set) and proposes a lesson
-// when two of their choices agree on a frame's knob for a product family, or
-// when a listing's after-read shows a change worth a sentence. An agent may
-// propose one too. A lesson counts only once the maker keeps it: then every
-// agent reads it, and a scene lesson starts that frame's knob in new projects
-// of the family. Nothing here is paid, and none of it fails the action that
-// taught it.
+// The maker's lessons. Kiln records what the maker does on the board that says
+// something of their taste (a reason given for a take, a take approved with a
+// knob they set) and proposes a lesson when two of their choices agree on a
+// frame's knob for a product family, or when a listing's after-read shows a
+// change worth a sentence. An agent may propose one too. A lesson counts only
+// once the maker keeps it: then every agent reads it, and a scene lesson starts
+// that frame's knob in new projects of the family. Nothing here is paid, and
+// none of it fails the action that taught it.
 
 export interface LessonView {
   id: string;

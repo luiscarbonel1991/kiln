@@ -41,12 +41,12 @@ import {
   shopConnection,
 } from "@/server/shop-connection";
 
-// Shops (ROADMAP Phase 20; Luis, 2026-10-27): the maker's best sellers, read
-// from their connected shop's receipts, and the other shops they compare
-// theirs with, from Etsy's public numbers. Read through the API on request
-// and kept in memory for ten minutes; Etsy's API terms (2026-08-18) allow
-// showing listings at most six hours old and storing nothing longer than the
-// service needs, so nothing read from Etsy is stored.
+// Shops (Luis, 2026-10-27): the maker's best sellers, read from their connected
+// shop's receipts, and the other shops they compare theirs with, from Etsy's
+// public numbers. Read through the API on request and kept in memory for ten
+// minutes; Etsy's API terms (2026-08-18) allow showing listings at most six
+// hours old and storing nothing longer than the service needs, so nothing read
+// from Etsy is stored.
 
 const FRESH_MS = 10 * 60_000;
 // 5,000 orders in a window, 500 of a shop's listings, the details (photo,

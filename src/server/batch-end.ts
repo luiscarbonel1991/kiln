@@ -1,11 +1,10 @@
 import { db } from "@/lib/db";
 import { appendChatEvent } from "@/server/chat/chat-repository";
 
-// A batch that ended says so in its project's latest conversation (ROADMAP
-// "Agents", stage 2): once, by the batch's id, and never at the cost of the
-// job that ended it. The agent reads it with the maker's next message; it
-// does not start a turn on its own (Luis, 2026-10-30: free work alone, paid
-// work on the maker's ok).
+// A batch that ended says so in its project's latest conversation: once, by the
+// batch's id, and never at the cost of the job that ended it. The agent reads
+// it with the maker's next message; it does not start a turn on its own (Luis,
+// 2026-10-30: free work alone, paid work on the maker's ok).
 
 // How a batch's jobs ended, once its last one did.
 export interface BatchEnd {

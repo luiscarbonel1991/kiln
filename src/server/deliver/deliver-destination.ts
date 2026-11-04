@@ -19,11 +19,11 @@ import { readBeforeAtDelivery } from "@/server/listing-results";
 import { getMakerBrand } from "@/server/maker-repository";
 import { loadProjectBoard, setDelivered } from "@/server/project-repository";
 
-// Deliver one destination of a planned project: a zip of its files (ROADMAP
-// "Deliver"), stored and handed back as a link; the slots it exported are
-// stamped delivered, and a sale destination with a connected shop takes its
-// before read. The board's action and the deliver tool run it the same way;
-// every read and write is scoped to the current maker.
+// Deliver one destination of a planned project: a zip of its files, stored and
+// handed back as a link; the slots it exported are stamped delivered, and a
+// sale destination with a connected shop takes its before read. The board's
+// action and the deliver tool run it the same way; every read and write is
+// scoped to the current maker.
 
 export type DeliverResult =
   | { url: string; filename: string; count: number }

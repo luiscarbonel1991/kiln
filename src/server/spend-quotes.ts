@@ -2,10 +2,10 @@ import type { Prisma } from "@prisma/client";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { getCurrentMaker } from "@/server/maker-repository";
 
-// A paid tool runs in two calls (ROADMAP "Agents", stage 1): `quote` stores
-// the action, its input and its estimate here and answers an id; the paid
-// tool takes only that id and runs what was quoted, once, before the quote
-// expires. Every read and write is scoped to the current maker.
+// A paid tool runs in two calls: `quote` stores the action, its input and its
+// estimate here and answers an id; the paid tool takes only that id and runs
+// what was quoted, once, before the quote expires. Every read and write is
+// scoped to the current maker.
 
 export const QUOTE_MINUTES = 30;
 

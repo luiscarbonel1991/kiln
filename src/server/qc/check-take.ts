@@ -20,9 +20,9 @@ import {
 import { decodeImage, relayRow } from "@/server/qc/decode";
 import type { OcrEngine, TextReader } from "@/server/qc/ocr";
 
-// A take's check (ROADMAP Phase 10): the reference it edited and the take are
-// read the same way, and the take is held only to the wording the reference
-// itself reads. Free and local; nothing here is paid.
+// A take's check: the reference it edited and the take are read the same way,
+// and the take is held only to the wording the reference itself reads. Free and
+// local; nothing here is paid.
 
 export interface CheckedImage {
   bytes: Uint8Array;

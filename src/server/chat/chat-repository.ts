@@ -7,9 +7,9 @@ import {
 } from "@/server/chat/messages";
 import { getCurrentMaker } from "@/server/maker-repository";
 
-// The chat's sessions and messages (ROADMAP "Agents", stage 2), scoped to the
-// current maker. A session holds a lock while a turn runs; a message is
-// stored as the chat shows it, and keeps its place (`seq`) once stored.
+// The chat's sessions and messages, scoped to the current maker. A session
+// holds a lock while a turn runs; a message is stored as the chat shows it, and
+// keeps its place (`seq`) once stored.
 
 export const NEW_TITLE = "New conversation";
 export const LOCK_MINUTES = 10;

@@ -5,12 +5,11 @@ import { findRecipe } from "@/lib/recipes";
 import { projectGenerationState } from "@/server/generation-repository";
 import { getCurrentMaker } from "@/server/maker-repository";
 
-// A maker's design projects as the tools read them (ROADMAP "Agents", the SVG
-// specialist): a design starts in the studio from an image, has no plan and
-// no frames, and each of its drawings is a line-art card that is drawn (the
-// image model, paid), then traced into an SVG (free). The studio's editor and
-// the tools share these rows: the queue draws, the server traces, and the
-// editor's autosave keeps both (saveProject).
+// A maker's design projects as the tools read them: a design starts in the
+// studio from an image, has no plan and no frames, and each of its drawings is
+// a line-art card that is drawn (the image model, paid), then traced into an
+// SVG (free). The studio's editor and the tools share these rows: the queue
+// draws, the server traces, and the editor's autosave keeps both (saveProject).
 
 export type DrawingState =
   | "to-draw"

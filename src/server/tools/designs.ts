@@ -11,11 +11,11 @@ import { setCardVector } from "@/server/project-repository";
 import { defineTool, ToolRefusal } from "@/server/tools/registry";
 import { traceToVector, VectorDetail, VectorMode } from "@/server/vectorize";
 
-// A design's tools (ROADMAP "Agents", the SVG specialist): read the maker's
-// designs, look at a drawing or its vector, and trace a drawing into an SVG
-// (free, on the server). Drawing the line art is paid: quote "draw", then
-// draw. A vector is art for the maker's product, made into one in their
-// product form (makeProduct); Kiln makes no production files.
+// A design's tools (the SVG specialist's): read the maker's designs, look at a
+// drawing or its vector, and trace a drawing into an SVG (free, on the server).
+// Drawing the line art is paid: quote "draw", then draw. A vector is art for
+// the maker's product, made into one in their product form (makeProduct); Kiln
+// makes no production files.
 
 const DesignRef = z
   .object({

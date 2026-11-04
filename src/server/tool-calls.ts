@@ -8,9 +8,8 @@ import {
   type ToolContext,
 } from "@/server/tools/registry";
 
-// Every tool call is recorded (ROADMAP "Agents": which tool, for whom, what it
-// cost): the token or the chat session, the tool, its arguments and how it
-// ended. A call's
+// Every tool call is recorded (which tool, for whom, what it cost): the token
+// or the chat session, the tool, its arguments and how it ended. A call's
 // arguments over 4 KB (a product package) are kept only by their size.
 
 const MAX_ARGS_BYTES = 4096;

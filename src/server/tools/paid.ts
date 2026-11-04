@@ -30,12 +30,12 @@ import {
 } from "@/server/tools/registry";
 import { takeQuote } from "@/server/tools/spend";
 
-// The paid tools (ROADMAP "Agents", stage 1): `quote` prices a task and
-// stores it; generate, draw, write_listing and review_product take only the
-// quote's id, run what was quoted once, and only for a token the maker lets
-// spend. Each task runs on its role's route (Settings → Models): frames and
-// drawings on their card's model and the final route, the listing text on
-// deep, the review on fast. The cap rules every attempt, as on the board.
+// The paid tools: `quote` prices a task and stores it; generate, draw,
+// write_listing and review_product take only the quote's id, run what was
+// quoted once, and only for a token the maker lets spend. Each task runs on its
+// role's route (Settings → Models): frames and drawings on their card's model
+// and the final route, the listing text on deep, the review on fast. The cap
+// rules every attempt, as on the board.
 
 const usd = (micros: number) =>
   Math.round(fromMicros(micros) * 10_000) / 10_000;

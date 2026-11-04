@@ -10,10 +10,10 @@ import {
 } from "@/server/etsy-drafts";
 import { defineTool, ToolRefusal } from "@/server/tools/registry";
 
-// The maker's Etsy drafts as tools (ROADMAP Phase 11). Reading is free and
-// open to every agent; making or changing a draft runs only after the
-// maker's click in Kiln's chat (an MCP agent is not offered them). Nothing
-// publishes: the maker publishes a draft in Etsy's editor.
+// The maker's Etsy drafts as tools. Reading is free and open to every agent;
+// making or changing a draft runs only after the maker's click in Kiln's chat
+// (an MCP agent is not offered them). Nothing publishes: the maker publishes a
+// draft in Etsy's editor.
 
 async function asTool<T>(run: () => Promise<T>): Promise<T> {
   try {

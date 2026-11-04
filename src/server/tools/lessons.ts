@@ -3,9 +3,9 @@ import { LessonStatus, LessonTopic } from "@/domain/lesson";
 import { listLessons, proposeLesson } from "@/server/lessons";
 import { defineTool } from "@/server/tools/registry";
 
-// The maker's lessons as tools (ROADMAP "Agents", stage 4): an agent reads
-// the ones the maker kept and follows them, and may propose one; a proposal
-// counts only once the maker keeps it (in the chat, or Settings → Lessons).
+// The maker's lessons as tools: an agent reads the ones the maker kept and
+// follows them, and may propose one; a proposal counts only once the maker
+// keeps it (in the chat, or Settings → Lessons).
 
 export const listLessonsTool = defineTool({
   name: "list_lessons",

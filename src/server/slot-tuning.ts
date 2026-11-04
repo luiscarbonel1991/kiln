@@ -48,12 +48,11 @@ export function retuneSlot(
   return setSlotTuning(projectId, ref, tune, derivedCard(ref));
 }
 
-// A frame's own colour and style (ROADMAP P2-9), free: a colour or style
-// given, null to follow the project's again, left out to keep the frame's.
-// Kiln draws the look when the project has none of it yet, then writes the
-// frame's whole card in it (its product's words and material sample; the
-// maker's own fields stay). Nothing is generated. Refused, with why, for a
-// look the product cannot show.
+// A frame's own colour and style, free: a colour or style given, null to follow
+// the project's again, left out to keep the frame's. Kiln draws the look when
+// the project has none of it yet, then writes the frame's whole card in it (its
+// product's words and material sample; the maker's own fields stay). Nothing is
+// generated. Refused, with why, for a look the product cannot show.
 export async function relookSlot(
   projectId: string,
   ref: SlotRef,

@@ -2,10 +2,10 @@ import { Prisma } from "@prisma/client";
 import { ProjectPlan } from "@/domain/plan";
 import { assertDatabaseUrl, db } from "@/lib/db";
 
-// What a maker cares about on Home (ROADMAP screen 1): what each project has
-// spent and kept, and this month's cost per approved output — not per output
-// made. Spend follows the budget's rule: live jobs only, a job's measured
-// cost, else its estimate when its paid call went out.
+// What a maker cares about on Home: what each project has spent and kept, and
+// this month's cost per approved output — not per output made. Spend follows
+// the budget's rule: live jobs only, a job's measured cost, else its estimate
+// when its paid call went out.
 
 export interface ProjectStats {
   spentMicros: number;

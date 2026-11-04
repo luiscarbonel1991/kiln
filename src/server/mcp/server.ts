@@ -12,9 +12,9 @@ import {
   type ToolAnswer,
 } from "@/server/tools/registry";
 
-// Kiln's MCP server (ROADMAP "Agents", stage 1): the tool list over the
-// Streamable HTTP transport, stateless, answering in JSON. The only place the
-// MCP SDK is imported (a test holds it here).
+// Kiln's MCP server: the tool list over the Streamable HTTP transport,
+// stateless, answering in JSON. The only place the MCP SDK is imported (a test
+// holds it here).
 
 const INSTRUCTIONS = `Kiln prepares a maker's products for sale: each project is a board of frames (photos, video, exact renders) for its destinations.
 The maker's lessons say what they want: read them first with list_lessons (for the product's family) and follow them; propose_lesson proposes one they stated, which counts once they keep it.
