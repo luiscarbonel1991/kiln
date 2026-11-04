@@ -30,7 +30,9 @@ Without `OPENAI_API_KEY` or `GOOGLE_API_KEY`, every provider runs on its mock.
 
 ## The checks a change passes
 
-CI runs these on every pull request. Run them before you push:
+CI runs these on every pull request, in the Dockerfile's base image. Run them
+before you push. The image tests need ImageMagick 7 (`magick`) and ffmpeg (see the
+README's "System dependencies").
 
 ```bash
 pnpm lint
