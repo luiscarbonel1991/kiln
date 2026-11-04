@@ -1,0 +1,59 @@
+name: Bug report
+description: Something in Kiln does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. A vulnerability goes through the Security tab
+        (Report a vulnerability), never here. Leave keys, tokens and `.env`
+        values out of everything you paste.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what Kiln did instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a project…
+        2. …
+    validations:
+      required: true
+  - type: dropdown
+    id: providers
+    attributes:
+      label: Providers
+      options:
+        - Mock (KILN_PROVIDERS=mock)
+        - Live (OpenAI and/or Google keys)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit
+      description: The output of `git rev-parse --short HEAD`.
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: How you run Kiln
+      options:
+        - pnpm dev on macOS
+        - pnpm dev on Linux
+        - pnpm dev on Windows (WSL)
+        - Docker (docker compose --profile app)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: The server log or the browser console around the failure.
+      render: text

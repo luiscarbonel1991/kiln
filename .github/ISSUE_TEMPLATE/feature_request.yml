@@ -1,0 +1,33 @@
+name: Idea
+description: Something Kiln could do for a maker before the sale.
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Kiln works before the sale and stays generic: no cut files, orders or
+        job cards, and nothing tied to one maker (CONTRIBUTING.md, "What Kiln
+        leaves out").
+  - type: textarea
+    id: problem
+    attributes:
+      label: The maker's problem
+      description: What a maker is trying to do today, and where it hurts.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What Kiln could do
+      description: The smallest change that would solve it.
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: Does it cost money?
+      description: Whether it needs a paid model call, and when the maker approves it.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
