@@ -41,8 +41,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local Claude Code settings (per-developer)
-.claude/settings.local.json
+# editor and agent settings (per-developer)
+/.idea/
+/.vscode/
+/.claude/
 
 # package build output (@kiln/engine dist is built on publish, never committed)
 packages/*/dist
