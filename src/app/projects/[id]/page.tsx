@@ -104,7 +104,7 @@ async function batchEstimate(
   }
 }
 
-// The Project board (ROADMAP screen 3): the storyboard of a planned project.
+// The Project board: the storyboard of a planned project.
 // Dynamic per request (no static params); a project of another maker or an
 // unknown id is a 404. `?chat=1` opens the project's chat beside the board
 // (full screen on a phone).

@@ -108,11 +108,11 @@ function money(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-// The New project flow (ROADMAP "Experience design"): pick a product (or add
-// one: a short form, a photo or a design file — no file format to learn; a
-// catalog export still imports), then three decisions. Every frame of the
-// plan is previewed here; exact ones are already final. Start creates the
-// project and opens its board; it calls no model.
+// The New project flow: pick a product (or add one: a short form, a photo or a
+// design file — no file format to learn; a catalog export still imports), then
+// three decisions. Every frame of the plan is previewed here; exact ones are
+// already final. Start creates the project and opens its board; it calls no
+// model.
 export function NewProjectFlow({
   initialProducts,
   initialBrand,
@@ -992,9 +992,9 @@ function Step({
   );
 }
 
-// The colour and style the project shows (ROADMAP P2-9). Only a product drawn
-// from an SVG can be shown in another: Kiln redraws its design. The
-// product's own default never changes for it.
+// The colour and style the project shows. Only a product drawn from an SVG can
+// be shown in another: Kiln redraws its design. The product's own default never
+// changes for it.
 function ProjectLook({
   product,
   look,

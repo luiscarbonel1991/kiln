@@ -12,9 +12,9 @@ import { SAMPLE_PRODUCT, SAMPLE_SCENES } from "@/lib/home-sample";
 import { type PlateImage, plateHref } from "@/lib/plate-href";
 import { CATALOG } from "@/lib/recipes";
 
-// Home's story (ROADMAP "Toward a stable version", step 3; Luis, 2026-11-02):
-// one product traveling through Kiln, told with the maker's own work, the
-// sample product where they have none. Pure: the server reads, these build.
+// Home's story (Luis, 2026-11-02): one product traveling through Kiln, told
+// with the maker's own work, the sample product where they have none. Pure: the
+// server reads, these build.
 
 export interface StoryProduct {
   name: string;

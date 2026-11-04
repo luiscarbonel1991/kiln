@@ -2,9 +2,9 @@ import { Check } from "lucide-react";
 import type { SlotView } from "@/domain/plan";
 import { cn } from "@/lib/utils";
 
-// Slot states in the provenance hues (DESIGN.md): pine = exact / approved (true
-// to the spec), terracotta = the maker's own photo, slate = to review, primary
-// = generating, amber = retrying.
+// Slot states in the provenance hues (globals.css): pine = exact / approved
+// (true to the spec), terracotta = the maker's own photo, slate = to review,
+// primary = generating, amber = retrying.
 const STYLE: Record<SlotView["state"], { label: string; className: string }> = {
   off: {
     label: "off",

@@ -18,9 +18,9 @@ export function SlotGrid({ children }: { children: ReactNode }) {
 }
 
 // One frame of the storyboard: the render at the slot's real aspect (render
-// radius + render shadow, DESIGN.md), the position label ("Etsy photo 1"), the
-// slot's job as a serif caption, and its state. A slot switched off stays in
-// place, faded, so the maker can switch it back on.
+// radius + render shadow), the position label ("Etsy photo 1"), the slot's job
+// as a serif caption, and its state. A slot switched off stays in place, faded,
+// so the maker can switch it back on.
 export function SlotFrame({
   position,
   label,

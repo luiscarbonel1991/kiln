@@ -34,8 +34,8 @@ export function slotCamera(
 }
 
 // The reference a scene card edits: the plate Kiln drew for its frame's own
-// look (ROADMAP P2-9), else the project's reference; and of either, the view
-// from above when its camera looks down and the view applies.
+// look, else the project's reference; and of either, the view from above when
+// its camera looks down and the view applies.
 export function cardReference(
   plan: ProjectPlan,
   cardId: string,

@@ -37,7 +37,7 @@ const LABEL =
 const FIELD =
   "w-full min-w-0 rounded-field border border-border bg-secondary px-3 py-2 font-sans text-sm text-foreground outline-none focus:ring-1 focus:ring-ring";
 
-// Where a field's words came from, in the provenance hues (DESIGN.md): the
+// Where a field's words came from, in the provenance hues (globals.css): the
 // spec (pine, free), the text model (slate), the maker (terracotta).
 const SOURCE: Record<TextSource, { label: string; className: string }> = {
   spec: {
@@ -169,15 +169,14 @@ function FieldHead({
   );
 }
 
-// The listing text of one sale destination (ROADMAP Phase 16): every field
-// the maker pastes into the channel's editor, in the editor's order, each
-// with its count against the limit, what the channel would refuse (red) or
-// advises (amber), where its words came from, and Copy. Drafted from the
-// spec for free; what the maker edits becomes theirs. Variations, prices
-// and attributes come from the product and are edited there. With a market
-// brief, each tag shows the demand the brief has for it, the brief's
-// searches that fit are offered as tags, and the title and the price are
-// read against it (warnings only).
+// The listing text of one sale destination: every field the maker pastes into
+// the channel's editor, in the editor's order, each with its count against the
+// limit, what the channel would refuse (red) or advises (amber), where its
+// words came from, and Copy. Drafted from the spec for free; what the maker
+// edits becomes theirs. Variations, prices and attributes come from the product
+// and are edited there. With a market brief, each tag shows the demand the
+// brief has for it, the brief's searches that fit are offered as tags, and the
+// title and the price are read against it (warnings only).
 export function ListingPanel({
   projectId,
   destinationId,

@@ -1,6 +1,6 @@
 import type { ProjectType } from "@/domain/project";
 
-// How the four project types read in the UI (ROADMAP "Domain model").
+// How the four project types read in the UI.
 export const PROJECT_TYPES: {
   type: ProjectType;
   label: string;

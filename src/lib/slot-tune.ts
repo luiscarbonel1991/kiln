@@ -98,8 +98,8 @@ export interface TuneView {
   // The image the next take edits, when Kiln drew a view from above: that
   // view for a camera looking down, else the front. Null without one.
   startsFrom: "above" | "front" | null;
-  // The colour and style the scene shows (ROADMAP P2-9); null when the
-  // product shows in one look only.
+  // The colour and style the scene shows; null when the product shows in one
+  // look only.
   look: TuneLook | null;
 }
 

@@ -301,8 +301,7 @@ export function GenerationCard({
             </button>
           ) : null}
           {card.vectorUrl && !vectorizing ? (
-            // A design becomes a product: size, material, finish, colours
-            // (ROADMAP: a Design SVG "becomes a product").
+            // A design becomes a product: size, material, finish, colours.
             <Link
               href={`/projects/new?design=${encodeURIComponent(card.vectorUrl)}`}
               className="flex w-full items-center justify-center gap-1.5 border-border-soft border-t py-3 font-sans text-[0.78rem] font-semibold text-primary transition-colors hover:bg-secondary"

@@ -3,11 +3,11 @@ import { join, relative } from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-// Kiln is driven by agents and test runners as much as by hands (ROADMAP
-// P2-10, DOGFOOD #71): every control has a stable data-testid and a name an
-// accessibility tree can read. Read from the source: a button, a field, a
-// menu item or a toggle in the app's components and pages. The primitives
-// in components/ui pass their props through.
+// Kiln is driven by agents and test runners as much as by hands (DOGFOOD #71):
+// every control has a stable data-testid and a name an accessibility tree can
+// read. Read from the source: a button, a field, a menu item or a toggle in the
+// app's components and pages. The primitives in components/ui pass their props
+// through.
 const root = join(import.meta.dirname, "..", "..");
 const SKIP = new Set(["__tests__", "ui"]);
 

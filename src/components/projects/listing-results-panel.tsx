@@ -57,11 +57,11 @@ function typed(text: string): unknown {
   return Number.isFinite(n) ? n : text;
 }
 
-// The board's results for one sale destination (ROADMAP Phase 20): the
-// listing's address, the day its photos went up, the three reads (typed from
-// the shop's stats, or read from a connected shop) and before against after,
-// beside the frames that changed. Followed from a delivery, or from the day
-// the maker says the photos went up. Kiln never opens the listing's page.
+// The board's results for one sale destination: the listing's address, the day
+// its photos went up, the three reads (typed from the shop's stats, or read
+// from a connected shop) and before against after, beside the frames that
+// changed. Followed from a delivery, or from the day the maker says the photos
+// went up. Kiln never opens the listing's page.
 export function ListingResultsPanel({
   projectId,
   destinationId,

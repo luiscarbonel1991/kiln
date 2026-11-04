@@ -24,11 +24,11 @@ const DIRECTION_LABEL = {
   lighting: "Lighting",
 } as const;
 
-// A scene's knobs on the board (ROADMAP "Knobs, not prose"): a line says how
-// the scene is set, Tune opens its stops. Turning one is free and writes the
-// scene's direction again at once; only a new take costs, its price on the
-// button. What's off about a take is a reason chip that moves a knob: the
-// reason is the next instruction, nobody rewrites a prompt.
+// A scene's knobs on the board: a line says how the scene is set, Tune opens
+// its stops. Turning one is free and writes the scene's direction again at
+// once; only a new take costs, its price on the button. What's off about a take
+// is a reason chip that moves a knob: the reason is the next instruction,
+// nobody rewrites a prompt.
 export function SlotTune({
   projectId,
   destinationId,

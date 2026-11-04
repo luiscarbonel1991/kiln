@@ -5,7 +5,7 @@ import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import type { HomeStory } from "@/lib/home-story";
 
 // Home's opening: what Kiln is for in one line, one way in, and the story's
-// product rising into place: the page's one entrance (DESIGN.md "Motion").
+// product rising into place: the page's one entrance.
 export function HomeHero({
   story,
   eyebrow,

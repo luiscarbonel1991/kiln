@@ -3,8 +3,7 @@ import Link from "next/link";
 
 // Header for Home and the project pages: the wordmark (Home), the chat, the
 // studio, Shops, Settings and a "New project" entry. Same chrome as the
-// studio header (DESIGN.md). On a project the chat opens beside its board
-// (`chatHref`).
+// studio header. On a project the chat opens beside its board (`chatHref`).
 export function ProjectsHeader({
   children,
   chatHref = "/chat",

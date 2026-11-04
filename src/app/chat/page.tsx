@@ -14,9 +14,9 @@ const when = (iso: string) =>
     minute: "2-digit",
   });
 
-// Chat (ROADMAP "Agents", stage 2): the maker's conversations with Kiln's
-// agent, their own and each project's, newest first; one open beside them.
-// `?session=` opens one; none opens a new conversation of the maker's own.
+// Chat: the maker's conversations with Kiln's agent, their own and each
+// project's, newest first; one open beside them. `?session=` opens one; none
+// opens a new conversation of the maker's own.
 export default async function ChatPage({
   searchParams,
 }: {

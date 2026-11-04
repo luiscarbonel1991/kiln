@@ -4,10 +4,10 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 
 type Phase = "still" | "armed" | "played";
 
-// One chapter of Home's story (DESIGN.md "Motion"): its copy, and a stage
-// whose parts play one staggered sequence the first time the chapter comes
-// into view. A chapter already on screen when the page opens, or any chapter
-// when the maker asks for reduced motion, stays still, every part in place.
+// One chapter of Home's story: its copy, and a stage whose parts play one
+// staggered sequence the first time the chapter comes into view. A chapter
+// already on screen when the page opens, or any chapter when the maker asks for
+// reduced motion, stays still, every part in place.
 export function StoryChapter({
   id,
   number,

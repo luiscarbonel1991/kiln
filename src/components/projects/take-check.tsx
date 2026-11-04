@@ -17,10 +17,10 @@ const TONE: Record<TakeCheck["status"], string> = {
 export const SCALE_TITLE =
   "Kiln cannot measure a scene's scale: compare the product with what is around it before approving.";
 
-// What Kiln read in a scene's shown take (ROADMAP Phase 10): its text and
-// letterforms against the reference, and the size the scene asked for, which
-// nothing measured. A take never checked (from before the check, or left
-// unchecked) can be checked again for free. Approving is never blocked.
+// What Kiln read in a scene's shown take: its text and letterforms against the
+// reference, and the size the scene asked for, which nothing measured. A take
+// never checked (from before the check, or left unchecked) can be checked again
+// for free. Approving is never blocked.
 export function TakeCheckChips({
   projectId,
   destinationId,

@@ -38,12 +38,11 @@ import type { KilnMessage } from "@/server/chat/messages";
 import type { SpecialistId } from "@/server/chat/specialists";
 import type { SessionSpend } from "@/server/generation-repository";
 
-// Kiln's chat (ROADMAP "Agents", stage 2): a project's conversation beside
-// its board, or one of the maker's own on the Chat page. The maker writes;
-// the agent works through Kiln's tools and asks for a click before anything
-// that spends, approves a frame or makes the delivery. A conversation is
-// made on the first message; one whose turn is still running (after a
-// reload) is read from Kiln until the turn ends.
+// Kiln's chat: a project's conversation beside its board, or one of the maker's
+// own on the Chat page. The maker writes; the agent works through Kiln's tools
+// and asks for a click before anything that spends, approves a frame or makes
+// the delivery. A conversation is made on the first message; one whose turn is
+// still running (after a reload) is read from Kiln until the turn ends.
 
 const SUGGESTIONS = {
   project: [

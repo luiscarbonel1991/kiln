@@ -13,8 +13,7 @@ import { Input } from "@/components/ui/input";
 import type { SlotView } from "@/domain/plan";
 import { gradientForPrompt } from "@/lib/gradient";
 
-// Every state a board slot can show (ROADMAP "Experience design"), plus a
-// failed generation.
+// Every state a board slot can show, plus a failed generation.
 const SLOT_STATES: { label: string; view: SlotView }[] = [
   { label: "exact", view: { state: "exact", failed: false } },
   { label: "waiting", view: { state: "queued", failed: false } },

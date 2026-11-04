@@ -51,12 +51,12 @@ const range = (typical: number, max: number) =>
     ? money(max)
     : `≈ ${money(typical)}–${money(max)}`;
 
-// The board's generate panel (ROADMAP principle 8, "cost before spend, one
-// approval per batch"): one button for every waiting scene, a confirmation
-// that names every card's model and price, the total and the month's budget,
-// then the running batch's progress with Cancel. Generation runs in the
-// background. When the queue would refuse the batch (a retired model, a
-// provider without a key), the panel says why instead of offering it.
+// The board's generate panel (cost before spend, one approval per batch): one
+// button for every waiting scene, a confirmation that names every card's model
+// and price, the total and the month's budget, then the running batch's
+// progress with Cancel. Generation runs in the background. When the queue would
+// refuse the batch (a retired model, a provider without a key), the panel says
+// why instead of offering it.
 export function GenerationPanel({
   projectId,
   cardIds,

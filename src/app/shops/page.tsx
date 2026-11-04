@@ -50,10 +50,9 @@ const said = (error: unknown) =>
       ? error.message
       : String(error);
 
-// Shops (ROADMAP Phase 20; Luis, 2026-10-27): the maker's best sellers, read
-// from their connected Etsy shop's orders, and the other shops they compare
-// theirs with, from Etsy's public numbers. Read per request through Etsy's
-// API, never its pages.
+// Shops (Luis, 2026-10-27): the maker's best sellers, read from their connected
+// Etsy shop's orders, and the other shops they compare theirs with, from Etsy's
+// public numbers. Read per request through Etsy's API, never its pages.
 export default async function ShopsPage({
   searchParams,
 }: {

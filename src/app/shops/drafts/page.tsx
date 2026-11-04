@@ -20,9 +20,9 @@ const HEADING = "font-serif text-xl italic text-foreground";
 const LEAD =
   "mt-1 max-w-[620px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid";
 
-// The drafts of the maker's Etsy shop (ROADMAP Phase 11; Luis, 2026-11-02):
-// the ones there now, read from Etsy per request, and the projects a new one
-// can be made from. Nothing here publishes.
+// The drafts of the maker's Etsy shop (Luis, 2026-11-02): the ones there now,
+// read from Etsy per request, and the projects a new one can be made from.
+// Nothing here publishes.
 export default async function DraftsPage() {
   await dynamic();
   const setup = etsySetup();

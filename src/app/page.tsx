@@ -34,11 +34,10 @@ function projectDetail(stats: ProjectStats): string {
   return `${kept} · ${money(stats.spentMicros)} spent${each}`;
 }
 
-// Home (ROADMAP screen 1; "Toward a stable version", step 3): what Kiln does,
-// told as one product's way through it, with the maker's own work when they
-// have some (the sample product when they do not), and for a returning maker
-// where they left off, their projects and their products. Nothing here calls
-// a model or a shop. Rendered per request.
+// Home: what Kiln does, told as one product's way through it, with the maker's
+// own work when they have some (the sample product when they do not), and for a
+// returning maker where they left off, their projects and their products.
+// Nothing here calls a model or a shop. Rendered per request.
 export default async function HomePage() {
   await connection();
   const story = await homeStory();

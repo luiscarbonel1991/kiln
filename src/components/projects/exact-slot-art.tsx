@@ -21,8 +21,8 @@ import type { PlateImage } from "@/lib/plate-href";
 // slot's aspect.
 export const WIDTH = 400;
 
-// DESIGN.md's light tokens: on-surface, on-surface-mid, on-surface-dim,
-// surface, surface-soft, line.
+// The DESIGN light tokens (globals.css): on-surface, on-surface-mid,
+// on-surface-dim, surface, surface-soft, line.
 const INK = {
   foreground: "#241f18",
   mid: "#6f6657",

@@ -16,10 +16,10 @@ export interface StyleRow {
 
 const SVG_TYPES = "image/svg+xml,.svg";
 
-// A vector product's other designs (ROADMAP P2-9): each a drawing of the same
-// piece with the wording it shows, chosen per project and per frame like a
-// colour. Kiln redraws every style in every colour, so a style is uploaded
-// once, in any of the product's colours.
+// A vector product's other designs: each a drawing of the same piece with the
+// wording it shows, chosen per project and per frame like a colour. Kiln
+// redraws every style in every colour, so a style is uploaded once, in any of
+// the product's colours.
 export function ProductStyles({
   styles,
   onStyles,

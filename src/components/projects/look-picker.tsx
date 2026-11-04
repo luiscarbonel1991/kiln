@@ -15,10 +15,10 @@ export interface LookOption {
   warning?: string;
 }
 
-// A colour and a style to show the product in (ROADMAP P2-9): New project
-// picks the project's, Tune a frame's. Free: Kiln redraws the design in the
-// look, nothing is generated. An option Kiln cannot draw says why, and a
-// colour the product's text contradicts says what, once picked.
+// A colour and a style to show the product in: New project picks the project's,
+// Tune a frame's. Free: Kiln redraws the design in the look, nothing is
+// generated. An option Kiln cannot draw says why, and a colour the product's
+// text contradicts says what, once picked.
 export function LookPicker({
   colours,
   styles,

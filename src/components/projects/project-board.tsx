@@ -230,13 +230,12 @@ function deliveryBlocker(
   return null;
 }
 
-// The storyboard (ROADMAP "Experience design"): one row per destination, one
-// frame per slot, the deliverable visible from minute one. Exact frames are
-// drawn from the spec; scene frames show their card's candidate and their job's
-// progress. The side panel carries the reference image, the generate panel
-// (one approval per batch, background queue), and each destination's
-// checklist. A server component: approvals, the reference upload, the generate
-// panel and the poller are client islands.
+// The storyboard: one row per destination, one frame per slot, the deliverable
+// visible from minute one. Exact frames are drawn from the spec; scene frames
+// show their card's candidate and their job's progress. The side panel carries
+// the reference image, the generate panel (one approval per batch, background
+// queue), and each destination's checklist. A server component: approvals, the
+// reference upload, the generate panel and the poller are client islands.
 export function ProjectBoard({
   projectId,
   board,
@@ -945,7 +944,7 @@ export function ProjectBoard({
 }
 
 // A sale destination that takes drafts through its API: make one from the
-// project, or open the last one Kiln made (ROADMAP Phase 11).
+// project, or open the last one Kiln made.
 function DraftLink({
   projectId,
   destinationId,

@@ -7,9 +7,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Kiln — Studio design system. docs/app-idea/DESIGN.md is the binding visual spec.
+ * Kiln — Studio design system. The tokens in this file are the binding visual spec.
  * shadcn (radix-nova) semantic tokens are mapped to DESIGN tokens (hex). --primary and
- * --prov-local are runtime-tinted from BrandProfile.palette[0]. Light-only: DESIGN.md
+ * --prov-local are runtime-tinted from BrandProfile.palette[0]. Light-only: the spec
  * defines no dark palette, so there is no .dark block and no prefers-color-scheme switch.
  */
 
@@ -145,12 +145,11 @@
   }
 }
 
-/* Home's story (DESIGN.md "Motion"): each chapter plays one staggered
-   sequence the first time it comes into view. A chapter is armed (its parts
-   held at their start) by StoryChapter only when it starts below the fold and
-   motion is allowed, so without script, or with reduced motion, every part
-   simply shows. Each part takes its kind from a class and its place from
-   --i (90 ms apart). */
+/* Home's story: each chapter plays one staggered sequence the first time it
+   comes into view. A chapter is armed (its parts held at their start) by
+   StoryChapter only when it starts below the fold and motion is allowed, so
+   without script, or with reduced motion, every part simply shows. Each part
+   takes its kind from a class and its place from --i (90 ms apart). */
 .story-part {
   --story-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --story-anim: story-rise;
@@ -302,7 +301,7 @@
   --ring: #c0461f; /* primary */
   --radius: 0.8rem; /* base; named DESIGN radii live in @theme */
 
-  /* chart palette — derived from DESIGN hues (not defined in DESIGN.md) */
+  /* chart palette — derived from DESIGN hues (charts have no hues of their own) */
   --chart-1: #c0461f; /* terracotta */
   --chart-2: #8a6310; /* amber */
   --chart-3: #2c6a51; /* pine */

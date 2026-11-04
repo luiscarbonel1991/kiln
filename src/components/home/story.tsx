@@ -14,10 +14,10 @@ import {
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import type { HomeStory } from "@/lib/home-story";
 
-// Home's story (ROADMAP "Toward a stable version", step 3): one product's way
-// through Kiln, chapter by chapter: its spec, its designs, its exact frames,
-// its scenes, its looks, its words, and everywhere it sells. Told with the
-// maker's showcase project, or with the sample product.
+// Home's story: one product's way through Kiln, chapter by chapter: its spec,
+// its designs, its exact frames, its scenes, its looks, its words, and
+// everywhere it sells. Told with the maker's showcase project, or with the
+// sample product.
 export function Story({ story }: { story: HomeStory }) {
   const sample = story.project === null;
   const lead = story.scenes[0];

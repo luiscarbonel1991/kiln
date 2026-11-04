@@ -125,12 +125,12 @@ const conversionText = (s: TargetSearch) =>
 const priceText = (band: PriceBand | undefined) =>
   band ? bandLabel(band) : "";
 
-// A listing's market brief on the board (ROADMAP Phase 20): the searches it
-// aims at (the first leads: the title should name it), each with its source
-// and date, and what page 1 shows for them, in words. A note's place can be
-// handed to a frame, which then stands there; the price is set beside the
-// band that sells, as a warning. All of it is the maker's research, kept
-// with the project; Kiln reads no marketplace.
+// A listing's market brief on the board: the searches it aims at (the first
+// leads: the title should name it), each with its source and date, and what
+// page 1 shows for them, in words. A note's place can be handed to a frame,
+// which then stands there; the price is set beside the band that sells, as a
+// warning. All of it is the maker's research, kept with the project; Kiln reads
+// no marketplace.
 export function MarketBriefPanel({
   projectId,
   destinationId,

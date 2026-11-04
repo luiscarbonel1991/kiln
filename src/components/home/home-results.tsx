@@ -6,10 +6,10 @@ import type { FollowedListing } from "@/server/listing-results";
 const LABEL =
   "font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim";
 
-// Home's results (ROADMAP Phase 20): every listing the maker follows, the
-// reads due first (the reminder), then before against after where both were
-// read, with the frames that changed and their family, so the scene styles
-// that move a number add up per family.
+// Home's results: every listing the maker follows, the reads due first (the
+// reminder), then before against after where both were read, with the frames
+// that changed and their family, so the scene styles that move a number add up
+// per family.
 export function HomeResults({ listings }: { listings: FollowedListing[] }) {
   const order = (l: FollowedListing) =>
     l.view.reads.find((r) => r.due)?.dueOn ?? l.view.next?.dueOn ?? "9999";

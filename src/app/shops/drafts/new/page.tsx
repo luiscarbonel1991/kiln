@@ -12,7 +12,7 @@ import {
 } from "@/server/etsy-drafts";
 
 // A new Etsy draft from a project's destination: everything it would carry,
-// seen and completed before anything is sent (ROADMAP Phase 11).
+// seen and completed before anything is sent.
 export default async function NewDraftPage({
   searchParams,
 }: {

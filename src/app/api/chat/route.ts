@@ -3,11 +3,10 @@ import { runTurn, TurnRefusal } from "@/server/chat/run-turn";
 import { SpecialistId } from "@/server/chat/specialists";
 import { apiError, foreignOrigin, readBody } from "@/server/http-api";
 
-// POST /api/chat — one turn of Kiln's chat (ROADMAP "Agents", stage 2): the
-// conversation, and what the maker did (a message, or a yes or no to a tool
-// call that waits). It answers the agent's reply as the AI SDK's UI message
-// stream. Kiln's own pages only; the conversation itself is read from the
-// database, never from the request.
+// POST /api/chat — one turn of Kiln's chat: the conversation, and what the
+// maker did (a message, or a yes or no to a tool call that waits). It answers
+// the agent's reply as the AI SDK's UI message stream. Kiln's own pages only;
+// the conversation itself is read from the database, never from the request.
 const MAX_BODY_BYTES = 256 * 1024;
 
 const Body = z.object({

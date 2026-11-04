@@ -86,13 +86,12 @@ export interface AgentChoice {
   about: string;
 }
 
-// Settings → Models: a route per role (ROADMAP "Model routing") and, for each
-// chat agent, a route of its own when the maker gives it one (Luis,
-// 2026-10-31). The first model is what the work starts on; with fallback on,
-// a failure another model can fix moves down the route, and nothing outside
-// it ever runs. A text route has an effort: how hard its models think. Until
-// the maker saves, the routes shown are Kiln's proposal and every task runs
-// its one model with no fallback.
+// Settings → Models: a route per role and, for each chat agent, a route of its
+// own when the maker gives it one (Luis, 2026-10-31). The first model is what
+// the work starts on; with fallback on, a failure another model can fix moves
+// down the route, and nothing outside it ever runs. A text route has an effort:
+// how hard its models think. Until the maker saves, the routes shown are Kiln's
+// proposal and every task runs its one model with no fallback.
 export function RoutesForm({
   initial,
   initialAgents,
