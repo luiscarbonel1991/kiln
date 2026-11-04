@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "kiln — feed Kiln without a file picker: check a product package offline with the import's own rules, import it, send a colour's material photo, approve frames, and reach Kiln's MCP tools (kiln call, or kiln mcp over stdio).",
-  "license": "FSL-1.1-Apache-2.0",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "bin": {
     "kiln": "./dist/kiln.js"

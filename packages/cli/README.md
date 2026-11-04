@@ -27,3 +27,7 @@ Kiln did not answer or refused the token.
 
 In Kiln's repository: `pnpm cli:build` (the engine, then the CLI), then `pnpm kiln …`
 or `node packages/cli/dist/kiln.js …` from any folder. Not published to npm yet.
+
+## License
+
+[GNU AGPL v3](./LICENSE), like the rest of Kiln.

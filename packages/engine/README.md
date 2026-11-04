@@ -59,5 +59,4 @@ See [`src/env.ts`](./src/env.ts) for the full schema.
 
 ## License
 
-[FSL-1.1-Apache-2.0](./LICENSE) — free for any non-competing use; converts to
-Apache-2.0 two years after each release.
+[GNU AGPL v3](./LICENSE), like the rest of Kiln.
