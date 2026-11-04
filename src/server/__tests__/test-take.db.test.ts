@@ -118,12 +118,9 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
     expect(test.cards[0].request.model).toMatchObject({ size: "1k" });
 
     const feed = await start("instagram", "content");
+    // A scene of its own: a version (Story, Square post) waits for its source.
     const scene = await db.card.findFirstOrThrow({
-      where: {
-        projectId: feed,
-        type: "image",
-        cardId: { startsWith: "instagram." },
-      },
+      where: { projectId: feed, type: "image", cardId: "instagram.hook" },
     });
     const post = await estimateProjectCards(feed, [scene.cardId]);
     expect(post.cards[0].request.model).toMatchObject({ size: "1k" });
