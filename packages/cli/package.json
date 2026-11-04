@@ -4,6 +4,11 @@
   "private": true,
   "description": "kiln — feed Kiln without a file picker: check a product package offline with the import's own rules, import it, send a colour's material photo, approve frames, and reach Kiln's MCP tools (kiln call, or kiln mcp over stdio).",
   "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luiscarbonel1991/kiln.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "bin": {
     "kiln": "./dist/kiln.js"

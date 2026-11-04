@@ -4,6 +4,11 @@
   "private": true,
   "description": "Kiln engine — the provenance cascade (brand -> image -> recipe -> local) and multi-provider AI adapters (Gemini / OpenAI) behind clean interfaces.",
   "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luiscarbonel1991/kiln.git",
+    "directory": "packages/engine"
+  },
   "type": "module",
   "main": "./dist/providers/index.js",
   "module": "./dist/providers/index.js",

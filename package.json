@@ -3,6 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "license": "AGPL-3.0-only",
+  "description": "A product-first studio for makers: exact frames from the product spec, clean SVG, listing text to each channel's rules, and checked scenes.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luiscarbonel1991/kiln.git"
+  },
+  "homepage": "https://github.com/luiscarbonel1991/kiln#readme",
+  "bugs": {
+    "url": "https://github.com/luiscarbonel1991/kiln/issues"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
     "dev:mock": "KILN_PROVIDERS=mock KILN_MOCK_DELAY_MS=4000 next dev -H 127.0.0.1",
