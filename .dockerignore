@@ -1,0 +1,21 @@
+# Never in the image: secrets, local state, development material.
+.env*
+!.env.example
+.git
+.idea
+.next
+out
+node_modules
+**/node_modules
+packages/*/dist
+scripts/ocr/.bin
+docs
+CLAUDE.md
+AGENTS.md
+scripts/README.md
+scripts/brief.mjs
+scripts/briefs
+scripts/ocr.mjs
+scripts/scenes.json
+scripts/sign-prompt.mjs
+tsconfig.tsbuildinfo

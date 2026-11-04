@@ -40,6 +40,38 @@ services:
       timeout: 5s
       retries: 10
 
+  # Kiln itself (docker compose --profile app up -d --build). Off by default,
+  # so `pnpm db:up` still starts only the database and storage for `pnpm dev`.
+  # Without keys it runs on mock providers: nothing is paid, nothing is sent.
+  # Keys and settings come from .env when there is one.
+  app:
+    profiles: ["app"]
+    build: .
+    container_name: kiln-app
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://kiln:kiln@db:5432/kiln?schema=public
+      KILN_MOCK_DATABASE_URL: postgresql://kiln:kiln@db:5432/kiln_mock?schema=public
+      KILN_PROVIDERS: ${KILN_PROVIDERS:-mock}
+      STORAGE_PROVIDER: s3
+      # The server reaches storage inside the network; browsers on the host.
+      S3_ENDPOINT: http://s3:9000
+      S3_PUBLIC_URL: http://localhost:9000
+      S3_BUCKET: kiln-assets
+      S3_ACCESS_KEY_ID: kiln
+      S3_SECRET_ACCESS_KEY: kiln-secret-key
+      KILN_OCR: tesseract
+    ports:
+      - "${KILN_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      s3:
+        condition: service_healthy
+
 volumes:
   kiln-pgdata:
     name: kiln-pgdata
