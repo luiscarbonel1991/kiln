@@ -1,6 +1,6 @@
 // Deterministic placeholder gradient for generated images: stub provider URLs
 // (https://stub.local/...) do not resolve, so we render a stable CSS gradient
-// derived from the prompt instead. Ports grad() from studio-image-flow.jsx.
+// derived from the prompt instead.
 // These hex literals are render-content (a faux photograph), not UI chrome.
 
 const ASSET_PALETTE = ["#d9c3a5", "#b07a4e", "#6f5237", "#efe6d6", "#2e2620"];
