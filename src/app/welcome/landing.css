@@ -1,0 +1,105 @@
+/*
+ * The public page's motion follows the scroll, in CSS only. Each step names a
+ * view timeline (--kit-1 to --kit-8) and the steps' list names --kit-all; the
+ * track shares them with the sheet beside it. A sheet cell's parts play their
+ * kind (story-rise, deal, develop, wipe, stamp, draw in globals.css) along
+ * their step's timeline, 90 ms apart becoming a few percent of the scroll; on
+ * a phone each part follows its own view. Without scroll timelines, with
+ * reduced motion, or in print, nothing is declared here and every part shows.
+ */
+
+.kit-track {
+  timeline-scope:
+    --kit-1, --kit-2, --kit-3, --kit-4, --kit-5, --kit-6, --kit-7, --kit-8,
+    --kit-all;
+}
+.kit-step {
+  view-timeline-name: var(--kit-tl);
+}
+.kit-steps {
+  view-timeline-name: --kit-all;
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .kit-sheet .story-part {
+      animation: var(--story-anim) linear both;
+      animation-timeline: var(--kit-tl);
+      animation-range: cover calc(12% + min(var(--i, 0), 12) * 1.6%) cover
+        calc(34% + min(var(--i, 0), 12) * 1.6%);
+    }
+
+    .kit-inline .story-part {
+      animation: var(--story-anim) linear both;
+      animation-timeline: view();
+      animation-range: cover calc(4% + min(var(--i, 0), 12) * 1.2%) cover
+        calc(24% + min(var(--i, 0), 12) * 1.2%);
+    }
+
+    .kit-rail {
+      animation: kit-fill linear both;
+      animation-timeline: --kit-all;
+      animation-range: contain 0% contain 100%;
+    }
+
+    .kit-hero-print {
+      animation: kit-recede linear both;
+      animation-timeline: view();
+      animation-range: exit 0% exit 100%;
+    }
+
+    @media (min-width: 64rem) {
+      .kit-step-copy {
+        animation: kit-focus linear both;
+        animation-timeline: var(--kit-tl);
+        animation-range: cover 0% cover 100%;
+      }
+    }
+  }
+}
+
+/* The step being read comes forward; the others wait, dimmed. */
+@keyframes kit-focus {
+  0%,
+  100% {
+    opacity: 0.22;
+  }
+  34%,
+  66% {
+    opacity: 1;
+  }
+}
+
+@keyframes kit-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* The hero's print settles back into the page as it leaves. */
+@keyframes kit-recede {
+  to {
+    opacity: 0.55;
+    transform: translateY(-6%) scale(0.95);
+  }
+}
+
+/* A step takes most of a screen's height, so the sheet beside it has time to
+   fill; the last leaves room to see the sheet complete. In print, where a
+   page's height is not the screen's, the steps keep their natural height. */
+@media screen and (min-width: 64rem) {
+  .kit-step {
+    min-height: 62vh;
+  }
+  .kit-steps {
+    padding-bottom: 24vh;
+  }
+}
+@media print {
+  .kit-step {
+    padding-block: 1.25rem;
+  }
+}

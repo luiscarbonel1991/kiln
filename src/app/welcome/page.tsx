@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site/site-header";
 import { SiteHero } from "@/components/site/site-hero";
 import { SitePricing } from "@/components/site/site-pricing";
 import { sampleStory } from "@/lib/home-story";
+import "./landing.css";
 
 export const dynamic = "force-static";
 
