@@ -124,7 +124,7 @@ export function SpecStage({
 }
 
 // The sample leaf, filled as a source drawing.
-function SampleSource() {
+export function SampleSource() {
   return (
     <svg viewBox="0 0 100 100" className="size-full" role="img">
       <title>{`${SAMPLE_DESIGN.name}, the source drawing`}</title>
@@ -145,7 +145,13 @@ function SampleSource() {
 }
 
 // Its line art, drawn stroke by stroke; the vector carries its nodes.
-function SampleLines({ vector, from }: { vector: boolean; from: number }) {
+export function SampleLines({
+  vector,
+  from,
+}: {
+  vector: boolean;
+  from: number;
+}) {
   return (
     <svg viewBox="0 0 100 100" className="size-full" role="img">
       <title>
