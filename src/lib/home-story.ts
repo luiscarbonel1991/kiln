@@ -205,7 +205,7 @@ function storyLooks(product: Product): StoryLook[] {
   }));
 }
 
-function storyWords(
+export function storyWords(
   product: Product,
   destination: PlanDestination | undefined,
 ): StoryWords | null {
