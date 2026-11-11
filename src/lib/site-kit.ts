@@ -13,7 +13,9 @@ import type { PlateImage } from "@/lib/plate-href";
 // a glazed coaster, on 2026-11-10 (a Launch project: Etsy and Instagram; GPT
 // Image 2 at medium quality, 2K where the destination asks; the video on
 // Gemini Omni Flash). Every take keeps what its check read, the two that
-// failed included, and the costs are what Kiln recorded. Served as fixed
+// failed included, and the costs are what Kiln recorded. The lifestyle scene
+// and its video were retaken on 2026-11-11: the first had a wine glass with
+// no foot, which the check does not look for. Served as fixed
 // files (public/home/coaster); nothing here reaches the server.
 
 const FILES = "/home/coaster";
@@ -131,7 +133,7 @@ const TAKES = {
     "lifestyle",
     "Lifestyle scene",
     "4:5",
-    "The coaster under a glass of white wine on a linen tablecloth, with bread and an olive branch",
+    "The coaster on a linen tablecloth beside a stemless glass of white wine, with olives, grapes and cheese",
   ),
   gift: take(
     "gift",
@@ -182,7 +184,13 @@ export interface SiteKit {
   video: { url: string; poster: string; seconds: number; cost: number };
   loupes: { reference: string; passed: string; failed: string };
   // What Kiln recorded for the project, in dollars.
-  cost: { sceneTakes: number; scenes: number; video: number; total: number };
+  cost: {
+    sceneTakes: number;
+    scenes: number;
+    videos: number;
+    video: number;
+    total: number;
+  };
 }
 
 export function siteKit(): SiteKit {
@@ -212,13 +220,13 @@ export function siteKit(): SiteKit {
       url: `${FILES}/lifestyle.mp4`,
       poster: TAKES.lifestyle.url,
       seconds: 6,
-      cost: 0.62,
+      cost: 0.61,
     },
     loupes: {
       reference: `${FILES}/loupe-reference.jpg`,
       passed: `${FILES}/loupe-pass.jpg`,
       failed: `${FILES}/loupe-fail.jpg`,
     },
-    cost: { sceneTakes: 13, scenes: 1.2, video: 0.62, total: 1.82 },
+    cost: { sceneTakes: 14, scenes: 1.29, videos: 2, video: 1.23, total: 2.52 },
   };
 }

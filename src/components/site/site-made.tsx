@@ -273,7 +273,7 @@ export function SiteMade({ kit }: { kit: SiteKit }) {
           <KitVideo
             src={kit.video.url}
             poster={kit.video.poster}
-            label="The coaster under a glass of wine as the camera moves slowly closer"
+            label="The coaster beside a glass of wine as the camera moves slowly closer"
           />
         </Print>
       </section>
