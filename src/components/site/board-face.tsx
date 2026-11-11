@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 // The sample board's face, drawn flat from its spec: its colour, its two lines
 // of wording and its 16 x 10 proportion. Plain SVG, so it redraws at no cost
 // whenever the spec changes.
@@ -19,6 +21,7 @@ export function BoardFace({
   year,
   label,
   className,
+  style,
 }: {
   face: string;
   ink: string;
@@ -27,6 +30,7 @@ export function BoardFace({
   // Read aloud in place of the drawing; without it the drawing is decoration.
   label?: string;
   className?: string;
+  style?: CSSProperties;
 }) {
   const size = Math.min(40, 440 / Math.max(name.length, 6));
   const hasYear = Boolean(year);
@@ -36,6 +40,7 @@ export function BoardFace({
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 320 200"
       className={className}
+      style={style}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}

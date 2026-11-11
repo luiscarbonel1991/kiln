@@ -1,0 +1,348 @@
+/* Direction B, "the inspection". A dark table, the photos lit, verdicts in
+   the provenance colours lifted for a dark ground. */
+
+.lb {
+  --canvas: #14110e;
+  --raise: #1e1915;
+  --rule: #3b332a;
+  --ink: #f2eadb;
+  --mid: #b9ae9c;
+  --pass: #86d3a9;
+  --fail: #ff8a61;
+  --accent: #c0461f;
+  --display: var(--font-fraunces), serif;
+
+  flex: 1;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-hanken), sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.lb :focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+.lb-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lb-top,
+.lb main > section {
+  width: 100%;
+  max-width: 1360px;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+.lb-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 1.1rem;
+}
+.lb-mark {
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.lb-cta {
+  display: inline-flex;
+  align-items: center;
+  height: 3.25rem;
+  padding-inline: 1.5rem;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  transition: background 120ms;
+}
+.lb-cta:hover {
+  background: #a83a17;
+}
+.lb-cta-small {
+  height: 2.5rem;
+  padding-inline: 1rem;
+  font-size: 0.9375rem;
+  background: var(--ink);
+  color: var(--canvas);
+}
+.lb-cta-small:hover {
+  background: #fff;
+}
+
+/* Hero */
+.lb-hero {
+  display: grid;
+  gap: 2.5rem;
+  padding-block: 1.5rem 4rem;
+}
+.lb-copy h1 {
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: clamp(2.6rem, 11.5vw, 3.6rem);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.lb-copy > p {
+  margin-top: 1.5rem;
+  max-width: 31rem;
+  font-size: 1.125rem;
+  color: var(--mid);
+}
+.lb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 2rem;
+  color: var(--mid);
+}
+
+.lb-pair {
+  display: grid;
+  gap: 2rem;
+}
+.lb-inspected {
+  --tone: var(--pass);
+  min-width: 0;
+}
+.lb-inspected[data-ok="false"] {
+  --tone: var(--fail);
+}
+.lb-photo {
+  position: relative;
+  overflow: hidden;
+  border-radius: 3px;
+}
+.lb-inspected[data-ok="true"] .lb-photo {
+  aspect-ratio: 1;
+}
+.lb-inspected[data-ok="false"] .lb-photo {
+  aspect-ratio: 4 / 5;
+}
+/* What Kiln read: a frame around each line of wording. */
+.lb-read {
+  position: absolute;
+  border: 2px solid var(--tone);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(20, 17, 14, 0.55);
+}
+.lb-inspected[data-ok="false"] .lb-read {
+  border-style: dashed;
+}
+.lb-inspected figcaption {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 2px solid var(--tone);
+  color: var(--mid);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.lb-inspected figcaption b {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: 2.25rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--tone);
+}
+
+/* Sections */
+.lb-table,
+.lb-loupes {
+  padding-block: 4rem;
+  border-top: 1px solid var(--rule);
+}
+.lb-head {
+  display: grid;
+  gap: 1rem;
+}
+.lb-head h2 {
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: clamp(2rem, 8.5vw, 3.25rem);
+  font-weight: 500;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.lb-head p {
+  max-width: 34rem;
+  font-size: 1.125rem;
+  color: var(--mid);
+}
+
+.lb-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.75rem 0.875rem;
+  margin-top: 2.5rem;
+}
+.lb-strip li {
+  --tone: var(--pass);
+  min-width: 0;
+}
+.lb-strip li[data-ok="false"] {
+  --tone: var(--fail);
+}
+.lb-tile {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #fffdf9;
+}
+.lb-strip [data-kind="exact"] .lb-tile {
+  display: grid;
+  align-items: center;
+}
+.lb-strip [data-kind="exact"] .lb-tile svg {
+  height: auto;
+}
+.lb-strip p {
+  margin-top: 0.6rem;
+  padding-top: 0.55rem;
+  border-top: 2px solid var(--tone);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  color: var(--tone);
+}
+.lb-strip p b {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+}
+.lb-words {
+  margin-top: 2.5rem;
+  max-width: 44rem;
+  font-size: 1.125rem;
+  color: var(--mid);
+}
+.lb-words span {
+  color: var(--ink);
+  font-weight: 600;
+}
+.lb-words b {
+  color: var(--pass);
+  font-weight: 600;
+}
+
+/* Loupes */
+.lb-lenses {
+  display: grid;
+  gap: 2.5rem;
+  margin-top: 3rem;
+}
+.lb-lenses li {
+  --tone: var(--ink);
+  display: grid;
+  justify-items: center;
+  gap: 1.25rem;
+  text-align: center;
+}
+.lb-lenses li[data-ok="true"] {
+  --tone: var(--pass);
+}
+.lb-lenses li[data-ok="false"] {
+  --tone: var(--fail);
+}
+.lb-lens {
+  position: relative;
+  width: min(100%, 17rem);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px var(--canvas),
+    0 0 0 5px var(--tone);
+}
+.lb-lens-art {
+  position: absolute;
+  max-width: none;
+  height: auto;
+}
+.lb-lenses p {
+  max-width: 17rem;
+  color: var(--mid);
+}
+.lb-lenses p b {
+  display: block;
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: 3.5rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--tone);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lb-read {
+    animation: lb-read 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(500ms + var(--n, 0) * 220ms);
+  }
+  @keyframes lb-read {
+    from {
+      opacity: 0;
+      scale: 1.25;
+    }
+  }
+}
+
+@media (min-width: 40rem) {
+  .lb-top,
+  .lb main > section {
+    padding-inline: 2.5rem;
+  }
+  .lb-pair {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+    align-items: start;
+    gap: 1.5rem;
+  }
+  .lb-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .lb-lenses {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 72rem) {
+  .lb-hero {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    align-items: start;
+    gap: 3.5rem;
+    padding-block: 2.5rem 5.5rem;
+  }
+  .lb-copy {
+    padding-top: 1rem;
+  }
+  .lb-copy h1 {
+    font-size: 4.75rem;
+  }
+  .lb-head {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 34rem);
+    align-items: end;
+    gap: 3rem;
+  }
+  .lb-head h2 {
+    font-size: 3.75rem;
+  }
+  .lb-table,
+  .lb-loupes {
+    padding-block: 5.5rem;
+  }
+  .lb-strip {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1rem;
+  }
+}

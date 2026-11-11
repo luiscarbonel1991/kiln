@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { StoryScene } from "@/lib/home-story";
 
 // What each sample take shows, said for someone who cannot see it.
@@ -26,11 +27,13 @@ export function Take({
   className,
   eager,
   alt,
+  style,
 }: {
   scene: StoryScene;
   className?: string;
   eager?: boolean;
   alt?: string;
+  style?: CSSProperties;
 }) {
   const [width, height] = SIZE[scene.aspect] ?? [1080, 1080];
   return (
@@ -44,6 +47,7 @@ export function Take({
       fetchPriority={eager ? "high" : undefined}
       decoding="async"
       className={className}
+      style={style}
     />
   );
 }
