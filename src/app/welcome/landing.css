@@ -19,8 +19,8 @@ html:has(.kl) {
   --rule: #3a3129;
   --paper: #fbf8f2;
   --dark: #1d1813;
-  --pass: #8ed6ad;
-  --fail: #ff8a61;
+  --pass: #96d39b;
+  --fail: #ff7a8a;
   --paid: #e3b75a;
   --accent: #c0461f;
   --display: var(--font-fraunces), serif;
@@ -115,7 +115,7 @@ html:has(.kl) {
   transition: background 120ms;
 }
 .kl-cta:hover {
-  background: #d2532a;
+  background: #a93c19;
 }
 .kl-cta-small {
   height: 2.75rem;
@@ -292,7 +292,7 @@ html:has(.kl) {
 .kl-arrow {
   width: 100%;
   fill: none;
-  stroke: var(--fail);
+  stroke: var(--ink);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
