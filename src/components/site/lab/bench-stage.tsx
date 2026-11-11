@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import { BoardFace } from "@/components/site/board-face";
-import { Take } from "@/components/site/take";
+import { Print } from "@/components/site/print";
+import { TakePrint } from "@/components/site/take-print";
 import type { ExactView } from "@/domain/exact";
 import type { StoryFrame, StoryProduct, StoryScene } from "@/lib/home-story";
 
-// Direction C's bench: the sample's spec as a drawing whose labels are
-// fields. Editing one redraws the board and the exact frames in the browser,
-// which is the claim itself: what comes from the spec is free and immediate.
-// The photos stay as they were made, and say so.
+// The bench's live part: the sample board lying on the mat with its spec on a
+// ticket beside it. Editing the ticket redraws the board and the exact frames
+// in the browser, which is the claim itself: what comes from the spec is free
+// and immediate. The photos stay as they were made, and say so.
 
 export interface BenchColour {
   key: string;
@@ -29,7 +30,7 @@ function redraw(view: ExactView, face: string, wording: string[]): ExactView {
     : view;
 }
 
-export function SpecBench({
+export function BenchStage({
   product,
   colours,
   exact,
@@ -49,35 +50,40 @@ export function SpecBench({
   const [year, setYear] = useState(sample.year);
   const [colour, setColour] = useState(sample.colour);
   const look = colours.find((c) => c.key === colour) ?? colours[0];
+  const face = look?.face ?? "#E8D2A6";
   const shownName = name.trim() || sample.name;
   const wording = [shownName, year.trim()].filter(Boolean);
   const changed =
     shownName !== sample.name ||
     year.trim() !== sample.year ||
     colour !== sample.colour;
+  const [w, h] = product.size.replace(/ in$/, "").split(" x ");
 
   return (
-    <div className="lc-bench">
-      <form className="lc-spec" onSubmit={(e) => e.preventDefault()}>
-        <div className="lc-drawing">
+    <div className="bn-stage">
+      <div className="bn-object">
+        <div className="bn-drawing" style={{ "--face": face } as CSSProperties}>
           <BoardFace
-            face={look?.face ?? "#E8D2A6"}
+            face={face}
             ink={look?.inlay ?? "#3B2A1E"}
             name={shownName}
             year={year.trim() || undefined}
-            className="lc-board"
+            className="bn-board"
             label={`The board in ${look?.name ?? "its colour"}, engraved ${wording.join(", ")}`}
           />
-          <span className="lc-dim lc-dim-w" aria-hidden>
-            <i>{product.size.split(" x ")[0]} in</i>
+          <span className="bn-dim bn-dim-w" aria-hidden>
+            <i>{w} in</i>
           </span>
-          <span className="lc-dim lc-dim-h" aria-hidden>
-            <i>{product.size.split(" x ")[1]}</i>
+          <span className="bn-dim bn-dim-h" aria-hidden>
+            <i>{h} in</i>
           </span>
         </div>
 
-        <div className="lc-fields">
-          <label className="lc-field">
+        <form className="bn-ticket" onSubmit={(e) => e.preventDefault()}>
+          <p className="bn-ticket-head">
+            The spec. <span>Change it: the drawings follow.</span>
+          </p>
+          <label className="bn-field">
             <span>{product.wording[0]?.label ?? "Name"}</span>
             <input
               value={name}
@@ -87,7 +93,7 @@ export function SpecBench({
               spellCheck={false}
             />
           </label>
-          <label className="lc-field lc-field-short">
+          <label className="bn-field bn-field-short">
             <span>{product.wording[1]?.label ?? "Year"}</span>
             <input
               value={year}
@@ -97,20 +103,20 @@ export function SpecBench({
               inputMode="numeric"
             />
           </label>
-          <fieldset className="lc-field lc-field-wide">
+          <fieldset className="bn-field bn-field-wide">
             <legend>Colour</legend>
-            <div className="lc-colours">
+            <div className="bn-colours">
               {colours.map((c) => (
                 <label key={c.key}>
                   <input
                     type="radio"
-                    name="lc-colour"
+                    name="bn-colour"
                     className="sr-only"
                     checked={c.key === colour}
                     onChange={() => setColour(c.key)}
                   />
                   <span
-                    className="lc-swatch"
+                    className="bn-swatch"
                     style={{ backgroundColor: c.face }}
                   />
                   {c.name}
@@ -118,29 +124,16 @@ export function SpecBench({
               ))}
             </div>
           </fieldset>
-          <dl className="lc-facts lc-field-wide">
-            <div>
-              <dt>Material</dt>
-              <dd>{product.material}</dd>
-            </div>
-            <div>
-              <dt>Finish</dt>
-              <dd>{product.finish}</dd>
-            </div>
-            {product.price ? (
-              <div>
-                <dt>Price</dt>
-                <dd>${product.price}</dd>
-              </div>
-            ) : null}
-          </dl>
-        </div>
-        <p className="lc-try">Try it: change the name or the colour.</p>
-      </form>
+          <p className="bn-facts bn-field-wide">
+            {product.size} · {product.material} · {product.finish.toLowerCase()}
+            {product.price ? ` · $${product.price}` : ""}
+          </p>
+        </form>
+      </div>
 
-      <div className="lc-out">
-        <div className="lc-row" data-stale={changed}>
-          <p className="lc-row-head" data-tone="paid" aria-live="polite">
+      <div className="bn-made">
+        <div className="bn-group" data-stale={changed}>
+          <p className="bn-note" data-tone="paid" aria-live="polite">
             {changed ? (
               <>
                 <b>These photos still show the first spec.</b> New ones need an
@@ -149,35 +142,36 @@ export function SpecBench({
             ) : (
               <>
                 <b>Photographed around the real product.</b> An image model,
-                priced first, each take checked.
+                priced first, every take checked.
               </>
             )}
           </p>
-          <ul>
-            {scenes.map((s) => (
+          <ul className="bn-photos">
+            {scenes.map((s, n) => (
               <li key={s.url}>
-                <div className="lc-tile">
-                  <Take scene={s} eager className="lc-fill" />
-                </div>
-                <span>{s.label}</span>
+                <TakePrint
+                  scene={s}
+                  tilt={[1.6, -1.2, 0.8][n] ?? 0}
+                  eager
+                  at={900 + n * 300}
+                />
               </li>
             ))}
           </ul>
         </div>
-        <div className="lc-row">
-          <p className="lc-row-head" data-tone="free">
-            <b>Redrawn as you type.</b> From the spec, free.
+        <div className="bn-group">
+          <p className="bn-note" data-tone="free">
+            <b>Drawn from the spec.</b> Free, and redrawn as you type.
           </p>
-          <ul>
-            {exact.map((f) => (
+          <ul className="bn-frames">
+            {exact.map((f, n) => (
               <li key={f.label}>
-                <div className="lc-tile">
+                <Print tilt={[-1.5, 1, -0.6][n] ?? 0} title={f.label}>
                   <ExactSlotArt
-                    view={redraw(f.view, look?.face ?? "#E8D2A6", wording)}
+                    view={redraw(f.view, face, wording)}
                     aspect={f.aspect}
                   />
-                </div>
-                <span>{f.label}</span>
+                </Print>
               </li>
             ))}
           </ul>

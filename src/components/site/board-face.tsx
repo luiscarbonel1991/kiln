@@ -59,6 +59,22 @@ export function BoardFace({
       </g>
       <text
         x="160"
+        y={nameY + 0.9}
+        textAnchor="middle"
+        fill="#fff"
+        fillOpacity="0.28"
+        fontSize={size}
+        fontWeight="600"
+        style={{
+          fontFamily: "var(--font-fraunces)",
+          fontVariationSettings: "'opsz' 144",
+        }}
+        aria-hidden
+      >
+        {name}
+      </text>
+      <text
+        x="160"
         y={nameY}
         textAnchor="middle"
         fill={ink}
