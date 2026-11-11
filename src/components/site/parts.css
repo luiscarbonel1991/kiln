@@ -1,3 +1,4 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: the rules follow the page from top to bottom, not their specificity */
 /* Parts the landing shares: prints on paper and wax-pencil marks. */
 
 .print {

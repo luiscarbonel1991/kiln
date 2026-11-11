@@ -1,31 +1,41 @@
 import type { Metadata } from "next";
-import { KitSteps } from "@/components/site/kit-steps";
+import { SiteCost } from "@/components/site/site-cost";
 import { SiteClose, SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { SiteHero } from "@/components/site/site-hero";
-import { SitePricing } from "@/components/site/site-pricing";
-import { sampleStory } from "@/lib/home-story";
+import { SiteMade } from "@/components/site/site-made";
+import { SiteRefresh } from "@/components/site/site-refresh";
+import { SiteShips } from "@/components/site/site-ships";
+import { SiteStarts } from "@/components/site/site-starts";
+import { WaxDefs } from "@/components/site/wax";
+import { siteKit } from "@/lib/site-kit";
+import "@/components/site/parts.css";
 import "./landing.css";
 
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
-  title: "Kiln · Everything your product needs before the sale",
+  title: "Kiln · Your product, photographed, listed and checked",
   description:
-    "Photos, SVG designs, listing text and every frame each channel asks for, made from your product and checked before you see them.",
+    "Describe what you make once. Kiln draws the exact frames, stages your real product in scenes, writes the listing to your shop's limits and checks every photo before you see it.",
 };
 
 // The public page, for a visitor without an account: what Kiln makes, told
-// with the sample product. Built once, with no database and nothing paid.
+// with one sample product's kit. Built once, with no database and nothing
+// paid.
 export default function WelcomePage() {
-  const story = sampleStory();
+  const kit = siteKit();
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="kl">
+      <WaxDefs />
       <SiteHeader />
-      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-28 px-4 pt-8 pb-24 sm:gap-36 sm:px-8">
-        <SiteHero lead={story.scenes[0]} />
-        <KitSteps story={story} />
-        <SitePricing />
+      <main>
+        <SiteHero kit={kit} />
+        <SiteRefresh kit={kit} />
+        <SiteStarts />
+        <SiteMade kit={kit} />
+        <SiteShips kit={kit} />
+        <SiteCost kit={kit} />
         <SiteClose />
       </main>
       <SiteFooter />

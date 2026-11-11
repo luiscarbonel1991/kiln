@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 // Marks made by hand on a print with a wax pencil: a tick, a ring around what
 // was read, a cross. Each stroke has pathLength 1, so CSS can draw it.
 
@@ -27,17 +29,39 @@ export function WaxDefs() {
   );
 }
 
-export function WaxTick({ className }: { className?: string }) {
+export function WaxTick({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: CSSProperties;
+}) {
   return (
-    <svg viewBox="0 0 100 100" className={`wax ${className ?? ""}`} aria-hidden>
+    <svg
+      viewBox="0 0 100 100"
+      className={`wax ${className ?? ""}`}
+      style={style}
+      aria-hidden
+    >
       <path {...STROKE} d="M10 56 C20 62 30 74 36 88 C48 56 68 28 94 8" />
     </svg>
   );
 }
 
-export function WaxCross({ className }: { className?: string }) {
+export function WaxCross({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: CSSProperties;
+}) {
   return (
-    <svg viewBox="0 0 100 100" className={`wax ${className ?? ""}`} aria-hidden>
+    <svg
+      viewBox="0 0 100 100"
+      className={`wax ${className ?? ""}`}
+      style={style}
+      aria-hidden
+    >
       <path {...STROKE} d="M12 14 C36 34 62 60 90 88" />
       <path {...STROKE} d="M88 10 C64 36 38 62 10 92" />
     </svg>
@@ -49,7 +73,7 @@ export function WaxRing({
   style,
 }: {
   className?: string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
 }) {
   return (
     <svg

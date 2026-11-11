@@ -1,105 +1,1049 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: the rules follow the page from top to bottom, not their specificity */
 /*
- * The public page's motion follows the scroll, in CSS only. Each step names a
- * view timeline (--kit-1 to --kit-8) and the steps' list names --kit-all; the
- * track shares them with the sheet beside it. A sheet cell's parts play their
- * kind (story-rise, deal, develop, wipe, stamp, draw in globals.css) along
- * their step's timeline, 90 ms apart becoming a few percent of the scroll; on
- * a phone each part follows its own view. Without scroll timelines, with
- * reduced motion, or in print, nothing is declared here and every part shows.
+ * The public page: one product's kit as prints on a dark table under a warm
+ * lamp. Its tokens are the landing's own (the app's DESIGN.md binds the app);
+ * terracotta, the provenance green and amber, Fraunces and Hanken Grotesk are
+ * the brand's. Motion is CSS only: the hero's prints are dealt once, wax marks
+ * draw themselves, and sections follow the scroll where the browser supports
+ * view timelines. With reduced motion, or without them, everything is in place.
  */
 
-.kit-track {
-  timeline-scope:
-    --kit-1, --kit-2, --kit-3, --kit-4, --kit-5, --kit-6, --kit-7, --kit-8,
-    --kit-all;
-}
-.kit-step {
-  view-timeline-name: var(--kit-tl);
-}
-.kit-steps {
-  view-timeline-name: --kit-all;
+html:has(.kl) {
+  background: #171310;
 }
 
+.kl {
+  --table: #171310;
+  --ink: #f4ecdf;
+  --mid: #b9ad9b;
+  --rule: #3a3129;
+  --paper: #fbf8f2;
+  --dark: #1d1813;
+  --pass: #8ed6ad;
+  --fail: #ff8a61;
+  --paid: #e3b75a;
+  --accent: #c0461f;
+  --display: var(--font-fraunces), serif;
+
+  flex: 1;
+  overflow-x: clip;
+  background:
+    radial-gradient(
+      1100px 760px at 74% 300px,
+      rgba(255, 205, 150, 0.16),
+      transparent 68%
+    ),
+    var(--table);
+  color: var(--ink);
+  font-family: var(--font-hanken), sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.kl :focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+:where(.kl) h1,
+:where(.kl) h2 {
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-weight: 400;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+:where(.kl) h2 {
+  font-size: clamp(2.05rem, 8.6vw, 3.1rem);
+  line-height: 1.02;
+}
+.kl-top,
+.kl main > section,
+.kl-made > section,
+.kl-foot {
+  width: 100%;
+  max-width: 1360px;
+  margin-inline: auto;
+  padding-inline: 1.125rem;
+}
+
+/* Header */
+.kl-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 1.1rem;
+}
+.kl-mark {
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: 1.85rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.kl-top nav {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+}
+.kl-top nav a:not(.kl-cta) {
+  display: none;
+  font-weight: 600;
+  color: var(--mid);
+  transition: color 120ms;
+}
+.kl-top nav a:not(.kl-cta):hover {
+  color: var(--ink);
+}
+.kl-cta {
+  display: inline-flex;
+  align-items: center;
+  height: 3.25rem;
+  padding-inline: 1.6rem;
+  border-radius: 5px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  box-shadow: 0 10px 24px -10px rgba(192, 70, 31, 0.9);
+  transition: background 120ms;
+}
+.kl-cta:hover {
+  background: #d2532a;
+}
+.kl-cta-small {
+  height: 2.5rem;
+  padding-inline: 1rem;
+  font-size: 0.9375rem;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgba(244, 236, 223, 0.55);
+}
+.kl-cta-small:hover {
+  background: rgba(244, 236, 223, 0.12);
+}
+
+/* Hero */
+.kl-hero {
+  display: grid;
+  gap: 2.5rem;
+  padding-block: 1.25rem 4rem;
+}
+.kl-hero h1 {
+  font-size: clamp(2.9rem, 13vw, 4rem);
+  line-height: 0.97;
+}
+.kl-hero-copy > p {
+  margin-top: 1.5rem;
+  max-width: 29rem;
+  font-size: 1.125rem;
+  color: var(--mid);
+}
+.kl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 2rem;
+  color: var(--mid);
+}
+.kl-hero-copy > .kl-aside {
+  display: none;
+  margin-top: 2.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--rule);
+  max-width: 24rem;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.kl-pile {
+  position: relative;
+  aspect-ratio: 100 / 186;
+}
+.kl-pile > * {
+  position: absolute;
+}
+.kl-p1 {
+  left: 0;
+  top: 0;
+  width: 74%;
+}
+.kl-p2 {
+  left: 50%;
+  top: 41%;
+  width: 50%;
+}
+.kl-p3 {
+  left: 0;
+  top: 57%;
+  width: 49%;
+}
+.kl-pile > .kl-p4,
+.kl-pile > .kl-p5 {
+  display: none;
+}
+
+.kl-slip {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem 1rem;
+  background: var(--paper);
+  color: var(--dark);
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.35),
+    0 14px 28px -10px rgba(0, 0, 0, 0.55);
+}
+.kl-slip b {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.kl-slip span {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #2c6a51;
+}
+
+/* Bands */
+.kl-band {
+  padding-block: 4rem;
+  border-top: 1px solid var(--rule);
+}
+.kl-head {
+  display: grid;
+  gap: 1rem;
+}
+:where(.kl-band) p {
+  font-size: 1.125rem;
+  color: var(--mid);
+}
+.kl-head p {
+  max-width: 35rem;
+}
+
+/* Before and after */
+.kl-swap {
+  display: grid;
+  justify-items: center;
+  gap: 1.25rem;
+  margin-top: 2.75rem;
+}
+.kl-before,
+.kl-new {
+  width: min(100%, 24rem);
+}
+.kl-before {
+  padding: 0.55rem 0.55rem 0;
+  background: #d9d2c4;
+  color: var(--dark);
+  rotate: -1.5deg;
+  box-shadow: 0 14px 28px -10px rgba(0, 0, 0, 0.55);
+}
+.kl-before-art {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 1.5rem;
+  border: 2px dashed #7d7466;
+  background: repeating-linear-gradient(
+    -45deg,
+    #cfc7b8 0 14px,
+    #c6bead 14px 28px
+  );
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+.kl-before-art small {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+.kl-before figcaption {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0.1rem 0.7rem;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+.kl-before figcaption span {
+  color: #5d5446;
+}
+.kl-new .print-art {
+  aspect-ratio: 1;
+}
+.kl-arrow {
+  width: 5.5rem;
+  rotate: 90deg;
+  fill: none;
+  stroke: var(--fail);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+}
+
+/* Ways to start */
+.kl-starts h2 {
+  max-width: 62rem;
+}
+.kl-starts ul {
+  display: grid;
+  gap: 0;
+  margin-top: 2.5rem;
+}
+.kl-starts li {
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+  padding-block: 1rem;
+  border-top: 1px solid var(--rule);
+  color: var(--mid);
+}
+.kl-starts li b {
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.kl-starts li b::first-letter {
+  text-transform: uppercase;
+}
+
+/* Prints in rows */
+.kl-frames,
+.kl-colours {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.75rem 1rem;
+  margin-top: 2.75rem;
+}
+.kl-frames > li,
+.kl-colours > li {
+  min-width: 0;
+}
+.kl-frames .print-art,
+.kl-colours .print-art {
+  aspect-ratio: 1;
+}
+
+/* Scenes and their controls */
+.kl-scenes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem 1rem;
+  margin-top: 2.75rem;
+}
+.kl-knobs {
+  grid-column: 1 / -1;
+}
+.kl-scenes .print-art {
+  aspect-ratio: 4 / 5;
+}
+.kl-knobs {
+  align-self: start;
+  padding: 1.15rem 1.15rem 1.25rem;
+  background: var(--paper);
+  color: var(--dark);
+  rotate: -0.8deg;
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.35),
+    0 16px 28px -12px rgba(0, 0, 0, 0.55);
+}
+.kl-knobs p {
+  color: var(--dark);
+}
+.kl-knobs-head {
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+}
+.kl-knob {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+}
+.kl-knob > span {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #5d5446;
+}
+.kl-knob ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1.5px solid var(--dark);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.kl-knob li {
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.kl-knob li + li {
+  border-left: 1.5px solid var(--dark);
+}
+.kl-knob li[data-on="true"] {
+  background: var(--dark);
+  color: var(--paper);
+}
+.kl-knobs-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px dashed #c9bfab;
+  font-size: 0.9375rem;
+}
+.kl-knobs-foot b {
+  padding: 0.55rem 0.9rem;
+  border-radius: 5px;
+  background: var(--accent);
+  color: #fff;
+}
+
+/* The check */
+.kl-check-body {
+  display: grid;
+  gap: 2.75rem;
+  margin-top: 2.75rem;
+}
+.kl-check-print {
+  width: min(100%, 27rem);
+  justify-self: center;
+}
+.kl-check-print .print-art {
+  aspect-ratio: 4 / 5;
+}
+.kl-check-print figcaption {
+  font-size: 0.9375rem;
+}
+.kl-lenses {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+.kl-lenses li {
+  --tone: var(--ink);
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.9rem;
+  text-align: center;
+}
+.kl-lenses li[data-tone="pass"] {
+  --tone: var(--pass);
+}
+.kl-lenses li[data-tone="fail"] {
+  --tone: var(--fail);
+}
+.kl-lens {
+  width: 100%;
+  max-width: 13rem;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px var(--table),
+    0 0 0 5px var(--tone),
+    0 24px 40px -18px rgba(0, 0, 0, 0.8);
+}
+.kl-lens img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.kl-lenses p {
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+.kl-lenses p b {
+  display: block;
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: clamp(1.9rem, 8vw, 3rem);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--tone);
+}
+.kl-reasons {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+.kl-reasons p b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.kl-reasons ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.kl-reasons li {
+  padding: 0.45rem 0.8rem;
+  border: 1.5px solid rgba(244, 236, 223, 0.5);
+  border-radius: 5px;
+  font-weight: 600;
+}
+
+/* The video */
+.kl-moves {
+  display: grid;
+  gap: 2.5rem;
+}
+.kl-moves-copy p {
+  max-width: 30rem;
+  margin-top: 1rem;
+}
+.kl-video {
+  width: min(100%, 17rem);
+  justify-self: center;
+}
+.kl-video video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  background: #2a231d;
+}
+
+/* The listing text */
+.kl-words {
+  display: grid;
+  gap: 2.25rem;
+  margin-top: 2.75rem;
+}
+.kl-listing {
+  gap: 0.75rem;
+  padding: 1.5rem;
+  rotate: -0.6deg;
+}
+.kl-listing b {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+.kl-listing p {
+  white-space: pre-line;
+  font-size: 1rem;
+  color: #4a4237;
+}
+.kl-listing ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.kl-listing li {
+  padding: 0.2rem 0.55rem;
+  border-radius: 3px;
+  background: #ece5d6;
+  font-size: 0.875rem;
+}
+.kl-measures {
+  display: grid;
+  align-content: start;
+  gap: 1.5rem;
+}
+.kl-measure p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.kl-measure span,
+.kl-free {
+  color: var(--pass);
+}
+.kl-free {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.kl-ruler {
+  height: 1.1rem;
+  margin-top: 0.4rem;
+  border: 1.5px solid var(--ink);
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(244, 236, 223, 0.6) 0 1px,
+    transparent 1px 10%
+  );
+}
+.kl-ruler i {
+  display: block;
+  height: 100%;
+  background: var(--pass);
+  transform-origin: left;
+}
+
+/* Where it goes */
+.kl-ships {
+  display: grid;
+  gap: 2.5rem;
+  margin-top: 2.5rem;
+}
+.kl-routes li {
+  display: grid;
+  gap: 0.3rem;
+  padding-block: 1.25rem;
+  border-top: 1px solid var(--rule);
+  font-size: 1.0625rem;
+  color: var(--mid);
+}
+.kl-routes b {
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.kl-ships-print {
+  width: min(100%, 21rem);
+  justify-self: center;
+}
+.kl-ships-print .print-art {
+  aspect-ratio: 4 / 5;
+}
+
+.kl-after {
+  display: grid;
+  gap: 3.5rem;
+}
+.kl-after h2 {
+  font-size: clamp(1.8rem, 7.4vw, 2.5rem);
+}
+.kl-after p {
+  max-width: 33rem;
+  margin-top: 1rem;
+}
+.kl-approval {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 24rem;
+  margin-top: 1.75rem;
+}
+.kl-approval > p {
+  justify-self: end;
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px 12px 3px 12px;
+  background: #2a231d;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.kl-approval > div {
+  display: grid;
+  gap: 0.4rem;
+  justify-self: start;
+  padding: 0.9rem 1rem 1rem;
+  border-radius: 12px 12px 12px 3px;
+  background: var(--paper);
+  color: var(--dark);
+}
+.kl-approval span {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #7a560c;
+}
+.kl-approval i {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+  font-style: normal;
+}
+.kl-approval em {
+  padding: 0.4rem 0.8rem;
+  border-radius: 5px;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+.kl-approval em:first-child {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* What it cost */
+.kl-cost {
+  display: grid;
+  gap: 2.75rem;
+}
+.kl-cost-copy p {
+  max-width: 33rem;
+  margin-top: 1rem;
+}
+.kl-rules {
+  margin-top: 1.75rem;
+}
+.kl-rules li {
+  padding-block: 0.7rem;
+  border-top: 1px solid var(--rule);
+  font-weight: 600;
+}
+.kl-receipt > ul {
+  padding: 0.5rem 1.4rem 1.2rem;
+  background: var(--paper);
+  color: var(--dark);
+  rotate: 0.6deg;
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.35),
+    0 18px 32px -14px rgba(0, 0, 0, 0.6);
+}
+.kl-receipt li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding-block: 0.85rem;
+  border-bottom: 1px dashed #c9bfab;
+  font-size: 1.0625rem;
+}
+.kl-receipt li b {
+  flex: none;
+  font-weight: 700;
+  color: #2c6a51;
+}
+.kl-receipt li[data-paid="true"] b {
+  color: #7a560c;
+}
+.kl-receipt .kl-total {
+  border-bottom: 0;
+  padding-top: 1.1rem;
+  font-weight: 700;
+}
+.kl-receipt .kl-total b {
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: 2.5rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--dark);
+}
+.kl-plans {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 2rem;
+  padding: 1.1rem 1.25rem;
+  border: 2px dashed rgba(244, 236, 223, 0.5);
+  color: var(--mid);
+}
+.kl-plans b {
+  color: var(--ink);
+}
+
+/* Close */
+.kl-close {
+  display: grid;
+  justify-items: start;
+  gap: 1.5rem;
+  padding-block: 5rem 5.5rem;
+  border-top: 1px solid var(--rule);
+}
+.kl-close h2 {
+  font-size: clamp(3rem, 14vw, 6.5rem);
+  line-height: 0.95;
+}
+.kl-close p {
+  max-width: 30rem;
+  font-size: 1.125rem;
+  color: var(--mid);
+}
+.kl-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+  padding-block: 1.75rem 2.25rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.875rem;
+  color: var(--mid);
+}
+.kl-foot .kl-mark {
+  font-size: 1.4rem;
+  color: var(--ink);
+}
+
+/* Motion */
 @media screen and (prefers-reduced-motion: no-preference) {
+  .kl-pile > * {
+    animation: kl-deal 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .kl-p1 {
+    animation-delay: 80ms;
+  }
+  .kl-p2 {
+    animation-delay: 220ms;
+  }
+  .kl-p4 {
+    animation-delay: 340ms;
+  }
+  .kl-p5 {
+    animation-delay: 440ms;
+  }
+  .kl-p3 {
+    animation-delay: 560ms;
+  }
+
   @supports (animation-timeline: view()) {
-    .kit-sheet .story-part {
-      animation: var(--story-anim) linear both;
-      animation-timeline: var(--kit-tl);
-      animation-range: cover calc(12% + min(var(--i, 0), 12) * 1.6%) cover
-        calc(34% + min(var(--i, 0), 12) * 1.6%);
-    }
-
-    .kit-inline .story-part {
-      animation: var(--story-anim) linear both;
+    /* A section's prints are dealt as they scroll in, one after another. */
+    .kl-band .print,
+    .kl-knobs,
+    .kl-band .kl-slip,
+    .kl-before,
+    .kl-receipt > ul {
+      animation: kl-deal linear both;
       animation-timeline: view();
-      animation-range: cover calc(4% + min(var(--i, 0), 12) * 1.2%) cover
-        calc(24% + min(var(--i, 0), 12) * 1.2%);
+      animation-range: entry 0% entry 80%;
     }
-
-    .kit-rail {
-      animation: kit-fill linear both;
-      animation-timeline: --kit-all;
-      animation-range: contain 0% contain 100%;
+    .kl-frames > li:nth-child(even) .print,
+    .kl-colours > li:nth-child(even) .print {
+      animation-range: entry 15% entry 95%;
     }
-
-    .kit-hero-print {
-      animation: kit-recede linear both;
+    .kl-head,
+    .kl-starts li,
+    .kl-routes li,
+    .kl-lenses li {
+      animation: kl-rise linear both;
       animation-timeline: view();
-      animation-range: exit 0% exit 100%;
+      animation-range: entry 0% entry 70%;
     }
-
-    @media (min-width: 64rem) {
-      .kit-step-copy {
-        animation: kit-focus linear both;
-        animation-timeline: var(--kit-tl);
-        animation-range: cover 0% cover 100%;
-      }
+    .kl-arrow path {
+      animation: wax-draw linear both;
+      animation-timeline: view();
+      animation-range: entry 80% cover 40%;
+    }
+    .kl-ruler i {
+      animation: kl-measure linear both;
+      animation-timeline: view();
+      animation-range: entry 40% cover 35%;
     }
   }
 }
-
-/* The step being read comes forward; the others wait, dimmed. */
-@keyframes kit-focus {
-  0%,
-  100% {
-    opacity: 0.22;
-  }
-  34%,
-  66% {
-    opacity: 1;
-  }
-}
-
-@keyframes kit-fill {
+@keyframes kl-deal {
   from {
-    transform: scaleX(0);
+    opacity: 0;
+    translate: 2.5rem -1.5rem;
+    rotate: calc(var(--tilt, 0deg) + 7deg);
   }
-  to {
-    transform: scaleX(1);
+}
+@keyframes kl-rise {
+  from {
+    opacity: 0;
+    translate: 0 1.5rem;
+  }
+}
+@keyframes kl-measure {
+  from {
+    scale: 0 1;
   }
 }
 
-/* The hero's print settles back into the page as it leaves. */
-@keyframes kit-recede {
-  to {
-    opacity: 0.55;
-    transform: translateY(-6%) scale(0.95);
+@media (min-width: 40rem) {
+  .kl-top,
+  .kl main > section,
+  .kl-made > section,
+  .kl-foot {
+    padding-inline: 2.5rem;
+  }
+  .kl-top nav a:not(.kl-cta) {
+    display: inline;
+  }
+  .kl-hero-copy > .kl-aside {
+    display: block;
+  }
+  .kl-pile {
+    aspect-ratio: 100 / 104;
+    max-width: 46rem;
+  }
+  .kl-p1 {
+    left: 3%;
+    top: 0;
+    width: 51%;
+  }
+  .kl-p2 {
+    left: 62%;
+    top: 3%;
+    width: 34%;
+  }
+  .kl-p3 {
+    left: 48%;
+    top: 55%;
+    width: 33%;
+  }
+  .kl-pile > .kl-p4 {
+    display: block;
+    left: 0;
+    top: 62%;
+    width: 27%;
+  }
+  .kl-pile > .kl-p5 {
+    display: grid;
+    left: 21%;
+    top: 84%;
+    width: 31%;
+    rotate: -2deg;
+  }
+  .kl-swap {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 2rem;
+  }
+  .kl-before {
+    justify-self: end;
+  }
+  .kl-new {
+    justify-self: start;
+  }
+  .kl-arrow {
+    width: 7rem;
+    rotate: none;
+  }
+  .kl-starts ul {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+  .kl-frames {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+  .kl-colours {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+  .kl-scenes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kl-knobs {
+    grid-column: 1 / -1;
+    max-width: 26rem;
+  }
+  .kl-moves {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+  .kl-video {
+    order: -1;
+  }
+  .kl-words {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 3rem;
+  }
+  .kl-ships {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+    align-items: center;
+    gap: 4rem;
+  }
+  .kl-after {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4rem;
   }
 }
 
-/* A step takes most of a screen's height, so the sheet beside it has time to
-   fill; the last leaves room to see the sheet complete. In print, where a
-   page's height is not the screen's, the steps keep their natural height. */
-@media screen and (min-width: 64rem) {
-  .kit-step {
-    min-height: 62vh;
+@media (min-width: 72rem) {
+  :where(.kl) h2 {
+    font-size: 3.75rem;
   }
-  .kit-steps {
-    padding-bottom: 24vh;
+  .kl-hero {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    align-items: start;
+    gap: 2rem;
+    padding-block: 2rem 6rem;
+  }
+  .kl-hero-copy {
+    padding-top: 1.5rem;
+  }
+  .kl-hero h1 {
+    font-size: 5.4rem;
+  }
+  .kl-pile {
+    max-width: none;
+    margin-right: -1rem;
+  }
+  .kl-band {
+    padding-block: 5.5rem;
+  }
+  .kl-head {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 35rem);
+    align-items: end;
+    gap: 3rem;
+  }
+  .kl-before,
+  .kl-new {
+    width: 27rem;
+  }
+  .kl-frames,
+  .kl-colours {
+    gap: 2rem;
+  }
+  .kl-scenes {
+    grid-template-columns: minmax(0, 23rem) repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 2.5rem;
+  }
+  .kl-knobs {
+    grid-column: auto;
+    margin-top: 2rem;
+  }
+  .kl-scene-b {
+    margin-top: 3.5rem;
+  }
+  .kl-check-body {
+    grid-template-columns: minmax(0, 27rem) minmax(0, 1fr);
+    align-items: center;
+    gap: 4.5rem;
+  }
+  .kl-lenses {
+    gap: 1.75rem;
+  }
+  .kl-moves {
+    grid-template-columns: 22rem minmax(0, 1fr);
+    gap: 6rem;
+    padding-left: 8rem;
+  }
+  .kl-ships {
+    grid-template-columns: minmax(0, 34rem) minmax(0, 23rem);
+    justify-content: space-between;
+  }
+  .kl-video {
+    width: 22rem;
+  }
+  .kl-cost {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 32rem);
+    align-items: start;
+    gap: 5rem;
+  }
+  .kl-close {
+    padding-block: 7.5rem 8rem;
+  }
+  .kl-close h2 {
+    font-size: 7rem;
+  }
+  .kl-starts h2 {
+    font-size: 3.4rem;
+  }
+  .kl-after h2 {
+    font-size: 2.75rem;
   }
 }
+
 @media print {
-  .kit-step {
-    padding-block: 1.25rem;
+  .kl-band {
+    padding-block: 1.5rem;
   }
 }

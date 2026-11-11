@@ -55,7 +55,8 @@ function reach(entry: string) {
 describe("the public page", () => {
   it("reaches no database, repository or Prisma, at any depth", () => {
     const { files, packages } = reach(join(repo, "src/app/welcome/page.tsx"));
-    expect(files).toContain("src/components/site/kit-steps.tsx");
+    expect(files).toContain("src/components/site/site-made.tsx");
+    expect(files).toContain("src/lib/site-kit.ts");
     expect(files.filter((f) => /^src\/(server\/|lib\/db\.ts)/.test(f))).toEqual(
       [],
     );
