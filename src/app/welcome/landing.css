@@ -557,39 +557,80 @@ html:has(.kl) {
 .kl-measures {
   display: grid;
   align-content: start;
-  gap: 1.5rem;
+  gap: 1.75rem;
+}
+.kl-measures-head {
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--display);
+  font-variation-settings: "opsz" 144;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.kl-measure {
+  display: grid;
+  gap: 0.55rem;
 }
 .kl-measure p {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
   font-size: 1rem;
+  color: var(--mid);
+}
+.kl-measure p b {
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--ink);
 }
-.kl-measure span,
-.kl-free {
+.kl-measure > span {
+  font-size: 0.9375rem;
+  font-weight: 700;
   color: var(--pass);
 }
 .kl-free {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
   font-size: 1rem;
-  font-weight: 700;
 }
+/* How much of the limit is used; the line at the end is the limit. */
 .kl-ruler {
-  height: 1.1rem;
-  margin-top: 0.4rem;
-  border: 1.5px solid var(--ink);
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(244, 236, 223, 0.6) 0 1px,
-    transparent 1px 10%
-  );
+  position: relative;
+  height: 0.6rem;
+  background: rgba(244, 236, 223, 0.16);
+}
+.kl-ruler::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: -0.3rem;
+  bottom: -0.3rem;
+  width: 2px;
+  background: var(--ink);
 }
 .kl-ruler i {
   display: block;
   height: 100%;
   background: var(--pass);
   transform-origin: left;
+}
+/* One box per tag the shop allows. */
+.kl-slots {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px;
+}
+.kl-slots i {
+  height: 1rem;
+  box-shadow: inset 0 0 0 1.5px rgba(244, 236, 223, 0.45);
+}
+.kl-slots i[data-on="true"] {
+  background: var(--pass);
+  box-shadow: none;
 }
 
 /* Where it goes */
@@ -960,6 +1001,10 @@ html:has(.kl) {
     animation-duration: 240ms;
     animation-delay: calc(var(--i, 0) * var(--step) + 600ms);
   }
+  :where(.kl-measure[data-reveal] .kl-slots i[data-on="true"]) {
+    animation: kl-slot 160ms ease-out backwards;
+    animation-delay: calc(200ms + var(--at, 0) * 45ms);
+  }
   :where(.kl-measure[data-reveal] .kl-ruler i) {
     animation: kl-measure 900ms var(--out) backwards;
     animation-delay: 200ms;
@@ -1010,6 +1055,11 @@ html:has(.kl) {
   from {
     scale: 1.35;
     filter: blur(4px);
+  }
+}
+@keyframes kl-slot {
+  from {
+    opacity: 0;
   }
 }
 @keyframes kl-measure {
@@ -1098,7 +1148,7 @@ html:has(.kl) {
     max-width: 26rem;
   }
   .kl-moves {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: 17rem minmax(0, 1fr);
     align-items: center;
   }
   .kl-video {

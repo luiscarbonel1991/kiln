@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import { KitVideo } from "@/components/site/kit-video";
 import { Print } from "@/components/site/print";
@@ -58,28 +59,44 @@ function Loupe({
   );
 }
 
+// How much of one of the shop's limits the draft uses: a bar for a count of
+// characters, one box per item when the limit is a handful of things.
 function Measure({
   label,
   used,
   max,
   unit,
+  slots,
 }: {
   label: string;
   used: number;
   max: number;
   unit: string;
+  slots?: boolean;
 }) {
   return (
     <div className="kl-measure">
       <p>
         <b>{label}</b>
-        <span>
-          {used} of {max} {unit}
-        </span>
+        {used} of {max} {unit}
       </p>
-      <div className="kl-ruler" aria-hidden>
-        <i style={{ width: `${Math.min(100, (used / max) * 100)}%` }} />
-      </div>
+      {slots ? (
+        <div className="kl-slots" aria-hidden>
+          {Array.from({ length: max }, (_, n) => (
+            <i
+              // biome-ignore lint/suspicious/noArrayIndexKey: fixed boxes, never reordered
+              key={n}
+              data-on={n < used}
+              style={{ "--at": n } as CSSProperties}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="kl-ruler" aria-hidden>
+          <i style={{ width: `${Math.min(100, (used / max) * 100)}%` }} />
+        </div>
+      )}
+      <span>Within the limit · {max - used} to spare</span>
     </div>
   );
 }
@@ -283,6 +300,9 @@ export function SiteMade({ kit }: { kit: SiteKit }) {
               </ul>
             </div>
             <div className="kl-measures">
+              <p className="kl-measures-head">
+                Counted against {words.channel}'s limits
+              </p>
               <Measure
                 label="Title"
                 used={words.title.length}
@@ -294,8 +314,9 @@ export function SiteMade({ kit }: { kit: SiteKit }) {
                 used={words.tags.length}
                 max={words.tagMax}
                 unit="tags"
+                slots
               />
-              <p className="kl-free">Drafted from the spec · free</p>
+              <p className="kl-free">Drafted from the spec, free.</p>
             </div>
           </div>
         </section>
