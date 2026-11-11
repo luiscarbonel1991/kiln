@@ -40,14 +40,14 @@ export function SiteHero({ kit }: { kit: SiteKit }) {
           tilt={2.5}
           className="kl-p2"
           eager
-          at={1300}
+          at={1050}
         />
         <TakePrint
           take={kit.takes.hero}
           tilt={-3}
           className="kl-p1"
           eager
-          at={900}
+          at={850}
         />
         {colours ? (
           <Print
@@ -74,7 +74,7 @@ export function SiteHero({ kit }: { kit: SiteKit }) {
           tilt={-2}
           className="kl-p3"
           eager
-          at={1700}
+          at={1450}
           note="Failed its check: letters too thin"
         />
       </div>

@@ -187,6 +187,7 @@ html:has(.kl) {
   padding: 0.9rem 1rem 1rem;
   background: var(--paper);
   color: var(--dark);
+  rotate: var(--tilt, 0deg);
   box-shadow:
     0 1px 1px rgba(0, 0, 0, 0.35),
     0 14px 28px -10px rgba(0, 0, 0, 0.55);
@@ -234,7 +235,8 @@ html:has(.kl) {
   padding: 0.55rem 0.55rem 0;
   background: #d9d2c4;
   color: var(--dark);
-  rotate: -1.5deg;
+  --tilt: -1.5deg;
+  rotate: var(--tilt);
   box-shadow: 0 14px 28px -10px rgba(0, 0, 0, 0.55);
 }
 .kl-before-art {
@@ -347,7 +349,8 @@ html:has(.kl) {
   padding: 1.15rem 1.15rem 1.25rem;
   background: var(--paper);
   color: var(--dark);
-  rotate: -0.8deg;
+  --tilt: -0.8deg;
+  rotate: var(--tilt);
   box-shadow:
     0 1px 1px rgba(0, 0, 0, 0.35),
     0 16px 28px -12px rgba(0, 0, 0, 0.55);
@@ -529,7 +532,7 @@ html:has(.kl) {
 .kl-listing {
   gap: 0.75rem;
   padding: 1.5rem;
-  rotate: -0.6deg;
+  --tilt: -0.6deg;
 }
 .kl-listing b {
   font-size: 1.5rem;
@@ -699,7 +702,8 @@ html:has(.kl) {
   padding: 0.5rem 1.4rem 1.2rem;
   background: var(--paper);
   color: var(--dark);
-  rotate: 0.6deg;
+  --tilt: 0.6deg;
+  rotate: var(--tilt);
   box-shadow:
     0 1px 1px rgba(0, 0, 0, 0.35),
     0 18px 32px -14px rgba(0, 0, 0, 0.6);
@@ -779,73 +783,233 @@ html:has(.kl) {
   color: var(--ink);
 }
 
-/* Motion */
+/* Motion. Three moves, each for one thing: paper lands on the table, wax
+   marks are drawn on it once it is down, and text rises into place. The hero
+   plays on load; everything else waits for the visitor (reveal.tsx marks it
+   with data-reveal). Every rule sits in :where() so one rule can hold it. */
 @media screen and (prefers-reduced-motion: no-preference) {
-  .kl-pile > * {
-    animation: kl-deal 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  .kl {
+    --step: 80ms;
+    --out: cubic-bezier(0.16, 0.84, 0.3, 1);
   }
-  .kl-p1 {
-    animation-delay: 80ms;
+  html:has(.kl) {
+    scroll-behavior: smooth;
   }
-  .kl-p2 {
-    animation-delay: 220ms;
+  .kl-cta {
+    transition:
+      background 120ms,
+      translate 120ms;
   }
-  .kl-p4 {
-    animation-delay: 340ms;
-  }
-  .kl-p5 {
-    animation-delay: 440ms;
-  }
-  .kl-p3 {
-    animation-delay: 560ms;
+  .kl-cta:active {
+    translate: 0 1px;
   }
 
-  @supports (animation-timeline: view()) {
-    /* A section's prints are dealt as they scroll in, one after another. */
-    .kl-band .print,
-    .kl-knobs,
-    .kl-band .kl-slip,
-    .kl-before,
-    .kl-receipt > ul {
-      animation: kl-deal linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 80%;
+  /* The hero: the kit is dealt, the failed print last. */
+  :where(.kl-pile > *) {
+    animation: kl-land 700ms backwards;
+  }
+  :where(.kl-p1) {
+    animation-delay: 120ms;
+  }
+  :where(.kl-p2) {
+    --spin: -5deg;
+    animation-delay: 300ms;
+  }
+  :where(.kl-p4) {
+    animation-delay: 450ms;
+  }
+  :where(.kl-p5) {
+    --spin: -4deg;
+    animation-delay: 580ms;
+  }
+  :where(.kl-p3) {
+    animation-delay: 740ms;
+  }
+  .kl-pile > [data-reveal] {
+    animation-delay: 0ms;
+  }
+  .kl-pile > [data-reveal] .wax-now {
+    --wax-wait: 620ms;
+  }
+
+  /* Prints overlap in the pile: pointing at one lifts it clear of the rest. */
+  @media (hover: hover) {
+    .kl-pile > * {
+      transition:
+        translate 260ms var(--out),
+        rotate 260ms var(--out),
+        z-index 0s 260ms;
     }
-    .kl-frames > li:nth-child(even) .print,
-    .kl-colours > li:nth-child(even) .print {
-      animation-range: entry 15% entry 95%;
-    }
-    .kl-head,
-    .kl-starts li,
-    .kl-routes li,
-    .kl-lenses li {
-      animation: kl-rise linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 70%;
-    }
-    .kl-arrow path {
-      animation: wax-draw linear both;
-      animation-timeline: view();
-      animation-range: entry 80% cover 40%;
-    }
-    .kl-ruler i {
-      animation: kl-measure linear both;
-      animation-timeline: view();
-      animation-range: entry 40% cover 35%;
+    .kl-pile > :hover {
+      z-index: 1;
+      translate: 0 -0.4rem;
+      rotate: calc(var(--tilt, 0deg) * 0.35);
+      transition-delay: 0s;
     }
   }
+
+  /* Pieces in one row follow each other. */
+  .kl-receipt li:nth-child(2) {
+    --n: 1;
+  }
+  .kl-receipt li:nth-child(3) {
+    --n: 2;
+  }
+  .kl-receipt li:nth-child(4) {
+    --n: 3;
+  }
+  .kl-knob:nth-child(3) {
+    --k: 1;
+  }
+  .kl-knob:nth-child(4) {
+    --k: 2;
+  }
+  .kl-knob:nth-child(5) {
+    --k: 3;
+  }
+  .kl-frames > li:nth-child(even),
+  .kl-colours > li:nth-child(even),
+  .kl-lenses > li:nth-child(2) {
+    --i: 1;
+  }
+  .kl-lenses > li:nth-child(3) {
+    --i: 2;
+  }
+  @media (min-width: 40rem) {
+    .kl-band li:nth-child(2),
+    .kl-head > :nth-child(2),
+    .kl-scene-a {
+      --i: 1;
+    }
+    .kl-band li:nth-child(3),
+    .kl-scene-b {
+      --i: 2;
+    }
+    .kl-band li:nth-child(4) {
+      --i: 3;
+    }
+    .kl-band li:nth-child(5),
+    .kl-new {
+      --i: 4;
+    }
+    .kl-arrow {
+      --i: 3;
+    }
+  }
+
+  :where(
+    .kl-band .print,
+    .kl-band .kl-slip,
+    .kl-knobs,
+    .kl-before,
+    .kl-receipt > ul
+  )[data-reveal] {
+    animation: kl-land 700ms backwards;
+    animation-delay: calc(var(--i, 0) * var(--step));
+  }
+  :where(
+    .kl-head > *,
+    .kl-starts > h2,
+    .kl-starts li,
+    .kl-routes li,
+    .kl-lenses li,
+    .kl-reasons,
+    .kl-moves-copy,
+    .kl-after > div,
+    .kl-cost-copy,
+    .kl-plans,
+    .kl-close > *
+  )[data-reveal] {
+    animation: kl-rise 620ms var(--out) backwards;
+    animation-delay: calc(var(--i, 0) * var(--step));
+  }
+
+  /* The scene's choices are pressed, one control after another. */
+  :where(.kl-knobs[data-reveal] .kl-knob li[data-on="true"]) {
+    animation: kl-press 220ms ease-out backwards;
+    animation-delay: calc(700ms + var(--k, 0) * 160ms);
+  }
+  /* The loupes pull into focus. */
+  :where(.kl-lenses li[data-reveal] .kl-lens img) {
+    animation: kl-focus 900ms var(--out) backwards;
+    animation-delay: calc(var(--i, 0) * var(--step));
+  }
+  /* The receipt prints its lines, the total last. */
+  :where(.kl-receipt > ul[data-reveal] li) {
+    --rise: 0.4rem;
+    animation: kl-rise 420ms var(--out) backwards;
+    animation-delay: calc(420ms + var(--n, 0) * 120ms);
+  }
+  :where(.kl-receipt > ul[data-reveal] .kl-total) {
+    animation-delay: 1100ms;
+  }
+  /* The request, then the card that waits for an ok. */
+  :where(.kl-after > div[data-reveal] .kl-approval > *) {
+    --rise: 0.6rem;
+    animation: kl-rise 420ms var(--out) backwards;
+    animation-delay: 500ms;
+  }
+  :where(.kl-after > div[data-reveal] .kl-approval > div) {
+    animation-delay: 1100ms;
+  }
+  :where(.kl-arrow[data-reveal] path) {
+    animation: wax-draw 520ms cubic-bezier(0.4, 0, 0.2, 1) backwards;
+    animation-delay: calc(var(--i, 0) * var(--step) + 120ms);
+  }
+  :where(.kl-arrow[data-reveal] path + path) {
+    animation-duration: 240ms;
+    animation-delay: calc(var(--i, 0) * var(--step) + 600ms);
+  }
+  :where(.kl-measure[data-reveal] .kl-ruler i) {
+    animation: kl-measure 900ms var(--out) backwards;
+    animation-delay: 200ms;
+  }
+
+  .kl [data-reveal="wait"],
+  .kl [data-reveal="wait"] * {
+    animation-play-state: paused;
+  }
 }
-@keyframes kl-deal {
-  from {
+@keyframes kl-land {
+  0% {
     opacity: 0;
-    translate: 2.5rem -1.5rem;
-    rotate: calc(var(--tilt, 0deg) + 7deg);
+    translate: 1.75rem -2.25rem;
+    rotate: calc(var(--tilt, 0deg) + var(--spin, 6deg));
+    scale: 1.07;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  30% {
+    opacity: 1;
+  }
+  70% {
+    translate: 0 0;
+    rotate: calc(var(--tilt, 0deg) - var(--spin, 6deg) * 0.12);
+    scale: 1;
+    animation-timing-function: ease-in-out;
+  }
+  100% {
+    opacity: 1;
+    translate: 0 0;
+    rotate: var(--tilt, 0deg);
+    scale: 1;
   }
 }
 @keyframes kl-rise {
   from {
     opacity: 0;
-    translate: 0 1.5rem;
+    translate: 0 var(--rise, 1.1rem);
+  }
+}
+@keyframes kl-press {
+  from {
+    background: transparent;
+    color: var(--dark);
+  }
+}
+@keyframes kl-focus {
+  from {
+    scale: 1.35;
+    filter: blur(4px);
   }
 }
 @keyframes kl-measure {
@@ -897,7 +1061,7 @@ html:has(.kl) {
     left: 21%;
     top: 84%;
     width: 31%;
-    rotate: -2deg;
+    --tilt: -2deg;
   }
   .kl-swap {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);

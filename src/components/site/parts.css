@@ -79,24 +79,29 @@
   --wax: #dc4a1f;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  /* A mark is drawn, stroke by stroke, shortly after its print is in place. */
-  .wax-now path {
-    animation: wax-draw 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
-    animation-delay: calc(var(--wax-at, 0) * 1ms);
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* A mark is drawn stroke by stroke once its print is down: on load in the
+     hero (--wax-at), and after the print lands everywhere else. A failed
+     print is ringed first, then crossed. */
+  .wax-now {
+    --wax-wait: calc(var(--wax-at, 0) * 1ms);
   }
-  .wax-now path + path {
-    animation-delay: calc(var(--wax-at, 0) * 1ms + 260ms);
+  .wax-seen {
+    --wax-wait: calc(var(--i, 0) * var(--step, 80ms) + 620ms);
   }
-  @supports (animation-timeline: view()) {
-    .wax-seen path {
-      animation: wax-draw linear both;
-      animation-timeline: view();
-      animation-range: entry 60% cover 38%;
-    }
-    .wax-seen path + path {
-      animation-range: entry 90% cover 46%;
-    }
+  .wax-corner.wax-fail {
+    --wax-lag: 380ms;
+  }
+  .wax path + path {
+    --wax-stroke: 230ms;
+  }
+  :where(.wax-now path, [data-reveal] .wax-seen path) {
+    animation: wax-draw 460ms cubic-bezier(0.4, 0, 0.2, 1) backwards;
+    animation-delay: calc(
+      var(--wax-wait, 0ms) +
+      var(--wax-lag, 0ms) +
+      var(--wax-stroke, 0ms)
+    );
   }
 }
 @keyframes wax-draw {

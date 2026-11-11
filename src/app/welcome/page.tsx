@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Reveal } from "@/components/site/reveal";
 import { SiteCost } from "@/components/site/site-cost";
 import { SiteClose, SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
@@ -39,6 +40,7 @@ export default function WelcomePage() {
         <SiteClose />
       </main>
       <SiteFooter />
+      <Reveal />
     </div>
   );
 }
