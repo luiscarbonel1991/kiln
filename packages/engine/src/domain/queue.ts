@@ -108,7 +108,6 @@ export function errorMessage(error: unknown): string {
 }
 
 const PROVIDER_LABEL = { google: "Google", openai: "OpenAI" } as const;
-const PROVIDER_KEY = { google: "GOOGLE_API_KEY", openai: "OPENAI_API_KEY" };
 
 // All an error says: its message and code, and the response body behind it
 // (the AI SDK keeps the body on the error or its cause; Google's SDK puts the
@@ -247,7 +246,7 @@ export function providerWords(text: string): string {
 function rejectedKey(provider: "google" | "openai", status?: unknown) {
   const other = PROVIDER_LABEL[provider === "google" ? "openai" : "google"];
   const code = typeof status === "number" ? ` (${status})` : "";
-  return `${PROVIDER_LABEL[provider]} rejected the API key${code} — check ${PROVIDER_KEY[provider]} or use ${other}.`;
+  return `${PROVIDER_LABEL[provider]} rejected the API key${code} — replace the key or use ${other}.`;
 }
 
 // A provider failure in words the maker can act on, naming the other provider

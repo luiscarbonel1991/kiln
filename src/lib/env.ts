@@ -5,8 +5,8 @@ import { MODULE_IDS } from "@/modules/ids";
 const unsetIfBlank = (v: unknown) => (v === "" ? undefined : v);
 
 const EnvSchema = z.object({
-  GOOGLE_API_KEY: z.string().min(1).optional(),
-  OPENAI_API_KEY: z.string().min(1).optional(),
+  GOOGLE_API_KEY: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
+  OPENAI_API_KEY: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
 
   // Persistence — local Postgres (docker-compose). Optional so DB-free build/test
   // never throw; the repositories assert it at runtime.
@@ -32,7 +32,15 @@ const EnvSchema = z.object({
     z.array(z.enum(MODULE_IDS)),
   ),
 
-  // Kiln's own key for what it keeps sealed (a connected shop's tokens): 32
+  // Kiln has no login and says so on any address but this machine's. "1"
+  // when the maker's own login sits in front of it: the notice goes away.
+  KILN_ACCESS_GUARDED: z.preprocess(
+    (v) => v === "1" || v === "true",
+    z.boolean(),
+  ),
+
+  // Kiln's own key for what it keeps sealed (the provider keys saved in
+  // Settings, a connected shop's tokens): 32
   // random bytes in base64, made once with `openssl rand -base64 32`.
   KILN_SECRET_KEY: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
   // The Etsy app Kiln acts as (etsy.com/developers/your-apps): its keystring

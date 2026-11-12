@@ -76,8 +76,6 @@ const ROLES: { role: ModelRole; label: string; what: string; off: string }[] = [
 
 const AGENT_OFF = "Off: a turn that fails says why; nothing else runs.";
 
-const KEY_NAME = { openai: "OPENAI_API_KEY", google: "GOOGLE_API_KEY" };
-
 const money = (usd: number) => `$${usd.toFixed(usd < 0.1 ? 3 : 2)}`;
 
 export interface AgentChoice {
@@ -409,8 +407,8 @@ function RouteEditor({
               </div>
               {keyed(entry.provider) ? null : (
                 <span className="pl-10 font-mono text-[0.6rem] text-fail">
-                  {PROVIDER_LABELS[entry.provider]} has no API key (
-                  {KEY_NAME[entry.provider]}): this model cannot run.
+                  {PROVIDER_LABELS[entry.provider]} has no API key (add one
+                  under Providers): this model cannot run.
                 </span>
               )}
             </li>

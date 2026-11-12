@@ -9,8 +9,8 @@ import { z } from "zod";
 const blankAsUnset = (v: unknown) => (v === "" ? undefined : v);
 
 const EnvSchema = z.object({
-  GOOGLE_API_KEY: z.string().min(1).optional(),
-  OPENAI_API_KEY: z.string().min(1).optional(),
+  GOOGLE_API_KEY: z.preprocess(blankAsUnset, z.string().min(1).optional()),
+  OPENAI_API_KEY: z.preprocess(blankAsUnset, z.string().min(1).optional()),
 
   // "mock" forces every adapter onto its stub, even with keys set (UI work and
   // demos without paid calls); KILN_MOCK_DELAY_MS makes stubs take that long.

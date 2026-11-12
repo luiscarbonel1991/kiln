@@ -34,7 +34,9 @@ export class ProviderKeyMissing extends Error {
   constructor(provider: "google" | "openai") {
     const key = provider === "openai" ? "OPENAI_API_KEY" : "GOOGLE_API_KEY";
     const label = provider === "openai" ? "OpenAI" : "Google";
-    super(`${label} has no API key (${key} is not set).`);
+    super(
+      `${label} has no API key: add one in Settings → Providers, or set ${key}.`,
+    );
     this.provider = provider;
     Object.setPrototypeOf(this, ProviderKeyMissing.prototype);
   }

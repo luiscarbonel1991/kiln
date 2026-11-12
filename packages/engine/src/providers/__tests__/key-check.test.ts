@@ -52,7 +52,7 @@ describe("checkProviderKey", () => {
       ok: false,
       called: true,
       message:
-        "Google rejected the API key (400) — check GOOGLE_API_KEY or use OpenAI.",
+        "Google rejected the API key (400) — replace the key or use OpenAI.",
     });
     lists.openai.mockRejectedValue(
       Object.assign(new Error("Incorrect API key provided"), { status: 401 }),
@@ -69,7 +69,7 @@ describe("checkProviderKey", () => {
     expect(await checkProviderKey("google")).toEqual({
       ok: false,
       called: false,
-      message: "No API key — set GOOGLE_API_KEY in .env and restart Kiln.",
+      message: "No API key: add one in Settings → Providers.",
     });
     env.KILN_PROVIDERS = "mock";
     expect(await checkProviderKey("openai")).toMatchObject({

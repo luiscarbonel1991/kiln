@@ -89,7 +89,7 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
     );
     const [, raw] = await providerHealth(makerId);
     expect(raw.lastError?.message).toBe(
-      "Google rejected the API key — check GOOGLE_API_KEY or use OpenAI.",
+      "Google rejected the API key — replace the key or use OpenAI.",
     );
     expect(raw.keyRejected).toBe(true);
 
@@ -108,11 +108,11 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
       makerId,
       provider: "google",
       error:
-        "Google rejected the API key (400) — check GOOGLE_API_KEY or use OpenAI.",
+        "Google rejected the API key (400) — replace the key or use OpenAI.",
     });
     const [, refused] = await providerHealth(makerId);
     expect(refused.lastError?.message).toBe(
-      "Google rejected the API key (400) — check GOOGLE_API_KEY or use OpenAI.",
+      "Google rejected the API key (400) — replace the key or use OpenAI.",
     );
     expect(refused.keyRejected).toBe(true);
   });

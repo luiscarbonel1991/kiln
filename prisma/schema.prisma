@@ -41,6 +41,7 @@ model Maker {
   moduleSettings  ModuleSettings[]
   accessTokens    AccessToken[]
   shopConnections ShopConnection[]
+  providerKeys    ProviderKey[]
   shopWrites      ShopWrite[]
   chatSessions    ChatSession[]
   lessons         Lesson[]
@@ -223,6 +224,21 @@ model ShopConnection {
   refreshedAt    DateTime? @db.Timestamptz(3)
 
   @@unique([makerId, platform])
+}
+
+// A provider's API key the maker saved in Settings → Providers, sealed under
+// KILN_SECRET_KEY (secret-box.ts) and never sent back to the browser. `hint`
+// is its last four characters, so Settings can name the key it holds.
+// Removing the key deletes the row; the environment's key, if any, takes over.
+model ProviderKey {
+  makerId   String
+  maker     Maker    @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  provider  String
+  sealed    String
+  hint      String
+  updatedAt DateTime @updatedAt
+
+  @@id([makerId, provider])
 }
 
 // Everything Kiln sent to a shop (Etsy drafts), one row per write: a draft

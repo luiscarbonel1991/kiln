@@ -1,5 +1,6 @@
 import type { ProviderId } from "@/domain/model-defaults";
 import { describeProviderError } from "@/domain/queue";
+import { hasProviderKey } from "@/providers/keys";
 import { env } from "../env";
 import { checkGoogleKey } from "./google/key-check";
 import { checkOpenAIKey } from "./openai/key-check";
@@ -12,11 +13,6 @@ export type KeyCheck =
   | { ok: true; called: true; models: string[] }
   | { ok: false; called: boolean; message: string };
 
-const KEY_NAME: Record<ProviderId, string> = {
-  openai: "OPENAI_API_KEY",
-  google: "GOOGLE_API_KEY",
-};
-
 export async function checkProviderKey(
   provider: ProviderId,
 ): Promise<KeyCheck> {
@@ -27,12 +23,11 @@ export async function checkProviderKey(
       message: "Mock mode: nothing is called.",
     };
   }
-  const key = provider === "openai" ? env.OPENAI_API_KEY : env.GOOGLE_API_KEY;
-  if (!key) {
+  if (!hasProviderKey(provider)) {
     return {
       ok: false,
       called: false,
-      message: `No API key — set ${KEY_NAME[provider]} in .env and restart Kiln.`,
+      message: "No API key: add one in Settings → Providers.",
     };
   }
   try {

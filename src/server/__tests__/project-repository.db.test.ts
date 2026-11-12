@@ -655,7 +655,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       ).rejects.toMatchObject({
         reason: "provider",
         message:
-          "etsy.video uses Gemini Omni Flash, but Google has no API key (GOOGLE_API_KEY).",
+          "etsy.video uses Gemini Omni Flash, but Google has no API key: add one in Settings → Providers.",
       });
     } finally {
       keys.present = true;

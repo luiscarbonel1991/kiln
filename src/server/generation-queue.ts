@@ -175,11 +175,9 @@ function assertRunnable(
     );
   }
   if (providerMode() === "live" && !hasProviderKey(model.provider)) {
-    const key =
-      model.provider === "openai" ? "OPENAI_API_KEY" : "GOOGLE_API_KEY";
     throw new QueueRefusal(
       "provider",
-      `${cardId} uses ${check.entry.label}, but ${PROVIDER_LABELS[model.provider]} has no API key (${key}).`,
+      `${cardId} uses ${check.entry.label}, but ${PROVIDER_LABELS[model.provider]} has no API key: add one in Settings → Providers.`,
     );
   }
 }

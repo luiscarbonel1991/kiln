@@ -14,7 +14,12 @@ export type {
   VisionProvider,
 } from "@/providers/interfaces";
 export { checkProviderKey, type KeyCheck } from "@/providers/key-check";
-export { hasProviderKey } from "@/providers/keys";
+export {
+  hasProviderKey,
+  providerKey,
+  providerKeySource,
+  setProviderKey,
+} from "@/providers/keys";
 export { mockArtDirector } from "@/providers/mock/art-director";
 export { type MockReply, mockReply } from "@/providers/mock/chat-model";
 export { mockVisionProvider } from "@/providers/mock/vision";

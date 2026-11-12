@@ -11,7 +11,7 @@ const note = (over = {}) => ({
 describe("providerBlock", () => {
   it("blocks a live call to a provider with no key, or one that rejected its key", () => {
     expect(providerBlock([note({ keyPresent: false })], "google", "live")).toBe(
-      "Google has no API key: add GOOGLE_API_KEY to .env, or pick an OpenAI model.",
+      "Google has no API key: add one in Settings → Providers, or pick an OpenAI model.",
     );
     expect(
       providerBlock(

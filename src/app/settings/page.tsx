@@ -4,6 +4,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { AccessTokens } from "@/components/settings/access-tokens";
 import { KeyCheck } from "@/components/settings/key-check";
 import { Lessons } from "@/components/settings/lessons";
+import { ProviderKey } from "@/components/settings/provider-key";
 import { RoutesForm } from "@/components/settings/routes-form";
 import { ToolCalls } from "@/components/settings/tool-calls";
 import { EtsyConnection } from "@/components/shops/etsy-connection";
@@ -18,6 +19,10 @@ import { budget } from "@/server/generation-repository";
 import { listLessons } from "@/server/lessons";
 import { getCurrentMaker, getMakerModelSetup } from "@/server/maker-repository";
 import { providerHealth } from "@/server/provider-health";
+import {
+  type ProviderKeyState,
+  providerKeyStates,
+} from "@/server/provider-keys";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 import { recentToolCalls } from "@/server/tool-calls";
 
@@ -31,6 +36,20 @@ const when = (iso: string) =>
     minute: "2-digit",
   });
 
+const ENV_NAME = { openai: "OPENAI_API_KEY", google: "GOOGLE_API_KEY" };
+
+function keyLine(state: ProviderKeyState | undefined): string {
+  if (!state) return "No API key yet";
+  if (state.unreadable) {
+    return `A saved key (ends in ${state.hint}) cannot be read: KILN_SECRET_KEY is missing or changed. Paste the key again.`;
+  }
+  if (state.source === "saved") return `API key saved, ends in ${state.hint}`;
+  if (state.source === "env") {
+    return `API key from the environment (${ENV_NAME[state.provider]})`;
+  }
+  return "No API key yet";
+}
+
 // Settings (per request: it reads the maker's routes and the providers'
 // health). Models: a route per role, Kiln's proposal until saved. Providers: each key and its last
 // calls, read for free, and a free key check on a click (the provider lists
@@ -41,10 +60,11 @@ const when = (iso: string) =>
 export default async function SettingsPage() {
   await connection();
   const maker = hasDatabase() ? await getCurrentMaker() : null;
-  const [setup, health, month, tokens, shop, calls, lessons] =
+  const [setup, health, keyStates, month, tokens, shop, calls, lessons] =
     await Promise.all([
       getMakerModelSetup(),
       providerHealth(maker?.id ?? null),
+      providerKeyStates(),
       maker ? budget(maker.id) : Promise.resolve(null),
       maker ? listAccessTokens() : Promise.resolve(null),
       maker ? shopConnection() : Promise.resolve(null),
@@ -71,6 +91,92 @@ export default async function SettingsPage() {
         </span>
       </ProjectsHeader>
       <main className="mx-auto flex w-full max-w-[860px] flex-col gap-8 px-6 py-11 sm:px-8">
+        <section
+          id="providers"
+          className="rounded-card bg-card p-6 shadow-card"
+        >
+          <h2
+            className="font-serif text-xl text-foreground"
+            style={{ fontVariationSettings: "'opsz' 40" }}
+          >
+            Providers
+          </h2>
+          <p className="mt-1 mb-5 font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
+            {mode === "mock"
+              ? "Mock mode: nothing is called or paid."
+              : "Kiln runs on your own keys: paste one and it is kept sealed on this machine, then checked for free (the provider lists its models, nothing is generated). One provider is enough to start. The rest is read from the last calls Kiln made."}
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {health.map((h) => (
+              <div
+                key={h.provider}
+                className="flex min-w-0 flex-col gap-2 rounded-render border border-border-soft bg-surface-soft p-4"
+              >
+                <div className="font-sans text-sm font-semibold text-foreground">
+                  {h.label}
+                </div>
+                <div
+                  className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
+                  data-testid={`provider-${h.provider}-key`}
+                >
+                  <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
+                  {keyLine(keyStates.find((k) => k.provider === h.provider))}
+                </div>
+                {h.lastError ? (
+                  <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
+                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
+                    <span className="min-w-0 [overflow-wrap:anywhere]">
+                      {h.lastError.message}{" "}
+                      <span className="font-mono text-[0.65rem] text-on-surface-dim">
+                        {when(h.lastError.at)}
+                      </span>
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
+                  <CircleCheck className="size-3.5 text-prov-recipe" />
+                  {h.lastOkAt
+                    ? `Last call that worked: ${when(h.lastOkAt)}`
+                    : "No call that worked yet"}
+                </div>
+                {h.unlisted ? (
+                  <div
+                    className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
+                    data-testid={`provider-${h.provider}-unlisted`}
+                  >
+                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
+                    <span className="min-w-0 [overflow-wrap:anywhere]">
+                      No longer offered by {h.label}:{" "}
+                      {h.unlisted.models
+                        .map((model) =>
+                          modelLabel({ provider: h.provider, model }),
+                        )
+                        .join(", ")}
+                      . Kiln will not run{" "}
+                      {h.unlisted.models.length === 1 ? "it" : "them"}.{" "}
+                      <span className="font-mono text-[0.65rem] text-on-surface-dim">
+                        {when(h.unlisted.at)}
+                      </span>
+                    </span>
+                  </div>
+                ) : null}
+                {h.keyPresent && mode !== "mock" ? (
+                  <KeyCheck provider={h.provider} label={h.label} />
+                ) : null}
+                {maker && mode !== "mock" ? (
+                  <ProviderKey
+                    provider={h.provider}
+                    label={h.label}
+                    saved={keyStates.some(
+                      (k) => k.provider === h.provider && k.hint !== null,
+                    )}
+                  />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="rounded-card bg-card p-6 shadow-card">
           <h2
             className="font-serif text-xl text-foreground"
@@ -119,79 +225,6 @@ export default async function SettingsPage() {
             <Lessons lessons={lessons} />
           </section>
         ) : null}
-
-        <section className="rounded-card bg-card p-6 shadow-card">
-          <h2
-            className="font-serif text-xl text-foreground"
-            style={{ fontVariationSettings: "'opsz' 40" }}
-          >
-            Providers
-          </h2>
-          <p className="mt-1 mb-5 font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
-            {mode === "mock"
-              ? "Mock mode: nothing is called or paid."
-              : "Read from the last calls Kiln made. Checking a key is free: the provider lists its models, nothing is generated."}
-          </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {health.map((h) => (
-              <div
-                key={h.provider}
-                className="flex min-w-0 flex-col gap-2 rounded-render border border-border-soft bg-surface-soft p-4"
-              >
-                <div className="font-sans text-sm font-semibold text-foreground">
-                  {h.label}
-                </div>
-                <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
-                  <KeyRound className="size-3.5" />
-                  {h.keyPresent
-                    ? "API key set"
-                    : `No API key — set ${h.provider === "openai" ? "OPENAI_API_KEY" : "GOOGLE_API_KEY"}`}
-                </div>
-                {h.lastError ? (
-                  <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
-                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
-                    <span className="min-w-0 [overflow-wrap:anywhere]">
-                      {h.lastError.message}{" "}
-                      <span className="font-mono text-[0.65rem] text-on-surface-dim">
-                        {when(h.lastError.at)}
-                      </span>
-                    </span>
-                  </div>
-                ) : null}
-                <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
-                  <CircleCheck className="size-3.5 text-prov-recipe" />
-                  {h.lastOkAt
-                    ? `Last call that worked: ${when(h.lastOkAt)}`
-                    : "No call that worked yet"}
-                </div>
-                {h.unlisted ? (
-                  <div
-                    className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
-                    data-testid={`provider-${h.provider}-unlisted`}
-                  >
-                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
-                    <span className="min-w-0 [overflow-wrap:anywhere]">
-                      No longer offered by {h.label}:{" "}
-                      {h.unlisted.models
-                        .map((model) =>
-                          modelLabel({ provider: h.provider, model }),
-                        )
-                        .join(", ")}
-                      . Kiln will not run{" "}
-                      {h.unlisted.models.length === 1 ? "it" : "them"}.{" "}
-                      <span className="font-mono text-[0.65rem] text-on-surface-dim">
-                        {when(h.unlisted.at)}
-                      </span>
-                    </span>
-                  </div>
-                ) : null}
-                {h.keyPresent && mode !== "mock" ? (
-                  <KeyCheck provider={h.provider} label={h.label} />
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </section>
 
         {month ? (
           <section className="rounded-card bg-card p-6 shadow-card">

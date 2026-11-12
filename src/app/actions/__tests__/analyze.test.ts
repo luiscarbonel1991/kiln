@@ -39,7 +39,8 @@ describe("analyzeMaster", () => {
       provider: "openai",
       model: "gpt-6.1-sol",
       label: "GPT-6.1 Sol",
-      message: "OpenAI has no API key (OPENAI_API_KEY is not set).",
+      message:
+        "OpenAI has no API key: add one in Settings → Providers, or set OPENAI_API_KEY.",
       alternative: {
         provider: "google",
         model: "gemini-3.8-flash",
@@ -57,7 +58,8 @@ describe("analyzeMaster", () => {
     expect(degraded).toMatchObject({
       provider: "google",
       model: "gemini-3.8-flash",
-      message: "Google has no API key (GOOGLE_API_KEY is not set).",
+      message:
+        "Google has no API key: add one in Settings → Providers, or set GOOGLE_API_KEY.",
       alternative: { provider: "openai", model: "gpt-6.1-sol" },
     });
   });

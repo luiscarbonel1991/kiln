@@ -138,10 +138,10 @@ describe("provider errors in plain words", () => {
         Object.assign(new Error(googleBody), { status: 400 }),
       ),
     ).toBe(
-      "Google rejected the API key (400) — check GOOGLE_API_KEY or use OpenAI.",
+      "Google rejected the API key (400) — replace the key or use OpenAI.",
     );
     expect(readableFailure(googleBody, "google")).toBe(
-      "Google rejected the API key — check GOOGLE_API_KEY or use OpenAI.",
+      "Google rejected the API key — replace the key or use OpenAI.",
     );
   });
 
@@ -166,9 +166,9 @@ describe("provider errors in plain words", () => {
     );
   });
 
-  it("a rejected key names the variable; anything else keeps the provider's words", () => {
+  it("a rejected key says to replace it; anything else keeps the provider's words", () => {
     expect(describeProviderError("openai", withStatus(401))).toBe(
-      "OpenAI rejected the API key (401) — check OPENAI_API_KEY or use Google.",
+      "OpenAI rejected the API key (401) — replace the key or use Google.",
     );
     expect(describeProviderError("google", new Error("socket hang up"))).toBe(
       "socket hang up",
