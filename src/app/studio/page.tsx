@@ -1,3 +1,4 @@
+import { OpenAddressNotice } from "@/components/open-address-notice";
 import { StudioShell } from "@/components/studio/studio-shell";
 import { enabledModules } from "@/modules/enabled";
 import { ModulesProvider } from "@/modules/modules-context";
@@ -18,6 +19,7 @@ export default async function StudioPage({
   const [draft] = routes?.draft.models ?? [models.image];
   return (
     <ModulesProvider modules={enabledModules()}>
+      <OpenAddressNotice />
       <StudioShell
         fresh={fresh === "1"}
         openId={typeof open === "string" ? open : undefined}

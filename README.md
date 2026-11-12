@@ -15,15 +15,43 @@ orders or job cards.
 
 ## Quickstart (Docker)
 
+You need Docker and nothing else:
+
 ```bash
+git clone https://github.com/luiscarbonel1991/kiln.git && cd kiln
 docker compose --profile app up -d --build
 ```
 
-Open http://localhost:3000. Without keys Kiln runs on mock providers, so nothing
-is paid and nothing is sent. To generate for real, copy `.env.example` to `.env`,
-add `OPENAI_API_KEY` and/or `GOOGLE_API_KEY`, set `KILN_PROVIDERS=live` and run
-the command again. Every paid call shows its estimate first, and the month's cap
-rules every attempt.
+Open http://localhost:3000. The first build takes a few minutes.
+
+1. **Add a product.** Type it in, start from a photo or a design file, or import a
+   catalog. Its exact frames (colour options, size and spec, scale) are drawn at once
+   and cost nothing, with no key.
+2. **Add a model key** when you want scenes, video or written text: Settings →
+   Providers, paste an OpenAI or a Google key. One is enough. Kiln keeps it sealed in
+   its own database, checks it for free and never shows it again. Every paid call
+   shows its estimate first, and the month's cap (25 USD by default) rules
+   every attempt.
+3. **Connect your AI**, if you want an agent to do the work: Settings → Access tokens,
+   make a token, then
+
+   ```bash
+   claude mcp add --transport http kiln http://127.0.0.1:3000/api/mcp \
+     --header "Authorization: Bearer $KILN_TOKEN"
+   ```
+
+   The agent quotes every paid task and spends only with a token you marked "May
+   spend" ([MCP server](#mcp-server)).
+
+**Kiln has no login.** It is made to run on your own machine: the ports are
+published on `127.0.0.1` only. Anyone who can open the app can use your studio and
+spend on your keys up to the monthly cap, so do not put it on a network or the
+internet without your own login in front of it ([SECURITY.md](SECURITY.md)).
+
+To look around with nothing real, `KILN_PROVIDERS=mock docker compose --profile app up -d`
+plays the paid parts with stubs, in a database of its own. To stop Kiln:
+`docker compose --profile app down` (your work stays in Docker's volumes). To update:
+`git pull`, then the first command again.
 
 The image carries Tesseract for the take check, plus ImageMagick and ffmpeg (see [System dependencies](#system-dependencies-vectorize-deliver-stills-in-motion-take-checks)).
 
@@ -34,6 +62,7 @@ Node 24 or later, pnpm 10 and Docker:
 ```bash
 pnpm install
 cp .env.example .env
+echo "KILN_SECRET_KEY=$(openssl rand -base64 32)" >> .env   # seals saved keys
 pnpm db:up          # Postgres + MinIO
 pnpm db:deploy      # apply the migrations
 pnpm dev            # http://127.0.0.1:3000
@@ -302,10 +331,10 @@ approved without the board: from a script, an agent, a scheduled job or another 
 **A token.** Settings → Access tokens: name it after what will use it, then Make a
 token. Copy it at once: Kiln keeps only its SHA-256 and cannot show it again. A token
 acts as this studio; make one per system, so each can be revoked on its own. Every
-call sends `Authorization: Bearer kiln_pat_…`. Kiln itself has no sign-in yet, so
+call sends `Authorization: Bearer kiln_pat_…`. Kiln itself has no login yet, so
 `pnpm dev`, `pnpm dev:mock` and `pnpm start` listen on 127.0.0.1 only: anyone who can
 open Kiln can open Settings and make a token. To reach it from another machine, put it
-behind your own sign-in (a VPN, a reverse proxy with authentication) and start it with
+behind your own login (a VPN, a reverse proxy with authentication) and start it with
 `-H 0.0.0.0` there.
 
 **The routes.** Answers are JSON; a refusal is `{ "error": "…" }`, in words.
@@ -693,20 +722,24 @@ reason, and a live job whose provider has no key is refused.
   effort. It then runs its turns and its plans on it. An agent whose tools show it
   images (`view_frame`, `view_design`) takes only models that read images.
 
-Settings → Providers shows each key and the provider's last calls (the last
-error, the last call that worked). It reads them from the job ledger, so it
+Settings → Providers takes each provider's key and shows its last calls (the last
+error, the last call that worked). A pasted key is sealed in the database under
+`KILN_SECRET_KEY` (AES-256-GCM), handed to the adapters in memory and used from the
+next call, with no restart; the page only ever shows its last four characters, and
+Remove deletes it. It reads them from the job ledger, so it
 costs nothing. "Check the key" asks the provider for the list of models the
 key reaches: free, nothing is generated, and the answer is kept as the
-provider's latest call, so a key replaced in `.env` (then a restart) clears
-the error the old one left. The list is also compared with the catalog: a model
+provider's latest call, so a replaced key clears the error the old one left; a
+saved key is checked as it is saved. The list is also compared with the catalog: a model
 Kiln offers that the provider no longer lists is named on the provider's card
 and in every model picker ("no longer offered by Google"), and Kiln refuses it
 before any paid call: the queue's cards, the studio's calls, the text calls and
 the chat (a route moves past it). The catalog's `retired` always wins over the
 list.
 
-Keys: `OPENAI_API_KEY` and `GOOGLE_API_KEY` (`.env`). Tests drop both before
-any test runs (`vitest.setup.ts`), so a test never makes a paid call.
+Keys can also come from the environment (`OPENAI_API_KEY`, `GOOGLE_API_KEY` in
+`.env`): headless runs read them there, and a key saved in Settings wins over
+them. Tests drop both before any test runs (`vitest.setup.ts`), so a test never makes a paid call.
 
 ## Generation queue
 

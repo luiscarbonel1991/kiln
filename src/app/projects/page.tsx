@@ -7,6 +7,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { fromMicros } from "@/domain/generation-cost";
 import { buyerSizeLabel, type Product } from "@/domain/product";
 import { hasDatabase } from "@/lib/db";
+import { hasProviderKey } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
 import { budget } from "@/server/generation-repository";
 import { homeStats, type ProjectStats } from "@/server/home-repository";
@@ -14,6 +15,7 @@ import { followedListings } from "@/server/listing-results";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { listProducts } from "@/server/product-repository";
 import { listProjects } from "@/server/project-repository";
+import { ensureProviderKeys } from "@/server/provider-keys";
 
 const money = (micros: number) => `$${fromMicros(micros).toFixed(2)}`;
 
@@ -64,6 +66,9 @@ export default async function ProjectsPage() {
   ]);
   const followed = listings.filter((l) => l.view.following);
   const mock = providerMode() === "mock";
+  await ensureProviderKeys().catch(() => undefined);
+  const keyless =
+    !mock && !hasProviderKey("openai") && !hasProviderKey("google");
   const details = Object.fromEntries(
     projects.flatMap((p) => {
       const s = stats.projects.get(p.id);
@@ -108,7 +113,12 @@ export default async function ProjectsPage() {
     <div className="flex min-h-full flex-col">
       <ProjectsHeader />
       <main className={MAIN}>
-        <Opening maker={maker.name} next={next} returning={returning} />
+        <Opening
+          maker={maker.name}
+          next={next}
+          returning={returning}
+          keyless={keyless}
+        />
 
         {returning ? (
           <section
@@ -216,10 +226,12 @@ function Opening({
   maker,
   next,
   returning,
+  keyless,
 }: {
   maker: string;
   next: { href: string; label: string } | null;
   returning: boolean;
+  keyless: boolean;
 }) {
   return (
     <section className="flex flex-col gap-5 pt-4">
@@ -262,6 +274,22 @@ function Opening({
           {returning ? "New project" : "Add a product"}
         </Link>
       </div>
+      {keyless ? (
+        <p
+          data-testid="home-keys"
+          className="max-w-[520px] font-sans text-[0.875rem] leading-relaxed text-on-surface-mid"
+        >
+          Exact frames, vectors and the plan need no key. Scenes, video and
+          written text run on your own OpenAI or Google key:{" "}
+          <Link
+            href="/settings#providers"
+            className="font-semibold text-foreground underline underline-offset-2"
+          >
+            add one in Settings
+          </Link>
+          .
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -44,8 +44,11 @@ services:
 
   # Kiln itself (docker compose --profile app up -d --build). Off by default,
   # so `pnpm db:up` still starts only the database and storage for `pnpm dev`.
-  # Without keys it runs on mock providers: nothing is paid, nothing is sent.
-  # Keys and settings come from .env when there is one.
+  # It starts with no provider keys: everything exact works, and nothing paid
+  # can run until a key is pasted in Settings → Providers (kept sealed under a
+  # key of Kiln's own, made on the first start in the kiln-secrets volume).
+  # KILN_PROVIDERS=mock plays the paid parts with stubs instead. A .env, when
+  # there is one, still sets keys and anything else.
   app:
     profiles: ["app"]
     build: .
@@ -57,7 +60,7 @@ services:
     environment:
       DATABASE_URL: postgresql://kiln:kiln@db:5432/kiln?schema=public
       KILN_MOCK_DATABASE_URL: postgresql://kiln:kiln@db:5432/kiln_mock?schema=public
-      KILN_PROVIDERS: ${KILN_PROVIDERS:-mock}
+      KILN_PROVIDERS: ${KILN_PROVIDERS:-live}
       STORAGE_PROVIDER: s3
       # The server reaches storage inside the network; browsers on the host.
       S3_ENDPOINT: http://s3:9000
@@ -68,6 +71,8 @@ services:
       KILN_OCR: tesseract
     ports:
       - "127.0.0.1:${KILN_PORT:-3000}:3000"
+    volumes:
+      - kiln-secrets:/app/.kiln
     depends_on:
       db:
         condition: service_healthy
@@ -79,3 +84,5 @@ volumes:
     name: kiln-pgdata
   kiln-minio:
     name: kiln-minio
+  kiln-secrets:
+    name: kiln-secrets
