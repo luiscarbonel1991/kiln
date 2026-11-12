@@ -30,7 +30,7 @@ export function GenerationPhase({
     if (!ready || !focusCardId) return;
     document
       .getElementById(`card-${focusCardId}`)
-      ?.scrollIntoView({ inline: "center", block: "nearest" });
+      ?.scrollIntoView({ block: "center" });
   }, [ready, focusCardId]);
 
   if (!cards || !master || !understanding) return null;
@@ -79,13 +79,13 @@ export function GenerationPhase({
           <RanOnNotice ranOn={directedBy} testId="directions-ran-on" />
         </div>
       ) : null}
-      <div className="flex gap-4 overflow-x-auto px-6 py-5 sm:px-8">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] items-start gap-5 px-6 py-5 sm:px-8">
         {cards.map((card) => (
           <div
             key={card.id}
             id={`card-${card.id}`}
             className={cn(
-              "flex-shrink-0 rounded-card",
+              "min-w-0 rounded-card",
               card.id === focusCardId &&
                 "ring-2 ring-primary ring-offset-4 ring-offset-background",
             )}

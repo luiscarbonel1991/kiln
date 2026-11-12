@@ -167,7 +167,7 @@ export function GenerationCard({
   }
 
   return (
-    <div className="w-[300px] flex-shrink-0 overflow-hidden rounded-card bg-card shadow-card">
+    <div className="w-full overflow-hidden rounded-card bg-card shadow-card">
       <div className="p-4 pb-0">
         <RenderCanvas
           seed={card.renderSeed}
