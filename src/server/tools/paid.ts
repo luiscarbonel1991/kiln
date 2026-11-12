@@ -14,7 +14,7 @@ import {
 import { budget, QueueRefusal } from "@/server/generation-repository";
 import { listingTarget, writeProjectListing } from "@/server/listing-write";
 import { getCurrentMaker } from "@/server/maker-repository";
-import { getProduct } from "@/server/product-repository";
+import { findProduct, getProduct } from "@/server/product-repository";
 import { waitingProjectFrames } from "@/server/project-frames";
 import {
   createQuote,
@@ -87,7 +87,7 @@ async function priceGenerate(
   }
   if (!state.reference) {
     throw new ToolRefusal(
-      "This project has no reference image yet, and its scenes are made from one: the maker adds the product's photo on the board (Kiln could not draw one from the product for free).",
+      "This project has no reference image yet, and its scenes are made from one. Kiln could not draw one from the product for free (it has no design file): send its photo with add_reference, or `kiln reference <project> <photo>` from a terminal, or the maker adds it on the board.",
     );
   }
   const asked = frames ?? state.waiting;
@@ -229,7 +229,7 @@ const QuoteInput = z.object({
     .string()
     .min(1)
     .optional()
-    .describe("review_product: the product's Kiln id."),
+    .describe("review_product: the product's Kiln id or its SKU."),
   test: z
     .boolean()
     .optional()
@@ -267,11 +267,11 @@ async function priceOf(input: z.output<typeof QuoteInput>): Promise<Priced> {
     }
     return priceText("listingCopy", "listing text", { project, destination });
   }
-  const product = needs(input.product, action, "product");
-  if (!(await getProduct(product))) {
-    throw new ToolRefusal("No product of yours has that id.");
+  const found = await findProduct(needs(input.product, action, "product"));
+  if (!found) {
+    throw new ToolRefusal("No product of yours has that id or SKU.");
   }
-  return priceText("productReview", "product review", { product });
+  return priceText("productReview", "product review", { product: found.id });
 }
 
 export const quote = defineTool({

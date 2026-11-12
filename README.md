@@ -355,6 +355,7 @@ pnpm kiln swatch CB-01 maple maple.jpg   # a colour's material photo
 pnpm kiln swatch CB-01 maple maple.jpg --white=0.12,0.2   # its light balanced first
 pnpm kiln swatch CB-01 maple maple.jpg --match-swatch     # or tinted to the swatch
 pnpm kiln swatch CB-01 maple --remove
+pnpm kiln reference <project> photo.jpg  # a project's reference image (the product's photo)
 pnpm kiln schema                         # the package's JSON Schema
 pnpm kiln projects                       # the projects with frames
 pnpm kiln frames <project>               # each frame, its state, its take and its look
@@ -429,7 +430,7 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 | Tools | |
 |---|---|
 | Products | `list_products`, `import_products` (a product package), `review_product` (paid) |
-| Projects | `plan_project` (the frames it would start with and the look it shows; nothing saved), `create_project` (free, in a colour and style), `deliver` (a destination's zip; publishing stays the maker's) |
+| Projects | `plan_project` (the frames it would start with and the look it shows; nothing saved), `create_project` (free, in a colour and style), `add_reference` (the product's photo as base64, for a product Kiln cannot draw for free), `deliver` (a destination's zip; publishing stays the maker's) |
 | The board | `list_projects`, `get_frames`, `view_frame` (the take as an image), `approve_frame`, `unapprove_frame`, `reject_frame` (a reason: top, small, busy, dark, harsh, which moves a knob as the board's chips do), `tune_frame` (any of a scene's knobs, its place, and its colour and style, as Tune does; free), `switch_frame` (a frame off or back on; free), `make_stills_video` (a video frame's free stills in motion) |
 | Designs | `list_designs`, `get_design` (each drawing's state, line art and vector, and the link where the maker makes a vector into a product), `view_design` (a drawing's line art, or its vector rendered), `vectorize` (free: outline or centerline, detail fine, balanced or clean; kept as the drawing's vector) |
 | Paid work | `quote`, then `generate`, `draw` (a design's line art, through the queue), `write_listing` or `review_product` with its id |
@@ -451,9 +452,14 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
   agent looked at (`view_frame`); a newer one refuses.
 - **Every call is recorded**: Settings → Access tokens → Recent tool calls shows the
   token, the tool, done or the refusal, and a paid call's quote.
-- A project whose product Kiln cannot draw for free needs its photo on the board
-  before its scenes can be quoted; `create_project` says so. Filling a product from a
-  photo is not a tool yet (it needs an upload).
+- A project whose product Kiln cannot draw for free (it has no design file) needs the
+  product's photo before its scenes can be quoted; `create_project` says so. Send it
+  with `add_reference` (base64, at most 6 MB), `kiln reference <project> <photo>`,
+  `POST /api/projects/<id>/reference` (the image as the body, at most 15 MB), or on the
+  board. Filling a product's fields from a photo is not a tool yet.
+- **A product is named by its Kiln id or its SKU** wherever a tool takes one.
+- **An edit the channel would refuse is not saved.** `edit_listing` refuses a tag over
+  the channel's length or a title over its limit and says what to fix.
 - From a terminal: `kiln tools` lists them; `kiln call <tool> '<json>'` (or
   `@args.json`) calls one and prints its data, a refusal on stderr with exit 1.
 

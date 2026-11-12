@@ -239,7 +239,7 @@ export const editListingTool = defineTool({
   name: "edit_listing",
   title: "Edit a listing's text",
   description:
-    "Write a destination's listing fields (title, description, tags, materials), each marked as written by a model; the fields not given stay as they are. A field the maker wrote is kept unless overwriteMakerText is true: ask the maker first (in Kiln's chat they click to allow it). Free. The answer is the listing's problems after the edit, as get_listing gives them: fix the errors before you stop.",
+    "Write a destination's listing fields (title, description, tags, materials), each marked as written by a model; the fields not given stay as they are. A field the maker wrote is kept unless overwriteMakerText is true: ask the maker first (in Kiln's chat they click to allow it). Free. An edit the channel would refuse (a tag over its length, a title over its limit) is not saved: the refusal says what to fix. The answer is the listing's problems after the edit, as get_listing gives them.",
   input: z.object({
     ...Where,
     title: z.string().trim().min(1).max(400).optional(),
@@ -283,14 +283,16 @@ export const editListingTool = defineTool({
         source: "model",
       };
     }
+    const issues = issuesOf(listing, target);
+    const wrong = issues.filter(
+      (i) => i.severity === "error" && given.includes(i.field as ListingField),
+    );
+    if (wrong.length > 0) {
+      throw new ToolRefusal(
+        `Nothing was saved: ${wrong.map((i) => i.message).join(" ")} Fix it and send the edit again.`,
+      );
+    }
     await setListing(project, destination, listing).catch(refused);
-    return {
-      data: {
-        project,
-        destination,
-        written: given,
-        issues: issuesOf(listing, target),
-      },
-    };
+    return { data: { project, destination, written: given, issues } };
   },
 });

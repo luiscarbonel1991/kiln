@@ -126,6 +126,7 @@ vi.mock("@/server/listing-write", () => ({
 }));
 vi.mock("@/server/product-repository", () => ({
   getProduct: async () => null,
+  findProduct: async () => null,
 }));
 vi.mock("@/server/designs", () => ({
   designView: async (id: string) =>
@@ -228,7 +229,7 @@ describe("quote", () => {
       await call("quote", { action: "review_product", product: "x" }),
     ).toEqual({
       ok: false,
-      error: "No product of yours has that id.",
+      error: "No product of yours has that id or SKU.",
     });
     expect(s.quotes.size).toBe(0);
   });

@@ -13,6 +13,8 @@ const product = parsed.products[0];
 const s = vi.hoisted(() => ({ started: [] as unknown[] }));
 vi.mock("@/server/product-repository", () => ({
   getProduct: async (id: string) => (id === product.id ? product : null),
+  findProduct: async (ref: string) =>
+    ref === product.id || ref === product.sku ? product : null,
   listProducts: async () => [product],
 }));
 vi.mock("@/server/maker-repository", () => ({
@@ -104,6 +106,16 @@ describe("plan_project", () => {
     });
   });
 
+  it("finds the product by its sku as well as its id", async () => {
+    expect(
+      await call("plan_project", {
+        product: product.sku,
+        type: "listing-kit",
+        destinations: ["etsy"],
+      }),
+    ).toMatchObject({ ok: true });
+  });
+
   it("refuses an unknown product", async () => {
     expect(
       await call("plan_project", {
@@ -111,7 +123,7 @@ describe("plan_project", () => {
         type: "listing-kit",
         destinations: ["etsy"],
       }),
-    ).toEqual({ ok: false, error: "No product of yours has that id." });
+    ).toEqual({ ok: false, error: "No product of yours has that id or SKU." });
   });
 });
 
@@ -129,7 +141,7 @@ describe("create_project", () => {
         data: {
           project: "p9",
           reference: false,
-          next: expect.stringContaining("adds the product's photo"),
+          next: expect.stringContaining("add_reference"),
         },
       },
     });

@@ -57,6 +57,19 @@ describe("parseProductPackage", () => {
     expect(rejected[1].label).toBe("product #2");
   });
 
+  it("reads a finish written the catalog's way when it names exactly one", () => {
+    const result = parseProductPackage([
+      { ...board, sku: "A", id: "A", treatment: "UV printed" },
+      { ...board, sku: "B", id: "B", treatment: "Hand Engraved" },
+      { ...board, sku: "C", id: "C", treatment: "printed and cut" },
+    ]);
+    const products = result.ok ? result.products : [];
+    expect(products.map((p) => p.treatment)).toEqual(["printed", "engraved"]);
+    expect(result.ok ? result.rejected.map((r) => r.label) : []).toEqual([
+      expect.stringContaining('"C"'),
+    ]);
+  });
+
   it("refuses an empty package; a repeated sku keeps the first", () => {
     expect(parseProductPackage({ products: [] }).ok).toBe(false);
     expect(parseProductPackage("hello").ok).toBe(false);

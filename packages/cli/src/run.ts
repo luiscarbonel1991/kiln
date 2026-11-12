@@ -14,6 +14,7 @@ import type {
 //   kiln swatch <product> <colour> <photo>   a colour's material photo
 //     [--white=x,y | --match-swatch]         corrected first (P2-8)
 //   kiln swatch <product> <colour> --remove
+//   kiln reference <project> <photo>         a project's reference image
 //   kiln schema                              the package's JSON Schema
 //   kiln projects                            the projects with frames
 //   kiln frames <project>                    each frame, its state and take
@@ -34,6 +35,7 @@ export const USAGE = `Usage:
   kiln import <package.json>               check it, then import it into Kiln
   kiln swatch <product> <colour> <photo>   set a colour's material photo
   kiln swatch <product> <colour> --remove  remove it
+  kiln reference <project> <photo>         set a project's reference image
   kiln schema                              print the package's JSON Schema
   kiln projects                            list the projects with frames
   kiln frames <project>                    each frame, its state and its take
@@ -49,6 +51,9 @@ you checked, as kiln frames prints it: Kiln refuses when a newer one has
 landed since. <json> is the tool's arguments ('{"project":"..."}'), or
 @file.json. A paid tool takes a quote's id, and runs only for a token the
 maker lets spend. --json prints Kiln's answer as JSON.
+
+A reference image is the product's photo: what a project's scenes are made
+from when Kiln cannot draw the product for free (it has no design file).
 
 A material photo may be corrected as it is set, free: --white=x,y balances
 its light from a white or grey spot (from the photo's top left, each from 0
@@ -756,7 +761,73 @@ async function bridge(io: Io): Promise<number> {
   return 0;
 }
 
+// A project's reference image: the product's photo, sent as it is.
+async function reference(
+  io: Io,
+  [project, photo]: (string | undefined)[],
+  flags: Flags,
+): Promise<number> {
+  if (!project || !photo) {
+    io.err(USAGE);
+    return 2;
+  }
+  const conn = connection(io);
+  if (!conn) return 2;
+  const bytes = await io.readBytes(photo);
+  const type = io.engine.rasterType(bytes);
+  if (!type) {
+    io.err(
+      `${photo}: a reference image must be a PNG, JPEG or WebP image. Nothing was sent.`,
+    );
+    return 1;
+  }
+  const answer = await call(
+    io,
+    conn,
+    `/api/projects/${encodeURIComponent(project)}/reference`,
+    {
+      method: "POST",
+      headers: { "Content-Type": type },
+      body: bytes as RequestInit["body"],
+    },
+  );
+  if ("exit" in answer) return answer.exit;
+  if (answer.status !== 200) {
+    io.err(errorOf(answer.body) ?? `Kiln answered ${answer.status}.`);
+    return 1;
+  }
+  if (flags.json) {
+    io.out(JSON.stringify(answer.body, null, 2));
+    return 0;
+  }
+  io.out(
+    `Reference image set for ${project}. Its scenes can be quoted now (kiln call quote).`,
+  );
+  return 0;
+}
+
+// A command that reads a file the caller named says so when it is not there,
+// in a sentence, as every other refusal does.
 export async function run(argv: string[], io: Io): Promise<number> {
+  try {
+    return await dispatch(argv, io);
+  } catch (error) {
+    const { code, path } = error as { code?: string; path?: string };
+    if (code === "ENOENT" || code === "EISDIR" || code === "EACCES") {
+      const why =
+        code === "ENOENT"
+          ? "there is no file there"
+          : code === "EISDIR"
+            ? "that is a folder"
+            : "it cannot be read";
+      io.err(`${path ?? "That file"}: ${why}. Nothing was sent.`);
+      return 2;
+    }
+    throw error;
+  }
+}
+
+async function dispatch(argv: string[], io: Io): Promise<number> {
   const flags: Flags = {
     json: argv.includes("--json"),
     remove: argv.includes("--remove"),
@@ -777,6 +848,12 @@ export async function run(argv: string[], io: Io): Promise<number> {
       return swatch(
         io,
         [args[0], args[1], args[2] ? resolve(io.cwd, args[2]) : undefined],
+        flags,
+      );
+    case "reference":
+      return reference(
+        io,
+        [args[0], args[1] ? resolve(io.cwd, args[1]) : undefined],
         flags,
       );
     case "schema":

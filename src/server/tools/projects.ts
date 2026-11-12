@@ -6,8 +6,9 @@ import { Look, lookLabel } from "@/domain/product-look";
 import { ProjectType } from "@/domain/project";
 import { CATALOG } from "@/lib/recipes";
 import { deliverDestination } from "@/server/deliver/deliver-destination";
-import { getProduct } from "@/server/product-repository";
+import { findProduct } from "@/server/product-repository";
 import { projectFrames, waitingProjectFrames } from "@/server/project-frames";
+import { addProjectReference } from "@/server/project-reference";
 import { startingPlan, startProject } from "@/server/start-project";
 import { defineTool, ToolRefusal } from "@/server/tools/registry";
 
@@ -19,7 +20,10 @@ const DESTINATIONS = CATALOG.destinations
   .join(", ");
 
 const NewProject = z.object({
-  product: z.string().min(1).describe("The product's Kiln id (list_products)."),
+  product: z
+    .string()
+    .min(1)
+    .describe("The product's Kiln id (list_products) or its SKU."),
   type: ProjectType.exclude(["design"]).describe(
     "listing-kit: a sale listing's photos, video and text; content: posts; launch: a sale listing and its posts.",
   ),
@@ -39,8 +43,10 @@ const NewProject = z.object({
 });
 
 async function productOf(id: string) {
-  const product = await getProduct(id);
-  if (!product) throw new ToolRefusal("No product of yours has that id.");
+  const product = await findProduct(id);
+  if (!product) {
+    throw new ToolRefusal("No product of yours has that id or SKU.");
+  }
   return product;
 }
 
@@ -99,7 +105,7 @@ export const createProjectTool = defineTool({
   hints: {},
   run: async ({ product, type, destinations, off, look }) => {
     const started = await startProject({
-      productId: product,
+      productId: (await productOf(product)).id,
       type,
       destinationIds: destinations,
       offSlots: off,
@@ -116,7 +122,48 @@ export const createProjectTool = defineTool({
         frames: frames?.frames ?? [],
         next: state?.reference
           ? "quote generate for this project to take its scenes."
-          : "Kiln could not draw a reference from the product for free: the maker adds the product's photo on the board, then quote generate.",
+          : "Kiln could not draw a reference from the product for free (it has no design file): send its photo with add_reference, or `kiln reference <project> <photo>` from a terminal, or the maker adds it on the board; then quote generate.",
+      },
+    };
+  },
+});
+
+// Base64 of the cap an agent can reasonably carry in one call; a larger photo
+// goes by the HTTP API or the CLI, which send its bytes as they are.
+const MAX_TOOL_IMAGE_BYTES = 6 * 1024 * 1024;
+
+export const addReferenceTool = defineTool({
+  name: "add_reference",
+  title: "Add a project's reference image",
+  description:
+    "Set a project's reference image: the product's photo, which its scenes are made from when Kiln could not draw the product for free (create_project answered reference: false). The image is sent in the call as base64 (PNG, JPEG or WebP, at most 6 MB); a larger file goes with `kiln reference <project> <photo>` or POST /api/projects/<id>/reference. Free. It replaces the project's reference, as the board's Add reference image does.",
+  input: z.object({
+    project: z.string().min(1).describe("The project's Kiln id."),
+    image: z
+      .string()
+      .min(1)
+      .max(Math.ceil((MAX_TOOL_IMAGE_BYTES * 4) / 3) + 64)
+      .describe("The photo's bytes in base64, with or without a data: prefix."),
+  }),
+  hints: {},
+  run: async ({ project, image }) => {
+    const base64 = image.replace(/^data:[^,]*,/, "").replace(/\s+/g, "");
+    if (!/^[A-Za-z0-9+/]+=*$/.test(base64)) {
+      throw new ToolRefusal("The image is not base64.");
+    }
+    const bytes = new Uint8Array(Buffer.from(base64, "base64"));
+    if (bytes.length > MAX_TOOL_IMAGE_BYTES) {
+      throw new ToolRefusal(
+        "The image is over 6 MB: send it with `kiln reference <project> <photo>` or POST /api/projects/<id>/reference.",
+      );
+    }
+    const outcome = await addProjectReference(project, bytes);
+    if (!outcome.ok) throw new ToolRefusal(outcome.error);
+    return {
+      data: {
+        project,
+        reference: outcome.reference,
+        next: "quote generate for this project to take its scenes.",
       },
     };
   },

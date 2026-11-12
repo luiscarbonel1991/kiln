@@ -42,6 +42,7 @@ import {
 } from "@/server/tools/paid";
 import { importProductsTool, listProductsTool } from "@/server/tools/products";
 import {
+  addReferenceTool,
   createProjectTool,
   deliverTool,
   planProjectTool,
@@ -54,6 +55,7 @@ export const TOOLS: readonly Tool[] = [
   importProductsTool,
   planProjectTool,
   createProjectTool,
+  addReferenceTool,
   listProjects,
   getFrames,
   viewFrame,

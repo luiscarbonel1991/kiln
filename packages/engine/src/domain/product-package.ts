@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { BrandKit } from "@/domain/brand";
 import { colourTextNotes } from "@/domain/colour-text";
-import { Product } from "@/domain/product";
+import { Product, Treatment } from "@/domain/product";
 
 // The product package contract: what a maker's catalog exports and Kiln
 // imports. A package is one Product, an array of them, or
@@ -50,6 +50,21 @@ export function packageJsonSchema(): Record<string, unknown> {
     description:
       "One product, a list of them, or { maker, products }. Example: /templates/product-package.json.",
   };
+}
+
+// A finish as a maker's catalog writes it ("UV printed", "hand engraved",
+// "die cut") read as the one finish it names, when it names exactly one: the
+// engine's finishes are single words and an exporter rarely knows them.
+function withFinish(raw: unknown): unknown {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const { treatment } = raw as { treatment?: unknown };
+  if (typeof treatment !== "string") return raw;
+  const words = treatment
+    .trim()
+    .toLowerCase()
+    .split(/[^a-z]+/);
+  const named = Treatment.options.filter((finish) => words.includes(finish));
+  return named.length === 1 ? { ...raw, treatment: named[0] } : raw;
 }
 
 type Key = PropertyKey;
@@ -208,7 +223,8 @@ export function parseProductPackage(input: unknown): PackageResult {
   const products: Product[] = [];
   const rejected: RejectedProduct[] = [];
   const seen = new Set<string>();
-  list.forEach((raw, index) => {
+  list.forEach((given, index) => {
+    const raw = withFinish(given);
     const parsed = Product.safeParse(raw);
     if (!parsed.success) {
       rejected.push({

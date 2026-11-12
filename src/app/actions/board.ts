@@ -1,12 +1,8 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { refresh } from "next/cache";
 import { z } from "zod";
-import {
-  ACCEPTED_IMAGE_MIME,
-  MAX_UPLOAD_BYTES,
-} from "@/components/studio/constants";
+import type { ACCEPTED_IMAGE_MIME } from "@/components/studio/constants";
 import { ListingText } from "@/domain/listing";
 import {
   ImageQuality,
@@ -32,23 +28,21 @@ import {
 } from "@/domain/plan-look";
 import { productUnderstanding } from "@/domain/product-understanding";
 import { KnobChoice, ReasonKey } from "@/domain/scene-knobs";
-import { threeQuarterFor } from "@/domain/scene-reference";
 import { VideoChoice } from "@/domain/video";
 import { refreshCards } from "@/lib/project-refresh";
 import { slotCards, videoSlotCard } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
-import { getStorageProvider } from "@/providers/registry";
 import { noteApproval, noteReason } from "@/server/lessons";
 import { writeProjectListing } from "@/server/listing-write";
 import { getMakerModels, rememberHeroSetting } from "@/server/maker-repository";
 import { lookedReference, redrawnLooks } from "@/server/product-reference";
+import { addProjectReference } from "@/server/project-reference";
 import {
   addVideoToPlan,
   loadProjectBoard,
   refreshProjectProduct,
   setCardModel,
   setListing,
-  setProjectReference,
   setSlotApproval,
   setSlotOff,
   setSlotOrder,
@@ -228,7 +222,7 @@ export async function setSlotPlaceAction(
   refresh();
 }
 
-const EXTENSION: Record<(typeof ACCEPTED_IMAGE_MIME)[number], string> = {
+const _EXTENSION: Record<(typeof ACCEPTED_IMAGE_MIME)[number], string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
@@ -241,43 +235,11 @@ export async function addReferenceAction(formData: FormData): Promise<void> {
   const projectId = z.string().min(1).parse(formData.get("projectId"));
   const file = formData.get("file");
   if (!(file instanceof File)) throw new Error("No file provided.");
-  const mime = z.enum(ACCEPTED_IMAGE_MIME).parse(file.type);
-  if (file.size > MAX_UPLOAD_BYTES)
-    throw new Error("Image is larger than 15 MB.");
-
-  const loaded = await loadProjectBoard(projectId);
-  if (!loaded?.board.plan || !loaded.product) {
-    throw new Error("Only a planned project with a product takes a reference.");
-  }
-  const { url } = await getStorageProvider().put({
-    key: `masters/${randomUUID()}.${EXTENSION[mime]}`,
-    body: new Uint8Array(await file.arrayBuffer()),
-    contentType: mime,
-  });
-  const master = {
-    id: randomUUID(),
-    origin: "product" as const,
-    sourcePrompt: null,
-    assetUrl: url,
-    mime,
-  };
-  const { plan } = loaded.board;
-  const { product } = loaded;
-  const write = async () =>
-    slotCards(plan, master, product, await getMakerModels());
-  const first = loaded.board.cards.length === 0;
-  // The view from above was drawn beside Kiln's plate: with the maker's own
-  // reference it no longer applies, so the scenes Kiln started a little above
-  // are written again (the maker's own edits stay).
-  const rewrite =
-    !first &&
-    threeQuarterFor(plan.references, loaded.board.master?.assetUrl) !== null;
-  await setProjectReference(
+  const outcome = await addProjectReference(
     projectId,
-    master,
-    first ? await write() : [],
-    rewrite ? refreshCards(loaded.board.cards, await write(), master.id) : [],
+    new Uint8Array(await file.arrayBuffer()),
   );
+  if (!outcome.ok) throw new Error(outcome.error);
   refresh();
 }
 
