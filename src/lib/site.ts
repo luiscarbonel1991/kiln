@@ -1,3 +1,7 @@
-// Where a visitor of the public page starts. Kiln has no accounts yet, so it
-// opens the app; creating an account is wired here once it exists.
-export const GET_STARTED = { href: "/", label: "Get started" } as const;
+// Where a visitor of the public page starts. In an installed Kiln it opens the
+// maker's work. A public copy of the page sets NEXT_PUBLIC_KILN_START to where
+// a visitor gets Kiln (its repository), so the page never leads back to itself.
+export const GET_STARTED = {
+  href: process.env.NEXT_PUBLIC_KILN_START || "/projects",
+  label: "Get started",
+} as const;

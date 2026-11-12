@@ -4,7 +4,7 @@ import { GET_STARTED } from "@/lib/site";
 export function SiteHeader() {
   return (
     <header className="kl-top">
-      <Link href="/welcome" className="kl-mark">
+      <Link href="/" className="kl-mark">
         Kiln
       </Link>
       <nav aria-label="This page">

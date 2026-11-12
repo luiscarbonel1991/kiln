@@ -104,7 +104,11 @@ function ProjectEditor({
 }) {
   if (missing) {
     return (
-      <Notice text="This project could not be found." href="/" link="Home" />
+      <Notice
+        text="This project could not be found."
+        href="/projects"
+        link="Projects"
+      />
     );
   }
   if (!ready) {

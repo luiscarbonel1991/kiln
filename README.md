@@ -56,15 +56,17 @@ Copyright 2026 Luis Carbonel. Kiln, its engine (`packages/engine`) and its CLI
 [GNU Affero General Public License v3.0 only](LICENSE). If you run a modified
 Kiln for other people over a network, the AGPL asks you to offer them its source.
 
-## Home
+## Home and Projects
 
-`/` is Home: what Kiln does, told as one product's way through it (its spec, its designs
-to SVG, its exact frames, its checked scenes, its looks, its listing text, everywhere it
-sells), with the maker's showcase project, or with a sample product on a first visit.
-The sample's scenes are real takes Kiln made of it once, kept in `public/home/sample`.
-A returning maker also finds where they left off (this month's spend with its cost per
-approved output, the latest projects, results due), then every project and product. Each
-chapter plays one sequence as it comes into view; with reduced motion it shows still. The image-first studio is at
+`/` is the public page: what Kiln makes, told with one sample product's kit (its exact
+frames, its checked scenes, its looks, its video, its listing text, what it cost). It is
+built once and reads no database. Its "Get started" opens `/projects`; a public copy of
+the page sets `NEXT_PUBLIC_KILN_START` to where a visitor gets Kiln, so the page never
+leads back to itself.
+
+`/projects` is the maker's work: where they left off (this month's spend with its cost
+per approved output, the latest projects, results due), then every project and product.
+The image-first studio is at
 `/studio` (`?open=<id>` opens a studio project, `?new=1` starts empty).
 
 ## Database (Prisma Migrate)
@@ -166,7 +168,7 @@ imports a catalog:
 - Places of use, the default colour and, folded, depth, relief, hook, call to action
   and description complete it. Save says what is still needed, and a field Kiln
   refuses is marked under it with the reason.
-- Every product has its own page (Edit on Home, on New project's picker and on the
+- Every product has its own page (Edit on Projects, on New project's picker and on the
   board): edit it, see which projects use it, download its package for what the form
   does not show (parts, icons, variants), and delete it once no project uses it.
   Saving keeps the sku and writes nothing when nothing changed.
@@ -827,7 +829,7 @@ from above), distance (close, medium, wide), light (window, studio, warm), shado
   search) and a price guardrail (the price beside the band that sells, never set
   by Kiln). A new project of the product starts from its last brief, and the
   export's README and manifest carry it.
-- **Results** (each sale destination on the board, and Home): whether the new
+- **Results** (each sale destination on the board, and Projects): whether the new
   photos moved anything. A listing is followed from its delivery, or from the
   day the maker says its photos went up (Kiln never knows when they reach the
   shop). Three reads: the 30 days before, and the first 14 and 30 after, each
@@ -838,7 +840,7 @@ from above), distance (close, medium, wide), light (window, studio, warm), shado
   typed for the same window stay), which also takes the before read at
   delivery once the listing's address is known. Before against the latest
   after is brought to 30 days, with conversion and a note when too few visits
-  make a change chance. Home lists the reads due first, the family and the
+  make a change chance. Projects lists the reads due first, the family and the
   frames that changed. Stored in the plan (`PlanDestination.results`).
 
 The worker is a `globalThis` singleton started from `src/instrumentation.ts`.

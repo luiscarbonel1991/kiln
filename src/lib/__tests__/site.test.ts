@@ -54,7 +54,7 @@ function reach(entry: string) {
 
 describe("the public page", () => {
   it("reaches no database, repository or Prisma, at any depth", () => {
-    const { files, packages } = reach(join(repo, "src/app/welcome/page.tsx"));
+    const { files, packages } = reach(join(repo, "src/app/page.tsx"));
     expect(files).toContain("src/components/site/site-made.tsx");
     expect(files).toContain("src/lib/site-kit.ts");
     expect(files.filter((f) => /^src\/(server\/|lib\/db\.ts)/.test(f))).toEqual(
@@ -76,7 +76,7 @@ describe("the public page", () => {
     expect(story.destinations.length).toBeGreaterThan(1);
   });
 
-  it("starts a visitor in one place", () => {
-    expect(GET_STARTED).toEqual({ href: "/", label: "Get started" });
+  it("starts a visitor in one place, never back on itself", () => {
+    expect(GET_STARTED).toEqual({ href: "/projects", label: "Get started" });
   });
 });
