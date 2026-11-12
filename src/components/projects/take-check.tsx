@@ -45,8 +45,18 @@ export function TakeCheckChips({
       });
       setError(result?.error ?? null);
     });
+  const look = check?.look;
+  const looked = !look
+    ? []
+    : look.status === "unseen"
+      ? [`not looked at: ${look.why ?? "the look could not run"}`]
+      : look.status === "flagged"
+        ? look.problems.flatMap((p) => (p.where ? [`where: ${p.where}`] : []))
+        : [
+            `looked over by ${look.model ?? "a text model"}: nothing impossible seen`,
+          ];
   const detail = check
-    ? [...check.problems, ...check.notes].join("\n") || undefined
+    ? [...check.problems, ...check.notes, ...looked].join("\n") || undefined
     : undefined;
   return (
     <>

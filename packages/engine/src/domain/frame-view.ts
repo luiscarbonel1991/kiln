@@ -59,6 +59,14 @@ export interface FrameView {
 export type FrameCheck = Pick<TakeCheck, "status" | "problems" | "notes"> & {
   scale?: string;
   unchecked?: string;
+  // What the paid look saw (domain SceneLook): clear, flagged with what and
+  // where, or unseen with why; absent when nothing looked.
+  seen?: {
+    status: "clear" | "flagged" | "unseen";
+    problems: { what: string; where: string }[];
+    model?: string;
+    why?: string;
+  };
 };
 
 function frameCheck(check: TakeCheck | null): FrameCheck | null {
@@ -69,6 +77,16 @@ function frameCheck(check: TakeCheck | null): FrameCheck | null {
     notes: check.notes,
     ...(check.scale ? { scale: check.scale } : {}),
     ...(check.unchecked ? { unchecked: check.unchecked } : {}),
+    ...(check.look
+      ? {
+          seen: {
+            status: check.look.status,
+            problems: check.look.problems,
+            ...(check.look.model ? { model: check.look.model } : {}),
+            ...(check.look.why ? { why: check.look.why } : {}),
+          },
+        }
+      : {}),
   };
 }
 

@@ -13,6 +13,7 @@ import type {
   ProductDraft,
   ProductReview,
   ReviewField,
+  SceneLookAnswer,
 } from "@/providers/text-prompts";
 import type {
   Capabilities,
@@ -54,6 +55,11 @@ export interface VisionProvider {
     input: { assetUrl: string },
     options: TextCallOptions,
   ): Promise<TextResult<ProductDraft>>;
+  // A finished scene looked at for what a shopper would see as impossible.
+  lookAtScene(
+    input: { assetUrl: string },
+    options: TextCallOptions,
+  ): Promise<TextResult<SceneLookAnswer>>;
 }
 
 // (b) Art director: text model -> diverse per-direction creative specs (scene,

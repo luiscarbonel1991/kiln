@@ -155,6 +155,154 @@ describe("runJob", () => {
     );
   });
 
+  describe("the look at a scene", () => {
+    const check = {
+      status: "passed" as const,
+      engine: "fake",
+      lines: [],
+      problems: [],
+      notes: [],
+      checkedAt: "2026-11-12T10:00:00.000Z",
+    };
+    const looked = (id: string): ClaimedJob => ({
+      ...claimed(id),
+      request: {
+        ...request,
+        look: { provider: "openai", model: "gpt-6.1-sol" },
+      },
+    });
+    const usage = {
+      inputTextTokens: 1500,
+      inputImageTokens: 0,
+      outputTokens: 300,
+    };
+
+    it("flags the take, fails its check and adds what the look cost", async () => {
+      const lookAtScene = vi.fn(
+        async (_m: unknown, _url: string, beforeCall: () => Promise<void>) => {
+          await beforeCall();
+          return {
+            answer: {
+              plausible: false,
+              problems: [{ what: "The glass has no foot.", where: "centre" }],
+            },
+            model: "gpt-6.1-sol",
+            usage,
+          };
+        },
+      );
+      const { d } = deps({ checkTake: vi.fn(async () => check), lookAtScene });
+      await runJob(d, looked("a"));
+      expect(lookAtScene).toHaveBeenCalledWith(
+        { provider: "openai", model: "gpt-6.1-sol" },
+        "https://storage/out.png",
+        expect.any(Function),
+      );
+      // 1,500 in at $2 and 300 out at $10 per million: $0.006.
+      expect(d.recordCost).toHaveBeenLastCalledWith("a", undefined, 6_000);
+      expect(d.completeJob).toHaveBeenCalledWith(
+        "a",
+        "t-a",
+        "https://storage/out.png",
+        expect.objectContaining({
+          status: "failed",
+          problems: ["looks off: The glass has no foot."],
+          look: expect.objectContaining({
+            status: "flagged",
+            model: "gpt-6.1-sol",
+            costMicros: 6_000,
+          }),
+        }),
+      );
+    });
+
+    it("a clear look keeps the verdict and says who looked", async () => {
+      const { d } = deps({
+        checkTake: vi.fn(async () => check),
+        lookAtScene: vi.fn(async () => ({
+          answer: { plausible: true, problems: [] },
+          model: "gpt-6.1-sol",
+          usage,
+        })),
+      });
+      await runJob(d, looked("a"));
+      expect(d.completeJob).toHaveBeenCalledWith(
+        "a",
+        "t-a",
+        "https://storage/out.png",
+        expect.objectContaining({
+          status: "passed",
+          look: expect.objectContaining({ status: "clear" }),
+        }),
+      );
+    });
+
+    it("a look the provider refuses lands the take unseen and costs nothing", async () => {
+      const { d } = deps({
+        checkTake: vi.fn(async () => check),
+        lookAtScene: vi.fn(
+          async (_m: unknown, _u: string, beforeCall: () => Promise<void>) => {
+            await beforeCall();
+            throw Object.assign(new Error("bad request"), { status: 400 });
+          },
+        ),
+      });
+      await runJob(d, looked("a"));
+      expect(d.recordCost).toHaveBeenCalledTimes(1);
+      expect(d.failJob).not.toHaveBeenCalled();
+      expect(d.completeJob).toHaveBeenCalledWith(
+        "a",
+        "t-a",
+        "https://storage/out.png",
+        expect.objectContaining({
+          status: "passed",
+          look: expect.objectContaining({ status: "unseen" }),
+        }),
+      );
+    });
+
+    it("a look that got no answer may have been charged: its allowance is counted", async () => {
+      const { d } = deps({
+        checkTake: vi.fn(async () => check),
+        lookAtScene: vi.fn(
+          async (_m: unknown, _u: string, beforeCall: () => Promise<void>) => {
+            await beforeCall();
+            throw new Error("socket hang up");
+          },
+        ),
+      });
+      await runJob(d, looked("a"));
+      // 3,000 in at $2 and 1,500 out at $10 per million: $0.021.
+      expect(d.recordCost).toHaveBeenLastCalledWith("a", undefined, 21_000);
+      expect(d.completeJob).toHaveBeenCalledWith(
+        "a",
+        "t-a",
+        "https://storage/out.png",
+        expect.objectContaining({
+          look: expect.objectContaining({
+            status: "unseen",
+            costMicros: 21_000,
+          }),
+        }),
+      );
+    });
+
+    it("nothing looks at a take whose request asks for none, or that Kiln does not check", async () => {
+      const lookAtScene = vi.fn();
+      const unasked = deps({
+        checkTake: vi.fn(async () => check),
+        lookAtScene,
+      });
+      await runJob(unasked.d, claimed("a"));
+      const unchecked = deps({
+        checkTake: vi.fn(async () => null),
+        lookAtScene,
+      });
+      await runJob(unchecked.d, looked("b"));
+      expect(lookAtScene).not.toHaveBeenCalled();
+    });
+  });
+
   it("a check that throws or stalls lands the take unchecked, never failed", async () => {
     const thrown = deps({
       checkTake: vi.fn(async () => {

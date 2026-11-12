@@ -34,4 +34,9 @@ export const mockVisionProvider: VisionProvider = {
   async draftProduct(_input, options) {
     return { value: MOCK_PRODUCT_DRAFT, model: options.model };
   },
+  async lookAtScene(_input, options) {
+    // Loaded here: this file's fixtures are read before the environment is.
+    const { mockSceneLook } = await import("@/providers/mock/scene-look");
+    return { value: mockSceneLook(), model: options.model };
+  },
 };

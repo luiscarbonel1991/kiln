@@ -28,6 +28,8 @@ const EnvSchema = z.object({
     blankAsUnset,
     z.enum(["openai", "google"]).optional(),
   ),
+  // A mock run whose look at each scene finds a problem ("flag").
+  KILN_MOCK_LOOK: z.preprocess(blankAsUnset, z.enum(["flag"]).optional()),
   // The chat's own mode, over KILN_PROVIDERS: `pnpm eval:chat` runs the real
   // text model on a mock run (mock images, the mock database).
   KILN_CHAT_PROVIDERS: z.preprocess(

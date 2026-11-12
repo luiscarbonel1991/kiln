@@ -69,6 +69,7 @@ export {
   modelPriced,
   PRICES_AS_OF,
   type SceneEstimate,
+  sceneLookEstimate,
   textBudget,
   textEstimate,
   toMicros,
@@ -374,6 +375,8 @@ export {
   type OcrLine,
   type OcrResult,
   readTakeCheck,
+  SceneLook,
+  sceneLookFrom,
   suggestedReason,
   TakeCheck,
   TakeCheckLine,
@@ -383,6 +386,7 @@ export {
   type TextLineFinding,
   takeCheckLabel,
   uncheckedTake,
+  withLook,
 } from "@/domain/qc";
 export {
   compareLetterforms,

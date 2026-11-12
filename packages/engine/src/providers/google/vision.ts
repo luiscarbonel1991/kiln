@@ -15,6 +15,7 @@ import { ProviderKeyMissing } from "@/providers/errors";
 import { getGenAI, hasGoogleKey, ONE_REQUEST } from "@/providers/google/client";
 import { textUsage } from "@/providers/google/usage";
 import type { TextCallOptions, VisionProvider } from "@/providers/interfaces";
+import { mockSceneLook } from "@/providers/mock/scene-look";
 import {
   MOCK_PRODUCT_DRAFT,
   MOCK_UNDERSTANDING,
@@ -23,6 +24,8 @@ import { mockOutage, providerMode } from "@/providers/mode";
 import {
   PRODUCT_DRAFT_PROMPT,
   ProductDraft,
+  SCENE_LOOK_PROMPT,
+  SceneLookAnswer,
   VISION_PROMPT,
   VisionAnswer,
 } from "@/providers/text-prompts";
@@ -120,6 +123,25 @@ export const PRODUCT_DRAFT_SCHEMA = {
   ],
 };
 
+const SCENE_LOOK_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    plausible: { type: Type.BOOLEAN },
+    problems: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          what: { type: Type.STRING },
+          where: { type: Type.STRING },
+        },
+        required: ["what", "where"],
+      },
+    },
+  },
+  required: ["plausible", "problems"],
+};
+
 // One photo, one paid request (no SDK retry), marked by `beforeCall`, bounded
 // in time and output by its effort; the JSON answer parsed by `answer`.
 async function askGemini<T>(
@@ -197,6 +219,26 @@ export const googleVisionProvider: VisionProvider = {
         prompt: PRODUCT_DRAFT_PROMPT,
         schema: PRODUCT_DRAFT_SCHEMA,
         parse: (json) => ProductDraft.parse(json),
+      },
+    );
+  },
+  async lookAtScene(input, options) {
+    const model = geminiTextModel(options.model);
+    if (!hasGoogleKey()) {
+      if (providerMode() === "mock") {
+        mockOutage("google");
+        return { value: mockSceneLook(), model };
+      }
+      throw new ProviderKeyMissing("google");
+    }
+    return askGemini(
+      input.assetUrl,
+      { ...options, model },
+      {
+        kind: "sceneLook",
+        prompt: SCENE_LOOK_PROMPT,
+        schema: SCENE_LOOK_SCHEMA,
+        parse: (json) => SceneLookAnswer.parse(json),
       },
     );
   },

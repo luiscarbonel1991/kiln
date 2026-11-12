@@ -5,7 +5,11 @@ import { assemblePrompt } from "@/domain/cascade";
 import { sizeOn } from "@/domain/image-size";
 import type { MasterAsset } from "@/domain/master-asset";
 import { ModelConfig } from "@/domain/model-config";
-import { defaultVideoModel, modelLabel } from "@/domain/model-defaults";
+import {
+  defaultVideoModel,
+  modelLabel,
+  ProviderId,
+} from "@/domain/model-defaults";
 import type { VideoSettings } from "@/domain/plan";
 import type { Product } from "@/domain/product";
 import { productUnderstanding } from "@/domain/product-understanding";
@@ -27,6 +31,10 @@ export const ImageGenerationRequest = z.object({
   // A test take (DOGFOOD #53): the scene at its model's low quality, a cheap
   // check of the direction, never approved for a listing.
   test: z.boolean().optional(),
+  // The text model that looks at the take once it lands, for anything a
+  // shopper would see as impossible (domain SceneLook). Priced in the job's
+  // estimate; absent when the maker turned the look off.
+  look: z.object({ provider: ProviderId, model: z.string().min(1) }).optional(),
 });
 export type ImageGenerationRequest = z.infer<typeof ImageGenerationRequest>;
 

@@ -13,7 +13,7 @@ import {
 } from "@/domain/plan";
 import { slotProduct } from "@/domain/plan-look";
 import { Product } from "@/domain/product";
-import type { TakeCheck } from "@/domain/qc";
+import { readTakeCheck, type TakeCheck, withLook } from "@/domain/qc";
 import { sizeCueIn } from "@/domain/scene-direction";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { fetchAsset } from "@/providers/asset-bytes";
@@ -167,7 +167,7 @@ export async function recheckTake(
   const job = await db.generationJob.findFirst({
     where: { projectId, cardId, status: "done", outputUrl: output },
     orderBy: { finishedAt: "desc" },
-    select: { id: true, request: true },
+    select: { id: true, request: true, takeCheck: true },
   });
   const request = GenerationRequest.safeParse(job?.request).data;
   if (!job || request?.kind !== "image") {
@@ -180,10 +180,13 @@ export async function recheckTake(
   if (!take) {
     throw new SlotRefusal("refused", "That take could not be fetched.");
   }
-  const check = await checkProjectTake({ projectId, cardId }, request, take);
-  if (!check) {
+  const read = await checkProjectTake({ projectId, cardId }, request, take);
+  if (!read) {
     throw new SlotRefusal("refused", "That frame is not a scene Kiln checks.");
   }
+  // The look was paid for when the take landed: a free recheck keeps it.
+  const look = readTakeCheck(job.takeCheck)?.look;
+  const check = look ? withLook(read, look) : read;
   await db.generationJob.update({
     where: { id: job.id },
     data: { takeCheck: check },

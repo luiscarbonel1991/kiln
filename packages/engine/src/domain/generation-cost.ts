@@ -395,6 +395,8 @@ export function estimateScenes(
   slots: { aspect?: string; size?: ImageSize }[],
   model: { provider: string; model: string; quality?: ImageQuality },
   references = 0,
+  // The look at each scene once it lands, when the maker has it on.
+  look?: { typical: number; max: number } | null,
 ): SceneEstimate | null {
   const price = imagePrice(model);
   if (!price) return null;
@@ -405,8 +407,8 @@ export function estimateScenes(
     round(each.reduce((t, e) => t + (e ? pick(e) : 0), 0));
   return {
     count: slots.length,
-    typical: sum((e) => e.typical),
-    max: sum((e) => e.max),
+    typical: sum((e) => e.typical + (look?.typical ?? 0)),
+    max: sum((e) => e.max + (look?.max ?? 0)),
     quality: price.quality,
     confidence: price.confidence,
   };
@@ -515,6 +517,8 @@ export const TEXT_CALL_BUDGETS = {
   listingCopy: { inputTokens: 3_000, outputTokens: 3_000 },
   // The product form, each field with its use; a few suggestions and checks.
   productReview: { inputTokens: 3_000, outputTokens: 2_000 },
+  // The prompt and one finished scene; a short list of what looks impossible.
+  sceneLook: { inputTokens: 3_000, outputTokens: 1_500 },
   // One step of a chat turn: the instructions, Kiln's tools and the
   // conversation (old images left out); a reply or a tool call.
   chatTurn: { inputTokens: 20_000, outputTokens: 2_000 },
@@ -556,6 +560,21 @@ export function textEstimate(
       budget.outputTokens * p.textOut) /
       1_000_000,
   );
+}
+
+// What a look at a finished scene costs on a text model, at low effort: the
+// typical from the calls measured on 2026-11-12 (about 1,500 tokens in and 300
+// out), the max its allowance. null when the model has no pinned price.
+const SCENE_LOOK_TYPICAL = { inputTokens: 1_500, outputTokens: 300 };
+
+export function sceneLookEstimate(model: {
+  provider: string;
+  model: string;
+}): { typical: number; max: number } | null {
+  const max = textEstimate(model, textBudget("sceneLook", model, "low"));
+  const typical = textEstimate(model, SCENE_LOOK_TYPICAL);
+  if (max === null || typical === null) return null;
+  return { typical: Math.min(typical, max), max };
 }
 
 // Whether a model has a pinned price for what Kiln would ask of it: an image

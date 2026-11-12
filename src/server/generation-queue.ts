@@ -45,7 +45,11 @@ import { CATALOG, findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { storeAsset } from "@/providers/asset-bytes";
 import { hasProviderKey } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
-import { getImageProvider, getVideoProvider } from "@/providers/registry";
+import {
+  getImageProvider,
+  getVideoProvider,
+  getVisionProvider,
+} from "@/providers/registry";
 import {
   budget,
   claimJobs,
@@ -65,6 +69,7 @@ import { createWorker, type Worker } from "@/server/generation-worker";
 import { getCurrentMaker, getMakerRoutes } from "@/server/maker-repository";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
 import { checkProjectTake } from "@/server/qc/project-take";
+import { sceneLookPlan } from "@/server/scene-look";
 
 // The queue's entry points for the app: estimate and enqueue a planned
 // project's cards, and the per-process worker.
@@ -240,6 +245,9 @@ export async function estimateProjectCards(
   model: string;
   // The models cards may move to along their routes.
   fallbacks: BatchFallback[];
+  // The text model that looks at each scene once it lands, and how many
+  // scenes it looks at; null when none is looked at.
+  look: { label: string; count: number } | null;
 }> {
   const project = await loadProject(projectId);
   const routes = await getMakerRoutes();
@@ -252,6 +260,9 @@ export async function estimateProjectCards(
     throw new Error("The project needs a reference image first.");
   }
   const { master, understanding } = project;
+  // The look at each scene once it lands, priced with it; a test take, a
+  // cheap check of the direction, goes without.
+  const look = options.test ? null : await sceneLookPlan();
   const byId = new Map(project.cards.map((c) => [c.id, c]));
   // A video is built from the board (its plan slot, the approved scene it
   // starts from) and the product's spec.
@@ -387,7 +398,11 @@ export async function estimateProjectCards(
           },
           test: true,
         }
-      : { ...built, model: { ...built.model, size } };
+      : {
+          ...built,
+          model: { ...built.model, size },
+          ...(look ? { look: look.model } : {}),
+        };
     const estimate = estimateGeneration(
       request.model,
       request.model.aspect,
@@ -406,8 +421,9 @@ export async function estimateProjectCards(
     cards.push({
       cardId: id,
       request,
-      typicalMicros: toMicros(estimate.typical),
-      maxMicros: route.maxMicros ?? toMicros(estimate.max),
+      typicalMicros: toMicros(estimate.typical + (look?.typical ?? 0)),
+      maxMicros:
+        (route.maxMicros ?? toMicros(estimate.max)) + toMicros(look?.max ?? 0),
       next: route.next,
     });
   }
@@ -449,6 +465,12 @@ export async function estimateProjectCards(
     models: list,
     model: list.map((m) => `${batchLabel(m)} ×${m.count}`).join(", "),
     fallbacks: [...fallbacks.values()],
+    look: (() => {
+      const count = cards.filter(
+        (c) => c.request.kind === "image" && c.request.look,
+      ).length;
+      return look && count > 0 ? { label: look.label, count } : null;
+    })(),
   };
 }
 
@@ -547,6 +569,13 @@ export function ensureGenerationWorker(): Worker | null {
       videoProvider: (id) => getVideoProvider(id),
       storeAsset,
       checkTake: (job, request, take) => checkProjectTake(job, request, take),
+      lookAtScene: async (model, url, beforeCall) => {
+        const seen = await getVisionProvider(model.provider).lookAtScene(
+          { assetUrl: url },
+          { model: model.model, effort: "low", beforeCall },
+        );
+        return { answer: seen.value, model: seen.model, usage: seen.usage };
+      },
       log: (message, error) =>
         console.warn(`[kiln queue] ${message}`, error ?? ""),
     });

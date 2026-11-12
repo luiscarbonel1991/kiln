@@ -6,6 +6,7 @@ import { KeyCheck } from "@/components/settings/key-check";
 import { Lessons } from "@/components/settings/lessons";
 import { ProviderKey } from "@/components/settings/provider-key";
 import { RoutesForm } from "@/components/settings/routes-form";
+import { SceneLookSwitch } from "@/components/settings/scene-look-switch";
 import { ToolCalls } from "@/components/settings/tool-calls";
 import { EtsyConnection } from "@/components/shops/etsy-connection";
 import { fromMicros } from "@/domain/generation-cost";
@@ -23,10 +24,12 @@ import {
   type ProviderKeyState,
   providerKeyStates,
 } from "@/server/provider-keys";
+import { sceneLookSetup } from "@/server/scene-look";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 import { recentToolCalls } from "@/server/tool-calls";
 
 const money = (usd: number) => `$${usd.toFixed(2)}`;
+const lookMoney = (usd: number) => `$${usd.toFixed(usd < 0.1 ? 3 : 2)}`;
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", {
@@ -74,6 +77,7 @@ export default async function SettingsPage() {
         : Promise.resolve(null),
     ]);
   const mode = providerMode();
+  const look = maker ? await sceneLookSetup() : null;
   // A mock run calls nothing, so every provider counts as keyed.
   const keys = {
     openai:
@@ -202,6 +206,37 @@ export default async function SettingsPage() {
             mock={mode === "mock"}
           />
         </section>
+
+        {look ? (
+          <section id="checks" className="rounded-card bg-card p-6 shadow-card">
+            <h2
+              className="font-serif text-xl text-foreground"
+              style={{ fontVariationSettings: "'opsz' 40" }}
+            >
+              Checks
+            </h2>
+            <p className="mt-1 mb-4 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
+              Kiln reads every scene&apos;s text and letters for free. A text
+              model can also look at each scene for what no photo of the real
+              thing could show: a glass with no foot, objects fused together,
+              something floating. It is a paid call, counted in every
+              scene&apos;s estimate before you generate, and a label on the
+              take, never a retake: it can miss a flaw or flag a take that is
+              fine, so you still decide.
+            </p>
+            <SceneLookSwitch on={look.on} />
+            <p
+              className="mt-2 font-mono text-[0.68rem] leading-snug text-on-surface-mid"
+              data-testid="scene-look-plan"
+            >
+              {!look.on
+                ? "Off: scenes land with the free check only."
+                : look.plan
+                  ? `${look.plan.label} (the deep route's model), about ${lookMoney(look.plan.typical)} a scene, at most ${lookMoney(look.plan.max)}.`
+                  : "No model of the deep route can run here (no key), so no scene is looked at and nothing is added to an estimate."}
+            </p>
+          </section>
+        ) : null}
 
         {lessons ? (
           <section

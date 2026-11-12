@@ -533,6 +533,7 @@ export function ProjectBoard({
                               product,
                             ),
                             route: takeRoutes.final,
+                            sceneLook: takeRoutes.look,
                             look: tuneLook(product, board.plan, slot),
                             blocked: card
                               ? providerBlock(notes, card.model.provider, mode)

@@ -9,6 +9,7 @@ import {
 } from "@/server/maker-repository";
 import { describeStoredSvg } from "@/server/product-files";
 import { listProducts } from "@/server/product-repository";
+import { sceneLookPlan } from "@/server/scene-look";
 import { textWorstCase } from "@/server/text-calls";
 
 // New project: product -> type -> destinations -> plan -> Start. Rendered per
@@ -44,6 +45,7 @@ export default async function NewProjectPage({
   // Priced at the dearest model of each call's route (deep, fast).
   const draft = await textWorstCase("productDraft");
   const review = await textWorstCase("productReview");
+  const look = await sceneLookPlan();
   return (
     <div className="flex min-h-full flex-col">
       <ProjectsHeader />
@@ -51,6 +53,7 @@ export default async function NewProjectPage({
         initialProducts={products}
         initialBrand={brand}
         makerModels={models}
+        sceneLook={look ? { typical: look.typical, max: look.max } : null}
         draftPrice={draft === null ? null : `≈ $${draft.toFixed(2)}`}
         reviewPrice={review === null ? null : `≈ $${review.toFixed(2)}`}
         rememberedHero={heroSetting}

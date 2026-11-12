@@ -38,6 +38,8 @@ export interface BatchEstimate {
   }[];
   // The models cards may move to along their routes, and how many.
   fallbacks: { label: string; count: number }[];
+  // The text model that looks at each scene once it lands, in the estimate.
+  look?: { label: string; count: number } | null;
   // A provider the batch uses that may not answer (no key, a failed last
   // call), in a line each. Nothing is switched on its own.
   warnings: string[];
@@ -252,6 +254,18 @@ export function GenerationPanel({
                     )
                     .join("; ")}
                   , only if the first model fails
+                </dd>
+              </>
+            ) : null}
+            {estimate.look ? (
+              <>
+                <dt className="text-on-surface-mid">Look</dt>
+                <dd className="text-foreground" data-testid="generate-look">
+                  {estimate.look.label} looks at{" "}
+                  {estimate.look.count === 1
+                    ? "the scene"
+                    : `each of ${estimate.look.count} scenes`}{" "}
+                  for anything impossible, in the estimate
                 </dd>
               </>
             ) : null}

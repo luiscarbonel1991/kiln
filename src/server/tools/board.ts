@@ -108,7 +108,7 @@ export const getFrames = defineTool({
   name: "get_frames",
   title: "Get a project's frames",
   description:
-    "Each frame of a project as the board shows it: its state (queued, generating, to-review, approved, exact, ...), the take an approval approves (output), the approved one, whether it failed and why, Kiln's check of a scene's take (its text and letterforms against the reference: passed, failed with what, or unchecked with why; scale is the size the scene asked for, never measured), and, after a fallback, the model it ran on. Exact frames are drawn from the product at delivery and cost nothing.",
+    "Each frame of a project as the board shows it: its state (queued, generating, to-review, approved, exact, ...), the take an approval approves (output), the approved one, whether it failed and why, Kiln's check of a scene's take (its text and letterforms against the reference: passed, failed with what, or unchecked with why; scale is the size the scene asked for, never measured; seen is what a text model saw when it looked at the take for anything impossible, when the maker has that look on: it can miss a flaw or flag a fine take, so look yourself), and, after a fallback, the model it ran on. Exact frames are drawn from the product at delivery and cost nothing.",
   input: z.object({ project: ProjectId }),
   hints: { readOnly: true },
   run: async ({ project }) => {

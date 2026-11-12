@@ -341,6 +341,24 @@ export const TakeCheckLine = z.object({
 });
 export type TakeCheckLine = z.infer<typeof TakeCheckLine>;
 
+// What a text model saw when it looked at the take for anything a shopper
+// would read as impossible (an object missing a part, things fused or
+// floating). A label like the rest of the check, never a retake: the model
+// can miss a flaw or flag a take that is fine, and the maker decides.
+export const SceneLook = z.object({
+  status: z.enum(["clear", "flagged", "unseen"]),
+  problems: z
+    .array(z.object({ what: z.string(), where: z.string().default("") }))
+    .default([]),
+  // The model that looked.
+  model: z.string().optional(),
+  // Why nothing looked (unseen).
+  why: z.string().optional(),
+  // What the look cost, in millionths of a dollar, when it is known.
+  costMicros: z.number().optional(),
+});
+export type SceneLook = z.infer<typeof SceneLook>;
+
 export const TakeCheck = z.object({
   status: z.enum(["passed", "failed", "unchecked"]),
   engine: z.string().optional(),
@@ -351,6 +369,7 @@ export const TakeCheck = z.object({
   scale: z.string().optional(),
   // Why nothing was checked.
   unchecked: z.string().optional(),
+  look: SceneLook.optional(),
   checkedAt: z.string(),
 });
 export type TakeCheck = z.infer<typeof TakeCheck>;
@@ -481,15 +500,52 @@ export function uncheckedTake(
   };
 }
 
-// The board's chip: "checked · text 2/2 · letters match".
+const LOOKS_OFF = "looks off: ";
+
+// A check with what the look saw. A flagged look fails the check, whatever
+// was read, and says what looks off; a clear or unseen one changes no verdict.
+export function withLook(check: TakeCheck, look: SceneLook): TakeCheck {
+  const problems = check.problems.filter((p) => !p.startsWith(LOOKS_OFF));
+  if (look.status !== "flagged") {
+    return { ...check, problems, look };
+  }
+  return {
+    ...check,
+    status: "failed",
+    problems: [
+      ...problems,
+      ...look.problems.map((p) => `${LOOKS_OFF}${p.what}`),
+    ],
+    look,
+  };
+}
+
+// The look as a model answered it.
+export function sceneLookFrom(
+  answer: { plausible: boolean; problems: { what: string; where: string }[] },
+  model: string,
+): SceneLook {
+  const problems = answer.problems
+    .map((p) => ({ what: p.what.trim().slice(0, 240), where: p.where.trim() }))
+    .filter((p) => p.what)
+    .slice(0, 5);
+  return {
+    status: !answer.plausible && problems.length > 0 ? "flagged" : "clear",
+    problems,
+    model,
+  };
+}
+
+// The board's chip: "checked · text 2/2 · letters match · looked over".
 export function takeCheckLabel(check: TakeCheck): string {
-  if (check.status === "unchecked")
-    return `unchecked · ${check.unchecked ?? "nothing to read"}`;
   if (check.status === "failed")
     return `check failed · ${check.problems[0] ?? "see the take"}`;
+  const looked = check.look?.status === "clear" ? " · looked over" : "";
+  if (check.status === "unchecked")
+    return `unchecked · ${check.unchecked ?? "nothing to read"}${looked}`;
   const n = check.lines.length;
   const measured = check.lines.some((l) => l.letters);
-  return `checked · text ${n}/${n}${measured ? " · letters match" : ""}`;
+  return `checked · text ${n}/${n}${measured ? " · letters match" : ""}${looked}`;
 }
 
 // The reason chip a failed check points to, when one moves a knob that helps.

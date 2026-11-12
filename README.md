@@ -825,6 +825,26 @@ free and local, and lands with what was read (`GenerationJob.takeCheck`,
   take unchecked. Off macOS it says "no OCR engine on this machine".
 - *Elsewhere.* `get_frames`, `view_frame` and the export's manifest carry the check.
 
+**The look at each scene (paid).** The free check reads lettering, so it passes a
+scene whose product is right and whose props are impossible (a wine glass with no
+foot, 2026-11-11). When Settings → Checks has it on (the default), a text model looks
+at every scene once it lands and answers what a shopper would see as impossible:
+- *Which model.* The deep route's first model that can run here. Measured on
+  2026-11-12 over six scenes: GPT-6.1 Sol named the missing foot and passed five kept
+  takes; Gemini 3.6 Flash caught it with one false alarm; GPT-6 Luna missed it.
+- *What it costs.* About $0.006 a scene on GPT-6.1 Sol, at most $0.021, inside the
+  scene's estimate: the Generate confirmation and an agent's quote name the model, the
+  cap reserves it, and the job's cost adds what the model reported. A test take goes
+  without.
+- *What it does.* A flagged look fails the take's check ("check failed · looks off:
+  …", the wax cross) and says where. A clear one adds "looked over". It is a label,
+  never a retake, and it can miss a flaw or flag a take that is fine.
+- *When it cannot run.* The take lands anyway, marked not looked at, with why. A look
+  the provider refuses costs nothing; one that got no answer is counted at its
+  allowance, since it may have been charged. No fallback: one call at most.
+- *Mock runs.* The stub sees nothing wrong; `KILN_MOCK_LOOK=flag` makes it flag every
+  scene, to walk the board's flagged take for free.
+
 **Scene knobs.** A scene planned on the Etsy shot list (hero, in-use, lifestyle,
 gift) is tuned with knobs, never with prose: camera (eye level, a little above,
 from above), distance (close, medium, wide), light (window, studio, warm), shadow

@@ -1069,6 +1069,16 @@ export async function outputSources(
               problems: check.problems,
               ...(check.scale ? { scale: check.scale } : {}),
               ...(check.unchecked ? { unchecked: check.unchecked } : {}),
+              ...(check.look
+                ? {
+                    look: {
+                      status: check.look.status,
+                      problems: check.look.problems,
+                      ...(check.look.model ? { model: check.look.model } : {}),
+                      ...(check.look.why ? { why: check.look.why } : {}),
+                    },
+                  }
+                : {}),
             },
           }
         : {}),

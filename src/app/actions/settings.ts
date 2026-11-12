@@ -10,7 +10,7 @@ import {
 import { AgentRoutes, MakerRoutes } from "@/domain/model-routing";
 import { providerMode } from "@/providers/mode";
 import { agentRoutesProblem } from "@/server/chat/agent-route";
-import { saveMakerRoutes } from "@/server/maker-repository";
+import { saveMakerRoutes, setSceneLook } from "@/server/maker-repository";
 import { checkKey } from "@/server/provider-health";
 import { removeProviderKey, saveProviderKey } from "@/server/provider-keys";
 
@@ -110,4 +110,19 @@ export async function removeProviderKeyAction(
   }
   refresh();
   return { ok: true, message: "Removed." };
+}
+
+// Settings → Checks: the paid look at every scene, on or off.
+export async function setSceneLookAction(
+  input: unknown,
+): Promise<{ error?: string }> {
+  const parsed = z.boolean().safeParse(input);
+  if (!parsed.success) return { error: "On or off?" };
+  try {
+    await setSceneLook(parsed.data);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+  refresh();
+  return {};
 }

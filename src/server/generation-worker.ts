@@ -1,4 +1,9 @@
-import { costFromUsage, toMicros, videoCost } from "@/domain/generation-cost";
+import {
+  costFromUsage,
+  sceneLookEstimate,
+  toMicros,
+  videoCost,
+} from "@/domain/generation-cost";
 import {
   GenerationRequest,
   type ImageGenerationRequest,
@@ -10,7 +15,12 @@ import {
   type RouteEntry,
   readJobRoute,
 } from "@/domain/model-routing";
-import { type TakeCheck, uncheckedTake } from "@/domain/qc";
+import {
+  sceneLookFrom,
+  type TakeCheck,
+  uncheckedTake,
+  withLook,
+} from "@/domain/qc";
 import {
   describeProviderError,
   errorMessage,
@@ -18,6 +28,7 @@ import {
   retryDecision,
 } from "@/domain/queue";
 import type { ImageProvider, VideoProvider } from "@/providers/interfaces";
+import type { GenerationUsage } from "@/providers/types";
 import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 
 // The background generation worker: one per server process (a globalThis
@@ -91,6 +102,17 @@ export interface WorkerDeps {
     take: { url: string; bytes: Uint8Array; mime: string },
   ): Promise<TakeCheck | null>;
   checkTimeoutMs?: number;
+  // The paid look at a scene that landed (domain SceneLook), on the text
+  // model the request names: one request, marked by `beforeCall`.
+  lookAtScene?(
+    model: { provider: "google" | "openai"; model: string },
+    url: string,
+    beforeCall: () => Promise<void>,
+  ): Promise<{
+    answer: { plausible: boolean; problems: { what: string; where: string }[] };
+    model: string;
+    usage?: GenerationUsage;
+  }>;
   log(message: string, error?: unknown): void;
 }
 
@@ -148,6 +170,59 @@ async function checkLanding(
     return uncheckedTake("the check could not run", at());
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// The look at a scene that landed, when its request asks for one. It never
+// costs the take: a look that fails lands the take unseen. Its cost joins the
+// job's: what the model reported, or its allowance when a live call reported
+// nothing or got no answer (it may have been charged).
+async function lookLanding(
+  deps: WorkerDeps,
+  job: ClaimedJob,
+  request: ImageGenerationRequest,
+  url: string,
+  check: TakeCheck | null,
+): Promise<TakeCheck | null> {
+  const model = request.look;
+  if (!check || !model || !deps.lookAtScene) return check;
+  const allowance = () =>
+    deps.mode === "live" ? (sceneLookEstimate(model)?.max ?? null) : null;
+  const charge = async (usd: number | null) => {
+    if (usd === null) return;
+    await recordPaidCost(deps, job, undefined, usd);
+  };
+  let started = false;
+  try {
+    const seen = await deps.lookAtScene(model, url, async () => {
+      started = true;
+    });
+    const usd = seen.usage
+      ? costFromUsage(
+          { provider: model.provider, model: seen.model },
+          seen.usage,
+        )
+      : null;
+    const cost = usd ?? allowance();
+    await charge(cost);
+    return withLook(check, {
+      ...sceneLookFrom(seen.answer, seen.model),
+      ...(cost === null ? {} : { costMicros: toMicros(cost) }),
+    });
+  } catch (error) {
+    deps.log(`could not look at the take of ${job.id}`, error);
+    const unanswered = started && !hadResponse(error);
+    const cost = unanswered ? allowance() : null;
+    await charge(cost);
+    return withLook(check, {
+      status: "unseen",
+      problems: [],
+      model: model.model,
+      why: unanswered
+        ? "the look got no answer; it may have been charged"
+        : describeProviderError(model.provider, error),
+      ...(cost === null ? {} : { costMicros: toMicros(cost) }),
+    });
   }
 }
 
@@ -342,7 +417,7 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
       );
     }
     const url = await storeWithRetries(deps, result.bytes, result.mime);
-    const check =
+    const read =
       parsed.kind === "image"
         ? await checkLanding(deps, job, parsed, {
             url,
@@ -350,6 +425,10 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
             mime: result.mime,
           })
         : null;
+    const check =
+      parsed.kind === "image"
+        ? await lookLanding(deps, job, parsed, url, read)
+        : read;
     await deps.completeJob(job.id, job.leaseToken, url, check);
   } catch (error) {
     const unanswered = callStarted && !paid && !hadResponse(error);

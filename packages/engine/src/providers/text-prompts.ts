@@ -296,3 +296,19 @@ export const ProductReview = z.object({
   checks: z.array(z.object({ field: z.string(), why: z.string() })),
 });
 export type ProductReview = z.infer<typeof ProductReview>;
+
+// A finished scene, looked at for what no photo of the real product could
+// show. Measured on 2026-11-12: a deep model names a wine glass with no foot
+// and passes five kept takes; the fastest models miss it.
+export const SCENE_LOOK_PROMPT = [
+  "This is a generated product photo for an online listing.",
+  "Look at every object in it, one at a time, for anything physically impossible or malformed that a shopper would notice: an object missing a part it needs or with nothing holding it up, objects fused together or duplicated, warped geometry, things floating, shadows or reflections that cannot be, malformed hands.",
+  "Ignore style, the wording on the product, and whether the photo is attractive.",
+  "Report only what you are confident is wrong, each in one short sentence, and say where in the photo it is.",
+].join(" ");
+
+export const SceneLookAnswer = z.object({
+  plausible: z.boolean(),
+  problems: z.array(z.object({ what: z.string(), where: z.string() })),
+});
+export type SceneLookAnswer = z.infer<typeof SceneLookAnswer>;

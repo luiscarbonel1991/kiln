@@ -115,6 +115,7 @@ export async function getMakerPreferences(): Promise<MakerPreferences> {
       searchColumns: {},
       watchedShops: [],
       leftOutListings: [],
+      sceneLook: true,
     };
   }
   const maker = await getCurrentMaker();
@@ -153,6 +154,13 @@ async function updatePreferences(
       data: { preferences: { ...raw, ...changed } as Prisma.InputJsonValue },
     });
   });
+}
+
+// Settings → Checks: whether every scene is looked at once it lands.
+export async function setSceneLook(on: boolean): Promise<void> {
+  await updatePreferences((kept) =>
+    kept.sceneLook === on ? null : { sceneLook: on },
+  );
 }
 
 // Remember the hero's setting for a destination and a product family.

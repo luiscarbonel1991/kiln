@@ -200,6 +200,8 @@ export function tuneView(input: {
   // The scenes' route (final), its models that may run here: a take is
   // priced at the dearest model it may run on, as the queue reserves it.
   route?: Route | null;
+  // What the look at the take adds to its price (TakeRoutes.look).
+  sceneLook?: { typical: number; max: number } | null;
   // The scene's colour and style (tuneLook).
   look?: TuneLook | null;
   // Why its provider cannot take a paid call now (providerBlock).
@@ -232,6 +234,7 @@ export function tuneView(input: {
           { ...card.model, size: input.size },
           card.references.length,
           input.route,
+          input.sceneLook,
         )
       : null;
   return {

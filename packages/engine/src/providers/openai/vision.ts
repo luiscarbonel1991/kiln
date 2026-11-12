@@ -1,6 +1,7 @@
 import { BaseUnderstanding } from "@/domain/understanding";
 import { fetchAsset } from "@/providers/asset-bytes";
 import type { VisionProvider } from "@/providers/interfaces";
+import { mockSceneLook } from "@/providers/mock/scene-look";
 import {
   MOCK_PRODUCT_DRAFT,
   MOCK_UNDERSTANDING,
@@ -9,6 +10,8 @@ import { askOpenAI, openaiTextModel } from "@/providers/openai/text";
 import {
   PRODUCT_DRAFT_PROMPT,
   ProductDraft,
+  SCENE_LOOK_PROMPT,
+  SceneLookAnswer,
   VISION_PROMPT,
   VisionAnswer,
 } from "@/providers/text-prompts";
@@ -53,6 +56,28 @@ export const openaiVisionProvider: VisionProvider = {
       schema: ProductDraft,
       content: [
         { type: "input_text", text: PRODUCT_DRAFT_PROMPT },
+        {
+          type: "input_image",
+          image_url: `data:${img.mime};base64,${img.base64}`,
+          detail: "high",
+        },
+      ],
+      effort: options.effort,
+      beforeCall: options.beforeCall,
+    });
+    return { value: answer.value, model: model.id, usage: answer.usage };
+  },
+  async lookAtScene(input, options) {
+    const model = openaiTextModel(options.model);
+    if (model.mock) return { value: mockSceneLook(), model: model.id };
+    const img = await fetchAsset(input.assetUrl);
+    const answer = await askOpenAI({
+      model: model.id,
+      kind: "sceneLook",
+      name: "scene_look",
+      schema: SceneLookAnswer,
+      content: [
+        { type: "input_text", text: SCENE_LOOK_PROMPT },
         {
           type: "input_image",
           image_url: `data:${img.mime};base64,${img.base64}`,

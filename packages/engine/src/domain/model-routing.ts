@@ -60,6 +60,7 @@ export const TEXT_CALL_ROLES: Record<TextCallKind, "fast" | "deep"> = {
   artDirection: "deep",
   listingCopy: "deep",
   productReview: "fast",
+  sceneLook: "deep",
   chatTurn: "fast",
   chatPlan: "deep",
 };
@@ -510,6 +511,8 @@ export function worstCase(
   return worst;
 }
 
+const roundUsd = (usd: number) => Math.round(usd * 10_000) / 10_000;
+
 // What one take of a scene costs along its route, as Tune prices it: the
 // typical of the model it starts on, the max of the dearest model it may run
 // on (the queue reserves the same). null when its own model has no price.
@@ -518,9 +521,20 @@ export function takeEstimate(
   model: RouteEntry & { aspect?: string; size?: ImageSize },
   references: number,
   route: Route | null | undefined,
+  // The look at the take, when the maker has it on (sceneLookEstimate).
+  look?: { typical: number; max: number } | null,
 ): { typical: number; max: number } | null {
   const own = estimateGeneration(model, model.aspect, references);
   if (!own) return null;
+  if (look) {
+    const priced = takeEstimate(model, references, route);
+    return priced
+      ? {
+          typical: roundUsd(priced.typical + look.typical),
+          max: roundUsd(priced.max + look.max),
+        }
+      : null;
+  }
   let max = own.max;
   for (const entry of routeCandidates(route, model).slice(1)) {
     const caps = PROVIDER_CAPABILITIES[entry.provider];
@@ -557,6 +571,8 @@ export function videoTakeEstimate(
 export interface TakeRoutes {
   final: Route | null;
   video: Route | null;
+  // What the look at each scene adds to a take, when the maker has it on.
+  look?: { typical: number; max: number } | null;
 }
 
 export const NO_TAKE_ROUTES: TakeRoutes = { final: null, video: null };

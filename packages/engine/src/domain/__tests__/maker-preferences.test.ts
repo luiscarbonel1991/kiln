@@ -24,13 +24,17 @@ describe("readPreferences", () => {
       },
       watchedShops: [{ shopId: "7", name: "PineGoods" }],
       leftOutListings: ["4143619041"],
+      sceneLook: true,
     });
     expect(readPreferences(null)).toEqual({
       heroSetting: {},
       searchColumns: {},
       watchedShops: [],
       leftOutListings: [],
+      sceneLook: true,
     });
+    expect(readPreferences({ sceneLook: false }).sceneLook).toBe(false);
+    expect(readPreferences({ sceneLook: "no" }).sceneLook).toBe(true);
     expect(
       readPreferences({ heroSetting: "nope", watchedShops: "nope" }),
     ).toEqual({
@@ -38,6 +42,7 @@ describe("readPreferences", () => {
       searchColumns: {},
       watchedShops: [],
       leftOutListings: [],
+      sceneLook: true,
     });
   });
 });

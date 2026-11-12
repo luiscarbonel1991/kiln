@@ -117,6 +117,7 @@ export function NewProjectFlow({
   initialProducts,
   initialBrand,
   makerModels,
+  sceneLook = null,
   draftPrice,
   reviewPrice,
   rememberedHero = {},
@@ -128,6 +129,8 @@ export function NewProjectFlow({
   initialProducts: Product[];
   initialBrand: BrandKit | null;
   makerModels: MakerModels;
+  // What the look at each scene adds to the plan's estimate, when it is on.
+  sceneLook?: { typical: number; max: number } | null;
   draftPrice: string | null;
   reviewPrice: string | null;
   // The maker's remembered hero settings, per destination and family.
@@ -296,6 +299,7 @@ export function NewProjectFlow({
     sized,
     model,
     shown ? productImages(shown).length : 0,
+    sceneLook,
   );
   // A video is paid like a scene, so the plan prices it too.
   const videoModel = defaultVideoModel(makerModels);
@@ -902,7 +906,7 @@ export function NewProjectFlow({
                 </p>
                 <p className="font-mono text-[0.7rem] text-on-surface-mid">
                   {estimate
-                    ? `≈ ${money(estimate.typical)}–${money(estimate.max)} if each scene is generated once · ${model.model}${estimate.quality ? `, quality ${estimate.quality}` : ""}${at2k > 0 ? `, ${at2k} at 2K for ${at2k === 1 ? "its destination" : "their destinations"}` : ""}${estimate.confidence === "derived" ? " (derived price)" : ""}`
+                    ? `≈ ${money(estimate.typical)}–${money(estimate.max)} if each scene is generated once · ${model.model}${estimate.quality ? `, quality ${estimate.quality}` : ""}${at2k > 0 ? `, ${at2k} at 2K for ${at2k === 1 ? "its destination" : "their destinations"}` : ""}${sceneLook ? ", each looked at once it lands" : ""}${estimate.confidence === "derived" ? " (derived price)" : ""}`
                     : `no pinned price for ${model.model}`}
                 </p>
                 {videos.count > 0 ? (

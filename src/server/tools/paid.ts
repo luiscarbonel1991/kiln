@@ -96,9 +96,11 @@ async function priceGenerate(
       "Nothing waits to be generated: every scene has a take, is in the queue, or waits for the scene it re-frames. Name frames to take again.",
     );
   }
-  const { cards } = await estimateProjectCards(project, [...new Set(asked)], {
-    test,
-  }).catch((error) => {
+  const { cards, look } = await estimateProjectCards(
+    project,
+    [...new Set(asked)],
+    { test },
+  ).catch((error) => {
     throw asRefusal(error);
   });
   return {
@@ -115,6 +117,9 @@ async function priceGenerate(
       fallbacks: c.next.map(modelLabel),
       typicalUsd: usd(c.typicalMicros),
       atMostUsd: usd(c.maxMicros),
+      ...(look && c.request.kind === "image" && c.request.look
+        ? { look: look.label }
+        : {}),
     })),
   };
 }

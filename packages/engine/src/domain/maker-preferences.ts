@@ -51,6 +51,9 @@ export const MakerPreferences = z.object({
   // Listings of the maker's shop left out of their best sellers (add-ons,
   // samples: anything that is not a product to refresh).
   leftOutListings: lenientList(ListingId, MAX_LEFT_OUT),
+  // Whether a text model looks at every scene once it lands, for anything a
+  // shopper would see as impossible (Settings → Checks). On until turned off.
+  sceneLook: z.boolean().catch(true).default(true),
 });
 export type MakerPreferences = z.infer<typeof MakerPreferences>;
 
@@ -63,5 +66,6 @@ export function readPreferences(raw: unknown): MakerPreferences {
         searchColumns: {},
         watchedShops: [],
         leftOutListings: [],
+        sceneLook: true,
       };
 }

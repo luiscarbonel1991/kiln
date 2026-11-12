@@ -95,7 +95,7 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
   });
 
   it("asks an Etsy scene at 2K and says so; a test take and an Instagram scene stay at 1K", async () => {
-    const { estimateGeneration, toMicros } = await import(
+    const { estimateGeneration, sceneLookEstimate, toMicros } = await import(
       "@/domain/generation-cost"
     );
     const id = await start();
@@ -111,11 +111,22 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
       hero.request.model.aspect,
       hero.request.kind === "image" ? hero.request.imageInputs.length : 0,
     );
-    expect(hero.typicalMicros).toBe(toMicros(at2k?.typical ?? 0));
+    // A scene is looked at once it lands, and its estimate counts the look.
+    const looking =
+      hero.request.kind === "image" ? hero.request.look : undefined;
+    expect(looking).toBeDefined();
+    const look = looking ? sceneLookEstimate(looking) : null;
+    expect(full.look).toEqual({ label: expect.any(String), count: 1 });
+    expect(hero.typicalMicros).toBe(
+      toMicros((at2k?.typical ?? 0) + (look?.typical ?? 0)),
+    );
     expect(full.models[0]).toMatchObject({ resolution: "2K" });
     expect(full.model).toContain("medium 2K");
     const test = await estimateProjectCards(id, ["etsy.hero"], { test: true });
     expect(test.cards[0].request.model).toMatchObject({ size: "1k" });
+    // A test take, a cheap check of the direction, goes without the look.
+    expect(test.cards[0].request).not.toHaveProperty("look");
+    expect(test.look).toBeNull();
 
     const feed = await start("instagram", "content");
     // A scene of its own: a version (Story, Square post) waits for its source.
