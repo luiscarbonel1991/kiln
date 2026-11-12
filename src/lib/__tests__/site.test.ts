@@ -1,8 +1,9 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { sampleStory } from "@/lib/home-story";
 import { GET_STARTED } from "@/lib/site";
+import { siteKit } from "@/lib/site-kit";
+import { LEAK } from "../../../packages/engine/src/__tests__/leak";
 
 // The public page is built once and needs no database: nothing it imports, at
 // any depth, reaches the server's repositories, the database client or
@@ -63,17 +64,25 @@ describe("the public page", () => {
     expect([...packages].filter((p) => p.startsWith("@prisma/"))).toEqual([]);
   });
 
-  it("tells every step with the sample alone", () => {
-    const story = sampleStory();
-    expect(story.project).toBeNull();
-    expect(story.exact).toHaveLength(3);
-    expect(story.scenes).toHaveLength(4);
-    expect(story.scenes.map((s) => s.check?.status)).toContain("failed");
-    expect(story.looks.length).toBeGreaterThanOrEqual(3);
-    expect(story.words?.title.length).toBeLessThanOrEqual(
-      story.words?.titleMax ?? 0,
+  it("tells every step with its sample kit alone, from files it ships", () => {
+    const kit = siteKit();
+    expect(kit.frames.length).toBeGreaterThanOrEqual(3);
+    expect(kit.colours.length).toBeGreaterThanOrEqual(3);
+    expect(kit.words?.title.length).toBeLessThanOrEqual(
+      kit.words?.titleMax ?? 0,
     );
-    expect(story.destinations.length).toBeGreaterThan(1);
+    const files = [
+      kit.plate.href,
+      kit.video.url,
+      kit.video.poster,
+      ...Object.values(kit.loupes),
+      ...Object.values(kit.takes).map((t) => t.url),
+      ...kit.colours.map((c) => c.take.url),
+    ];
+    for (const file of files) {
+      expect(existsSync(join(repo, "public", file)), file).toBe(true);
+    }
+    expect(JSON.stringify(kit)).not.toMatch(LEAK);
   });
 
   it("starts a visitor in one place, never back on itself", () => {

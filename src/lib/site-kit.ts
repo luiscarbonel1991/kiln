@@ -1,13 +1,13 @@
 import { type ExactView, exactView } from "@/domain/exact";
 import { Product } from "@/domain/product";
 import type { ExactKind } from "@/domain/shot-list";
+import type { PlateImage } from "@/lib/plate-href";
 import {
   type StoryProduct,
   type StoryWords,
   storyProduct,
   storyWords,
-} from "@/lib/home-story";
-import type { PlateImage } from "@/lib/plate-href";
+} from "@/lib/product-story";
 
 // The public page's running example: a kit Kiln made for one sample product,
 // a glazed coaster, on 2026-11-10 (a Launch project: Etsy and Instagram; GPT
