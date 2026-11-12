@@ -61,7 +61,7 @@ export function ToolCalls({ calls }: { calls: ToolCallView[] }) {
             className={
               c.ok
                 ? "font-sans text-[0.75rem] text-prov-recipe"
-                : "min-w-0 basis-full font-sans text-[0.75rem] text-prov-local sm:basis-auto"
+                : "min-w-0 basis-full font-sans text-[0.75rem] text-fail sm:basis-auto"
             }
           >
             {c.ok ? "done" : `refused: ${c.error ?? "no reason given"}`}

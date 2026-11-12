@@ -198,9 +198,7 @@ export default async function ProjectBoardPage({
       />
     ) : (
       <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
-        <h1 className="font-serif text-2xl italic text-foreground">
-          {board.name}
-        </h1>
+        <h1 className="font-serif text-2xl text-foreground">{board.name}</h1>
         <p className="font-sans text-sm text-on-surface-mid">
           {board.type === "design"
             ? designLine(board.cards)

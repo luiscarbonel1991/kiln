@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { SlotStateBadge } from "@/components/projects/slot-state-badge";
+import { WaxCross, WaxTick } from "@/components/site/wax";
 import type { SlotView } from "@/domain/plan";
 import { cn } from "@/lib/utils";
+import "@/components/site/parts.css";
 
 const css = (aspect?: string) => (aspect ?? "1:1").replace(":", " / ");
 
@@ -17,9 +19,10 @@ export function SlotGrid({ children }: { children: ReactNode }) {
   );
 }
 
-// One frame of the storyboard: the render at the slot's real aspect (render
-// radius + render shadow), the position label ("Etsy photo 1"), the slot's job
-// as a serif caption, and its state. A slot switched off stays in place, faded,
+// One frame of the storyboard: the render at the slot's real aspect as a print
+// on paper, marked in wax with what Kiln's check read of its take (a tick, or a
+// cross), the position label ("Etsy photo 1"), the slot's job as a serif
+// caption, and its state. A slot switched off stays in place, faded,
 // so the maker can switch it back on.
 export function SlotFrame({
   position,
@@ -32,6 +35,7 @@ export function SlotFrame({
   mark,
   cost,
   ranOn,
+  check,
   testId,
 }: {
   position: string;
@@ -48,6 +52,8 @@ export function SlotFrame({
   // Its latest take moved down its route: the model it ran on, from which,
   // and why (never switched unseen).
   ranOn?: { label: string; from: string; reason: string };
+  // What Kiln's check read of the shown take, drawn on the print's corner.
+  check?: "passed" | "failed" | null;
   // The frame's own id, so its controls can be found inside it; its state is
   // data-state.
   testId?: string;
@@ -60,12 +66,21 @@ export function SlotFrame({
     >
       <div
         className={cn(
-          "self-end overflow-hidden rounded-render bg-surface-soft shadow-render transition-opacity",
+          "relative self-end rounded-print bg-card p-1.5 shadow-render transition-opacity",
           view.state === "off" && "opacity-35 grayscale",
         )}
-        style={{ aspectRatio: css(aspect) }}
       >
-        {children}
+        <div
+          className="overflow-hidden bg-surface-soft"
+          style={{ aspectRatio: css(aspect) }}
+        >
+          {children}
+        </div>
+        {check === "passed" ? (
+          <WaxTick className="wax-corner" />
+        ) : check === "failed" ? (
+          <WaxCross className="wax-corner wax-fail" />
+        ) : null}
       </div>
       <figcaption className="flex flex-col gap-1 self-start px-0.5">
         <div className="flex items-center justify-between gap-2">
@@ -80,7 +95,7 @@ export function SlotFrame({
           </span>
         ) : null}
         <span
-          className="font-serif text-[0.95rem] italic leading-tight text-foreground"
+          className="font-serif text-[0.95rem] leading-tight text-foreground"
           style={{ fontVariationSettings: "'opsz' 40" }}
         >
           {label}

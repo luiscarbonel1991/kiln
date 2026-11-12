@@ -163,7 +163,7 @@ export function GenerationPanel({
           {money(estimate.maxMicros)}
         </Button>
       ) : refusal ? (
-        <p className="font-mono text-[0.68rem] leading-snug text-prov-local">
+        <p className="font-mono text-[0.68rem] leading-snug text-fail">
           {refusal}
         </p>
       ) : batch ? null : (
@@ -180,7 +180,7 @@ export function GenerationPanel({
         ? estimate.warnings.map((w) => (
             <p
               key={w}
-              className="font-mono text-[0.65rem] leading-snug text-prov-local"
+              className="font-mono text-[0.65rem] leading-snug text-fail"
             >
               {w}
             </p>
@@ -291,17 +291,17 @@ export function GenerationPanel({
             </div>
           ) : null}
           {estimate.warnings.map((w) => (
-            <p key={w} className="font-mono text-[0.7rem] text-prov-local">
+            <p key={w} className="font-mono text-[0.7rem] text-fail">
               {w}
             </p>
           ))}
           {!fits ? (
-            <p className="font-mono text-[0.7rem] text-prov-local">
+            <p className="font-mono text-[0.7rem] text-fail">
               This batch would go over the monthly cap.
             </p>
           ) : null}
           {error ? (
-            <p className="font-mono text-[0.7rem] text-prov-local">{error}</p>
+            <p className="font-mono text-[0.7rem] text-fail">{error}</p>
           ) : null}
           <div className="flex justify-end gap-2">
             <Button

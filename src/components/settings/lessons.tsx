@@ -35,7 +35,7 @@ function LessonRow({ lesson }: { lesson: LessonView }) {
           {lesson.move ? " · starts the knob in new projects" : ""}
         </p>
         {error ? (
-          <p className="font-mono text-[0.62rem] text-prov-local">{error}</p>
+          <p className="font-mono text-[0.62rem] text-fail">{error}</p>
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">

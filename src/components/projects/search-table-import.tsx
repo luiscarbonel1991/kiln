@@ -128,7 +128,7 @@ export function SearchTableImport({
         your browser.
       </p>
       {error ? (
-        <p className="font-mono text-[0.7rem] text-prov-local">{error}</p>
+        <p className="font-mono text-[0.7rem] text-fail">{error}</p>
       ) : null}
 
       {table.headers.length > 0 ? (

@@ -301,7 +301,7 @@ export function DraftPreviewForm({
                 key={b}
                 className="flex items-start gap-2 font-sans text-[0.8rem] text-foreground"
               >
-                <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-prov-local" />
+                <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
                 <span className="[overflow-wrap:anywhere]">{b}</span>
               </li>
             ))}
@@ -370,7 +370,7 @@ export function DraftPreviewForm({
           </div>
         )}
         {error ? (
-          <p className="font-mono text-[0.7rem] text-prov-local" role="alert">
+          <p className="font-mono text-[0.7rem] text-fail" role="alert">
             {error}
           </p>
         ) : null}
@@ -619,10 +619,7 @@ function DraftMadeView({
             Etsy shows something else than Kiln sent:
           </p>
           {made.readBack.map((r) => (
-            <p
-              key={r.field}
-              className="font-mono text-[0.7rem] text-prov-local"
-            >
+            <p key={r.field} className="font-mono text-[0.7rem] text-fail">
               {FIELD_LABEL[r.field] ?? r.field}: sent {r.sent}, Etsy shows{" "}
               {r.onEtsy}
             </p>
@@ -657,7 +654,7 @@ function DraftMadeView({
             Send them again
           </Button>
           {error ? (
-            <p className="font-mono text-[0.7rem] text-prov-local">{error}</p>
+            <p className="font-mono text-[0.7rem] text-fail">{error}</p>
           ) : null}
         </div>
       ) : null}

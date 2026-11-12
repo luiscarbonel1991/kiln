@@ -136,7 +136,7 @@ export function ImportResultPanel({
         <X className="size-4" />
       </button>
       {"error" in outcome ? (
-        <p className="font-sans text-sm text-prov-local">{outcome.error}</p>
+        <p className="font-sans text-sm text-fail">{outcome.error}</p>
       ) : (
         <ImportSummary result={outcome} />
       )}
@@ -190,8 +190,8 @@ function ImportSummary({ result }: { result: ImportResult }) {
         </p>
       ) : null}
       {result.rejected.length > 0 ? (
-        <div className="flex flex-col gap-2 rounded-field bg-prov-local/10 px-4 py-3">
-          <p className="font-sans text-[0.8rem] font-semibold text-prov-local">
+        <div className="flex flex-col gap-2 rounded-field bg-fail/10 px-4 py-3">
+          <p className="font-sans text-[0.8rem] font-semibold text-fail">
             Not imported — fix these and import again (the others are saved):
           </p>
           {result.rejected.map((r) => (
@@ -199,7 +199,7 @@ function ImportSummary({ result }: { result: ImportResult }) {
               <span className="font-sans text-[0.8rem] text-foreground">
                 {r.label}
               </span>
-              <ul className="flex flex-col gap-0.5 font-mono text-[0.7rem] text-prov-local">
+              <ul className="flex flex-col gap-0.5 font-mono text-[0.7rem] text-fail">
                 {r.errors.map((e) => (
                   <li key={e}>{e}</li>
                 ))}
@@ -209,11 +209,11 @@ function ImportSummary({ result }: { result: ImportResult }) {
         </div>
       ) : null}
       {result.brandErrors.length > 0 ? (
-        <div className="flex flex-col gap-0.5 rounded-field bg-prov-local/10 px-4 py-3">
-          <p className="font-sans text-[0.8rem] font-semibold text-prov-local">
+        <div className="flex flex-col gap-0.5 rounded-field bg-fail/10 px-4 py-3">
+          <p className="font-sans text-[0.8rem] font-semibold text-fail">
             Your brand kit (the maker block) was not saved:
           </p>
-          <ul className="flex flex-col gap-0.5 font-mono text-[0.7rem] text-prov-local">
+          <ul className="flex flex-col gap-0.5 font-mono text-[0.7rem] text-fail">
             {result.brandErrors.map((e) => (
               <li key={e}>{e}</li>
             ))}

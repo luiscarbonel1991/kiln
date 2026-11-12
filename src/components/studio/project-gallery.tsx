@@ -63,7 +63,7 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
       <div className="relative mx-auto w-full max-w-[1120px] p-6 sm:p-10">
         <div className="mb-6 flex items-center justify-between">
           <h2
-            className="font-serif text-2xl italic text-card"
+            className="font-serif text-2xl text-card"
             style={{ fontVariationSettings: "'opsz' 144" }}
           >
             Projects
@@ -110,7 +110,7 @@ export function ProjectGallery({ onClose }: { onClose: () => void }) {
           </div>
         ) : projects.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-24 text-center">
-            <p className="font-serif text-lg italic text-card">
+            <p className="font-serif text-lg text-card">
               No saved projects yet.
             </p>
             <p className="font-mono text-[0.6875rem] text-card/70">

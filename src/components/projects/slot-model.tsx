@@ -51,7 +51,7 @@ export function SlotModel({
         }
       />
       {error ? (
-        <span className="font-mono text-[0.6rem] text-prov-local">{error}</span>
+        <span className="font-mono text-[0.6rem] text-fail">{error}</span>
       ) : null}
     </div>
   );

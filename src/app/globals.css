@@ -59,6 +59,8 @@
   --color-prov-image: var(--prov-image);
   --color-prov-recipe: var(--prov-recipe);
   --color-prov-local: var(--prov-local);
+  --color-pass: var(--pass);
+  --color-fail: var(--fail);
 
   /* fonts — next/font var names are distinct from theme keys (no circular self-ref) */
   --font-sans: var(--font-hanken);
@@ -81,6 +83,7 @@
   --radius-field: 13px;
   --radius-thumb: 13px;
   --radius-render: 17px;
+  --radius-print: 3px;
   --radius-card: 24px;
   --radius-pill: 999px;
 
@@ -295,7 +298,7 @@
   --muted-foreground: #6f6657; /* on-surface-mid */
   --accent: #faf5ec; /* surface-soft */
   --accent-foreground: #241f18; /* on-surface */
-  --destructive: #b3401a; /* warm red (not in DESIGN; terracotta family) */
+  --destructive: #a8233f; /* the fail crimson, apart from the action's terracotta */
   --border: #ebe2d2; /* strong divider */
   --input: #f0e8da; /* soft divider */
   --ring: #c0461f; /* primary */
@@ -329,6 +332,9 @@
   --prov-image: #3f5f84; /* slate  — extracted from master asset */
   --prov-recipe: #2c6a51; /* pine   — set by recipe */
   --prov-local: #c0461f; /* terracotta — locally edited (== primary) */
+  /* what a check read, and errors: never the action's terracotta */
+  --pass: #2c6a51; /* pine — a take that passed its check */
+  --fail: #a8233f; /* crimson — a take that failed, an error, a removal */
 }
 
 @layer base {

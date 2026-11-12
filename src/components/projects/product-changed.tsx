@@ -39,7 +39,7 @@ export function UpdateProjectButton({
         Update the project · free
       </Button>
       {error ? (
-        <p className="font-mono text-[0.68rem] text-prov-local">{error}</p>
+        <p className="font-mono text-[0.68rem] text-fail">{error}</p>
       ) : null}
     </div>
   );

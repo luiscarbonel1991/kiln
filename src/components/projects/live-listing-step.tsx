@@ -254,9 +254,7 @@ export function LiveListingStep({
           </span>
         </div>
         {error ? (
-          <span className="font-mono text-[0.7rem] text-prov-local">
-            {error}
-          </span>
+          <span className="font-mono text-[0.7rem] text-fail">{error}</span>
         ) : null}
       </div>
     </div>

@@ -241,7 +241,7 @@ export function GenerationCard({
         testId={`card-${card.id}`}
       />
       {queueError || failure ? (
-        <p className="px-4 pb-3 font-mono text-[0.625rem] leading-snug text-prov-local">
+        <p className="px-4 pb-3 font-mono text-[0.625rem] leading-snug text-fail">
           {queueError ?? `Last try failed: ${failure}`}
         </p>
       ) : null}
@@ -278,7 +278,7 @@ export function GenerationCard({
           </div>
           {vectorError && !vectorizing ? (
             <p
-              className="border-border-soft border-t px-4 py-2.5 font-mono text-[0.625rem] leading-snug text-prov-local"
+              className="border-border-soft border-t px-4 py-2.5 font-mono text-[0.625rem] leading-snug text-fail"
               role="alert"
             >
               {vectorError}

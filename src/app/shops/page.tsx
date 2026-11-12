@@ -29,7 +29,7 @@ import {
   yourBestSellers,
 } from "@/server/shop-ranking";
 
-const HEADING = "font-serif text-xl italic text-foreground";
+const HEADING = "font-serif text-xl text-foreground";
 const LEAD =
   "mt-1 max-w-[620px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid";
 
@@ -144,11 +144,11 @@ export default async function ShopsPage({
         ) : null}
         {problem ? (
           <p
-            className="flex items-start gap-2 rounded-render border border-prov-local/40 bg-card px-4 py-3 font-sans text-sm text-foreground"
+            className="flex items-start gap-2 rounded-render border border-fail/40 bg-card px-4 py-3 font-sans text-sm text-foreground"
             data-testid="shops-connect-problem"
             role="alert"
           >
-            <CircleAlert className="mt-0.5 size-4 flex-shrink-0 text-prov-local" />
+            <CircleAlert className="mt-0.5 size-4 flex-shrink-0 text-fail" />
             <span className="min-w-0 [overflow-wrap:anywhere]">
               {problem}
               {params.connect === "etsy" && note ? ` ${note}` : ""}
@@ -176,7 +176,7 @@ export default async function ShopsPage({
                   className="flex items-start gap-2 font-sans text-[0.8rem] text-foreground"
                   role="alert"
                 >
-                  <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-prov-local" />
+                  <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
                   <span className="min-w-0 [overflow-wrap:anywhere]">
                     {bestError}
                   </span>
@@ -248,10 +248,7 @@ export default async function ShopsPage({
               by={others.by}
             />
           ) : othersError ? (
-            <p
-              className="font-mono text-[0.65rem] text-prov-local"
-              role="alert"
-            >
+            <p className="font-mono text-[0.65rem] text-fail" role="alert">
               {othersError}
             </p>
           ) : (

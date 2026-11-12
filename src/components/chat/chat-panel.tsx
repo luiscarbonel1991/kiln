@@ -149,7 +149,7 @@ export function ChatPanel({
             Chat
           </div>
           <div
-            className="truncate font-serif text-base text-foreground italic"
+            className="truncate font-serif text-base text-foreground"
             style={{ fontVariationSettings: "'opsz' 40" }}
           >
             {title}
@@ -210,7 +210,7 @@ export function ChatPanel({
         <>
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <p
-              className="font-serif text-lg text-foreground italic"
+              className="font-serif text-lg text-foreground"
               style={{ fontVariationSettings: "'opsz' 40" }}
             >
               Ask Kiln to do the work.
@@ -236,9 +236,7 @@ export function ChatPanel({
               ))}
             </div>
             {error ? (
-              <p className="font-sans text-[0.75rem] text-prov-local">
-                {error}
-              </p>
+              <p className="font-sans text-[0.75rem] text-fail">{error}</p>
             ) : null}
           </div>
           <Composer
@@ -427,8 +425,8 @@ function Conversation({
                 </div>
               ) : null}
               {error ? (
-                <div className="flex items-start justify-between gap-3 rounded-field bg-prov-local/10 px-3 py-2">
-                  <span className="font-sans text-[0.78rem] text-prov-local">
+                <div className="flex items-start justify-between gap-3 rounded-field bg-fail/10 px-3 py-2">
+                  <span className="font-sans text-[0.78rem] text-fail">
                     {error.message}
                   </span>
                   <button

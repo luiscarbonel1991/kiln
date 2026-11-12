@@ -180,7 +180,7 @@ export function CostPanel({ vectorUrl }: { vectorUrl: string }) {
           ) : null}
           {load === "error" ? (
             <div className="flex items-center justify-between gap-2 rounded-field bg-secondary px-3 py-2">
-              <span className="font-sans text-[0.6875rem] text-prov-local">
+              <span className="font-sans text-[0.6875rem] text-fail">
                 Could not read the .svg geometry.
               </span>
               <button
@@ -270,7 +270,7 @@ export function CostPanel({ vectorUrl }: { vectorUrl: string }) {
               </div>
 
               {!price.fitsOnSheet ? (
-                <p className="flex items-start gap-1.5 rounded-field bg-prov-local/10 px-3 py-2 font-sans text-[0.6875rem] text-prov-local">
+                <p className="flex items-start gap-1.5 rounded-field bg-fail/10 px-3 py-2 font-sans text-[0.6875rem] text-fail">
                   <AlertTriangle className="mt-0.5 size-3 flex-shrink-0" />
                   <span>
                     Larger than the {material.name} sheet — billed across{" "}

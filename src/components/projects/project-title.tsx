@@ -104,7 +104,7 @@ export function ProjectTitle({
         </Button>
       </div>
       {error ? (
-        <p className="font-mono text-[0.7rem] text-prov-local">{error}</p>
+        <p className="font-mono text-[0.7rem] text-fail">{error}</p>
       ) : null}
     </div>
   );

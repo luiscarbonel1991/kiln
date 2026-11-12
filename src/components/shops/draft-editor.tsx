@@ -356,7 +356,7 @@ export function DraftEditor({
                 {saved.map((r) => (
                   <p
                     key={r.field}
-                    className="font-mono text-[0.7rem] text-prov-local"
+                    className="font-mono text-[0.7rem] text-fail"
                   >
                     {FIELD_LABEL[r.field] ?? r.field}: sent {r.sent}, Etsy shows{" "}
                     {r.onEtsy}
@@ -366,7 +366,7 @@ export function DraftEditor({
             )
           ) : null}
           {error ? (
-            <p className="font-mono text-[0.7rem] text-prov-local" role="alert">
+            <p className="font-mono text-[0.7rem] text-fail" role="alert">
               {error}
             </p>
           ) : null}
@@ -436,7 +436,7 @@ function DraftPhotos({ draft }: { draft: DraftDetail }) {
                   data-testid={`draft-photo-remove-${i + 1}`}
                   type="button"
                   aria-label={`Remove photo ${i + 1}`}
-                  className="absolute top-1 right-1 rounded-full bg-card/90 p-0.5 text-on-surface-mid hover:text-prov-local"
+                  className="absolute top-1 right-1 rounded-full bg-card/90 p-0.5 text-on-surface-mid hover:text-fail"
                   onClick={() => setRemoving(image.id)}
                 >
                   <X className="size-3.5" />
@@ -517,7 +517,7 @@ function DraftPhotos({ draft }: { draft: DraftDetail }) {
         )}
       </ol>
       {error ? (
-        <p className="font-mono text-[0.7rem] text-prov-local" role="alert">
+        <p className="font-mono text-[0.7rem] text-fail" role="alert">
           {error}
         </p>
       ) : null}

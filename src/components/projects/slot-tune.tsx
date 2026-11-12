@@ -233,13 +233,13 @@ export function SlotTune({
               />
             ) : null}
             {tune.inert.prompt ? (
-              <p className={cn(NOTE, "text-prov-local")}>
+              <p className={cn(NOTE, "text-fail")}>
                 This scene runs its own prompt from the editor; the knobs reach
                 it once that prompt is cleared.
               </p>
             ) : null}
             {tune.inert.fields.length > 0 ? (
-              <p className={cn(NOTE, "text-prov-local")}>
+              <p className={cn(NOTE, "text-fail")}>
                 Written in the editor:{" "}
                 {tune.inert.fields
                   .map((f) => DIRECTION_LABEL[f].toLowerCase())
@@ -312,9 +312,7 @@ export function SlotTune({
                       }
                       className={cn(
                         "rounded-pill border bg-secondary px-3 py-1 font-sans text-xs text-on-surface-mid transition-colors hover:border-primary disabled:opacity-60",
-                        reason.suggested
-                          ? "border-prov-local"
-                          : "border-border-soft",
+                        reason.suggested ? "border-fail" : "border-border-soft",
                       )}
                     >
                       {reason.label}
@@ -373,19 +371,19 @@ export function SlotTune({
                 data-testid={`tune-${destinationId}-${slotKey}-blocked`}
                 className={cn(
                   NOTE,
-                  "border-border-soft border-t pt-3 text-prov-local",
+                  "border-border-soft border-t pt-3 text-fail",
                 )}
               >
                 {tune.blocked}
               </p>
             ) : null}
             {tune.error ? (
-              <p className="font-mono text-[0.6rem] text-prov-local [overflow-wrap:anywhere]">
+              <p className="font-mono text-[0.6rem] text-fail [overflow-wrap:anywhere]">
                 Last take failed: {tune.error}
               </p>
             ) : null}
             {error ? (
-              <p className="font-mono text-[0.6rem] text-prov-local">{error}</p>
+              <p className="font-mono text-[0.6rem] text-fail">{error}</p>
             ) : null}
           </Popover.Content>
         </Popover.Portal>

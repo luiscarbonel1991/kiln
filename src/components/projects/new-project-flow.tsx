@@ -509,7 +509,7 @@ export function NewProjectFlow({
                 <span className="font-mono text-[0.625rem] text-on-surface-dim">
                   {p.sku} · {p.source.kind}
                 </span>
-                <span className="font-serif text-lg italic leading-tight text-foreground">
+                <span className="font-serif text-lg leading-tight text-foreground">
                   {p.name}
                 </span>
                 <span className="font-sans text-[0.8rem] text-on-surface-mid">
@@ -548,7 +548,7 @@ export function NewProjectFlow({
               <span className="flex size-8 items-center justify-center rounded-pill bg-primary/10 text-primary">
                 <Plus className="size-4" />
               </span>
-              <span className="font-serif text-lg italic leading-tight text-foreground">
+              <span className="font-serif text-lg leading-tight text-foreground">
                 New product
               </span>
               <span className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
@@ -577,7 +577,7 @@ export function NewProjectFlow({
                 data-testid="type-design"
                 className="flex flex-col gap-1.5 rounded-card bg-card/60 p-5 shadow-card hover:ring-1 hover:ring-border"
               >
-                <span className="font-serif text-lg italic text-foreground">
+                <span className="font-serif text-lg text-foreground">
                   {t.label}
                 </span>
                 <span className="font-sans text-[0.78rem] leading-snug text-on-surface-mid">
@@ -599,7 +599,7 @@ export function NewProjectFlow({
                     : "enabled:hover:ring-1 enabled:hover:ring-border",
                 )}
               >
-                <span className="font-serif text-lg italic text-foreground">
+                <span className="font-serif text-lg text-foreground">
                   {t.label}
                 </span>
                 <span className="font-sans text-[0.78rem] leading-snug text-on-surface-mid">
@@ -671,7 +671,7 @@ export function NewProjectFlow({
                     on ? "ring-2 ring-primary" : "opacity-70 hover:opacity-100",
                   )}
                 >
-                  <span className="font-serif text-lg italic text-foreground">
+                  <span className="font-serif text-lg text-foreground">
                     {d.name}
                   </span>
                   <span className="font-mono text-[0.625rem] text-on-surface-mid">
@@ -931,9 +931,7 @@ export function NewProjectFlow({
               </Button>
             </div>
             {startError ? (
-              <p className="font-mono text-[0.7rem] text-prov-local">
-                {startError}
-              </p>
+              <p className="font-mono text-[0.7rem] text-fail">{startError}</p>
             ) : null}
           </div>
         ) : (
@@ -981,7 +979,7 @@ function Step({
       <h2 className="flex items-baseline gap-3">
         <span className="font-mono text-[0.7rem] text-primary">0{n}</span>
         <span
-          className="font-serif text-xl italic text-foreground"
+          className="font-serif text-xl text-foreground"
           style={{ fontVariationSettings: "'opsz' 40" }}
         >
           {title}
@@ -1058,7 +1056,7 @@ function ProjectLook({
       {error ? (
         <p
           role="alert"
-          className="font-sans text-[0.75rem] text-prov-local"
+          className="font-sans text-[0.75rem] text-fail"
           data-testid="project-look-error"
         >
           {error}

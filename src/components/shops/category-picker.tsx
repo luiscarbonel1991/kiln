@@ -47,7 +47,7 @@ export function CategoryPicker({
         {chosen ? (
           chosen.path.join(" › ")
         ) : (
-          <span className="text-prov-local">No category chosen yet.</span>
+          <span className="text-fail">No category chosen yet.</span>
         )}
       </p>
       {disabled ? null : (

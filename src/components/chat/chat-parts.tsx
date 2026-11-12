@@ -170,7 +170,7 @@ function ApprovalCard({
         )
       ) : null}
       {quote?.fitsCap === false ? (
-        <p className="font-sans text-[0.75rem] text-prov-local">
+        <p className="font-sans text-[0.75rem] text-fail">
           It may not fit what is left of this month's cap.
         </p>
       ) : null}
@@ -213,7 +213,7 @@ function ToolLine({
     tool.state === "output-available" ? (
       <Check className="size-3 text-prov-recipe" />
     ) : tool.state === "output-error" ? (
-      <AlertCircle className="size-3 text-prov-local" />
+      <AlertCircle className="size-3 text-fail" />
     ) : tool.state === "output-denied" ? (
       <CircleSlash className="size-3 text-on-surface-dim" />
     ) : (
@@ -248,7 +248,7 @@ function ToolLine({
         <ChevronRight className="size-3 transition-transform group-data-[state=open]:rotate-90" />
       </CollapsibleTrigger>
       {tool.state === "output-error" && tool.errorText ? (
-        <p className="pl-2.5 font-sans text-[0.75rem] text-prov-local">
+        <p className="pl-2.5 font-sans text-[0.75rem] text-fail">
           {tool.errorText}
         </p>
       ) : null}
@@ -379,9 +379,7 @@ function LessonProposal({ tool, known }: { tool: ToolPart; known?: string }) {
         </span>
       )}
       {error ? (
-        <span className="font-mono text-[0.62rem] text-prov-local">
-          {error}
-        </span>
+        <span className="font-mono text-[0.62rem] text-fail">{error}</span>
       ) : null}
     </div>
   );
@@ -515,7 +513,7 @@ export function ChatMessage({
             ) : null}
             {meta.role === "deep" ? <span>· planned</span> : null}
             {meta.stopped ? (
-              <span className="text-prov-local">· {meta.stopped}</span>
+              <span className="text-fail">· {meta.stopped}</span>
             ) : null}
           </MessageFooter>
         ) : null}

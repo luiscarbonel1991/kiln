@@ -73,7 +73,7 @@ export default async function SettingsPage() {
       <main className="mx-auto flex w-full max-w-[860px] flex-col gap-8 px-6 py-11 sm:px-8">
         <section className="rounded-card bg-card p-6 shadow-card">
           <h2
-            className="font-serif text-xl italic text-foreground"
+            className="font-serif text-xl text-foreground"
             style={{ fontVariationSettings: "'opsz' 40" }}
           >
             Models
@@ -103,7 +103,7 @@ export default async function SettingsPage() {
             className="rounded-card bg-card p-6 shadow-card"
           >
             <h2
-              className="font-serif text-xl italic text-foreground"
+              className="font-serif text-xl text-foreground"
               style={{ fontVariationSettings: "'opsz' 40" }}
             >
               Lessons
@@ -122,7 +122,7 @@ export default async function SettingsPage() {
 
         <section className="rounded-card bg-card p-6 shadow-card">
           <h2
-            className="font-serif text-xl italic text-foreground"
+            className="font-serif text-xl text-foreground"
             style={{ fontVariationSettings: "'opsz' 40" }}
           >
             Providers
@@ -149,7 +149,7 @@ export default async function SettingsPage() {
                 </div>
                 {h.lastError ? (
                   <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
-                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-prov-local" />
+                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
                     <span className="min-w-0 [overflow-wrap:anywhere]">
                       {h.lastError.message}{" "}
                       <span className="font-mono text-[0.65rem] text-on-surface-dim">
@@ -169,7 +169,7 @@ export default async function SettingsPage() {
                     className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
                     data-testid={`provider-${h.provider}-unlisted`}
                   >
-                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-prov-local" />
+                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
                     <span className="min-w-0 [overflow-wrap:anywhere]">
                       No longer offered by {h.label}:{" "}
                       {h.unlisted.models
@@ -196,7 +196,7 @@ export default async function SettingsPage() {
         {month ? (
           <section className="rounded-card bg-card p-6 shadow-card">
             <h2
-              className="font-serif text-xl italic text-foreground"
+              className="font-serif text-xl text-foreground"
               style={{ fontVariationSettings: "'opsz' 40" }}
             >
               This month
@@ -213,7 +213,7 @@ export default async function SettingsPage() {
         {maker ? (
           <section className="rounded-card bg-card p-6 shadow-card">
             <h2
-              className="font-serif text-xl italic text-foreground"
+              className="font-serif text-xl text-foreground"
               style={{ fontVariationSettings: "'opsz' 40" }}
             >
               Shops
@@ -229,7 +229,7 @@ export default async function SettingsPage() {
         {tokens ? (
           <section className="rounded-card bg-card p-6 shadow-card">
             <h2
-              className="font-serif text-xl italic text-foreground"
+              className="font-serif text-xl text-foreground"
               style={{ fontVariationSettings: "'opsz' 40" }}
             >
               Access tokens

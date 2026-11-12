@@ -138,12 +138,12 @@ export function WordingRows({
               </div>
             </div>
             {problem ? (
-              <span className="font-sans text-[0.75rem] text-prov-local">
+              <span className="font-sans text-[0.75rem] text-fail">
                 {problem}
               </span>
             ) : null}
             {hint ? (
-              <span className="flex flex-wrap items-center gap-2 font-sans text-[0.75rem] text-prov-local">
+              <span className="flex flex-wrap items-center gap-2 font-sans text-[0.75rem] text-fail">
                 {hint.words}
                 {hint.swap ? (
                   <button

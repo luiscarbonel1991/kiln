@@ -32,9 +32,9 @@ export function DegradedNotice({
 }) {
   const alt = degraded.alternative;
   return (
-    <div className="mb-5 flex flex-col gap-3 rounded-card border border-dashed border-prov-local/50 bg-secondary/60 p-4">
+    <div className="mb-5 flex flex-col gap-3 rounded-card border border-dashed border-fail/50 bg-secondary/60 p-4">
       <p className="flex items-start gap-2 font-sans text-[0.8125rem] leading-snug text-foreground">
-        <TriangleAlert className="mt-0.5 size-4 flex-shrink-0 text-prov-local" />
+        <TriangleAlert className="mt-0.5 size-4 flex-shrink-0 text-fail" />
         <span>
           {degraded.label} could not answer: {degraded.message} Kiln used{" "}
           {fellBackTo}.

@@ -110,7 +110,7 @@ export function ListingResultsPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex max-w-[620px] flex-col gap-1">
-          <h3 className="font-serif text-lg italic text-foreground">Results</h3>
+          <h3 className="font-serif text-lg text-foreground">Results</h3>
           <p className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
             Is the new {destinationName} listing working? Read its numbers from
             your shop's stats before the photos went up, and 14 and 30 days
@@ -134,9 +134,7 @@ export function ListingResultsPanel({
         ) : null}
       </div>
       {error && error.at === null ? (
-        <p className="font-mono text-[0.7rem] text-prov-local">
-          {error.message}
-        </p>
+        <p className="font-mono text-[0.7rem] text-fail">{error.message}</p>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
@@ -393,9 +391,7 @@ function ReadCard({
           {read.label}
         </span>
         {taken ? null : read.due ? (
-          <span className="font-mono text-[0.65rem] text-prov-local">
-            due now
-          </span>
+          <span className="font-mono text-[0.65rem] text-primary">due now</span>
         ) : (
           <span className="font-mono text-[0.65rem] text-on-surface-dim">
             {following ? `on ${dayLabel(read.dueOn)}` : "not followed"}
@@ -415,7 +411,7 @@ function ReadCard({
       {error ? (
         <p
           data-testid={`${testId}-error`}
-          className="font-mono text-[0.68rem] text-prov-local [overflow-wrap:anywhere]"
+          className="font-mono text-[0.68rem] text-fail [overflow-wrap:anywhere]"
         >
           {error}
         </p>
@@ -509,7 +505,7 @@ function ReadCard({
                       <dt className={`${LABEL} truncate`}>
                         {METRIC_LABELS[m]}
                       </dt>
-                      <dd className="font-serif text-base italic text-foreground">
+                      <dd className="font-serif text-base text-foreground">
                         {shown(m, taken[m] as number)}
                       </dd>
                     </div>,

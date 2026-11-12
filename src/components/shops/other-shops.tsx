@@ -52,7 +52,7 @@ function ShopAvatar({
 }) {
   return (
     <span
-      className="flex flex-shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-soft font-serif text-base italic text-on-surface-mid shadow-[0_3px_10px_-4px_rgba(50,32,18,0.25)]"
+      className="flex flex-shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-soft font-serif text-base text-on-surface-mid shadow-[0_3px_10px_-4px_rgba(50,32,18,0.25)]"
       style={{ width: size, height: size }}
     >
       {shop.icon ? (
@@ -185,7 +185,7 @@ export function OtherShops({
       </form>
 
       {error ? (
-        <p className="font-mono text-[0.65rem] text-prov-local" role="alert">
+        <p className="font-mono text-[0.65rem] text-fail" role="alert">
           {error}
         </p>
       ) : null}
@@ -417,7 +417,7 @@ export function OtherShops({
                       {shown === undefined ? (
                         <Loader2 className="size-4 animate-spin text-on-surface-dim" />
                       ) : typeof shown === "string" ? (
-                        <span className="font-mono text-[0.65rem] text-prov-local">
+                        <span className="font-mono text-[0.65rem] text-fail">
                           {shown}
                         </span>
                       ) : (

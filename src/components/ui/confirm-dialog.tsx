@@ -37,7 +37,7 @@ export function ConfirmDialog({
           className="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-3rem)] w-[min(28rem,calc(100vw-3rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-card bg-card p-6 shadow-card"
         >
           <Dialog.Title
-            className="font-serif text-xl italic text-foreground"
+            className="font-serif text-xl text-foreground"
             style={{ fontVariationSettings: "'opsz' 40" }}
           >
             {title}

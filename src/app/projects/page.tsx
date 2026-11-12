@@ -42,7 +42,7 @@ export default async function ProjectsPage() {
         <ProjectsHeader />
         <main className={MAIN}>
           <div className="flex flex-col items-start gap-3 rounded-card bg-card p-6 shadow-card">
-            <h1 className="font-serif text-xl italic text-foreground">
+            <h1 className="font-serif text-xl text-foreground">
               Kiln has no database yet
             </h1>
             <p className="font-sans text-sm text-on-surface-mid">
@@ -119,7 +119,7 @@ export default async function ProjectsPage() {
             <div className="flex flex-wrap items-end justify-between gap-3">
               <h2
                 id="home-continue-title"
-                className="font-serif text-xl italic text-foreground"
+                className="font-serif text-xl text-foreground"
               >
                 Where you left off
               </h2>
@@ -142,7 +142,7 @@ export default async function ProjectsPage() {
                   <span className="font-sans text-[0.594rem] font-bold uppercase tracking-[0.09em] text-on-surface-dim">
                     {t.label}
                   </span>
-                  <span className="font-serif text-2xl italic text-foreground">
+                  <span className="font-serif text-2xl text-foreground">
                     {t.value}
                   </span>
                   <span className="font-mono text-[0.65rem] text-on-surface-mid">
@@ -160,7 +160,7 @@ export default async function ProjectsPage() {
             {followed.length > 0 ? (
               <div className="flex flex-col gap-3" data-testid="home-results">
                 <div className="flex flex-col gap-1">
-                  <h3 className="font-serif text-lg italic text-foreground">
+                  <h3 className="font-serif text-lg text-foreground">
                     Results
                   </h3>
                   <p className="font-sans text-[0.8125rem] text-on-surface-mid">
@@ -177,9 +177,7 @@ export default async function ProjectsPage() {
         {returning ? (
           <>
             <section id="projects" className="flex scroll-mt-20 flex-col gap-4">
-              <h2 className="font-serif text-xl italic text-foreground">
-                Projects
-              </h2>
+              <h2 className="font-serif text-xl text-foreground">Projects</h2>
               {projects.length > 0 ? (
                 <HomeProjects projects={projects} details={details} />
               ) : (
@@ -271,7 +269,7 @@ function Opening({
 function Products({ products }: { products: Product[] }) {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="font-serif text-xl italic text-foreground">Products</h2>
+      <h2 className="font-serif text-xl text-foreground">Products</h2>
       {products.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((p) => (
@@ -282,7 +280,7 @@ function Products({ products }: { products: Product[] }) {
               <span className="font-mono text-[0.625rem] text-on-surface-dim">
                 {p.sku}
               </span>
-              <span className="font-serif text-lg italic leading-tight text-foreground">
+              <span className="font-serif text-lg leading-tight text-foreground">
                 {p.name}
               </span>
               <span className="font-sans text-[0.8rem] text-on-surface-mid">

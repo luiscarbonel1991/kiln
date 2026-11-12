@@ -271,7 +271,7 @@ export function RoutesForm({
             Saved. New work follows these routes.
           </span>
         ) : message ? (
-          <span className="font-mono text-[0.65rem] text-prov-local">
+          <span className="font-mono text-[0.65rem] text-fail">
             {message.error}
           </span>
         ) : null}
@@ -408,7 +408,7 @@ function RouteEditor({
                 </Button>
               </div>
               {keyed(entry.provider) ? null : (
-                <span className="pl-10 font-mono text-[0.6rem] text-prov-local">
+                <span className="pl-10 font-mono text-[0.6rem] text-fail">
                   {PROVIDER_LABELS[entry.provider]} has no API key (
                   {KEY_NAME[entry.provider]}): this model cannot run.
                 </span>
@@ -522,7 +522,7 @@ function EffortControl({
         return top ? (
           <span
             key={`${m.provider}/${m.model}`}
-            className="font-mono text-[0.6rem] text-prov-local"
+            className="font-mono text-[0.6rem] text-fail"
           >
             {modelLabel(m)} thinks at most at {EFFORT_LABELS[top].toLowerCase()}
             .

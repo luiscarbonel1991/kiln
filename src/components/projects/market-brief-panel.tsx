@@ -227,7 +227,7 @@ export function MarketBriefPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex max-w-[620px] flex-col gap-1">
-          <h3 className="font-serif text-lg italic text-foreground">
+          <h3 className="font-serif text-lg text-foreground">
             Market brief{" "}
             <span className="ml-1 font-sans text-[0.7rem] not-italic text-on-surface-dim">
               optional
@@ -274,7 +274,7 @@ export function MarketBriefPanel({
         ) : null}
       </div>
       {error ? (
-        <p className="font-mono text-[0.7rem] text-prov-local">{error}</p>
+        <p className="font-mono text-[0.7rem] text-fail">{error}</p>
       ) : null}
 
       <div className="flex flex-col gap-2">

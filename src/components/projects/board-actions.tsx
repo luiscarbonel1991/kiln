@@ -120,7 +120,7 @@ export function SlotSwitch({
         </span>
       </Button>
       {error ? (
-        <span className="font-mono text-[0.6rem] text-prov-local">{error}</span>
+        <span className="font-mono text-[0.6rem] text-fail">{error}</span>
       ) : null}
     </span>
   );
@@ -157,7 +157,7 @@ export function ReferenceUpload({ projectId }: { projectId: string }) {
         Add reference image
       </FilePick>
       {error ? (
-        <p className="font-mono text-[0.65rem] text-prov-local">{error}</p>
+        <p className="font-mono text-[0.65rem] text-fail">{error}</p>
       ) : null}
     </div>
   );
@@ -220,7 +220,7 @@ export function DeliverButton({
       </Button>
       {blocker || message ? (
         <p
-          className={`font-mono text-[0.6rem] leading-snug ${failed ? "text-prov-local" : "text-on-surface-mid"}`}
+          className={`font-mono text-[0.6rem] leading-snug ${failed ? "text-fail" : "text-on-surface-mid"}`}
         >
           {message ?? blocker}
         </p>

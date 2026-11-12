@@ -154,7 +154,7 @@ export function MaterialCheck({
       {error ? (
         <p
           role="alert"
-          className="font-sans text-[0.75rem] text-prov-local"
+          className="font-sans text-[0.75rem] text-fail"
           data-testid="material-check-error"
         >
           {error}

@@ -251,13 +251,13 @@ export function VideoControls({
       {blocked && !settings.stills ? (
         <span
           data-testid={`video-${destinationId}-${slotKey}-blocked`}
-          className="font-sans text-[0.68rem] leading-snug text-prov-local"
+          className="font-sans text-[0.68rem] leading-snug text-fail"
         >
           {blocked}
         </span>
       ) : null}
       {error ? (
-        <span className="font-mono text-[0.6rem] text-prov-local">{error}</span>
+        <span className="font-mono text-[0.6rem] text-fail">{error}</span>
       ) : null}
 
       <ConfirmDialog
@@ -347,7 +347,7 @@ export function AddVideoButton({
         Add video
       </Button>
       {error ? (
-        <span className="font-mono text-[0.6rem] text-prov-local">{error}</span>
+        <span className="font-mono text-[0.6rem] text-fail">{error}</span>
       ) : null}
     </span>
   );

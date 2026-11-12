@@ -30,7 +30,7 @@ export function HomeResults({ listings }: { listings: FollowedListing[] }) {
                 {l.destinationName}
                 {l.family ? ` · ${l.family}` : ""}
               </span>
-              <span className="font-serif text-lg italic leading-tight text-foreground">
+              <span className="font-serif text-lg leading-tight text-foreground">
                 {l.projectName}
               </span>
               {view.comparison?.line ? (
@@ -55,7 +55,7 @@ export function HomeResults({ listings }: { listings: FollowedListing[] }) {
             </div>
             <div className="flex flex-shrink-0 flex-col gap-1 font-mono text-[0.68rem] sm:items-end">
               {due.map((r) => (
-                <span key={r.key} className="text-prov-local">
+                <span key={r.key} className="text-primary">
                   {r.label} read due
                 </span>
               ))}

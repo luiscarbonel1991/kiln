@@ -131,7 +131,7 @@ export function EtsyConnection({
     <div className="flex flex-col gap-3" data-testid="etsy-connect">
       {connection?.needsReconnect ? (
         <p className="flex items-start gap-2 font-sans text-[0.8rem] text-foreground">
-          <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-prov-local" />
+          <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
           Etsy no longer accepts Kiln&apos;s access to {connection.shopName}{" "}
           (revoked, or unused for 90 days): connect it again.
         </p>

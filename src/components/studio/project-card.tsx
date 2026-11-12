@@ -98,7 +98,7 @@ export function ProjectCard({
           </div>
         </div>
         <div className="px-3.5 pt-3 pb-3.5">
-          <p className="line-clamp-1 font-serif text-[1.0625rem] italic leading-tight text-foreground">
+          <p className="line-clamp-1 font-serif text-[1.0625rem] leading-tight text-foreground">
             {name}
           </p>
           <p className="pt-1 font-mono text-[0.625rem] text-on-surface-dim">

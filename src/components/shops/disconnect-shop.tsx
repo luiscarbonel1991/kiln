@@ -58,9 +58,7 @@ export function DisconnectShop({ shopName }: { shopName: string }) {
         </Button>
       </div>
       {error ? (
-        <span className="font-mono text-[0.65rem] text-prov-local">
-          {error}
-        </span>
+        <span className="font-mono text-[0.65rem] text-fail">{error}</span>
       ) : null}
     </div>
   );

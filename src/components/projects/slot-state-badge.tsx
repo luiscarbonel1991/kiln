@@ -35,7 +35,7 @@ const STYLE: Record<SlotView["state"], { label: string; className: string }> = {
 export function SlotStateBadge({ view }: { view: SlotView }) {
   // "queued" in the batch vs "waiting" for the maker to generate it.
   const style = view.failed
-    ? { label: "failed", className: "text-prov-local bg-prov-local/10" }
+    ? { label: "failed", className: "text-fail bg-fail/10" }
     : view.state === "queued" && !view.inBatch
       ? { label: "waiting", className: STYLE.queued.className }
       : view.state === "queued"

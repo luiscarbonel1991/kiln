@@ -158,7 +158,7 @@ export function PlanningPhase({ master }: { master: MasterAsset }) {
                   : "border-border bg-transparent hover:border-border-soft",
               )}
             >
-              <span className="font-serif text-[0.9375rem] italic text-foreground">
+              <span className="font-serif text-[0.9375rem] text-foreground">
                 {recipe.name}
               </span>
               <span className="font-mono text-[0.6875rem] text-on-surface-dim">

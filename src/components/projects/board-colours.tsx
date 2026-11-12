@@ -91,7 +91,7 @@ export function BoardColours({
                   {lookVerified(c) ? null : (
                     <span
                       title={UNVERIFIED_TITLE}
-                      className="font-mono text-[0.62rem] text-prov-local"
+                      className="font-mono text-[0.62rem] text-prov-brand"
                     >
                       unverified look
                     </span>

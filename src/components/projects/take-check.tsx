@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 const CHIP = "font-mono text-[0.6rem] [overflow-wrap:anywhere]";
 
 const TONE: Record<TakeCheck["status"], string> = {
-  passed: "text-prov-recipe",
-  failed: "text-prov-local",
+  passed: "text-pass",
+  failed: "text-fail",
   unchecked: "text-on-surface-dim",
 };
 
@@ -80,7 +80,7 @@ export function TakeCheckChips({
         </span>
       ) : null}
       {error ? (
-        <span className={cn(CHIP, "w-full text-prov-local")}>{error}</span>
+        <span className={cn(CHIP, "w-full text-fail")}>{error}</span>
       ) : null}
     </>
   );

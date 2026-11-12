@@ -190,7 +190,7 @@ function ColourText({
       {warning ? (
         <output
           data-testid={`colour-${row + 1}-text-warning`}
-          className="block font-sans text-[0.75rem] text-prov-local"
+          className="block font-sans text-[0.75rem] text-fail"
         >
           {warning}
         </output>
@@ -763,9 +763,7 @@ export function ProductEditor({
   const problem = (...paths: string[]) => {
     const message = paths.map((p) => problems[p]).find(Boolean);
     return message ? (
-      <span className="font-sans text-[0.75rem] text-prov-local">
-        {message}
-      </span>
+      <span className="font-sans text-[0.75rem] text-fail">{message}</span>
     ) : null;
   };
 
@@ -788,7 +786,7 @@ export function ProductEditor({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3
-            className="font-serif text-xl italic text-foreground"
+            className="font-serif text-xl text-foreground"
             style={{ fontVariationSettings: "'opsz' 40" }}
           >
             {editing ? "Edit product" : "New product"}
@@ -1041,7 +1039,7 @@ export function ProductEditor({
             </span>
           ) : null}
           {ratioNote ? (
-            <span className="flex flex-wrap items-center gap-x-2 font-sans text-[0.75rem] text-prov-local">
+            <span className="flex flex-wrap items-center gap-x-2 font-sans text-[0.75rem] text-fail">
               {ratioNote}
               {ratio && Number(width) > 0 ? (
                 <button
@@ -1299,7 +1297,7 @@ export function ProductEditor({
                 />
               </label>
               {problems[`colours.${i}.supplierUrl`] ? (
-                <span className="pl-11 font-sans text-[0.75rem] text-prov-local">
+                <span className="pl-11 font-sans text-[0.75rem] text-fail">
                   {problems[`colours.${i}.supplierUrl`]}
                 </span>
               ) : null}
@@ -1320,7 +1318,7 @@ export function ProductEditor({
               <span
                 // biome-ignore lint/suspicious/noArrayIndexKey: one note per row
                 key={i}
-                className="font-sans text-[0.75rem] text-prov-local"
+                className="font-sans text-[0.75rem] text-fail"
               >
                 Colour {i + 1}: {problems[`colours.${i}.name`]}
               </span>
@@ -1585,12 +1583,12 @@ export function ProductEditor({
           , then make the design a product.
         </span>
         {error ? (
-          <span className="w-full font-mono text-[0.7rem] text-prov-local">
+          <span className="w-full font-mono text-[0.7rem] text-fail">
             {error}
           </span>
         ) : null}
         {reviewError ? (
-          <span className="w-full font-mono text-[0.7rem] text-prov-local">
+          <span className="w-full font-mono text-[0.7rem] text-fail">
             {reviewError}
           </span>
         ) : null}

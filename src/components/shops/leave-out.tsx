@@ -52,7 +52,7 @@ export function LeaveOut({
         </Button>
       )}
       {error ? (
-        <span className="font-mono text-[0.6rem] text-prov-local" role="alert">
+        <span className="font-mono text-[0.6rem] text-fail" role="alert">
           {error}
         </span>
       ) : null}

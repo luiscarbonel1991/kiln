@@ -139,7 +139,7 @@ export function ProductStyles({
             problems[path] ? (
               <span
                 key={path}
-                className="pl-11 font-sans text-[0.75rem] text-prov-local"
+                className="pl-11 font-sans text-[0.75rem] text-fail"
               >
                 {problems[path]}
               </span>
@@ -161,7 +161,7 @@ export function ProductStyles({
         </FilePick>
       ) : null}
       {problems.styles ? (
-        <span className="font-sans text-[0.75rem] text-prov-local">
+        <span className="font-sans text-[0.75rem] text-fail">
           {problems.styles}
         </span>
       ) : null}

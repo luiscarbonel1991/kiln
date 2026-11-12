@@ -80,7 +80,7 @@ export default async function DraftPage({
             </section>
             <section className="rounded-card bg-card p-5 shadow-card sm:p-6">
               <h2
-                className="font-serif text-xl italic text-foreground"
+                className="font-serif text-xl text-foreground"
                 style={{ fontVariationSettings: "'opsz' 40" }}
               >
                 What Kiln sent
@@ -105,16 +105,14 @@ export default async function DraftPage({
                       <span>{WRITE_LABEL[w.action] ?? w.action}</span>
                       <span
                         className={
-                          w.status === "done"
-                            ? "text-prov-recipe"
-                            : "text-prov-local"
+                          w.status === "done" ? "text-prov-recipe" : "text-fail"
                         }
                       >
                         {WRITE_STATUS[w.status] ?? w.status}
                       </span>
                       <span className="text-on-surface-mid">· {w.by}</span>
                       {w.error ? (
-                        <span className="w-full font-mono text-[0.65rem] text-prov-local [overflow-wrap:anywhere]">
+                        <span className="w-full font-mono text-[0.65rem] text-fail [overflow-wrap:anywhere]">
                           {w.error}
                         </span>
                       ) : null}
@@ -126,10 +124,10 @@ export default async function DraftPage({
           </>
         ) : (
           <p
-            className="flex items-start gap-2 rounded-render border border-prov-local/40 bg-card px-4 py-3 font-sans text-sm text-foreground"
+            className="flex items-start gap-2 rounded-render border border-fail/40 bg-card px-4 py-3 font-sans text-sm text-foreground"
             role="alert"
           >
-            <CircleAlert className="mt-0.5 size-4 flex-shrink-0 text-prov-local" />
+            <CircleAlert className="mt-0.5 size-4 flex-shrink-0 text-fail" />
             <span className="[overflow-wrap:anywhere]">{error}</span>
           </p>
         )}

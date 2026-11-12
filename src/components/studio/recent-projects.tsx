@@ -30,7 +30,7 @@ export function RecentProjects({ onViewAll }: { onViewAll?: () => void }) {
   return (
     <section className="mx-auto max-w-[1120px] px-6 pb-16 sm:px-8">
       <div className="mb-5 flex items-baseline justify-between border-border-soft border-t pt-8">
-        <h2 className="font-serif text-xl text-foreground italic">
+        <h2 className="font-serif text-xl text-foreground">
           Pick up where you left off
         </h2>
         {hasMore && onViewAll ? (

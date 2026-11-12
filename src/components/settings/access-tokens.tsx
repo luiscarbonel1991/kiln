@@ -103,7 +103,7 @@ export function AccessTokens({ tokens }: { tokens: AccessTokenView[] }) {
       </Switch>
 
       {error ? (
-        <p className="font-mono text-[0.65rem] text-prov-local">{error}</p>
+        <p className="font-mono text-[0.65rem] text-fail">{error}</p>
       ) : null}
 
       {made ? (

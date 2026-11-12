@@ -14,7 +14,7 @@ export default function ProjectsError({
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-6 py-24 text-center">
       <h1
-        className="font-serif text-2xl italic text-foreground"
+        className="font-serif text-2xl text-foreground"
         style={{ fontVariationSettings: "'opsz' 144" }}
       >
         Something went wrong

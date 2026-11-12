@@ -39,7 +39,7 @@ export function HowItWorks() {
         <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-on-surface-dim">
           How it works
         </p>
-        <h2 className="mt-2 font-serif text-2xl text-foreground italic">
+        <h2 className="mt-2 font-serif text-2xl text-foreground">
           One image in, a full set out — in three moves.
         </h2>
       </div>

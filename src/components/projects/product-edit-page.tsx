@@ -182,7 +182,7 @@ export function ProductEditPage({
           <AlertDialog.Portal>
             <AlertDialog.Overlay className="fixed inset-0 z-50 bg-foreground/30" />
             <AlertDialog.Content className="fixed top-1/2 left-1/2 z-50 flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-card bg-card p-6 shadow-card">
-              <AlertDialog.Title className="font-serif text-xl italic text-foreground">
+              <AlertDialog.Title className="font-serif text-xl text-foreground">
                 Delete {name}?
               </AlertDialog.Title>
               <AlertDialog.Description className={NOTE}>
@@ -213,7 +213,7 @@ export function ProductEditPage({
           </span>
         ) : null}
         {deleteError ? (
-          <span className="font-mono text-[0.7rem] text-prov-local">
+          <span className="font-mono text-[0.7rem] text-fail">
             {deleteError}
           </span>
         ) : null}

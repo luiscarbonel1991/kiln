@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { SlotFrame, SlotGrid } from "@/components/projects/slot-frame";
+import { WaxDefs } from "@/components/site/wax";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -109,7 +110,7 @@ export default function Preview() {
       <header className="flex flex-col gap-4 border-b border-border pb-10">
         <Eyebrow>Kiln · theme preview</Eyebrow>
         <h1
-          className="font-serif text-6xl italic leading-[0.95] text-foreground"
+          className="font-serif text-6xl leading-[0.95] text-foreground"
           style={{ fontVariationSettings: "'opsz' 144" }}
         >
           Elevate your
@@ -130,7 +131,7 @@ export default function Preview() {
               Fraunces · display · italic · opsz 144
             </span>
             <p
-              className="font-serif text-4xl italic leading-tight text-foreground"
+              className="font-serif text-4xl leading-tight text-foreground"
               style={{ fontVariationSettings: "'opsz' 144" }}
             >
               Reading the image
@@ -297,6 +298,7 @@ export default function Preview() {
         </div>
       </Section>
 
+      <WaxDefs />
       <Section eyebrow="Slot states · project board">
         <SlotGrid>
           {SLOT_STATES.map(({ label, view }) => (
@@ -307,6 +309,13 @@ export default function Preview() {
               purpose="Win the click: clean background, no props."
               aspect="1:1"
               view={view}
+              check={
+                view.failed
+                  ? "failed"
+                  : view.state === "to-review" || view.state === "approved"
+                    ? "passed"
+                    : null
+              }
             >
               <div
                 className="h-full w-full"

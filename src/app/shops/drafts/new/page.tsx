@@ -75,10 +75,10 @@ export default async function NewDraftPage({
           </section>
         ) : (
           <p
-            className="flex items-start gap-2 rounded-render border border-prov-local/40 bg-card px-4 py-3 font-sans text-sm text-foreground"
+            className="flex items-start gap-2 rounded-render border border-fail/40 bg-card px-4 py-3 font-sans text-sm text-foreground"
             role="alert"
           >
-            <CircleAlert className="mt-0.5 size-4 flex-shrink-0 text-prov-local" />
+            <CircleAlert className="mt-0.5 size-4 flex-shrink-0 text-fail" />
             <span className="[overflow-wrap:anywhere]">{error}</span>
           </p>
         )}

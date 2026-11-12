@@ -47,6 +47,7 @@ import {
   VideoControls,
 } from "@/components/projects/video-controls";
 import { ReadyMark } from "@/components/ready-mark";
+import { WaxDefs } from "@/components/site/wax";
 import type { BrandKit } from "@/domain/brand";
 import type { Card } from "@/domain/card";
 import { colourTextWarning } from "@/domain/colour-text";
@@ -160,6 +161,12 @@ export function waitingCardIds(rows: ReturnType<typeof boardRows>): string[] {
 const money = (micros: number) =>
   `$${fromMicros(micros).toFixed(micros > 0 && micros < 10_000 ? 3 : 2)}`;
 
+// The wax mark a frame's print carries: only what a check that ran decided.
+const takeMark = (check: TakeCheck | null | undefined) =>
+  check?.status === "passed" || check?.status === "failed"
+    ? check.status
+    : null;
+
 // "$0.12 · 2 takes": what a frame has cost, its re-rolls included; nothing
 // before its first take, nor in mock mode (nothing is paid there).
 function frameCostLine(
@@ -194,7 +201,7 @@ function ProjectCostCard({
         </p>
       ) : (
         <>
-          <p className="font-serif text-2xl italic text-foreground">
+          <p className="font-serif text-2xl text-foreground">
             {money(cost.spentMicros)}
           </p>
           <p className="font-mono text-[0.65rem] text-on-surface-mid">
@@ -345,6 +352,7 @@ export function ProjectBoard({
   return (
     <main className="mx-auto flex w-full max-w-[1320px] flex-col gap-8 px-6 py-8 sm:px-8 lg:flex-row">
       <ReadyMark page="board" />
+      <WaxDefs />
       <div className="flex min-w-0 flex-1 flex-col gap-8">
         <div>
           <p className="font-sans text-[0.656rem] font-bold uppercase tracking-[0.18em] text-prov-brand">
@@ -423,7 +431,7 @@ export function ProjectBoard({
           return (
             <section key={plan.destinationId} className="flex flex-col gap-3">
               <h2 className="flex items-baseline gap-3">
-                <span className="font-serif text-xl italic text-foreground">
+                <span className="font-serif text-xl text-foreground">
                   {destination.name}
                 </span>
                 <span className="font-mono text-[0.625rem] text-on-surface-dim">
@@ -496,6 +504,7 @@ export function ProjectBoard({
                           : slot.aspect
                       }
                       view={view}
+                      check={takeMark(checks[cardId])}
                       mark={
                         earlier.includes(cardId)
                           ? "earlier version of the product"
@@ -816,7 +825,7 @@ export function ProjectBoard({
               className="flex flex-col gap-2 rounded-card bg-card p-5 shadow-card"
             >
               <div className="flex items-baseline justify-between">
-                <h2 className="font-serif text-lg italic text-foreground">
+                <h2 className="font-serif text-lg text-foreground">
                   {destination.name}
                 </h2>
                 <span className="font-mono text-[0.625rem] text-on-surface-mid">
@@ -870,7 +879,7 @@ export function ProjectBoard({
                 {listingErrors !== null ? (
                   <li
                     className={
-                      listingErrors > 0 ? "text-prov-local" : "text-prov-recipe"
+                      listingErrors > 0 ? "text-fail" : "text-prov-recipe"
                     }
                   >
                     Listing text:{" "}
@@ -882,7 +891,7 @@ export function ProjectBoard({
                   <li
                     className={
                       results.reads.some((r) => r.due)
-                        ? "text-prov-local"
+                        ? "text-primary"
                         : undefined
                     }
                   >
@@ -1086,7 +1095,7 @@ function SlotActions({
     !off && actual.failed && actual.error ? (
       <p
         data-testid={`slot-error-${cardId}`}
-        className="w-full font-mono text-[0.6rem] leading-snug text-prov-local [overflow-wrap:anywhere]"
+        className="w-full font-mono text-[0.6rem] leading-snug text-fail [overflow-wrap:anywhere]"
       >
         Failed: {actual.error}
       </p>
@@ -1242,7 +1251,7 @@ function SlotActions({
           <span
             title={UNVERIFIED_TITLE}
             data-testid="unverified-look"
-            className="font-mono text-[0.6rem] text-prov-local"
+            className="font-mono text-[0.6rem] text-prov-brand"
           >
             unverified look · {look.unverified}
           </span>
@@ -1253,7 +1262,7 @@ function SlotActions({
           <span
             title={look.textWarning}
             data-testid={`slot-text-warning-${cardId}`}
-            className="font-mono text-[0.6rem] text-prov-local"
+            className="font-mono text-[0.6rem] text-fail"
           >
             text names another colour
           </span>

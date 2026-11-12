@@ -78,7 +78,7 @@ export function RenderCanvas({
       ) : null}
       {failed ? (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/70 px-4 text-center">
-          <span className="flex items-center gap-1.5 font-mono text-[0.6875rem] text-prov-local">
+          <span className="flex items-center gap-1.5 font-mono text-[0.6875rem] text-fail">
             <AlertTriangle className="size-3" /> generation failed
           </span>
           <span className="font-sans text-[0.625rem] text-on-surface-mid">
@@ -86,7 +86,7 @@ export function RenderCanvas({
           </span>
         </div>
       ) : null}
-      <span className="pointer-events-none absolute bottom-2.5 left-2.5 rounded-pill bg-card/95 px-3 py-1 font-serif text-[0.9375rem] italic text-foreground shadow-[0_2px_8px_rgba(50,32,18,0.18)]">
+      <span className="pointer-events-none absolute bottom-2.5 left-2.5 rounded-pill bg-card/95 px-3 py-1 font-serif text-[0.9375rem] text-foreground shadow-[0_2px_8px_rgba(50,32,18,0.18)]">
         {direction}
       </span>
     </div>

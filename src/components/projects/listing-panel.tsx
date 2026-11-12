@@ -113,7 +113,7 @@ function Count({ n, max }: { n: number; max: number }) {
     <span
       className={cn(
         "flex-shrink-0 whitespace-nowrap font-mono text-[0.625rem]",
-        n > max ? "text-prov-local" : "text-on-surface-dim",
+        n > max ? "text-fail" : "text-on-surface-dim",
       )}
     >
       {n} / {max}
@@ -130,7 +130,7 @@ function Issues({ issues }: { issues: ListingIssue[] }) {
           key={`${i.field}-${i.index ?? ""}-${i.message}`}
           className={cn(
             "font-mono text-[0.65rem] leading-snug",
-            i.severity === "error" ? "text-prov-local" : "text-prov-brand",
+            i.severity === "error" ? "text-fail" : "text-prov-brand",
           )}
         >
           {i.message}
@@ -301,7 +301,7 @@ export function ListingPanel({
     <div className="flex flex-col gap-5 rounded-card bg-card p-6 shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="font-serif text-lg italic text-foreground">
+          <h3 className="font-serif text-lg text-foreground">
             {destinationName} listing text
           </h3>
           <p className="max-w-[560px] font-sans text-[0.8rem] leading-snug text-on-surface-mid">
@@ -313,7 +313,7 @@ export function ListingPanel({
           <p
             className={cn(
               "font-mono text-[0.65rem]",
-              errors > 0 ? "text-prov-local" : "text-prov-recipe",
+              errors > 0 ? "text-fail" : "text-prov-recipe",
             )}
           >
             {errors > 0
@@ -346,7 +346,7 @@ export function ListingPanel({
         </div>
       </div>
       {error ? (
-        <p className="font-mono text-[0.7rem] text-prov-local">{error}</p>
+        <p className="font-mono text-[0.7rem] text-fail">{error}</p>
       ) : null}
       {ranOn && !degraded ? (
         <RanOnNotice ranOn={ranOn} testId={`listing-${destinationId}-ran-on`} />

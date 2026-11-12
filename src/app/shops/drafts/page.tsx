@@ -16,7 +16,7 @@ import {
 } from "@/server/etsy-drafts";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 
-const HEADING = "font-serif text-xl italic text-foreground";
+const HEADING = "font-serif text-xl text-foreground";
 const LEAD =
   "mt-1 max-w-[620px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid";
 
@@ -95,7 +95,7 @@ export default async function DraftsPage() {
                   className="flex items-start gap-2 font-sans text-[0.8rem] text-foreground"
                   role="alert"
                 >
-                  <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-prov-local" />
+                  <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
                   <span className="min-w-0 [overflow-wrap:anywhere]">
                     {error}
                   </span>

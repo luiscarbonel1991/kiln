@@ -39,7 +39,7 @@ export function KeyCheck({
       </Button>
       <span
         className={`font-mono text-[0.65rem] [overflow-wrap:anywhere] ${
-          said && !said.ok ? "text-prov-local" : "text-on-surface-dim"
+          said && !said.ok ? "text-fail" : "text-on-surface-dim"
         }`}
         data-testid={`key-check-${provider}-said`}
         aria-live="polite"

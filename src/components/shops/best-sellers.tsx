@@ -107,7 +107,7 @@ export function BestSellers({
             className="flex flex-col gap-1 rounded-render bg-surface-soft px-4 py-3"
           >
             <dt className={LABEL}>{t.label}</dt>
-            <dd className="font-serif text-xl italic tabular-nums text-foreground">
+            <dd className="font-serif text-xl tabular-nums text-foreground">
               {t.value}
             </dd>
           </div>

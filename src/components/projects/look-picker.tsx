@@ -86,7 +86,7 @@ export function LookPicker({
       {warning ? (
         <output
           data-testid={`${testId}-text-warning`}
-          className="block font-sans text-[0.75rem] text-prov-local"
+          className="block font-sans text-[0.75rem] text-fail"
         >
           {warning}
         </output>
