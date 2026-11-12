@@ -165,7 +165,7 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
             <br />
             into a full
             <br />
-            on-brand <span className="text-primary italic">set.</span>
+            on-brand <span className="text-primary">set.</span>
           </h1>
 
           <p
@@ -208,7 +208,7 @@ export function UploadPhase({ onViewAll }: { onViewAll?: () => void }) {
           ref={stageRef}
           onMouseMove={onMove}
           onMouseLeave={onLeave}
-          className="relative flex min-h-[460px] items-center justify-center"
+          className="relative flex min-h-[460px] items-center justify-center overflow-x-clip"
         >
           {/* ember glow (breathing) — centered behind the anchor */}
           <div

@@ -128,7 +128,7 @@ export default function Preview() {
         <div className="flex flex-col gap-7 rounded-card bg-card p-8 shadow-card">
           <div className="flex flex-col gap-1.5">
             <span className="font-mono text-[0.594rem] uppercase tracking-wider text-on-surface-dim">
-              Fraunces · display · italic · opsz 144
+              Fraunces · display · opsz 144
             </span>
             <p
               className="font-serif text-4xl leading-tight text-foreground"
