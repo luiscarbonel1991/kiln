@@ -19,8 +19,9 @@ export const SCALE_TITLE =
 
 // What Kiln read in a scene's shown take: its text and letterforms against the
 // reference, and the size the scene asked for, which nothing measured. A take
-// never checked (from before the check, or left unchecked) can be checked again
-// for free. Approving is never blocked.
+// never checked (from before the check, or left unchecked) or one whose check
+// failed can be checked again for free: the read is local, and a paid look it
+// already had is kept. Approving is never blocked.
 export function TakeCheckChips({
   projectId,
   destinationId,
@@ -68,7 +69,7 @@ export function TakeCheckChips({
       >
         {check ? takeCheckLabel(check) : "not checked"}
       </span>
-      {!check || check.status === "unchecked" ? (
+      {check?.status !== "passed" ? (
         <button
           type="button"
           data-testid={`slot-check-again-${cardId}`}
@@ -77,7 +78,7 @@ export function TakeCheckChips({
           className="inline-flex items-center gap-1 font-mono text-[0.6rem] text-primary underline-offset-2 hover:underline disabled:opacity-60"
         >
           {pending ? <Loader2 className="size-3 animate-spin" /> : null}
-          Check · free
+          {check?.status === "failed" ? "Check again · free" : "Check · free"}
         </button>
       ) : null}
       {check?.scale ? (

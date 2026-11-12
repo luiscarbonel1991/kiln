@@ -811,13 +811,19 @@ free and local, and lands with what was read (`GenerationJob.takeCheck`,
 - *Letterforms.* The stroke over the letters' height, against the reference's. A
   stroke 25 % off is another weight and fails, since a font product's buyers notice.
   The width is only noted, because an angled camera narrows letters too. Letters
-  with a stroke under 4 px are not compared.
+  with a stroke under 4 px are not compared. Three things a real scene does are
+  allowed for (2026-11-12, after eight real takes that read well had failed):
+  specks of a textured ground around the letters are not counted as ink, the box is
+  smoothed a little so the grain a close shot shows inside a stroke does not cut it,
+  and a stroke that agrees against the letters' width passes too, since a camera
+  above the product shortens the letters and grows stroke and width together.
 - *Scale.* Never measured: nothing local sees the door. "scale unverified · 6 x 3
   in, about 1/6 as wide as the door" carries the size the scene asked for, and the
   agents compare it in the image.
 - *On the board.* The chip reads "checked · text 1/1 · letters match", "check
-  failed · …" (its title lists every problem), or "unchecked · …" with "Check ·
-  free" (a take from before the check, or one with nothing to read).
+  failed · …" (its title lists every problem) with "Check again · free", or
+  "unchecked · …" with "Check · free" (a take from before the check, or one with
+  nothing to read).
 - *What a failure does.* A failed take is never re-rolled on its own, and approving
   is never blocked (Luis, 2026-11-02). A text read too small marks Tune's "Product
   too small".

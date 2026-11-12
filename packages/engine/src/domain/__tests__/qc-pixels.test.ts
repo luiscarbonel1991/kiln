@@ -93,6 +93,51 @@ describe("letterform", () => {
     expect(Math.abs(light.width / dark.width - 1)).toBeLessThan(0.1);
   });
 
+  // Light engraving on a dark, textured face (slate, 2026-11-12): three real
+  // takes that read well failed on a stroke the texture had thinned.
+  const DARK = "#1b1b1b";
+  const LIGHT = "#d9d6cf";
+  const engraved = (extra = "") =>
+    image(`${glyphs("205", 90, 320, 160, { fill: LIGHT })}${extra}`, 512, DARK);
+  const roomy = (img: RgbaImage) => {
+    const box = inkBox(engraved(), "#D9D6CF");
+    const pad = 26;
+    return letterform(img, {
+      x: box.x - pad,
+      y: box.y - pad,
+      w: box.w + 2 * pad,
+      h: box.h + 2 * pad,
+    }) as Letterform;
+  };
+
+  it("does not count specks of the ground around the letters as ink", () => {
+    const clean = roomy(engraved());
+    const box = inkBox(engraved(), "#D9D6CF");
+    const specks = Array.from({ length: 24 }, (_, i) => {
+      const x = box.x + 10 + i * ((box.w - 20) / 23);
+      const y = i % 2 === 0 ? box.y - 18 : box.y + box.h + 18;
+      return `<circle cx="${x}" cy="${y}" r="2.5" fill="${LIGHT}"/>`;
+    }).join("");
+    const speckled = roomy(engraved(specks));
+    expect(speckled.height).toBe(clean.height);
+    expect(Math.abs(speckled.stroke / clean.stroke - 1)).toBeLessThan(0.05);
+    expect(Math.abs(speckled.width / clean.width - 1)).toBeLessThan(0.05);
+  });
+
+  it("reads a stroke whole through the grain a close shot shows inside it", () => {
+    const clean = roomy(engraved());
+    const box = inkBox(engraved(), "#D9D6CF");
+    const grain: string[] = [];
+    for (let y = box.y; y < box.y + box.h; y += 5) {
+      for (let x = box.x + (y % 2) * 3; x < box.x + box.w; x += 5) {
+        grain.push(`<circle cx="${x}" cy="${y}" r="1.4" fill="${DARK}"/>`);
+      }
+    }
+    const grainy = roomy(engraved(grain.join("")));
+    expect(Math.abs(grainy.stroke / clean.stroke - 1)).toBeLessThan(0.2);
+    expect(Math.abs(grainy.width / clean.width - 1)).toBeLessThan(0.05);
+  });
+
   it("is null for a box with nothing to read", () => {
     const blank = image("");
     expect(letterform(blank, { x: 10, y: 10, w: 200, h: 80 })).toBeNull();
@@ -115,6 +160,25 @@ describe("compareLetterforms", () => {
     const bold = compareLetterforms(measure(700, 180), reference);
     expect(bold?.strokeOk).toBe(false);
     expect(bold?.take.stroke).toBeGreaterThan(bold?.reference.stroke ?? 1);
+  });
+
+  it("passes the same font seen from above, where the letters are shorter", () => {
+    const reference = measure(400, 180);
+    const img = image(
+      `<g transform="translate(0 90) scale(1 0.72)">${glyphs("205", 80, 330, 180)}</g>`,
+    );
+    const above = letterform(img, inkBox(img, "#1B1B1B")) as Letterform;
+    // Shorter letters: stroke and width both grow against the height.
+    expect(above.stroke / reference.stroke).toBeGreaterThan(1.25);
+    expect(compareLetterforms(above, reference)?.strokeOk).toBe(true);
+    const boldImg = image(
+      `<g transform="translate(0 90) scale(1 0.72)">${glyphs("205", 80, 330, 180, { weight: 700 })}</g>`,
+    );
+    const boldAbove = letterform(
+      boldImg,
+      inkBox(boldImg, "#1B1B1B"),
+    ) as Letterform;
+    expect(compareLetterforms(boldAbove, reference)?.strokeOk).toBe(false);
   });
 
   it("does not compare letters too small for their stroke to be told apart", () => {

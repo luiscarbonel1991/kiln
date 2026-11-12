@@ -165,20 +165,24 @@ export function letterform(img: RgbaImage, box: PixelRect): Letterform | null {
   const bh = y1 - y0;
   if (bw < 4 || bh < 8) return null;
   const n = bw * bh;
-  const lum = new Uint8Array(n);
-  const hist = new Array<number>(256).fill(0);
+  const raw = new Uint8Array(n);
   for (let y = 0; y < bh; y++) {
     for (let x = 0; x < bw; x++) {
       const i = 4 * ((y0 + y) * img.width + x0 + x);
-      const v = Math.round(
+      raw[y * bw + x] = Math.round(
         0.299 * img.pixels[i] +
           0.587 * img.pixels[i + 1] +
           0.114 * img.pixels[i + 2],
       );
-      lum[y * bw + x] = v;
-      hist[v]++;
     }
   }
+  // A close shot shows the material's grain inside each stroke (engraved
+  // slate, wood): thresholded as it is, the grain cuts a stroke into slivers.
+  // Smoothed over a small part of the box first, a stroke stays whole and
+  // keeps its edges.
+  const lum = smooth(raw, bw, bh, Math.round(bh / 60));
+  const hist = new Array<number>(256).fill(0);
+  for (let i = 0; i < n; i++) hist[lum[i]]++;
   const threshold = otsu(hist, n);
   let dark = 0;
   for (let i = 0; i < n; i++) if (lum[i] <= threshold) dark++;
@@ -203,6 +207,25 @@ export function letterform(img: RgbaImage, box: PixelRect): Letterform | null {
     }
   }
   if (inkCount < 30) return null;
+  // A textured ground (slate, wood grain) leaves specks of the ink's tone
+  // around the letters. Counted, they stretch the ink to the whole box and
+  // thin the median stroke, so a right take reads as a lighter weight. Only
+  // the blobs that stand as letters are measured.
+  inkCount = keepLetters(ink, bw, bh);
+  if (inkCount < 30) return null;
+  ix0 = bw;
+  iy0 = bh;
+  ix1 = -1;
+  iy1 = -1;
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      if (!ink[y * bw + x]) continue;
+      if (x < ix0) ix0 = x;
+      if (x > ix1) ix1 = x;
+      if (y < iy0) iy0 = y;
+      if (y > iy1) iy1 = y;
+    }
+  }
   const height = iy1 - iy0 + 1;
   const width = ix1 - ix0 + 1;
   if (height < 8) return null;
@@ -238,6 +261,103 @@ export function letterform(img: RgbaImage, box: PixelRect): Letterform | null {
   runs.sort((a, b) => a - b);
   const stroke = runs[Math.floor(runs.length / 2)];
   return { stroke: stroke / height, width: width / height, height };
+}
+
+// A box blur of `radius` pixels, across then down; the image itself at 0.
+function smooth(
+  src: Uint8Array,
+  w: number,
+  h: number,
+  radius: number,
+): Uint8Array {
+  if (radius < 1) return src;
+  const pass = (from: Uint8Array, across: boolean): Uint8Array => {
+    const to = new Uint8Array(w * h);
+    const lines = across ? h : w;
+    const length = across ? w : h;
+    const at = (line: number, k: number) =>
+      across ? line * w + k : k * w + line;
+    for (let line = 0; line < lines; line++) {
+      let sum = 0;
+      let count = 0;
+      for (let k = 0; k < Math.min(radius, length); k++) {
+        sum += from[at(line, k)];
+        count++;
+      }
+      for (let k = 0; k < length; k++) {
+        const add = k + radius;
+        if (add < length) {
+          sum += from[at(line, add)];
+          count++;
+        }
+        const drop = k - radius - 1;
+        if (drop >= 0) {
+          sum -= from[at(line, drop)];
+          count--;
+        }
+        to[at(line, k)] = Math.round(sum / count);
+      }
+    }
+    return to;
+  };
+  return pass(pass(src, true), false);
+}
+
+// How small a blob may be, against the largest, and still count as a letter:
+// a lowercase letter is over half a capital's height and a thin "l" a fair
+// part of its area; a speck of the ground is neither.
+const LETTER_MIN = { height: 0.4, area: 0.04 } as const;
+
+// Clear from the mask every 8-connected blob too small to be a letter beside
+// the largest; the ink left, in pixels.
+function keepLetters(ink: Uint8Array, w: number, h: number): number {
+  const label = new Int32Array(w * h);
+  const blobs: { area: number; height: number }[] = [];
+  const stack: number[] = [];
+  for (let start = 0; start < w * h; start++) {
+    if (!ink[start] || label[start]) continue;
+    const id = blobs.length + 1;
+    label[start] = id;
+    stack.push(start);
+    let area = 0;
+    let top = h;
+    let bottom = 0;
+    while (stack.length > 0) {
+      const j = stack.pop() as number;
+      const x = j % w;
+      const y = (j - x) / w;
+      area++;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const k = ny * w + nx;
+          if (ink[k] && !label[k]) {
+            label[k] = id;
+            stack.push(k);
+          }
+        }
+      }
+    }
+    blobs.push({ area, height: bottom - top + 1 });
+  }
+  const largest = blobs.reduce((a, b) => (b.area > a.area ? b : a), blobs[0]);
+  if (!largest) return 0;
+  const keep = blobs.map(
+    (b) =>
+      b.height >= LETTER_MIN.height * largest.height &&
+      b.area >= LETTER_MIN.area * largest.area,
+  );
+  let left = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (!label[i]) continue;
+    if (keep[label[i] - 1]) left++;
+    else ink[i] = 0;
+  }
+  return left;
 }
 
 function otsu(hist: number[], total: number): number {
@@ -289,10 +409,18 @@ export function compareLetterforms(
   if (take.height * reference.stroke < MIN_STROKE_PX) return null;
   const within = (a: number, b: number, tolerance: number) =>
     Math.abs(a / b - 1) <= tolerance;
+  // A camera above the product shortens the letters, so their stroke and
+  // their width grow together against their height. The stroke against the
+  // width does not move with that, and another weight changes it all the
+  // same (a bolder font is a third heavier and barely wider), so a stroke
+  // that agrees either way is the same weight.
+  const perWidth = (l: Letterform) => l.stroke / l.width;
   return {
     take,
     reference,
-    strokeOk: within(take.stroke, reference.stroke, LETTER_TOLERANCE.stroke),
+    strokeOk:
+      within(take.stroke, reference.stroke, LETTER_TOLERANCE.stroke) ||
+      within(perWidth(take), perWidth(reference), LETTER_TOLERANCE.stroke),
     widthOk: within(take.width, reference.width, LETTER_TOLERANCE.width),
   };
 }
