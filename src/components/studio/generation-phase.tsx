@@ -79,7 +79,7 @@ export function GenerationPhase({
           <RanOnNotice ranOn={directedBy} testId="directions-ran-on" />
         </div>
       ) : null}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] items-start gap-5 px-6 py-5 sm:px-8">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] items-start gap-5 px-6 py-5 sm:px-8">
         {cards.map((card) => (
           <div
             key={card.id}
