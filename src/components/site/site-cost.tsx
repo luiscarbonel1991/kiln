@@ -51,11 +51,12 @@ export function SiteCost({ kit }: { kit: SiteKit }) {
             <b>{money(c.total)}</b>
           </li>
         </ul>
-        <div className="kl-plans" data-placeholder>
-          <b>Placeholder: plans</b>
+        <div className="kl-plans">
+          <b>Open source, on your own keys</b>
           <span>
-            Kiln will be priced per listing kit, never per generation. The plans
-            go here.
+            Kiln is free under the AGPL and runs on your machine. You pay your
+            model provider directly, at the prices on this receipt: OpenAI and
+            Google models today.
           </span>
         </div>
       </div>

@@ -694,6 +694,40 @@ html:has(.kl) {
   max-width: 33rem;
   margin-top: 1rem;
 }
+.kl-after.kl-solo {
+  grid-template-columns: none;
+}
+.kl-after.kl-agent h2 {
+  font-size: clamp(2.05rem, 8.6vw, 3.1rem);
+}
+.kl-agent .kl-rules {
+  max-width: 33rem;
+}
+/* The one command that connects an assistant, on a slip like the others. */
+.kl-term {
+  max-width: 34rem;
+  padding: 1rem 1.15rem 1.15rem;
+  background: var(--paper);
+  color: var(--dark);
+  --tilt: 0.7deg;
+  rotate: var(--tilt);
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.35),
+    0 16px 28px -12px rgba(0, 0, 0, 0.55);
+}
+.kl-term figcaption {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #5d5446;
+}
+.kl-term pre {
+  margin-top: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
 .kl-approval {
   display: grid;
   gap: 0.75rem;
@@ -803,7 +837,7 @@ html:has(.kl) {
   gap: 0.3rem;
   margin-top: 2rem;
   padding: 1.1rem 1.25rem;
-  border: 2px dashed rgba(244, 236, 223, 0.5);
+  border: 1.5px solid rgba(244, 236, 223, 0.5);
   color: var(--mid);
 }
 .kl-plans b {
@@ -1307,6 +1341,9 @@ html:has(.kl) {
   }
   .kl-after h2 {
     font-size: 2.75rem;
+  }
+  .kl-after.kl-agent h2 {
+    font-size: 3.75rem;
   }
 }
 

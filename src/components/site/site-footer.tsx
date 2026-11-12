@@ -27,7 +27,7 @@ export function SiteFooter() {
       <span className="kl-mark">Kiln</span>
       <span>
         The sample coaster's photos, frames, video and text were made by Kiln on
-        2026-11-10 and 2026-11-11.
+        2026-11-10 and 2026-11-11. Open source under the AGPL.
       </span>
     </footer>
   );

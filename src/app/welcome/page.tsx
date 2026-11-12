@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Reveal } from "@/components/site/reveal";
+import { SiteAgent } from "@/components/site/site-agent";
 import { SiteCost } from "@/components/site/site-cost";
 import { SiteClose, SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
@@ -18,7 +19,7 @@ export const dynamic = "force-static";
 export const metadata: Metadata = {
   title: "Kiln · Your product, photographed, listed and checked",
   description:
-    "Describe what you make once. Kiln draws the exact frames, stages your real product in scenes, writes the listing to your shop's limits and checks every photo before you see it.",
+    "Open source, for shops that engrave, cut or print what they sell. Describe a product once: Kiln draws the exact frames, stages it in scenes, writes the listing to your shop's limits and checks every photo. Use it yourself or connect your AI.",
 };
 
 // The public page, for a visitor without an account: what Kiln makes, told
@@ -34,6 +35,7 @@ export default function WelcomePage() {
         <SiteHero kit={kit} />
         <SiteRefresh kit={kit} />
         <SiteStarts />
+        <SiteAgent />
         <SiteMade kit={kit} />
         <SiteShips kit={kit} />
         <SiteCost kit={kit} />

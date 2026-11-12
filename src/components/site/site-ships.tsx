@@ -48,7 +48,10 @@ export function SiteShips({ kit }: { kit: SiteKit }) {
         </div>
       </section>
 
-      <section className="kl-band kl-after" aria-labelledby="after-title">
+      <section
+        className="kl-band kl-after kl-solo"
+        aria-labelledby="after-title"
+      >
         <div>
           <h2 id="after-title">Then it tells you whether it worked.</h2>
           <p>
@@ -57,26 +60,6 @@ export function SiteShips({ kit }: { kit: SiteKit }) {
             agree twice, it proposes a lesson, and uses it in the next kit only
             once you keep it.
           </p>
-        </div>
-        <div>
-          <h2>Ask in words, or hand it to your assistant.</h2>
-          <p>
-            Kiln's agents do the free work on their own. Anything that costs
-            money or leaves Kiln waits for your click, with its price beside it.
-            The assistant you already use can run the same steps through MCP, a
-            command line or an API.
-          </p>
-          <div className="kl-approval" aria-hidden>
-            <p>Make the gift photo warmer.</p>
-            <div>
-              <span>Waits for your ok</span>
-              <b>New take · Packaging / gift · ≈ $0.08</b>
-              <i>
-                <em>Approve</em>
-                <em>Not now</em>
-              </i>
-            </div>
-          </div>
         </div>
       </section>
     </>

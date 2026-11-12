@@ -9,6 +9,7 @@ export function SiteHeader() {
       </Link>
       <nav aria-label="This page">
         <a href="#kit">What it makes</a>
+        <a href="#agent">With your AI</a>
         <a href="#cost">What it costs</a>
         <Link
           href={GET_STARTED.href}

@@ -14,9 +14,10 @@ export function SiteHero({ kit }: { kit: SiteKit }) {
       <div className="kl-hero-copy">
         <h1>Your product, photographed, listed and checked.</h1>
         <p>
-          Describe what you make once. Kiln draws the exact frames, stages your
-          real product in the scenes a listing needs, writes the text to your
-          shop's limits, and checks every photo before you see it.
+          For shops that engrave, cut or print what they sell. Describe a
+          product once: Kiln draws the exact frames, stages your real product in
+          the scenes a listing needs, writes the text to your shop's limits, and
+          checks every photo before you see it.
         </p>
         <div className="kl-actions">
           <Link
@@ -26,7 +27,7 @@ export function SiteHero({ kit }: { kit: SiteKit }) {
           >
             {GET_STARTED.label}
           </Link>
-          <span>Nothing is paid without your ok.</span>
+          <span>Open source. Runs on your own model keys.</span>
         </div>
         <p className="kl-aside">
           On the table: what Kiln made for one sample coaster. One photo did not
