@@ -438,14 +438,16 @@ html:has(.kl) {
   gap: 2.75rem;
   margin-top: 2.75rem;
 }
-.kl-check-print {
-  width: min(70%, 27rem);
-  justify-self: center;
+.kl-check-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
 }
-.kl-check-print .print-art {
-  aspect-ratio: 4 / 5;
+.kl-check-pair .print-art {
+  aspect-ratio: 1;
 }
-.kl-check-print figcaption {
+.kl-check-pair figcaption {
   font-size: 0.9375rem;
 }
 .kl-lenses {
@@ -463,9 +465,6 @@ html:has(.kl) {
 }
 .kl-lenses li[data-tone="pass"] {
   --tone: var(--pass);
-}
-.kl-lenses li[data-tone="fail"] {
-  --tone: var(--fail);
 }
 .kl-lens {
   width: 100%;
@@ -1151,9 +1150,6 @@ html:has(.kl) {
   .kl-before-art small {
     font-size: 0.9375rem;
   }
-  .kl-check-print {
-    width: min(100%, 27rem);
-  }
   .kl-video {
     width: min(100%, 17rem);
   }
@@ -1306,9 +1302,9 @@ html:has(.kl) {
     margin-top: 3.5rem;
   }
   .kl-check-body {
-    grid-template-columns: minmax(0, 27rem) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 32rem) minmax(0, 1fr);
     align-items: center;
-    gap: 4.5rem;
+    gap: 3.5rem;
   }
   .kl-lenses {
     gap: 1.75rem;

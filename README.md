@@ -11,7 +11,7 @@ its letterforms and the size it was asked for.
 Kiln works before the sale. Production stays with the maker: no cut files,
 orders or job cards.
 
-![A scene Kiln made of its sample product, checked: text 2/2, letters match](public/home/sample/hero.jpg)
+![A scene Kiln made of its sample product, an engraved serving board, checked: text 2/2, letters match](public/home/board/hero.jpg)
 
 ## Quickstart (Docker)
 

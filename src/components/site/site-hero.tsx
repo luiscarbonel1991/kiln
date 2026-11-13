@@ -31,8 +31,8 @@ export function SiteHero({ kit }: { kit: SiteKit }) {
           <span>Open source. Runs on your own model keys.</span>
         </div>
         <p className="kl-aside">
-          On the table: what Kiln made for one sample coaster. One photo did not
-          pass its check, and says so.
+          On the table: what Kiln made for one sample board. Every photo says
+          what its check read.
         </p>
       </div>
 
@@ -72,12 +72,11 @@ export function SiteHero({ kit }: { kit: SiteKit }) {
           </div>
         ) : null}
         <TakePrint
-          take={kit.takes.failed}
+          take={kit.takes.inUse}
           tilt={-2}
           className="kl-p3"
           eager
           at={1450}
-          note="Failed its check: letters too thin"
         />
       </div>
     </section>

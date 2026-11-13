@@ -45,10 +45,10 @@ export function SiteAgent() {
           </pre>
         </figure>
         <div className="kl-approval" aria-hidden>
-          <p>Start a launch kit for the coaster and take its scenes.</p>
+          <p>Start a launch kit for the board and take its scenes.</p>
           <div>
             <span>Waits for your ok</span>
-            <b>3 scenes · Etsy · ≈ $0.28</b>
+            <b>3 scenes · Etsy · ≈ $0.30</b>
             <i>
               <em>Approve</em>
               <em>Not now</em>

@@ -79,7 +79,7 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 cpSync(html, join(out, "index.html"));
 cpSync(join(dist, "static"), join(out, "_next", "static"), { recursive: true });
-cpSync(join(root, "public", "home", "coaster"), join(out, "home", "coaster"), {
+cpSync(join(root, "public", "home", "board"), join(out, "home", "board"), {
   recursive: true,
 });
 cpSync(join(root, "src", "app", "favicon.ico"), join(out, "favicon.ico"));

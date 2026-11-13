@@ -10,59 +10,60 @@ import {
 } from "@/lib/product-story";
 
 // The public page's running example: a kit Kiln made for one sample product,
-// a glazed coaster, on 2026-11-10 (a Launch project: Etsy and Instagram; GPT
-// Image 2 at medium quality, 2K where the destination asks; the video on
-// Gemini Omni Flash). Every take keeps what its check read, the two that
-// failed included, and the costs are what Kiln recorded. The lifestyle scene
-// and its video were retaken on 2026-11-11: the first had a wine glass with
-// no foot, which the check does not look for. Served as fixed
-// files (public/home/coaster); nothing here reaches the server.
+// an engraved serving board, on 2026-11-13 (a Launch project: Etsy and
+// Instagram; GPT Image 2 at medium quality, 2K where the destination asks,
+// each take looked over by a text model; the video on Gemini Omni Flash).
+// Every take keeps what its check read, and the costs are what Kiln recorded.
+// All nine takes passed. The first cherry hero passed too and read as painted
+// rather than wood, so it was taken again: the page shows both. Served as
+// fixed files (public/home/board); nothing here reaches the server.
 
 // Under the path a static copy of the page is served at (export-site.mjs);
 // nothing in an installed Kiln.
-const FILES = `${process.env.NEXT_PUBLIC_KILN_BASE ?? ""}/home/coaster`;
+const FILES = `${process.env.NEXT_PUBLIC_KILN_BASE ?? ""}/home/board`;
 
 export const KIT_PRODUCT: Product = Product.parse({
-  id: "sample:coaster",
-  sku: "SAMPLE-02",
-  name: "Glazed stoneware name coaster",
-  family: "Home",
-  description: "Round stoneware coaster with the family name inlaid in glaze.",
-  dimensions: { w: 4, h: 4, d: 0.4, unit: "in" },
-  shape: "round coaster",
-  material: "speckled stoneware with a satin glaze",
-  treatment: "inlaid",
+  id: "sample:board",
+  sku: "SAMPLE-03",
+  name: "Engraved family serving board",
+  family: "Kitchen",
+  description:
+    "Hardwood serving board engraved with the family name and the year.",
+  dimensions: { w: 16, h: 10, d: 0.75, unit: "in" },
+  shape: "serving board",
+  material: "solid walnut with an oiled finish",
+  treatment: "engraved",
   colours: [
     {
-      key: "terracotta",
-      name: "Terracotta",
-      face: "#B4532F",
-      inlay: "#F6EBD7",
-      edge: "#8E3F22",
+      key: "walnut",
+      name: "Walnut",
+      face: "#6B4530",
+      inlay: "#2A170E",
+      edge: "#4E3020",
     },
     {
-      key: "cobalt",
-      name: "Cobalt",
-      face: "#2B4590",
-      inlay: "#F6EBD7",
-      edge: "#1E3170",
+      key: "maple",
+      name: "Maple",
+      face: "#E3C9A0",
+      inlay: "#6B4A2E",
+      edge: "#C9AC80",
     },
     {
-      key: "celadon",
-      name: "Celadon",
-      face: "#A7C3AE",
-      inlay: "#2E4638",
-      edge: "#86A590",
+      key: "cherry",
+      name: "Cherry",
+      face: "#A8623F",
+      inlay: "#4A2313",
+      edge: "#86492C",
     },
     {
-      key: "oat",
-      name: "Oat",
-      face: "#E5D9C1",
-      inlay: "#5A3D2B",
-      edge: "#C9BB9F",
+      key: "oak",
+      name: "Oak",
+      face: "#C9A66B",
+      inlay: "#5E3D1F",
+      edge: "#A98850",
     },
   ],
-  defaultColour: "terracotta",
+  defaultColour: "walnut",
   typography: { family: "Fraunces", weight: 400, case: "title" },
   wording: [
     {
@@ -74,11 +75,11 @@ export const KIT_PRODUCT: Product = Product.parse({
     { label: "Year", maxChars: 4, required: false, example: "2026" },
   ],
   useContexts: [
-    "a coffee table under a cup of coffee",
-    "a set dinner table under a glass of wine",
+    "a kitchen counter, leaning against the tiled wall",
+    "a dinner table with cheese and grapes set beside the engraving",
   ],
-  hook: "Your name, glazed to last",
-  price: 16,
+  hook: "Your name, engraved to last",
+  price: 48,
   source: { kind: "form" },
 });
 
@@ -106,7 +107,7 @@ export interface KitColour {
   take: KitTake;
 }
 
-const PASSED = "Checked · text 2/2 · letters match";
+const PASSED = "Checked · text 2/2 · letters match · looked over";
 
 const take = (
   file: string,
@@ -129,44 +130,46 @@ const TAKES = {
     "hero",
     "Marketplace hero",
     "1:1",
-    "A terracotta stoneware coaster standing on a plain backdrop, lettered The Kilns, 2026, in cream glaze",
+    "A walnut serving board leaning on a stone kitchen wall, engraved The Kilns, 2026",
   ),
   lifestyle: take(
     "lifestyle",
     "Lifestyle scene",
     "4:5",
-    "The coaster on a linen tablecloth beside a stemless glass of white wine, with olives, grapes and cheese",
+    "The board on a linen runner on a dinner table, beside grapes, cheese and crackers",
   ),
   gift: take(
     "gift",
     "Packaging / gift",
     "4:5",
-    "The coaster leaning on a kraft gift box tied with a cream ribbon",
+    "The board leaning on an open kraft gift box with tissue paper and a brown ribbon",
   ),
   hook: take(
     "hook",
     "Instagram hook",
     "4:5",
-    "The coaster on a stone table in morning light, beside a mug of coffee",
+    "The board leaning on a tiled kitchen wall between a vase of olive branches and a jar of wooden spoons",
   ),
-  failed: take(
-    "inuse-fail",
+  inUse: take(
+    "inuse",
     "In-use mockup",
     "4:5",
-    "The coaster under a speckled mug of coffee on a stone side table",
-    {
-      check:
-        '"The Kilns" letters thinner than the reference: stroke 0.09 vs 0.15 of their height',
-      read: [0.35, 0.575, 0.4, 0.11],
-    },
+    "The board leaning on a white tiled kitchen wall beside a jar of wooden spoons and a plant",
+  ),
+  // The cherry hero's first take: it passed its check and read as painted.
+  retaken: take(
+    "hero-cherry-first",
+    "Cherry hero, first take",
+    "1:1",
+    "The board in a flat orange-brown with almost no grain, more like paint than cherry wood",
   ),
 };
 
 const COLOUR_TAKES: Record<string, string> = {
-  terracotta: "hero",
-  cobalt: "hero-cobalt",
-  celadon: "hero-celadon",
-  oat: "hero-oat",
+  walnut: "hero",
+  maple: "hero-maple",
+  cherry: "hero-cherry",
+  oak: "hero-oak",
 };
 
 const FRAME_LABEL: Partial<Record<ExactKind, string>> = {
@@ -184,7 +187,8 @@ export interface SiteKit {
   colours: KitColour[];
   words: StoryWords | null;
   video: { url: string; poster: string; seconds: number; cost: number };
-  loupes: { reference: string; passed: string; failed: string };
+  // The same letter, enlarged: as the spec draws it, and on two takes.
+  loupes: { reference: string; passed: string; other: string };
   // What Kiln recorded for the project, in dollars.
   cost: {
     sceneTakes: number;
@@ -192,6 +196,8 @@ export interface SiteKit {
     videos: number;
     video: number;
     total: number;
+    // What one hero in another colour cost.
+    colourTake: number;
   };
 }
 
@@ -199,7 +205,7 @@ export function siteKit(): SiteKit {
   const kinds = Object.keys(FRAME_LABEL) as ExactKind[];
   return {
     product: storyProduct(KIT_PRODUCT),
-    // The coaster's own drawing, which fills its frame edge to edge.
+    // The board's own drawing, which fills its frame edge to edge.
     plate: { href: `${FILES}/face.svg`, box: { x: 0, y: 0, w: 1, h: 1 } },
     frames: kinds.map((kind) => ({
       label: FRAME_LABEL[kind] ?? kind,
@@ -214,21 +220,28 @@ export function siteKit(): SiteKit {
         COLOUR_TAKES[c.key] ?? "hero",
         `${c.name} hero`,
         "1:1",
-        `The coaster in ${c.name.toLowerCase()} glaze, standing on a plain backdrop`,
+        `The board in ${c.name.toLowerCase()}, leaning on a kitchen wall, engraved The Kilns, 2026`,
       ),
     })),
     words: storyWords(KIT_PRODUCT, undefined),
     video: {
       url: `${FILES}/lifestyle.mp4`,
-      poster: TAKES.lifestyle.url,
-      seconds: 6,
-      cost: 0.61,
+      poster: `${FILES}/video-poster.jpg`,
+      seconds: 8,
+      cost: 0.83,
     },
     loupes: {
       reference: `${FILES}/loupe-reference.jpg`,
       passed: `${FILES}/loupe-pass.jpg`,
-      failed: `${FILES}/loupe-fail.jpg`,
+      other: `${FILES}/loupe-gift.jpg`,
     },
-    cost: { sceneTakes: 14, scenes: 1.29, videos: 2, video: 1.23, total: 2.52 },
+    cost: {
+      sceneTakes: 9,
+      scenes: 0.94,
+      videos: 1,
+      video: 0.83,
+      total: 1.77,
+      colourTake: 0.12,
+    },
   };
 }

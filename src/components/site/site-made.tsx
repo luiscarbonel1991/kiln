@@ -105,13 +105,14 @@ export function SiteMade({ kit }: { kit: SiteKit }) {
   const p = kit.product;
   const words = kit.words;
   const tilts = [-1.4, 0.9, -0.6, 1.2];
+  const cherry = kit.colours.find((c) => c.key === "cherry");
   return (
     <div id="kit" className="kl-made">
       <section className="kl-band" aria-labelledby="frames-title">
         <div className="kl-head">
           <h2 id="frames-title">Four frames, drawn from your numbers. Free.</h2>
           <p>
-            {p.size}, {p.material}, {p.colours.length} colours, a family name, $
+            {p.size}, {p.material}, {p.colours.length} woods, a family name, $
             {p.price}. Kiln draws these the moment the product is saved, at
             every size your shop asks for. They cost nothing, and they cannot
             get your product wrong.
@@ -155,13 +156,13 @@ export function SiteMade({ kit }: { kit: SiteKit }) {
             ))}
             <p className="kl-knobs-foot">
               <span>GPT Image 2 · 2K</span>
-              <b>Generate · ≈ $0.08</b>
+              <b>Generate · ≈ $0.09</b>
             </p>
           </div>
           <p className="sr-only">
             A scene's controls: camera, distance, light and shadow, each with
             three choices, and a Generate button that shows the price, about
-            $0.08.
+            $0.09.
           </p>
           <TakePrint
             take={kit.takes.lifestyle}
@@ -177,18 +178,30 @@ export function SiteMade({ kit }: { kit: SiteKit }) {
           <h2 id="check-title">Every photo is checked against your product.</h2>
           <p>
             Kiln reads the words on each take and weighs its letters against the
-            spec. This photo looked right and was not: its letters came out
-            thinner. It is marked, never hidden, and nothing is re-rolled behind
-            your back. You decide what happens next.
+            spec, then a text model looks the scene over for anything that could
+            not be. All nine photos of this board passed. A check reads letters,
+            not taste: the first cherry take passed and still looked painted, so
+            we took it again. A take that fails is marked, never hidden, and
+            nothing is re-rolled behind your back.
           </p>
         </div>
         <div className="kl-check-body">
-          <TakePrint
-            take={kit.takes.failed}
-            tilt={-1.5}
-            className="kl-check-print"
-            note={`Failed: ${kit.takes.failed.check}`}
-          />
+          <div className="kl-check-pair">
+            <TakePrint
+              take={kit.takes.retaken}
+              tilt={-1.5}
+              title="Cherry · first take"
+              note="Passed its check. Looked painted: taken again."
+            />
+            {cherry ? (
+              <TakePrint
+                take={cherry.take}
+                tilt={1.2}
+                title="Cherry · second take"
+                note={`Passed its check · the one we kept · ${money(kit.cost.colourTake)}`}
+              />
+            ) : null}
+          </div>
           <div className="kl-check-side">
             <ul className="kl-lenses">
               <Loupe
@@ -205,11 +218,11 @@ export function SiteMade({ kit }: { kit: SiteKit }) {
                 tone="pass"
               />
               <Loupe
-                src={kit.loupes.failed}
-                alt="The letter K on the take that failed, enlarged"
-                value="0.09"
-                note="This take: too thin."
-                tone="fail"
+                src={kit.loupes.other}
+                alt="The letter K on the gift scene, enlarged"
+                value="Match"
+                note="Another scene, another light."
+                tone="pass"
               />
             </ul>
             <div className="kl-reasons">
@@ -230,12 +243,12 @@ export function SiteMade({ kit }: { kit: SiteKit }) {
       <section className="kl-band" aria-labelledby="colours-title">
         <div className="kl-head">
           <h2 id="colours-title">
-            {kit.colours.length} glazes, {kit.colours.length} heroes.
+            {kit.colours.length} woods, {kit.colours.length} heroes.
           </h2>
           <p>
             The drawn frames follow every colour for free. A photo in another
             colour is a new take from the same drawing, priced first and checked
-            after. Each of these cost $0.12.
+            after. Each of these cost {money(kit.cost.colourTake)}.
           </p>
         </div>
         <ul className="kl-colours">
@@ -273,7 +286,7 @@ export function SiteMade({ kit }: { kit: SiteKit }) {
           <KitVideo
             src={kit.video.url}
             poster={kit.video.poster}
-            label="The coaster beside a glass of wine as the camera moves slowly closer"
+            label="The board on a dinner table beside grapes and cheese, in a slow, nearly still shot"
           />
         </Print>
       </section>

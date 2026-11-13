@@ -15,7 +15,10 @@ export function SiteCost({ kit }: { kit: SiteKit }) {
       paid: true,
     },
     {
-      item: `${c.videos} videos, ${kit.video.seconds} seconds each`,
+      item:
+        c.videos === 1
+          ? `1 video, ${kit.video.seconds} seconds`
+          : `${c.videos} videos, ${kit.video.seconds} seconds each`,
       cost: c.video,
       paid: true,
     },
@@ -26,10 +29,8 @@ export function SiteCost({ kit }: { kit: SiteKit }) {
         <h2 id="cost-title">Everything on this page cost {money(c.total)}.</h2>
         <p>
           What Kiln draws from your spec is free. Only image, video and text
-          models cost money, and that total counts every take: the two that
-          failed their check, four made before we changed the name on the
-          coaster, and a scene and its video we made again after spotting a
-          glass drawn wrong.
+          models cost money, and that total counts every take, the cherry hero
+          we took twice included.
         </p>
         <ul className="kl-rules">
           <li>Each paid step shows its price before it runs.</li>

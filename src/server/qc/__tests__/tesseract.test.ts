@@ -9,7 +9,7 @@ import {
 } from "@/server/qc/tesseract";
 
 // What `tesseract <take> stdout --psm 11 tsv` printed for the Home sample's
-// marketplace hero (public/home/sample/hero.jpg), block and line rows kept.
+// marketplace hero (an earlier sample, no longer shipped), block and line rows kept.
 const HEADER =
   "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext";
 const TSV = [
