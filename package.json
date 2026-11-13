@@ -39,6 +39,7 @@
     "brief": "node scripts/brief.mjs",
     "kiln": "node packages/cli/dist/kiln.js",
     "engine:build": "pnpm --filter @kiln/engine build",
+    "site:export": "node scripts/export-site.mjs",
     "cli:build": "pnpm --filter \"@kiln/cli...\" build"
   },
   "dependencies": {

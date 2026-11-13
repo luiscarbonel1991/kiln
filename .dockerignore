@@ -4,6 +4,8 @@
 .git
 .idea
 .next
+.next-site
+site
 out
 node_modules
 **/node_modules

@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
+// The public page exported as static files (scripts/export-site.mjs) is
+// built apart, into .next-site, under the path its host serves it at.
+const siteExport = process.env.KILN_SITE_EXPORT === "1";
+
 const nextConfig: NextConfig = {
+  ...(siteExport
+    ? {
+        distDir: ".next-site",
+        basePath: process.env.NEXT_PUBLIC_KILN_BASE || undefined,
+      }
+    : {}),
   reactCompiler: true,
   // Native NAPI addons stay external runtime requires instead of bundled, which
   // Turbopack can't do for the non-ECMAScript .node binding: the vectorizer

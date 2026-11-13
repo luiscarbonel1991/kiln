@@ -18,7 +18,9 @@ import {
 // no foot, which the check does not look for. Served as fixed
 // files (public/home/coaster); nothing here reaches the server.
 
-const FILES = "/home/coaster";
+// Under the path a static copy of the page is served at (export-site.mjs);
+// nothing in an installed Kiln.
+const FILES = `${process.env.NEXT_PUBLIC_KILN_BASE ?? ""}/home/coaster`;
 
 export const KIT_PRODUCT: Product = Product.parse({
   id: "sample:coaster",

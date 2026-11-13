@@ -93,6 +93,19 @@ built once and reads no database. Its "Get started" opens `/projects`; a public 
 the page sets `NEXT_PUBLIC_KILN_START` to where a visitor gets Kiln, so the page never
 leads back to itself.
 
+That public copy is plain files, for a host with no server:
+
+```bash
+pnpm site:export --base /kiln --start https://github.com/<owner>/kiln
+```
+
+`site/` then holds the page, its scripts, styles and fonts and the sample kit's files
+(about 7 MB), built for the path it is served under (`--base`; leave it out at a
+domain's root). The export checks that every file the page names is there and that
+"Get started" leads out. `.github/workflows/pages.yml` runs it and publishes to GitHub
+Pages, by hand only (Actions → Public page → Run workflow), once Settings → Pages →
+Source is set to GitHub Actions.
+
 `/projects` is the maker's work: where they left off (this month's spend with its cost
 per approved output, the latest projects, results due), then every project and product.
 The image-first studio is at
