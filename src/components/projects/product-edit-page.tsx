@@ -81,7 +81,9 @@ export function ProductEditPage({
       const result = await deleteProductAction(productId);
       if ("error" in result) setDeleteError(result.error);
       else
-        router.push(back.startsWith("/projects/new") ? "/projects/new" : "/");
+        router.push(
+          back.startsWith("/projects/new") ? "/projects/new" : "/projects",
+        );
     });
   const behind = saved ? saved.behind : uses.filter((u) => u.behind);
   return (

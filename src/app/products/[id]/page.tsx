@@ -63,7 +63,7 @@ export default async function ProductPage({
         families={[...new Set(products.map((p) => p.family))].sort()}
         draftPrice={draft === null ? null : `≈ $${draft.toFixed(2)}`}
         reviewPrice={review === null ? null : `≈ $${review.toFixed(2)}`}
-        back={typeof back === "string" && BACK.test(back) ? back : "/"}
+        back={typeof back === "string" && BACK.test(back) ? back : "/projects"}
       />
     </div>
   );
