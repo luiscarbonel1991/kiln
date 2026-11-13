@@ -227,76 +227,82 @@ html:has(.kl) {
   max-width: 35rem;
 }
 
-/* Before and after */
-/* Side by side at every width, so the swap reads as one move. */
-.kl-swap {
+/* Refreshing a listing: the plan, and what it makes */
+.kl-plan {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.25rem minmax(0, 1fr);
+  gap: 2.5rem;
+  margin-top: 2.5rem;
+}
+.kl-plan-panel ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.4rem 0 0.8rem;
+}
+.kl-plan-panel li {
+  display: grid;
+  grid-template-columns: 2.5rem auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-items: center;
-  gap: 0.5rem;
-  margin-top: 2.25rem;
+  gap: 0.75rem;
+  font-size: 0.9375rem;
 }
-.kl-before,
-.kl-new {
-  width: min(100%, 24rem);
-}
-.kl-before {
-  padding: 0.55rem 0.55rem 0;
-  background: #d9d2c4;
-  color: var(--dark);
-  --tilt: -1.5deg;
-  rotate: var(--tilt);
-  box-shadow: 0 14px 28px -10px rgba(0, 0, 0, 0.55);
-}
-.kl-before-art {
+.kl-yours {
   display: grid;
   place-items: center;
   aspect-ratio: 1;
-  padding: 0.5rem;
-  border: 2px dashed #7d7466;
-  background: repeating-linear-gradient(
-    -45deg,
-    #cfc7b8 0 14px,
-    #c6bead 14px 28px
-  );
+  padding: 0.2rem;
+  background: #cbb892;
+  color: #3d3020;
+  font-style: normal;
   text-align: center;
-  font-weight: 700;
-  font-size: 1rem;
-  line-height: 1.3;
+  line-height: 1.1;
 }
-.kl-before-art small {
-  display: block;
-  margin-top: 0.3rem;
+.kl-yours b {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+.kl-switch {
+  display: inline-flex;
+  border: 1px solid #d9d2c4;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.kl-switch em {
+  padding: 0.25rem 0.55rem;
+  font-style: normal;
   font-size: 0.8125rem;
+  color: #6f6657;
+}
+.kl-switch em[data-on="true"] {
+  background: #1d1813;
+  color: #fbf8f2;
+}
+.kl-plan-panel li[data-go="true"] .kl-switch em[data-on="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+.kl-with {
+  line-height: 1.25;
+  color: #6f6657;
+}
+.kl-plan-panel li[data-go="true"] .kl-with {
+  color: #1d1813;
   font-weight: 500;
 }
-@media (max-width: 23rem) {
-  .kl-before-art small {
-    display: none;
-  }
+.kl-plan-panel li > b {
+  font-weight: 600;
+  color: #2c6a51;
 }
-.kl-before figcaption {
+.kl-plan-panel li[data-paid="true"] > b {
+  color: #7a560c;
+}
+.kl-plan-made {
   display: grid;
-  gap: 0.1rem;
-  padding: 0.55rem 0.1rem 0.7rem;
-  font-size: 0.8125rem;
-  line-height: 1.3;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
 }
-.kl-before figcaption span {
-  color: #5d5446;
-}
-.kl-new .print-art {
+.kl-plan-made .print-art {
   aspect-ratio: 1;
-}
-.kl-arrow {
-  width: 100%;
-  fill: none;
-  stroke: var(--ink);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 1;
 }
 
 /* Ways to start */
@@ -981,12 +987,8 @@ html:has(.kl) {
     .kl-band li:nth-child(4) {
       --i: 3;
     }
-    .kl-band li:nth-child(5),
-    .kl-new {
+    .kl-band li:nth-child(5) {
       --i: 4;
-    }
-    .kl-arrow {
-      --i: 3;
     }
   }
 
@@ -994,7 +996,6 @@ html:has(.kl) {
     .kl-band .print,
     .kl-band .kl-slip,
     .kl-knobs,
-    .kl-before,
     .kl-receipt > ul
   )[data-reveal] {
     animation: kl-land 700ms backwards;
@@ -1044,14 +1045,6 @@ html:has(.kl) {
   }
   :where(.kl-after > div[data-reveal] .kl-approval > div) {
     animation-delay: 1100ms;
-  }
-  :where(.kl-arrow[data-reveal] path) {
-    animation: wax-draw 520ms cubic-bezier(0.4, 0, 0.2, 1) backwards;
-    animation-delay: calc(var(--i, 0) * var(--step) + 120ms);
-  }
-  :where(.kl-arrow[data-reveal] path + path) {
-    animation-duration: 240ms;
-    animation-delay: calc(var(--i, 0) * var(--step) + 600ms);
   }
   :where(.kl-measure[data-reveal] .kl-slots i[data-on="true"]) {
     animation: kl-slot 160ms ease-out backwards;
@@ -1143,13 +1136,6 @@ html:has(.kl) {
   .kl-close {
     padding-block: 5rem 5.5rem;
   }
-  .kl-before-art {
-    padding: 1.5rem;
-    font-size: 1.125rem;
-  }
-  .kl-before-art small {
-    font-size: 0.9375rem;
-  }
   .kl-video {
     width: min(100%, 17rem);
   }
@@ -1187,21 +1173,6 @@ html:has(.kl) {
     top: 84%;
     width: 31%;
     --tilt: -2deg;
-  }
-  .kl-swap {
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: center;
-    gap: 2rem;
-    margin-top: 2.75rem;
-  }
-  .kl-before {
-    justify-self: end;
-  }
-  .kl-new {
-    justify-self: start;
-  }
-  .kl-arrow {
-    width: 7rem;
   }
   .kl-frames {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1242,6 +1213,21 @@ html:has(.kl) {
 
 /* Five ways to start sit side by side only once each has room for a line. */
 @media (min-width: 60rem) {
+  .kl-plan-panel {
+    grid-column: auto;
+  }
+  .kl-plan {
+    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+    align-items: center;
+    gap: 4rem;
+  }
+  .kl-plan-made {
+    gap: 1rem;
+    align-items: start;
+  }
+  .kl-plan-made > .print:nth-child(2) {
+    margin-top: 3.5rem;
+  }
   .kl-starts ul {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 1.5rem;
@@ -1280,10 +1266,6 @@ html:has(.kl) {
     grid-template-columns: minmax(0, 1fr) minmax(0, 35rem);
     align-items: end;
     gap: 3rem;
-  }
-  .kl-before,
-  .kl-new {
-    width: 27rem;
   }
   .kl-frames,
   .kl-colours {

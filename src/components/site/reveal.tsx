@@ -10,7 +10,6 @@ const WAITS = [
   ".kl-band .print",
   ".kl-band .kl-slip",
   ".kl-knobs",
-  ".kl-before",
   ".kl-receipt > ul",
   ".kl-head > *",
   ".kl-starts > h2",
@@ -23,7 +22,6 @@ const WAITS = [
   ".kl-cost-copy",
   ".kl-plans",
   ".kl-close > *",
-  ".kl-arrow",
   ".kl-measure",
 ].join(",");
 
