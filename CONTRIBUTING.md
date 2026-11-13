@@ -61,7 +61,9 @@ however well it is built.
   orders, customer proofs, job cards or nesting. A design SVG is art, not a cut file.
 - **Kiln is generic.** No maker's name, formats, paths or pricing rules in the code.
   A maker's catalog reaches Kiln as a product package
-  (`public/templates/product-package.json`), and dependencies run one way.
+  (`public/templates/product-package.json`), and dependencies run one way. The
+  public page says who Kiln is for, in one file (`src/lib/site-audience.ts`); no
+  other source names a machine or a trade.
 - **No paid call without the maker's ok.** Every paid generation shows its estimate
   first and the month's cap rules every attempt. Tests never call a paid API:
   `vitest.setup.ts` drops the provider keys, and tests use fixtures and mocks.

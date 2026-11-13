@@ -10,6 +10,7 @@ import { SiteRefresh } from "@/components/site/site-refresh";
 import { SiteShips } from "@/components/site/site-ships";
 import { SiteStarts } from "@/components/site/site-starts";
 import { WaxDefs } from "@/components/site/wax";
+import { SITE_AUDIENCE } from "@/lib/site-audience";
 import { siteKit } from "@/lib/site-kit";
 import "@/components/site/parts.css";
 import "./welcome/landing.css";
@@ -18,8 +19,7 @@ export const dynamic = "force-static";
 
 export const metadata: Metadata = {
   title: "Kiln · Your product, photographed, listed and checked",
-  description:
-    "Open source, for shops that engrave, cut or print what they sell. Describe a product once: Kiln draws the exact frames, stages it in scenes, writes the listing to your shop's limits and checks every photo. Use it yourself or connect your AI.",
+  description: `Open source, for ${SITE_AUDIENCE}. Describe a product once: Kiln draws the exact frames, stages it in scenes, writes the listing to your shop's limits and checks every photo. Use it yourself or connect your AI.`,
 };
 
 // Home is the public page: what Kiln makes, told with one sample product's

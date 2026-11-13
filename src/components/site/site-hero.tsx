@@ -3,6 +3,7 @@ import { ExactSlotArt } from "@/components/projects/exact-slot-art";
 import { Print } from "@/components/site/print";
 import { TakePrint } from "@/components/site/take-print";
 import { GET_STARTED } from "@/lib/site";
+import { SITE_AUDIENCE } from "@/lib/site-audience";
 import type { SiteKit } from "@/lib/site-kit";
 
 // The page's opening: the outcome in one sentence, one way in, and the kit
@@ -14,10 +15,10 @@ export function SiteHero({ kit }: { kit: SiteKit }) {
       <div className="kl-hero-copy">
         <h1>Your product, photographed, listed and checked.</h1>
         <p>
-          For shops that engrave, cut or print what they sell. Describe a
-          product once: Kiln draws the exact frames, stages your real product in
-          the scenes a listing needs, writes the text to your shop's limits, and
-          checks every photo before you see it.
+          For {SITE_AUDIENCE}. Describe a product once: Kiln draws the exact
+          frames, stages your real product in the scenes a listing needs, writes
+          the text to your shop's limits, and checks every photo before you see
+          it.
         </p>
         <div className="kl-actions">
           <Link

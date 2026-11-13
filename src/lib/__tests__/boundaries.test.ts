@@ -6,10 +6,13 @@ import { LEAK } from "../../../packages/engine/src/__tests__/leak";
 // Kiln's core is generic too (CONTRIBUTING.md, "What Kiln leaves out"): outside
 // the optional modules (src/modules, off unless KILN_MODULES lists them), no
 // app source names a maker, signs and their formats, acrylic or laser work —
-// the same words as the engine's guard. The only exception is the wiring that
-// names the laser-pricing module by its id.
+// the same words as the engine's guard. Two exceptions: the wiring that names
+// the laser-pricing module by its id, and the one file that says who the
+// public page is for (site-audience.ts), which names the machines a visitor
+// searches with.
 const root = join(import.meta.dirname, "..", "..");
 const MODULE_WIRING = /laser-pricing/;
+const AUDIENCE = join("lib", "site-audience.ts");
 const SKIP = new Set(["__tests__", "__fixtures__", "modules"]);
 
 function sources(dir: string): string[] {
@@ -24,7 +27,9 @@ function sources(dir: string): string[] {
 
 describe("core boundaries", () => {
   it("no core source names a maker, signs and their formats, acrylic or laser work", () => {
-    const files = sources(root);
+    const files = sources(root).filter(
+      (path) => relative(root, path) !== AUDIENCE,
+    );
     expect(files.length).toBeGreaterThan(80);
     const leaks = files.flatMap((path) =>
       readFileSync(path, "utf8")
