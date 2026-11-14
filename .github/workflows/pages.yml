@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     container: node:26-trixie-slim
     timeout-minutes: 15
+    # The page reads no database, but `prisma generate` (on install) and the
+    # build want an address; nothing connects to it.
+    env:
+      DATABASE_URL: postgresql://kiln:kiln@localhost:5432/kiln
     steps:
       - name: System tools
         run: |
