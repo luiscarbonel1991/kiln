@@ -454,7 +454,7 @@ from a page on another origin is refused.
 
 ```bash
 # Claude Code, over HTTP
-claude mcp add --transport http kiln http://127.0.0.1:3009/api/mcp \
+claude mcp add --transport http kiln http://127.0.0.1:3000/api/mcp \
   --header "Authorization: Bearer $KILN_TOKEN"
 ```
 
@@ -465,7 +465,7 @@ message to `/api/mcp` with `KILN_URL` and `KILN_TOKEN`:
 { "mcpServers": { "kiln": {
   "command": "node",
   "args": ["/path/to/kiln/packages/cli/dist/kiln.js", "mcp"],
-  "env": { "KILN_URL": "http://127.0.0.1:3009", "KILN_TOKEN": "kiln_pat_…" }
+  "env": { "KILN_URL": "http://127.0.0.1:3000", "KILN_TOKEN": "kiln_pat_…" }
 } } }
 ```
 
@@ -611,7 +611,7 @@ terms forbid asking users to make keys of their own):
 1. Register an app at <https://www.etsy.com/developers>, or use one you
    already have.
 2. Add to its callback URLs the address Etsy sends you back to, exactly:
-   `http://localhost:3009/api/shops/etsy/callback` (Etsy takes http on a host
+   `http://localhost:3000/api/shops/etsy/callback` (Etsy takes http on a host
    name; an IP address such as 127.0.0.1 is refused).
 3. In `.env`: `ETSY_API_KEY` (the keystring), `ETSY_SHARED_SECRET`,
    `ETSY_REDIRECT_URI` (the address above) and `KILN_SECRET_KEY`

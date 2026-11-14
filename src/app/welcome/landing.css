@@ -690,7 +690,11 @@ html:has(.kl) {
 
 .kl-after {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2.75rem;
+}
+.kl-after > * {
+  min-width: 0;
 }
 .kl-after h2 {
   font-size: clamp(1.8rem, 7.4vw, 2.5rem);

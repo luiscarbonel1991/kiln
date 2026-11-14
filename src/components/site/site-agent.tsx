@@ -3,7 +3,7 @@
 // first, then the maker's ok.
 const CONNECT = [
   "claude mcp add --transport http kiln \\",
-  "  http://127.0.0.1:3009/api/mcp \\",
+  "  http://127.0.0.1:3000/api/mcp \\",
   '  --header "Authorization: Bearer $KILN_TOKEN"',
 ].join("\n");
 
