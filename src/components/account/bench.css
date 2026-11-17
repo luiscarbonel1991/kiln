@@ -1,84 +1,134 @@
-/* The account pages' scene: a piece being made, then photographed and
-   checked. One 14 s loop; every part runs the same clock. */
+/* The account pages' scene, in three acts on one 16 s clock: a pencil sketch
+   on paper, the product it becomes, and the photo Kiln makes of it. */
 .bench {
-  --ink: #f6f1e8;
-  --ember: #e2683c;
-  background: radial-gradient(
-    120% 90% at 30% 20%,
-    #3a3026 0%,
-    #241f18 60%,
-    #1b1712 100%
-  );
+  --pencil: #3b3733;
+  --paper: #efe7d8;
+  --ink: #241f18;
+  background: var(--paper);
 }
-.bench-grid {
-  stroke: rgba(246, 241, 232, 0.07);
-  stroke-width: 1;
-}
-.bench-tick {
-  fill: rgba(246, 241, 232, 0.35);
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 9px;
-  letter-spacing: 0.08em;
+.bench svg * {
+  animation-duration: 16s;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
 }
 
-.bench-plate-fill {
-  fill: #6b4530;
-  opacity: 0;
-  animation: bench-fill 14s ease-in-out infinite;
+/* The steps, top left: the one being played is dark. */
+.bench-step {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  fill: var(--ink);
+  opacity: 0.28;
 }
-.bench-outline,
-.bench-inset,
-.bench-sprig {
+.bench-step-1 {
+  animation-name: bench-step-1;
+}
+.bench-step-2 {
+  animation-name: bench-step-2;
+}
+.bench-step-3 {
+  animation-name: bench-step-3;
+}
+
+/* Act 1: the sketch. Every line is drawn, twice where a hand would go over
+   it, and wobbles through the pencil filter. */
+.bench-sketch {
+  animation-name: bench-sketch;
+}
+.bench-line {
   fill: none;
-  stroke: var(--ember);
+  stroke: var(--pencil);
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
+  opacity: 0.9;
 }
-.bench-outline {
-  stroke-width: 2.5;
-  animation: bench-outline 14s linear infinite;
+.bench-line-soft {
+  stroke-width: 1;
+  opacity: 0.5;
 }
-.bench-inset {
-  stroke-width: 1.5;
-  animation: bench-inset 14s linear infinite;
+.bench-l1 {
+  animation-name: bench-l1;
 }
-.bench-sprig {
-  stroke-width: 2;
-  animation: bench-sprig 14s linear infinite;
+.bench-l2 {
+  animation-name: bench-l2;
 }
-.bench-name {
+.bench-l3 {
+  animation-name: bench-l3;
+}
+.bench-l4 {
+  animation-name: bench-l4;
+}
+.bench-l5 {
+  animation-name: bench-l5;
+}
+.bench-hand {
   font-family: var(--font-fraunces), serif;
-  font-size: 46px;
-  font-weight: 500;
+  font-style: italic;
   fill: transparent;
-  stroke: var(--ember);
-  stroke-width: 1.1;
-  stroke-dasharray: 260;
-  stroke-dashoffset: 260;
-  animation: bench-name 14s linear infinite;
+  stroke: var(--pencil);
+  stroke-width: 0.9;
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
 }
-.bench-year {
+.bench-hand-name {
+  font-size: 44px;
+  animation-name: bench-hand-name;
+}
+.bench-hand-note {
+  font-size: 17px;
+  stroke-width: 0.7;
+  animation-name: bench-hand-note;
+}
+
+/* Act 2: the product. Clean edges, its material, its lettering engraved. */
+.bench-product {
+  opacity: 0;
+  animation-name: bench-product;
+}
+.bench-product-name {
   font-family: var(--font-fraunces), serif;
-  font-size: 22px;
+  font-size: 44px;
+  font-weight: 500;
+  fill: #2a1a10;
+}
+.bench-product-year {
+  font-family: var(--font-fraunces), serif;
+  font-size: 20px;
   letter-spacing: 0.12em;
   fill: #2a1a10;
+}
+.bench-spec {
   opacity: 0;
-  animation: bench-year 14s linear infinite;
+  animation-name: bench-spec;
+}
+.bench-spec text {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  fill: var(--ink);
+}
+.bench-spec path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1;
+  opacity: 0.5;
 }
 
-/* The head: the bright point that does the work, following the outline. */
-.bench-head {
-  fill: #fff3e6;
-  filter: drop-shadow(0 0 6px var(--ember)) drop-shadow(0 0 14px var(--ember));
-  offset-path: path(
-    "M132 190H468A22 22 0 0 1 490 212V388A22 22 0 0 1 468 410H132A22 22 0 0 1 110 388V212A22 22 0 0 1 132 190Z"
-  );
-  offset-rotate: 0deg;
-  animation: bench-head 14s linear infinite;
+/* Act 3: the scene around it, the camera's frame, the check. */
+.bench-scene {
+  opacity: 0;
+  animation-name: bench-scene;
 }
-
+.bench-counter {
+  animation-name: bench-counter;
+}
+.bench-shadow {
+  opacity: 0;
+  animation-name: bench-scene;
+}
 .bench-corner {
   fill: none;
   stroke: var(--ink);
@@ -86,180 +136,213 @@
   stroke-linecap: round;
   opacity: 0;
   transform-box: fill-box;
-  animation: bench-corner 14s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-name: bench-corner;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .bench-flash {
-  fill: var(--ink);
+  fill: #fffdf9;
   opacity: 0;
-  animation: bench-flash 14s linear infinite;
+  animation-name: bench-flash;
 }
 .bench-chip {
   opacity: 0;
-  animation: bench-chip 14s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-name: bench-chip;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .bench-chip rect {
   fill: #2c6a51;
 }
 .bench-chip text {
-  fill: var(--ink);
+  fill: #fffdf9;
   font-family: var(--font-jetbrains-mono), monospace;
   font-size: 11px;
   letter-spacing: 0.12em;
 }
 
-@keyframes bench-outline {
+@keyframes bench-step-1 {
+  0%,
+  34% {
+    opacity: 1;
+  }
+  38%,
+  100% {
+    opacity: 0.28;
+  }
+}
+@keyframes bench-step-2 {
+  0%,
+  34% {
+    opacity: 0.28;
+  }
+  38%,
+  58% {
+    opacity: 1;
+  }
+  62%,
+  100% {
+    opacity: 0.28;
+  }
+}
+@keyframes bench-step-3 {
+  0%,
+  58% {
+    opacity: 0.28;
+  }
+  62%,
+  94% {
+    opacity: 1;
+  }
+  99%,
+  100% {
+    opacity: 0.28;
+  }
+}
+
+@keyframes bench-sketch {
+  0%,
+  34% {
+    opacity: 1;
+  }
+  42%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes bench-l1 {
   0% {
     stroke-dashoffset: 1;
-    opacity: 1;
   }
-  22% {
-    stroke-dashoffset: 0;
-  }
-  50% {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-  56% {
-    opacity: 0.25;
-  }
-  92% {
-    stroke-dashoffset: 0;
-    opacity: 0.25;
-  }
-  98%,
+  10%,
   100% {
     stroke-dashoffset: 0;
-    opacity: 0;
   }
 }
-@keyframes bench-head {
-  0% {
-    offset-distance: 0%;
-    opacity: 1;
-  }
-  22% {
-    offset-distance: 100%;
-    opacity: 1;
-  }
-  24%,
-  100% {
-    offset-distance: 100%;
-    opacity: 0;
-  }
-}
-@keyframes bench-inset {
+@keyframes bench-l2 {
   0%,
-  22% {
+  6% {
     stroke-dashoffset: 1;
-    opacity: 1;
   }
-  32% {
-    stroke-dashoffset: 0;
-  }
-  50% {
-    opacity: 1;
-  }
-  56%,
-  92% {
-    stroke-dashoffset: 0;
-    opacity: 0.55;
-    stroke: #2a1a10;
-  }
-  98%,
+  15%,
   100% {
     stroke-dashoffset: 0;
-    opacity: 0;
   }
 }
-@keyframes bench-name {
+@keyframes bench-l3 {
   0%,
-  30% {
-    stroke-dashoffset: 260;
-    fill: transparent;
-    opacity: 1;
+  13% {
+    stroke-dashoffset: 1;
   }
-  46% {
-    stroke-dashoffset: 0;
-    fill: transparent;
-    stroke: var(--ember);
-  }
-  56%,
-  92% {
-    stroke-dashoffset: 0;
-    fill: #2a1a10;
-    stroke: #2a1a10;
-    opacity: 1;
-  }
-  98%,
+  18%,
   100% {
     stroke-dashoffset: 0;
-    fill: #2a1a10;
-    stroke: #2a1a10;
+  }
+}
+@keyframes bench-l4 {
+  0%,
+  24% {
+    stroke-dashoffset: 1;
+  }
+  29%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bench-l5 {
+  0%,
+  27% {
+    stroke-dashoffset: 1;
+  }
+  32%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bench-hand-name {
+  0%,
+  15% {
+    stroke-dashoffset: 320;
+  }
+  26%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bench-hand-note {
+  0%,
+  28% {
+    stroke-dashoffset: 320;
+  }
+  33%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes bench-product {
+  0%,
+  34% {
+    opacity: 0;
+  }
+  42%,
+  94% {
+    opacity: 1;
+  }
+  99%,
+  100% {
     opacity: 0;
   }
 }
-@keyframes bench-sprig {
+@keyframes bench-spec {
   0%,
   42% {
-    stroke-dashoffset: 1;
-    opacity: 1;
-  }
-  50% {
-    stroke-dashoffset: 0;
-    stroke: var(--ember);
-  }
-  56%,
-  92% {
-    stroke-dashoffset: 0;
-    stroke: #2a1a10;
-    opacity: 1;
-  }
-  98%,
-  100% {
-    stroke-dashoffset: 0;
     opacity: 0;
   }
-}
-@keyframes bench-year {
-  0%,
-  50% {
-    opacity: 0;
-  }
-  56%,
-  92% {
+  46%,
+  56% {
     opacity: 1;
   }
-  98%,
+  60%,
   100% {
     opacity: 0;
   }
 }
-@keyframes bench-fill {
+
+@keyframes bench-scene {
   0%,
-  48% {
+  58% {
     opacity: 0;
   }
-  56%,
-  92% {
+  68%,
+  94% {
     opacity: 1;
   }
-  98%,
+  99%,
   100% {
     opacity: 0;
+  }
+}
+@keyframes bench-counter {
+  0%,
+  58% {
+    transform: translateY(26px);
+  }
+  68%,
+  100% {
+    transform: translateY(0);
   }
 }
 @keyframes bench-corner {
   0%,
-  60% {
+  72% {
     opacity: 0;
     transform: scale(1.5);
   }
-  66%,
-  92% {
+  77%,
+  94% {
     opacity: 1;
     transform: scale(1);
   }
-  98%,
+  99%,
   100% {
     opacity: 0;
     transform: scale(1);
@@ -267,61 +350,51 @@
 }
 @keyframes bench-flash {
   0%,
-  68% {
+  79% {
     opacity: 0;
   }
-  69.5% {
-    opacity: 0.55;
+  80.5% {
+    opacity: 0.7;
   }
-  73%,
+  84%,
   100% {
     opacity: 0;
   }
 }
 @keyframes bench-chip {
   0%,
-  73% {
+  84% {
     opacity: 0;
     transform: translateY(8px);
   }
-  78%,
-  92% {
+  88%,
+  94% {
     opacity: 1;
     transform: translateY(0);
   }
-  98%,
+  99%,
   100% {
     opacity: 0;
     transform: translateY(0);
   }
 }
 
-/* Without motion: the finished piece, framed and checked. */
+/* Without motion: the last frame, the product in its scene, checked. */
 @media (prefers-reduced-motion: reduce) {
-  .bench * {
-    animation: none;
+  .bench svg * {
+    animation-name: none;
   }
-  .bench-plate-fill,
-  .bench-year,
-  .bench-corner,
-  .bench-chip {
-    opacity: 1;
-  }
-  .bench-outline {
-    stroke-dashoffset: 0;
-    opacity: 0.25;
-  }
-  .bench-inset,
-  .bench-sprig {
-    stroke-dashoffset: 0;
-    stroke: #2a1a10;
-  }
-  .bench-name {
-    stroke-dashoffset: 0;
-    fill: #2a1a10;
-    stroke: #2a1a10;
-  }
-  .bench-head {
+  .bench-sketch,
+  .bench-spec,
+  .bench-flash {
     opacity: 0;
+  }
+  .bench-product,
+  .bench-scene,
+  .bench-shadow,
+  .bench-corner,
+  .bench-chip,
+  .bench-step-3 {
+    opacity: 1;
   }
 }

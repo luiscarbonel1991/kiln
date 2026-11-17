@@ -25,15 +25,14 @@ export function AuthCard({
     <main className="grid min-h-dvh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
       <figure className="bench relative m-4 mr-0 hidden overflow-hidden rounded-card shadow-card lg:block">
         <BenchScene />
-        <figcaption className="absolute inset-x-0 bottom-0 p-8 text-[#fffdf9]">
+        <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#efe7d8] via-[#efe7d8]/85 to-transparent p-8 pt-16 text-foreground">
           <p
             className="max-w-sm font-serif text-3xl leading-tight"
             style={{ fontVariationSettings: "'opsz' 144" }}
           >
-            Describe it once.{" "}
-            <em className="italic">Kiln photographs and checks it.</em>
+            From a sketch <em className="italic">to the listing photo.</em>
           </p>
-          <p className="mt-3 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-[#fffdf9]/75">
+          <p className="mt-3 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-on-surface-mid">
             Drawn in code · nothing here is generated
           </p>
         </figcaption>
