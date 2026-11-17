@@ -1,6 +1,7 @@
 import { getChat } from "@/server/chat/chat-repository";
 import { stopTurn } from "@/server/chat/run-turn";
 import { apiError, foreignOrigin } from "@/server/http-api";
+import { denyWithoutSession } from "@/server/session";
 
 // POST /api/chat/:id/stop — end the turn running in a conversation. What it
 // did stays; a model call stopped midway counts at its estimate.
@@ -8,6 +9,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const denied = await denyWithoutSession();
+  if (denied) return denied;
   if (foreignOrigin(request)) {
     return apiError(403, "Kiln's chat answers only Kiln's own pages.");
   }

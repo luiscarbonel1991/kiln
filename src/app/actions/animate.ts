@@ -5,6 +5,7 @@ import { snapSeconds, videoSecondsFor } from "@/domain/video";
 import { getVideoProvider } from "@/providers/registry";
 import { AnimateInput, GenerationResult } from "@/providers/types";
 import { videoCall, withDirectSpend } from "@/server/direct-spend";
+import { requireMaker } from "@/server/session";
 
 // Server Function: the only client path into @/providers for video. The
 // provider is the card's own; a retired or unknown model (Sora) is refused with
@@ -15,6 +16,7 @@ import { videoCall, withDirectSpend } from "@/server/direct-spend";
 export async function animateVideo(
   input: AnimateInput,
 ): Promise<GenerationResult> {
+  await requireMaker();
   const raw = AnimateInput.parse(input);
   assertModel(raw.model, "video");
   const parsed = {

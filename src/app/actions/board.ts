@@ -49,6 +49,7 @@ import {
   setVideoChoice,
 } from "@/server/project-repository";
 import { recheckTake } from "@/server/qc/project-take";
+import { requireMaker } from "@/server/session";
 import { relookSlot, retuneSlot } from "@/server/slot-tuning";
 import { makeStillsVideo } from "@/server/stills-video";
 import type { Degraded } from "@/server/text-calls";
@@ -64,6 +65,7 @@ const Approval = z.object({
 });
 
 export async function setSlotApprovalAction(input: unknown): Promise<void> {
+  await requireMaker();
   const { projectId, destinationId, slotKey, approved } = Approval.parse(input);
   await setSlotApproval(projectId, { destinationId, slotKey }, approved);
   if (approved) await noteApproval(projectId, { destinationId, slotKey });
@@ -80,6 +82,7 @@ const Switch = z.object({
 export async function setSlotOffAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
+  await requireMaker();
   const { projectId, destinationId, slotKey, off } = Switch.parse(input);
   try {
     await setSlotOff(projectId, { destinationId, slotKey }, off);
@@ -102,6 +105,7 @@ const Frame = z.object({
 export async function checkTakeAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
+  await requireMaker();
   const { projectId, destinationId, slotKey } = Frame.parse(input);
   try {
     await recheckTake(projectId, { destinationId, slotKey });
@@ -126,6 +130,7 @@ const KnobWrite = z.object({
 export async function setSlotKnobAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
+  await requireMaker();
   const { projectId, destinationId, slotKey, choice, reason } =
     KnobWrite.parse(input);
   const ref = { destinationId, slotKey };
@@ -166,6 +171,7 @@ const LookWrite = z.object({
 export async function setSlotLookAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
+  await requireMaker();
   const parsed = LookWrite.safeParse(input);
   if (!parsed.success) return { error: "Pick a colour or a style." };
   const { projectId, destinationId, slotKey, colour, style } = parsed.data;
@@ -199,6 +205,7 @@ const PlaceWrite = z.object({
 export async function setSlotPlaceAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
+  await requireMaker();
   const parsed = PlaceWrite.safeParse(input);
   if (!parsed.success) return { error: "A place is at most 160 characters." };
   const { projectId, destinationId, slotKey, place } = parsed.data;
@@ -232,6 +239,7 @@ const _EXTENSION: Record<(typeof ACCEPTED_IMAGE_MIME)[number], string> = {
 // renderer) and make it the project's anchor. The file and the project id come
 // in one form, so no client-supplied URL is ever fetched by the server.
 export async function addReferenceAction(formData: FormData): Promise<void> {
+  await requireMaker();
   const projectId = z.string().min(1).parse(formData.get("projectId"));
   const file = formData.get("file");
   if (!(file instanceof File)) throw new Error("No file provided.");
@@ -250,6 +258,7 @@ export async function addReferenceAction(formData: FormData): Promise<void> {
 export async function updateProjectProductAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
+  await requireMaker();
   const { projectId } = z.object({ projectId: z.string().min(1) }).parse(input);
   const loaded = await loadProjectBoard(projectId);
   if (!loaded?.board.plan || !loaded.product) {
@@ -320,6 +329,7 @@ const ListingWrite = z.object({
 export async function writeListingAction(
   input: unknown,
 ): Promise<{ degraded?: Degraded; ranOn?: RanOn; error?: string }> {
+  await requireMaker();
   const parsed = ListingWrite.safeParse(input);
   if (!parsed.success) return { error: "Nothing to write for." };
   const { projectId, destinationId, model } = parsed.data;
@@ -341,6 +351,7 @@ const ListingSave = z.object({
 export async function saveListingAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
+  await requireMaker();
   const parsed = ListingSave.safeParse(input);
   if (!parsed.success) return { error: "The listing text could not be read." };
   const { projectId, destinationId, listing } = parsed.data;
@@ -361,6 +372,7 @@ const Move = z.object({
 
 // Reorder a destination's photos: make a slot photo 1, or move it one place.
 export async function moveSlotAction(input: z.infer<typeof Move>) {
+  await requireMaker();
   const { projectId, destinationId, slotKey, move } = Move.parse(input);
   await setSlotOrder(projectId, { destinationId, slotKey }, move);
   refresh();
@@ -375,6 +387,7 @@ const Video = z.object({
 
 // Change a video slot's start frame, motion, length or orientation.
 export async function setVideoChoiceAction(input: z.infer<typeof Video>) {
+  await requireMaker();
   const { projectId, destinationId, slotKey, choice } = Video.parse(input);
   await setVideoChoice(projectId, { destinationId, slotKey }, choice);
   refresh();
@@ -391,6 +404,7 @@ const Stills = z.object({
 export async function makeStillsVideoAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
+  await requireMaker();
   const parsed = Stills.safeParse(input);
   if (!parsed.success) return { error: "Name the video frame." };
   const { projectId, destinationId, slotKey } = parsed.data;
@@ -408,6 +422,7 @@ const AddVideo = z.object({
 export async function addVideoAction(
   input: z.infer<typeof AddVideo>,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const { projectId, destinationId } = AddVideo.parse(input);
   try {
     const models = await getMakerModels();
@@ -448,6 +463,7 @@ const CardModel = z.object({
 export async function setCardModelAction(
   input: z.infer<typeof CardModel>,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const { projectId, cardId, model } = CardModel.parse(input);
   try {
     await setCardModel(projectId, cardId, model);

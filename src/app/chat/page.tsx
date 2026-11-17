@@ -5,6 +5,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { cn } from "@/lib/utils";
 import { listChatSessions } from "@/server/chat/chat-repository";
 import { chatPanelData } from "@/server/chat/chat-view";
+import { requireMaker } from "@/server/session";
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", {
@@ -22,6 +23,7 @@ export default async function ChatPage({
 }: {
   searchParams: Promise<{ session?: string }>;
 }) {
+  await requireMaker();
   const { session } = await searchParams;
   const sessions = await listChatSessions();
   const open = sessions.find((s) => s.id === session) ?? null;

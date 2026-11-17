@@ -10,6 +10,7 @@ import {
   draftChoices,
   draftDetail,
 } from "@/server/etsy-drafts";
+import { requireMaker } from "@/server/session";
 
 // One listing of the maker's shop, as Etsy has it now: a draft can be changed
 // here (each save shows what changes first); a live listing only read. Below,
@@ -19,6 +20,7 @@ export default async function DraftPage({
 }: {
   params: Promise<{ listingId: string }>;
 }) {
+  await requireMaker();
   await dynamic();
   const { listingId } = await params;
   const id = Number(listingId);

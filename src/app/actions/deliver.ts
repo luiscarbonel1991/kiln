@@ -6,6 +6,7 @@ import {
   type DeliverResult,
   deliverDestination,
 } from "@/server/deliver/deliver-destination";
+import { requireMaker } from "@/server/session";
 
 // Deliver one destination of a planned project from the board
 // (src/server/deliver/deliver-destination.ts): the zip's link, which the
@@ -18,6 +19,7 @@ const Input = z.object({
 });
 
 export async function deliverAction(input: unknown): Promise<DeliverResult> {
+  await requireMaker();
   const { projectId, destinationId } = Input.parse(input);
   const result = await deliverDestination(projectId, destinationId);
   if ("url" in result) refresh();

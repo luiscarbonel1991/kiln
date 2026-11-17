@@ -8,6 +8,7 @@ import {
   setTokenSpend,
   TokenName,
 } from "@/server/access-tokens";
+import { requireMaker } from "@/server/session";
 
 // Settings → Access tokens. Zod is the trust boundary. The token comes back
 // this once; Kiln keeps only its hash.
@@ -16,6 +17,7 @@ const NewToken = z.object({ name: TokenName, canSpend: z.boolean() });
 export async function createAccessTokenAction(
   input: unknown,
 ): Promise<{ token: string } | { error: string }> {
+  await requireMaker();
   const parsed = NewToken.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Name the token." };
@@ -31,6 +33,7 @@ export async function createAccessTokenAction(
 export async function revokeAccessTokenAction(
   input: unknown,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const parsed = z.string().min(1).safeParse(input);
   if (!parsed.success) return { error: "Which token?" };
   const revoked = await revokeAccessToken(parsed.data);
@@ -44,6 +47,7 @@ const Spend = z.object({ id: z.string().min(1), canSpend: z.boolean() });
 export async function setTokenSpendAction(
   input: unknown,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const parsed = Spend.safeParse(input);
   if (!parsed.success) return { error: "Which token?" };
   const changed = await setTokenSpend(parsed.data.id, parsed.data.canSpend);

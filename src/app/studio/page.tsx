@@ -2,6 +2,7 @@ import { StudioShell } from "@/components/studio/studio-shell";
 import { enabledModules } from "@/modules/enabled";
 import { ModulesProvider } from "@/modules/modules-context";
 import { getMakerModelSetup } from "@/server/maker-repository";
+import { requireMaker } from "@/server/session";
 import { photoRead } from "@/server/text-calls";
 
 // The studio: image first, for a design or a photo without a product. It
@@ -13,6 +14,7 @@ export default async function StudioPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await requireMaker();
   const { new: fresh, open } = await searchParams;
   const { models, routes } = await getMakerModelSetup();
   const [draft] = routes?.draft.models ?? [models.image];

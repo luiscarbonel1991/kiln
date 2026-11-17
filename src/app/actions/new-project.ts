@@ -6,6 +6,7 @@ import { chosenLook } from "@/domain/plan-look";
 import { Look, resolveLook } from "@/domain/product-look";
 import { lookDesign } from "@/server/product-reference";
 import { getProduct } from "@/server/product-repository";
+import { requireMaker } from "@/server/session";
 import { startProject } from "@/server/start-project";
 
 // Start a project from New project (src/server/start-project.ts): no model is
@@ -14,6 +15,7 @@ import { startProject } from "@/server/start-project";
 export async function createProjectAction(
   input: unknown,
 ): Promise<{ error: string }> {
+  await requireMaker();
   const started = await startProject(input);
   if ("error" in started) return started;
   redirect(`/projects/${started.id}`);
@@ -26,6 +28,7 @@ const LookAsk = z.object({ productId: z.string().min(1), look: Look });
 export async function lookDesignAction(
   input: unknown,
 ): Promise<{ design: string } | { error: string }> {
+  await requireMaker();
   const parsed = LookAsk.safeParse(input);
   if (!parsed.success) return { error: "Pick a colour or a style." };
   const product = await getProduct(parsed.data.productId);

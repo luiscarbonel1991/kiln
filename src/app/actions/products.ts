@@ -54,6 +54,7 @@ import {
   upsertProducts,
 } from "@/server/product-repository";
 import { productHash } from "@/server/product-version";
+import { requireMaker } from "@/server/session";
 import {
   type Degraded,
   draftProduct,
@@ -63,6 +64,7 @@ import {
 // Server Functions are POST-reachable: the package parse is the trust boundary.
 
 export async function listProductsAction(): Promise<Product[]> {
+  await requireMaker();
   return listProducts();
 }
 
@@ -74,6 +76,7 @@ export type { ImportResult } from "@/server/product-import";
 export async function importProductsAction(
   input: unknown,
 ): Promise<ImportResult | { error: string }> {
+  await requireMaker();
   return importPackage(input);
 }
 
@@ -85,6 +88,7 @@ const PHOTO_MIME = new Set<string>(ACCEPTED_IMAGE_MIME);
 export async function uploadProductFileAction(
   formData: FormData,
 ): Promise<StoredProductFile | { error: string }> {
+  await requireMaker();
   const file = formData.get("file");
   if (!(file instanceof File)) return { error: "No file was sent." };
   if (file.size > MAX_UPLOAD_BYTES) {
@@ -118,6 +122,7 @@ const SampleFix = z.union([
 // colour, then corrected on the maker's word (src/server/material-photo.ts),
 // free. A corrected photo is a new stored file; the product changes on Save.
 export async function checkSampleAction(input: unknown): Promise<SampleCheck> {
+  await requireMaker();
   const parsed = z.object({ url: SampleUrl }).safeParse(input);
   if (!parsed.success) return { error: "No material photo to check." };
   return readSample(parsed.data.url);
@@ -126,6 +131,7 @@ export async function checkSampleAction(input: unknown): Promise<SampleCheck> {
 export async function correctSampleAction(
   input: unknown,
 ): Promise<SampleCheck> {
+  await requireMaker();
   const parsed = SampleFix.safeParse(input);
   if (!parsed.success) return { error: "That correction could not be read." };
   const { url, ...how } = parsed.data;
@@ -140,6 +146,7 @@ export async function createProductAction(
   | { product: Product; warning?: string }
   | { error: string; issues?: FormIssue[] }
 > {
+  await requireMaker();
   const parsed = ProductForm.safeParse(input);
   if (!parsed.success) {
     const issues = formIssues(input);
@@ -185,6 +192,7 @@ export async function draftProductAction(input: unknown): Promise<{
   ranOn?: RanOn;
   error?: string;
 }> {
+  await requireMaker();
   const parsed = Draft.safeParse(input);
   if (!parsed.success) return { error: "Upload the photo first." };
   try {
@@ -214,6 +222,7 @@ export async function reviewProductAction(input: unknown): Promise<{
   ranOn?: RanOn;
   error?: string;
 }> {
+  await requireMaker();
   const parsed = Review.safeParse(input);
   if (!parsed.success) return { error: "Nothing to review yet." };
   const { form, productId, model } = parsed.data;
@@ -249,6 +258,7 @@ export async function updateProductAction(input: unknown): Promise<
     }
   | { error: string; issues?: FormIssue[] }
 > {
+  await requireMaker();
   const { id, form } = Edit.parse(input);
   const stored = await getProduct(id);
   if (!stored) return { error: "That product no longer exists." };
@@ -291,6 +301,7 @@ export async function deleteProductAction(
   | { deleted: true }
   | { error: string; usedBy?: { projectId: string; name: string }[] }
 > {
+  await requireMaker();
   const id = z.string().min(1).parse(input);
   try {
     const result = await deleteProduct(id);

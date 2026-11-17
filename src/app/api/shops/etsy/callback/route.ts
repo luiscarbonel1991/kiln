@@ -1,3 +1,4 @@
+import { requireMaker } from "@/server/session";
 import {
   CONNECT_COOKIE,
   CONNECT_PATH,
@@ -12,6 +13,7 @@ import {
 // is traded for the shop's tokens, the handshake cookie is cleared either
 // way, and the maker lands on Shops.
 export async function GET(request: Request) {
+  await requireMaker();
   const here = new URL(request.url);
   const clear = `${CONNECT_COOKIE}=; Path=${CONNECT_PATH}; Max-Age=0; HttpOnly; SameSite=Lax`;
   const land = (to: string, note?: string) => {

@@ -62,10 +62,14 @@ async function requestHeaders(): Promise<Headers | null> {
   }
 }
 
-// The maker a request acts for. A personal access token names its own; any
-// other request needs a session, and works for the organization its person
-// belongs to. Without one the person is sent to sign in.
-const requestMaker = cache(async (): Promise<CurrentMaker | null> => {
+// What a request says about who it acts for. A personal access token names
+// its own maker; any other request needs a session, and works for the
+// organization its person belongs to.
+type RequestMaker =
+  | { maker: CurrentMaker }
+  | { refused: "token" | "session" | "organization" };
+
+const requestMaker = cache(async (): Promise<RequestMaker | null> => {
   const h = await requestHeaders();
   if (!h) return null;
   const token = bearerToken(h.get("authorization"));
@@ -74,28 +78,41 @@ const requestMaker = cache(async (): Promise<CurrentMaker | null> => {
       where: { hash: hashToken(token) },
       select: { maker: { select: { id: true, slug: true, name: true } } },
     });
-    if (!row) throw new Error("That access token is not valid here.");
-    return row.maker;
+    return row ? { maker: row.maker } : { refused: "token" };
   }
   const session = await getAuth().api.getSession({ headers: h });
-  if (!session) redirect("/sign-in");
+  if (!session) return { refused: "session" };
   const maker = await makerOfMember({
     userId: session.user.id,
     activeOrganizationId: session.session.activeOrganizationId,
   });
-  if (!maker) redirect("/sign-in?left=1");
-  return maker;
+  return maker ? { maker } : { refused: "organization" };
 });
 
+// The maker behind the request being served, or null when it carries no
+// session and no valid token. For route handlers, which answer 401 themselves.
+export async function getRequestMaker(): Promise<CurrentMaker | null> {
+  assertDatabaseUrl();
+  const found = await requestMaker();
+  return found && "maker" in found ? found.maker : null;
+}
+
 // The maker the caller works for: the one place it is resolved. While a
-// request is served, the maker behind its session or its access token. With no
+// request is served, the maker behind its session or its access token (without
+// either, the person is sent to sign in). With no
 // request (the worker, a script, a test), the instance's own maker
 // (env KILN_MAKER, default "default"), upserted on its unique slug so
 // concurrent first calls cannot create two.
 export async function getCurrentMaker(): Promise<CurrentMaker> {
   assertDatabaseUrl();
-  const fromRequest = await requestMaker();
-  if (fromRequest) return fromRequest;
+  const found = await requestMaker();
+  if (found) {
+    if ("maker" in found) return found.maker;
+    if (found.refused === "token") {
+      throw new Error("That access token is not valid here.");
+    }
+    redirect(found.refused === "session" ? "/sign-in" : "/sign-in?left=1");
+  }
   const slug = env.KILN_MAKER;
   const cached = makers.get(slug);
   if (cached) return cached;

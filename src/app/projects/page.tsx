@@ -16,6 +16,7 @@ import { getCurrentMaker } from "@/server/maker-repository";
 import { listProducts } from "@/server/product-repository";
 import { listProjects } from "@/server/project-repository";
 import { ensureProviderKeys } from "@/server/provider-keys";
+import { requireMaker } from "@/server/session";
 
 const money = (micros: number) => `$${fromMicros(micros).toFixed(2)}`;
 
@@ -37,6 +38,7 @@ function projectDetail(stats: ProjectStats): string {
 // What Kiln does is told on the public page (/); this is where a maker lands
 // from it. Nothing here calls a model or a shop. Rendered per request.
 export default async function ProjectsPage() {
+  await requireMaker();
   await connection();
   if (!hasDatabase()) {
     return (

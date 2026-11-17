@@ -13,6 +13,7 @@ import { agentRoutesProblem } from "@/server/chat/agent-route";
 import { saveMakerRoutes, setSceneLook } from "@/server/maker-repository";
 import { checkKey } from "@/server/provider-health";
 import { removeProviderKey, saveProviderKey } from "@/server/provider-keys";
+import { requireMaker } from "@/server/session";
 
 const SavedRoutes = z.object({ routes: MakerRoutes, agents: AgentRoutes });
 
@@ -23,6 +24,7 @@ const SavedRoutes = z.object({ routes: MakerRoutes, agents: AgentRoutes });
 export async function saveMakerRoutesAction(
   input: unknown,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const parsed = SavedRoutes.safeParse(input);
   if (!parsed.success) {
     return {
@@ -45,6 +47,7 @@ export async function saveMakerRoutesAction(
 export async function checkProviderKeyAction(
   input: unknown,
 ): Promise<{ ok: boolean; message: string }> {
+  await requireMaker();
   const parsed = ProviderId.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Which provider?" };
   const result = await checkKey(parsed.data);
@@ -72,6 +75,7 @@ const SavedKey = z.object({
 export async function saveProviderKeyAction(
   input: unknown,
 ): Promise<{ ok: boolean; message: string }> {
+  await requireMaker();
   const parsed = SavedKey.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Paste the key first." };
   if (providerMode() === "mock") {
@@ -98,6 +102,7 @@ export async function saveProviderKeyAction(
 export async function removeProviderKeyAction(
   input: unknown,
 ): Promise<{ ok: boolean; message: string }> {
+  await requireMaker();
   const parsed = ProviderId.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Which provider?" };
   try {
@@ -116,6 +121,7 @@ export async function removeProviderKeyAction(
 export async function setSceneLookAction(
   input: unknown,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const parsed = z.boolean().safeParse(input);
   if (!parsed.success) return { error: "On or off?" };
   try {

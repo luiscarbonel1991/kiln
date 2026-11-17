@@ -10,6 +10,7 @@ import {
 import { describeStoredSvg } from "@/server/product-files";
 import { listProducts } from "@/server/product-repository";
 import { sceneLookPlan } from "@/server/scene-look";
+import { requireMaker } from "@/server/session";
 import { textWorstCase } from "@/server/text-calls";
 
 // New project: product -> type -> destinations -> plan -> Start. Rendered per
@@ -23,6 +24,7 @@ export default async function NewProjectPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await requireMaker();
   await connection();
   const { design, product, listing, title } = await searchParams;
   const listingUrl =

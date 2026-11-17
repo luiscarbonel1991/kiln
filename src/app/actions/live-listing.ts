@@ -3,6 +3,7 @@
 import { MAX_UPLOAD_BYTES } from "@/components/studio/constants";
 import { imageSize, rasterType, sizeAspect } from "@/domain/image-type";
 import { storeAsset } from "@/providers/asset-bytes";
+import { requireMaker } from "@/server/session";
 
 export interface StoredListingPhoto {
   url: string;
@@ -18,6 +19,7 @@ export interface StoredListingPhoto {
 export async function uploadListingPhotoAction(
   formData: FormData,
 ): Promise<StoredListingPhoto | { error: string }> {
+  await requireMaker();
   const file = formData.get("file");
   if (!(file instanceof File)) return { error: "No photo was sent." };
   if (file.size > MAX_UPLOAD_BYTES) {

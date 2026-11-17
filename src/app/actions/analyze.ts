@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ProviderId } from "@/domain/model-defaults";
 import type { RanOn } from "@/domain/model-routing";
 import type { BaseUnderstanding } from "@/domain/understanding";
+import { requireMaker } from "@/server/session";
 import { type Degraded, readProduct } from "@/server/text-calls";
 
 const AnalyzeInput = z.object({
@@ -26,6 +27,7 @@ export async function analyzeMaster(input: {
   degraded?: Degraded;
   ranOn?: RanOn;
 }> {
+  await requireMaker();
   const safe = AnalyzeInput.parse(input);
   return readProduct(safe.assetUrl, safe.model);
 }

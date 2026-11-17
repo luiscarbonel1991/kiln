@@ -17,6 +17,7 @@ import {
   unwatchShop,
   watchShop,
 } from "@/server/maker-repository";
+import { requireMaker } from "@/server/session";
 import { disconnectShop } from "@/server/shop-connection";
 import { findShops, shopFavourites } from "@/server/shop-ranking";
 
@@ -31,6 +32,7 @@ const said = (error: unknown) =>
       : String(error);
 
 export async function disconnectShopAction(): Promise<{ error?: string }> {
+  await requireMaker();
   const gone = await disconnectShop();
   refresh();
   return gone ? {} : { error: "No shop was connected." };
@@ -39,6 +41,7 @@ export async function disconnectShopAction(): Promise<{ error?: string }> {
 export async function findShopsAction(
   input: unknown,
 ): Promise<{ shops: ShopStanding[] } | { error: string }> {
+  await requireMaker();
   const parsed = z.string().trim().min(2).max(80).safeParse(input);
   if (!parsed.success)
     return { error: "Type at least two letters of the shop's name." };
@@ -52,6 +55,7 @@ export async function findShopsAction(
 export async function watchShopAction(
   input: unknown,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const parsed = WatchedShop.safeParse(input);
   if (!parsed.success) return { error: "Which shop?" };
   const { watchedShops } = await getMakerPreferences();
@@ -71,6 +75,7 @@ export async function watchShopAction(
 export async function unwatchShopAction(
   input: unknown,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const parsed = WatchedShop.shape.shopId.safeParse(input);
   if (!parsed.success) return { error: "Which shop?" };
   await unwatchShop(parsed.data);
@@ -84,6 +89,7 @@ export async function shopFavouritesAction(
   | { listings: FavouredListing[]; read: number; complete: boolean }
   | { error: string }
 > {
+  await requireMaker();
   const parsed = WatchedShop.shape.shopId.safeParse(input);
   if (!parsed.success) return { error: "Which shop?" };
   try {
@@ -98,6 +104,7 @@ export async function shopFavouritesAction(
 export async function leaveOutListingAction(
   input: unknown,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const parsed = z
     .object({ listingId: ListingId, out: z.boolean() })
     .safeParse(input);

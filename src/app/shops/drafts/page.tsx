@@ -14,6 +14,7 @@ import {
   draftableProjects,
   listDrafts,
 } from "@/server/etsy-drafts";
+import { requireMaker } from "@/server/session";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 
 const HEADING = "font-serif text-xl text-foreground";
@@ -24,6 +25,7 @@ const LEAD =
 // read from Etsy per request, and the projects a new one can be made from.
 // Nothing here publishes.
 export default async function DraftsPage() {
+  await requireMaker();
   await dynamic();
   const setup = etsySetup();
   const shop = hasDatabase() ? await shopConnection() : null;

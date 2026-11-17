@@ -7,6 +7,7 @@ import { SEED_BRAND } from "@/domain/seed";
 import { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
+import { requireMaker } from "@/server/session";
 import { type Degraded, directScenes } from "@/server/text-calls";
 
 const ProposeInput = z.object({
@@ -27,6 +28,7 @@ export async function proposeVariants(input: unknown): Promise<{
   degraded?: Degraded;
   ranOn?: RanOn;
 }> {
+  await requireMaker();
   const { understanding, recipeId, model } = ProposeInput.parse(input);
   const recipe = findRecipe(recipeId) ?? SEED_RECIPES[0];
   return directScenes(

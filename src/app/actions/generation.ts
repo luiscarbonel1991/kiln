@@ -5,6 +5,7 @@ import { z } from "zod";
 import { enqueueProjectCards } from "@/server/generation-queue";
 import { cancelBatch, QueueRefusal } from "@/server/generation-repository";
 import { getCurrentMaker } from "@/server/maker-repository";
+import { requireMaker } from "@/server/session";
 
 // Queue mutations. Server Functions are POST-reachable: Zod is the trust
 // boundary; the queue re-derives every request and estimate from the saved
@@ -28,6 +29,7 @@ const Enqueue = z.object({
 export async function enqueueGenerationAction(
   input: unknown,
 ): Promise<{ queued: number } | { error: string }> {
+  await requireMaker();
   const parsed = Enqueue.parse(input);
   try {
     const result = await enqueueProjectCards(parsed);
@@ -42,6 +44,7 @@ export async function enqueueGenerationAction(
 const Cancel = z.object({ batchId: z.string().min(1) });
 
 export async function cancelBatchAction(input: unknown): Promise<void> {
+  await requireMaker();
   const { batchId } = Cancel.parse(input);
   const maker = await getCurrentMaker();
   await cancelBatch(maker.id, batchId);

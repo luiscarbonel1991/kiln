@@ -17,6 +17,7 @@ import {
   saveRead,
 } from "@/server/listing-results";
 import { changePlan } from "@/server/project-repository";
+import { requireMaker } from "@/server/session";
 
 // The board's results panel: the listing's address, the day its photos went
 // up, each read (typed, or from the shop connector) and whether the listing
@@ -42,6 +43,7 @@ async function run(change: () => Promise<unknown>, fallback: string) {
 }
 
 export async function saveReadAction(input: unknown): Promise<Result> {
+  await requireMaker();
   const parsed = Where.extend({
     key: ReadKey,
     read: ReadInput.nullable(),
@@ -61,12 +63,14 @@ export async function saveReadAction(input: unknown): Promise<Result> {
 }
 
 export async function readFromShopAction(input: unknown): Promise<Result> {
+  await requireMaker();
   const parsed = Where.extend({ key: ReadKey }).safeParse(input);
   if (!parsed.success) return { error: "The read could not be read." };
   return run(() => readFromShop(parsed.data), "The shop could not be read.");
 }
 
 export async function setListingUrlAction(input: unknown): Promise<Result> {
+  await requireMaker();
   const parsed = Where.extend({ url: z.string().trim().nullable() }).safeParse(
     input,
   );
@@ -85,6 +89,7 @@ export async function setListingUrlAction(input: unknown): Promise<Result> {
 }
 
 export async function setLiveOnAction(input: unknown): Promise<Result> {
+  await requireMaker();
   const parsed = Where.extend({ liveOn: z.iso.date().nullable() }).safeParse(
     input,
   );
@@ -99,6 +104,7 @@ export async function setLiveOnAction(input: unknown): Promise<Result> {
 }
 
 export async function setFollowingAction(input: unknown): Promise<Result> {
+  await requireMaker();
   const parsed = Where.extend({ following: z.boolean() }).safeParse(input);
   if (!parsed.success) return { error: "Could not read that." };
   const { projectId, destinationId, following } = parsed.data;

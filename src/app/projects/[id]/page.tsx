@@ -33,6 +33,7 @@ import {
 import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
 import { type ProviderHealth, providerHealth } from "@/server/provider-health";
+import { requireMaker } from "@/server/session";
 import { resultsConnector } from "@/server/shop-connector";
 import { takeRoutes } from "@/server/take-routes";
 import { textWorstCase } from "@/server/text-calls";
@@ -126,6 +127,7 @@ export default async function ProjectBoardPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ chat?: string }>;
 }) {
+  await requireMaker();
   const { id } = await params;
   const chatOpen = (await searchParams).chat === "1";
   const loaded = await loadProjectBoard(id);

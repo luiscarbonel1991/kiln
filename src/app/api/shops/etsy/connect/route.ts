@@ -1,3 +1,4 @@
+import { requireMaker } from "@/server/session";
 import {
   beginConnect,
   CONNECT_COOKIE,
@@ -22,6 +23,7 @@ function redirect(to: string | URL, cookie?: string): Response {
 // sealed cookie for ten minutes. Etsy sends them back to ETSY_REDIRECT_URI, so the
 // connection starts on that address's origin (the cookie must be there).
 export async function GET(request: Request) {
+  await requireMaker();
   const here = new URL(request.url);
   const setup = etsySetup();
   if (setup.redirectUri && here.searchParams.get("hop") === null) {

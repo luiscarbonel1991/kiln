@@ -17,6 +17,7 @@ import {
   sendMissingPhotos,
   updateDraft,
 } from "@/server/etsy-drafts";
+import { requireMaker } from "@/server/session";
 
 // The drafts pages' writes to the maker's Etsy shop. Each one is the maker's
 // click after a confirm; the rules around every write (a draft only, never a
@@ -43,6 +44,7 @@ const CreateInput = z.object({
 export async function createDraftAction(
   input: unknown,
 ): Promise<{ made: DraftMade } | { error: string }> {
+  await requireMaker();
   const parsed = CreateInput.safeParse(input);
   if (!parsed.success) return { error: "Which draft?" };
   try {
@@ -84,6 +86,7 @@ export async function updateDraftAction(
 ): Promise<
   { changes: FieldChange[]; readBack: ReadBack[] } | { error: string }
 > {
+  await requireMaker();
   const parsed = UpdateInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -108,6 +111,7 @@ export async function updateDraftAction(
 export async function addDraftPhotoAction(
   formData: FormData,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const listingId = ListingId.safeParse(Number(formData.get("listingId")));
   const file = formData.get("file");
   if (!listingId.success || !(file instanceof File)) {
@@ -142,6 +146,7 @@ const PhotoInput = z.object({
 export async function removeDraftPhotoAction(
   input: unknown,
 ): Promise<{ error?: string }> {
+  await requireMaker();
   const parsed = PhotoInput.safeParse(input);
   if (!parsed.success) return { error: "Which photo?" };
   try {
@@ -160,6 +165,7 @@ export async function removeDraftPhotoAction(
 export async function sendMissingPhotosAction(
   input: unknown,
 ): Promise<{ sent: number; missing: string[] } | { error: string }> {
+  await requireMaker();
   const parsed = z.object({ listingId: ListingId }).safeParse(input);
   if (!parsed.success) return { error: "Which draft?" };
   try {

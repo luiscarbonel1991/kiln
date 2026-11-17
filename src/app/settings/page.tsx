@@ -25,6 +25,7 @@ import {
   providerKeyStates,
 } from "@/server/provider-keys";
 import { sceneLookSetup } from "@/server/scene-look";
+import { requireMaker } from "@/server/session";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 import { recentToolCalls } from "@/server/tool-calls";
 
@@ -61,6 +62,7 @@ function keyLine(state: ProviderKeyState | undefined): string {
 // kept. Shops: the Etsy connection. Access tokens: for the HTTP API (README
 // "HTTP API").
 export default async function SettingsPage() {
+  await requireMaker();
   await connection();
   const maker = hasDatabase() ? await getCurrentMaker() : null;
   const [setup, health, keyStates, month, tokens, shop, calls, lessons] =

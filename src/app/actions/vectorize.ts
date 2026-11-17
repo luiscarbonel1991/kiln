@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { setCardVector } from "@/server/project-repository";
+import { requireMaker } from "@/server/session";
 import { traceToVector, VectorDetail, VectorMode } from "@/server/vectorize";
 
 const VectorizeInput = z.object({
@@ -21,6 +22,7 @@ const VectorizeInput = z.object({
 export async function vectorizeCardAction(
   input: unknown,
 ): Promise<{ url: string } | { error: string }> {
+  await requireMaker();
   const { imageUrl, mode, detail, projectId, cardId } =
     VectorizeInput.parse(input);
   const traced = await traceToVector(imageUrl, mode, detail);

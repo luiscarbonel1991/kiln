@@ -7,6 +7,7 @@ import {
   MAX_UPLOAD_BYTES,
 } from "@/components/studio/constants";
 import { getStorageProvider } from "@/providers/registry";
+import { requireMaker } from "@/server/session";
 
 const MimeSchema = z.enum(ACCEPTED_IMAGE_MIME);
 
@@ -22,6 +23,7 @@ const EXTENSION: Record<z.infer<typeof MimeSchema>, string> = {
 export async function uploadMasterImage(
   formData: FormData,
 ): Promise<{ url: string; mime: string }> {
+  await requireMaker();
   const file = formData.get("file");
   if (!(file instanceof File)) {
     throw new Error("No file provided.");

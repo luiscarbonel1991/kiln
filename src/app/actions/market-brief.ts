@@ -11,6 +11,7 @@ import {
 } from "@/domain/market-brief";
 import { rememberSearchColumns } from "@/server/maker-repository";
 import { setBrief } from "@/server/project-repository";
+import { requireMaker } from "@/server/session";
 
 const BriefSave = z.object({
   projectId: z.string().min(1),
@@ -62,6 +63,7 @@ function briefError(error: z.ZodError): string {
 export async function saveBriefAction(
   input: unknown,
 ): Promise<{ error: string } | undefined> {
+  await requireMaker();
   const parsed = BriefSave.safeParse(input);
   if (!parsed.success) return { error: "The brief could not be read." };
   const { projectId, destinationId, columns } = parsed.data;

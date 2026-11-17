@@ -6,6 +6,7 @@ import { getImageProvider } from "@/providers/registry";
 import { GenerationResult, ImageGenInput } from "@/providers/types";
 import { imageCall, withDirectSpend } from "@/server/direct-spend";
 import { getMakerModelSetup } from "@/server/maker-repository";
+import { requireMaker } from "@/server/session";
 
 const PromptInput = z.string().trim().min(1, "Describe the image to generate.");
 
@@ -13,6 +14,7 @@ const PromptInput = z.string().trim().min(1, "Describe the image to generate.");
 // Zod guard is the trust boundary (Server Functions are POST-reachable). The
 // studio explores, so it runs on the draft route's first model.
 export async function generateImage(prompt: string): Promise<GenerationResult> {
+  await requireMaker();
   const safePrompt = PromptInput.parse(prompt);
   const { models, routes } = await getMakerModelSetup();
   const input = ImageGenInput.parse({

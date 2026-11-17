@@ -8,6 +8,12 @@ import { type NextRequest, NextResponse } from "next/server";
 // assets are not matched.
 export function proxy(request: NextRequest) {
   if (!process.env.DATABASE_URL) return NextResponse.next();
+  // Only a page being opened is redirected here. A Server Action's POST goes
+  // on to the action, whose own check sends the person to sign in the way
+  // the page that called it can follow.
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return NextResponse.next();
+  }
   if (getSessionCookie(request, { cookiePrefix: "kiln" })) {
     return NextResponse.next();
   }

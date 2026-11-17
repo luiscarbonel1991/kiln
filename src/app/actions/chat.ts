@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createChatSession } from "@/server/chat/chat-repository";
+import { requireMaker } from "@/server/session";
 
 // A new conversation with Kiln's agent: the maker's own, or one on a
 // project. Zod is the trust boundary.
@@ -10,6 +11,7 @@ const NewChat = z.object({ projectId: z.string().min(1).optional() });
 export async function createChatAction(
   input: unknown,
 ): Promise<{ id: string } | { error: string }> {
+  await requireMaker();
   const parsed = NewChat.safeParse(input ?? {});
   if (!parsed.success) return { error: "That project cannot be read." };
   try {

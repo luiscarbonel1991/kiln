@@ -2,6 +2,7 @@ import { StudioShell } from "@/components/studio/studio-shell";
 import { enabledModules } from "@/modules/enabled";
 import { ModulesProvider } from "@/modules/modules-context";
 import { getMakerModels } from "@/server/maker-repository";
+import { requireMaker } from "@/server/session";
 import { takeRoutes } from "@/server/take-routes";
 import { photoRead } from "@/server/text-calls";
 
@@ -15,6 +16,7 @@ export default async function ProjectEditorPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await requireMaker();
   const { id } = await params;
   const { card } = await searchParams;
   return (

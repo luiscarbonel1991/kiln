@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { decideLesson } from "@/server/lessons";
+import { requireMaker } from "@/server/session";
 
 // The maker keeps a lesson Kiln or an agent proposed, or sets one aside (a
 // kept one too: it stops counting). Settings → Lessons and the chat's card.
@@ -14,6 +15,7 @@ const Decision = z.object({
 export async function decideLessonAction(
   input: unknown,
 ): Promise<{ status: "kept" | "dismissed" } | { error: string }> {
+  await requireMaker();
   const parsed = Decision.safeParse(input);
   if (!parsed.success) return { error: "Which lesson?" };
   const lesson = await decideLesson(parsed.data.id, parsed.data.status);

@@ -4,6 +4,7 @@ import { assertModel } from "@/domain/model-defaults";
 import { getImageProvider } from "@/providers/registry";
 import { GenerationResult, ImageEditInput } from "@/providers/types";
 import { imageCall, withDirectSpend } from "@/server/direct-spend";
+import { requireMaker } from "@/server/session";
 
 // Server Function: the only client path into @/providers for image editing. The
 // provider is the card's own; a model Kiln does not offer is refused, never
@@ -13,6 +14,7 @@ import { imageCall, withDirectSpend } from "@/server/direct-spend";
 export async function editImage(
   input: ImageEditInput,
 ): Promise<GenerationResult> {
+  await requireMaker();
   const parsed = ImageEditInput.parse(input);
   assertModel(parsed.model, "image");
   return withDirectSpend(

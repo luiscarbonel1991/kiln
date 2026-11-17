@@ -14,6 +14,7 @@ import {
   productProjects,
 } from "@/server/product-repository";
 import { productHash } from "@/server/product-version";
+import { requireMaker } from "@/server/session";
 import { textWorstCase } from "@/server/text-calls";
 
 // Where the page may send the maker back to: Home, a project's board, or a
@@ -31,6 +32,7 @@ export default async function ProductPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await requireMaker();
   await connection();
   const { id } = await params;
   const { back } = await searchParams;

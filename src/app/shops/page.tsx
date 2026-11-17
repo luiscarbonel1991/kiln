@@ -16,6 +16,7 @@ import {
 import { hasDatabase } from "@/lib/db";
 import { SHOP_RANK_LABEL, type ShopsQuery, shopsHref } from "@/lib/shops-view";
 import { EtsyError } from "@/providers/shop/etsy";
+import { requireMaker } from "@/server/session";
 import {
   type ConnectProblem,
   etsySetup,
@@ -58,6 +59,7 @@ export default async function ShopsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await requireMaker();
   await dynamic();
   const params = await searchParams;
   const query: ShopsQuery = {

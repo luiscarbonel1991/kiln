@@ -1,3 +1,5 @@
+import { vi } from "vitest";
+
 // Tests never make a paid call: the provider keys are dropped before any
 // module reads the environment, so every adapter takes its key-free path even
 // when the shell exports a real key.
@@ -9,3 +11,12 @@ delete process.env.ETSY_API_KEY;
 delete process.env.ETSY_SHARED_SECRET;
 delete process.env.ETSY_REDIRECT_URI;
 process.env.KILN_SECRET_KEY = Buffer.alloc(32, 7).toString("base64");
+
+// Server Actions and the app's own route handlers start by requiring a
+// session (src/server/session.ts). Tests call them directly, with no request,
+// so the guard lets them through; the guard's presence is its own test
+// (session-guard.test.ts).
+vi.mock("@/server/session", () => ({
+  requireMaker: async () => ({ id: "test", slug: "test", name: "Test" }),
+  denyWithoutSession: async () => null,
+}));
