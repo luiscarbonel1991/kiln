@@ -1,4 +1,12 @@
+"use client";
+
 import type { ComponentProps } from "react";
+import {
+  type Control,
+  Controller,
+  type FieldPath,
+  type FieldValues,
+} from "react-hook-form";
 import {
   Field,
   FieldDescription,
@@ -7,40 +15,47 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-// One labelled input of an account form, with its problem under it.
-export function AuthField({
+// One labelled input of an account form, bound to the form's state: its
+// problem shows under it after a submit and goes as soon as the value is
+// right again.
+export function AuthField<T extends FieldValues>({
+  control,
+  name,
   label,
   hint,
-  error,
-  name,
   ...input
 }: {
+  control: Control<T>;
+  name: FieldPath<T>;
   label: string;
   hint?: string;
-  error?: string;
-  name: string;
-} & ComponentProps<typeof Input>) {
+} & Omit<ComponentProps<typeof Input>, "name">) {
   const id = `account-${name}`;
-  const note = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
-    <Field data-invalid={error ? true : undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input
-        id={id}
-        name={name}
-        data-testid={id}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={note}
-        className="h-10 rounded-field bg-background px-3"
-        {...input}
-      />
-      {error ? (
-        <FieldError id={note} data-testid={`${id}-error`}>
-          {error}
-        </FieldError>
-      ) : hint ? (
-        <FieldDescription id={note}>{hint}</FieldDescription>
-      ) : null}
-    </Field>
+    <Controller
+      name={name}
+      control={control}
+      render={({ field, fieldState }) => (
+        <Field data-invalid={fieldState.invalid}>
+          <FieldLabel htmlFor={id}>{label}</FieldLabel>
+          <Input
+            {...input}
+            {...field}
+            id={id}
+            data-testid={id}
+            aria-invalid={fieldState.invalid}
+            className="h-10 rounded-field bg-background px-3"
+          />
+          {fieldState.invalid ? (
+            <FieldError
+              data-testid={`${id}-error`}
+              errors={[fieldState.error]}
+            />
+          ) : hint ? (
+            <FieldDescription>{hint}</FieldDescription>
+          ) : null}
+        </Field>
+      )}
+    />
   );
 }

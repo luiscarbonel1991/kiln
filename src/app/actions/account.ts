@@ -13,44 +13,30 @@ import {
   instanceClaimed,
 } from "@/server/organization";
 
-export interface OwnerFormState {
-  // A problem with the whole form (the instance is taken, the email is used).
+type OwnerValues = z.infer<typeof OwnerForm>;
+
+// What a refused first-run form gets back: a problem with the whole form
+// (the instance is taken, the email is used) or with single fields.
+export interface OwnerRefusal {
   error: string | null;
   fields: FieldErrors<OwnerValues>;
-  // What was typed, given back so a refused form is not emptied (never the
-  // password).
-  values: { company: string; name: string; email: string };
 }
-
-type OwnerValues = z.infer<typeof OwnerForm>;
 
 const TAKEN = "This Kiln already has its owner. Ask them for an invitation.";
 
 // The first run: the instance's first account. Their company becomes the
-// organization and takes the work this instance already holds.
-export async function createOwner(
-  _prev: OwnerFormState,
-  form: FormData,
-): Promise<OwnerFormState> {
-  const text = (key: string) => String(form.get(key) ?? "");
-  const values = {
-    company: text("company"),
-    name: text("name"),
-    email: text("email"),
-  };
-  const refuse = (error: string): OwnerFormState => ({
-    error,
-    fields: {},
-    values,
-  });
+// organization and takes the work this instance already holds. On success the
+// person is sent to their projects; otherwise the refusal comes back.
+export async function createOwner(input: unknown): Promise<OwnerRefusal> {
+  const refuse = (error: string): OwnerRefusal => ({ error, fields: {} });
   if (!hasDatabase() || !hasAuthSecret()) {
     return refuse(
       "Kiln needs DATABASE_URL and KILN_SECRET_KEY in .env before it can keep accounts.",
     );
   }
-  const parsed = OwnerForm.safeParse(Object.fromEntries(form));
+  const parsed = OwnerForm.safeParse(input);
   if (!parsed.success) {
-    return { error: null, fields: fieldErrors(parsed.error), values };
+    return { error: null, fields: fieldErrors(parsed.error) };
   }
   if (await instanceClaimed()) return refuse(TAKEN);
   const { company, name, email, password } = parsed.data;

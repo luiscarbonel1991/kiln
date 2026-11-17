@@ -1,0 +1,327 @@
+/* The account pages' scene: a piece being made, then photographed and
+   checked. One 14 s loop; every part runs the same clock. */
+.bench {
+  --ink: #f6f1e8;
+  --ember: #e2683c;
+  background: radial-gradient(
+    120% 90% at 30% 20%,
+    #3a3026 0%,
+    #241f18 60%,
+    #1b1712 100%
+  );
+}
+.bench-grid {
+  stroke: rgba(246, 241, 232, 0.07);
+  stroke-width: 1;
+}
+.bench-tick {
+  fill: rgba(246, 241, 232, 0.35);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.bench-plate-fill {
+  fill: #6b4530;
+  opacity: 0;
+  animation: bench-fill 14s ease-in-out infinite;
+}
+.bench-outline,
+.bench-inset,
+.bench-sprig {
+  fill: none;
+  stroke: var(--ember);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.bench-outline {
+  stroke-width: 2.5;
+  animation: bench-outline 14s linear infinite;
+}
+.bench-inset {
+  stroke-width: 1.5;
+  animation: bench-inset 14s linear infinite;
+}
+.bench-sprig {
+  stroke-width: 2;
+  animation: bench-sprig 14s linear infinite;
+}
+.bench-name {
+  font-family: var(--font-fraunces), serif;
+  font-size: 46px;
+  font-weight: 500;
+  fill: transparent;
+  stroke: var(--ember);
+  stroke-width: 1.1;
+  stroke-dasharray: 260;
+  stroke-dashoffset: 260;
+  animation: bench-name 14s linear infinite;
+}
+.bench-year {
+  font-family: var(--font-fraunces), serif;
+  font-size: 22px;
+  letter-spacing: 0.12em;
+  fill: #2a1a10;
+  opacity: 0;
+  animation: bench-year 14s linear infinite;
+}
+
+/* The head: the bright point that does the work, following the outline. */
+.bench-head {
+  fill: #fff3e6;
+  filter: drop-shadow(0 0 6px var(--ember)) drop-shadow(0 0 14px var(--ember));
+  offset-path: path(
+    "M132 190H468A22 22 0 0 1 490 212V388A22 22 0 0 1 468 410H132A22 22 0 0 1 110 388V212A22 22 0 0 1 132 190Z"
+  );
+  offset-rotate: 0deg;
+  animation: bench-head 14s linear infinite;
+}
+
+.bench-corner {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  opacity: 0;
+  transform-box: fill-box;
+  animation: bench-corner 14s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.bench-flash {
+  fill: var(--ink);
+  opacity: 0;
+  animation: bench-flash 14s linear infinite;
+}
+.bench-chip {
+  opacity: 0;
+  animation: bench-chip 14s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.bench-chip rect {
+  fill: #2c6a51;
+}
+.bench-chip text {
+  fill: var(--ink);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+@keyframes bench-outline {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+  22% {
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  56% {
+    opacity: 0.25;
+  }
+  92% {
+    stroke-dashoffset: 0;
+    opacity: 0.25;
+  }
+  98%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes bench-head {
+  0% {
+    offset-distance: 0%;
+    opacity: 1;
+  }
+  22% {
+    offset-distance: 100%;
+    opacity: 1;
+  }
+  24%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+@keyframes bench-inset {
+  0%,
+  22% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+  32% {
+    stroke-dashoffset: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  56%,
+  92% {
+    stroke-dashoffset: 0;
+    opacity: 0.55;
+    stroke: #2a1a10;
+  }
+  98%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes bench-name {
+  0%,
+  30% {
+    stroke-dashoffset: 260;
+    fill: transparent;
+    opacity: 1;
+  }
+  46% {
+    stroke-dashoffset: 0;
+    fill: transparent;
+    stroke: var(--ember);
+  }
+  56%,
+  92% {
+    stroke-dashoffset: 0;
+    fill: #2a1a10;
+    stroke: #2a1a10;
+    opacity: 1;
+  }
+  98%,
+  100% {
+    stroke-dashoffset: 0;
+    fill: #2a1a10;
+    stroke: #2a1a10;
+    opacity: 0;
+  }
+}
+@keyframes bench-sprig {
+  0%,
+  42% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+  50% {
+    stroke-dashoffset: 0;
+    stroke: var(--ember);
+  }
+  56%,
+  92% {
+    stroke-dashoffset: 0;
+    stroke: #2a1a10;
+    opacity: 1;
+  }
+  98%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes bench-year {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  56%,
+  92% {
+    opacity: 1;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes bench-fill {
+  0%,
+  48% {
+    opacity: 0;
+  }
+  56%,
+  92% {
+    opacity: 1;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes bench-corner {
+  0%,
+  60% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+  66%,
+  92% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  98%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@keyframes bench-flash {
+  0%,
+  68% {
+    opacity: 0;
+  }
+  69.5% {
+    opacity: 0.55;
+  }
+  73%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes bench-chip {
+  0%,
+  73% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  78%,
+  92% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  98%,
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+}
+
+/* Without motion: the finished piece, framed and checked. */
+@media (prefers-reduced-motion: reduce) {
+  .bench * {
+    animation: none;
+  }
+  .bench-plate-fill,
+  .bench-year,
+  .bench-corner,
+  .bench-chip {
+    opacity: 1;
+  }
+  .bench-outline {
+    stroke-dashoffset: 0;
+    opacity: 0.25;
+  }
+  .bench-inset,
+  .bench-sprig {
+    stroke-dashoffset: 0;
+    stroke: #2a1a10;
+  }
+  .bench-name {
+    stroke-dashoffset: 0;
+    fill: #2a1a10;
+    stroke: #2a1a10;
+  }
+  .bench-head {
+    opacity: 0;
+  }
+}

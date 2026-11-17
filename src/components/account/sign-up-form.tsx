@@ -1,84 +1,73 @@
 "use client";
 
-import { useActionState } from "react";
-import { createOwner, type OwnerFormState } from "@/app/actions/account";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import type { z } from "zod";
+import { createOwner } from "@/app/actions/account";
 import { AuthField } from "@/components/account/auth-field";
 import { Button } from "@/components/ui/button";
 import { FieldError, FieldGroup } from "@/components/ui/field";
-import { fieldErrors, MIN_PASSWORD, OwnerForm } from "@/lib/account-forms";
+import { MIN_PASSWORD, OwnerForm } from "@/lib/account-forms";
 
-const START: OwnerFormState = {
-  error: null,
-  fields: {},
-  values: { company: "", name: "", email: "" },
-};
-
-// Checked in the browser first, so a problem shows under its field at once;
-// the server checks again.
-async function submit(
-  prev: OwnerFormState,
-  form: FormData,
-): Promise<OwnerFormState> {
-  const parsed = OwnerForm.safeParse(Object.fromEntries(form));
-  if (!parsed.success) {
-    const text = (key: string) => String(form.get(key) ?? "");
-    return {
-      error: null,
-      fields: fieldErrors(parsed.error),
-      values: {
-        company: text("company"),
-        name: text("name"),
-        email: text("email"),
-      },
-    };
-  }
-  return createOwner(prev, form);
-}
+type Values = z.input<typeof OwnerForm>;
 
 export function SignUpForm() {
-  const [state, action, busy] = useActionState(submit, START);
+  const form = useForm<Values, unknown, z.output<typeof OwnerForm>>({
+    resolver: zodResolver(OwnerForm),
+    defaultValues: { company: "", name: "", email: "", password: "" },
+  });
+  const { isSubmitting, errors } = form.formState;
+
+  // The server checks again; what it refuses lands on the same fields.
+  const submit = form.handleSubmit(async (values) => {
+    const refused = await createOwner(values);
+    for (const [name, message] of Object.entries(refused.fields)) {
+      form.setError(name as keyof Values, { message });
+    }
+    if (refused.error) form.setError("root", { message: refused.error });
+  });
+
   return (
-    <form action={action} noValidate data-testid="sign-up-form">
+    <form onSubmit={submit} noValidate data-testid="sign-up-form">
       <FieldGroup className="gap-4">
         <AuthField
-          label="Company or studio"
+          control={form.control}
           name="company"
+          label="Company or studio"
           autoComplete="organization"
-          defaultValue={state.values.company}
-          error={state.fields.company}
         />
         <AuthField
-          label="Your name"
+          control={form.control}
           name="name"
+          label="Your name"
           autoComplete="name"
-          defaultValue={state.values.name}
-          error={state.fields.name}
         />
         <AuthField
-          label="Email"
+          control={form.control}
           name="email"
+          label="Email"
           type="email"
           autoComplete="email"
-          defaultValue={state.values.email}
-          error={state.fields.email}
         />
         <AuthField
-          label="Password"
+          control={form.control}
           name="password"
+          label="Password"
           type="password"
           autoComplete="new-password"
           hint={`At least ${MIN_PASSWORD} characters.`}
-          error={state.fields.password}
         />
-        <FieldError data-testid="sign-up-error">{state.error}</FieldError>
+        {errors.root ? (
+          <FieldError data-testid="sign-up-error" errors={[errors.root]} />
+        ) : null}
         <Button
           type="submit"
           size="lg"
-          disabled={busy}
+          disabled={isSubmitting}
           data-testid="sign-up-submit"
           className="h-10 w-full rounded-field shadow-button"
         >
-          {busy ? "Setting up…" : "Create the owner account"}
+          {isSubmitting ? "Setting up…" : "Create the owner account"}
         </Button>
       </FieldGroup>
     </form>

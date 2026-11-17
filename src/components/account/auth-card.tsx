@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BenchScene } from "@/components/account/bench-scene";
 import {
   Card,
   CardContent,
@@ -9,9 +10,8 @@ import {
 } from "@/components/ui/card";
 
 // The frame of the sign-in and first-run pages. On a wide screen the form
-// shares the page with a photo from the sample product's kit: what a maker
-// comes here to make, before they have made anything. On a phone, the form
-// alone.
+// shares the page with a scene drawn in code: a piece being made, framed and
+// checked. On a phone, the form alone.
 export function AuthCard({
   title,
   lead,
@@ -23,24 +23,18 @@ export function AuthCard({
 }) {
   return (
     <main className="grid min-h-dvh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      <figure className="relative m-4 mr-0 hidden overflow-hidden rounded-card shadow-card lg:block">
-        {/* biome-ignore lint/performance/noImgElement: a fixed file from public/, the same one the public page serves. */}
-        <img
-          src="/home/board/lifestyle.jpg"
-          alt="The sample product on a set table, from its kit."
-          className="absolute inset-0 size-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#241f18]/70 via-transparent to-transparent" />
+      <figure className="bench relative m-4 mr-0 hidden overflow-hidden rounded-card shadow-card lg:block">
+        <BenchScene />
         <figcaption className="absolute inset-x-0 bottom-0 p-8 text-[#fffdf9]">
           <p
             className="max-w-sm font-serif text-3xl leading-tight"
             style={{ fontVariationSettings: "'opsz' 144" }}
           >
             Describe it once.{" "}
-            <em className="italic">Photograph it everywhere.</em>
+            <em className="italic">Kiln photographs and checks it.</em>
           </p>
           <p className="mt-3 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-[#fffdf9]/75">
-            Sample product · made in Kiln · checked
+            Drawn in code · nothing here is generated
           </p>
         </figcaption>
       </figure>
