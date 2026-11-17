@@ -7,6 +7,7 @@ import { Lessons } from "@/components/settings/lessons";
 import { ProviderKey } from "@/components/settings/provider-key";
 import { RoutesForm } from "@/components/settings/routes-form";
 import { SceneLookSwitch } from "@/components/settings/scene-look-switch";
+import { Team } from "@/components/settings/team";
 import { ToolCalls } from "@/components/settings/tool-calls";
 import { EtsyConnection } from "@/components/shops/etsy-connection";
 import { fromMicros } from "@/domain/generation-cost";
@@ -28,6 +29,7 @@ import {
 } from "@/server/provider-keys";
 import { sceneLookSetup } from "@/server/scene-look";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
+import { listTeam } from "@/server/team";
 import { recentToolCalls } from "@/server/tool-calls";
 
 const money = (usd: number) => `$${usd.toFixed(2)}`;
@@ -65,18 +67,21 @@ function keyLine(state: ProviderKeyState | undefined): string {
 export default makerPage(async function SettingsPage(current: CurrentMaker) {
   await connection();
   const maker = hasDatabase() ? current : null;
-  const [setup, health, keyStates, month, tokens, shop, calls, lessons] =
+  // The team, the keys and the access tokens are the owner's to manage.
+  const owner = current.member?.role === "owner";
+  const [setup, health, keyStates, month, tokens, shop, calls, lessons, team] =
     await Promise.all([
       getMakerModelSetup(current),
       providerHealth(maker?.id ?? null),
       maker ? providerKeyStates(maker.id) : Promise.resolve([]),
       maker ? budget(maker.id) : Promise.resolve(null),
-      maker ? listAccessTokens(maker) : Promise.resolve(null),
+      maker && owner ? listAccessTokens(maker) : Promise.resolve(null),
       maker ? shopConnection(maker) : Promise.resolve(null),
       maker ? recentToolCalls(maker) : Promise.resolve([]),
       maker
         ? listLessons(maker, { status: ["proposed", "kept"] })
         : Promise.resolve(null),
+      maker && owner ? listTeam(maker) : Promise.resolve(null),
     ]);
   const mode = providerMode();
   const look = maker ? await sceneLookSetup(maker) : null;
@@ -169,7 +174,12 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
                 {h.keyPresent && mode !== "mock" ? (
                   <KeyCheck provider={h.provider} label={h.label} />
                 ) : null}
-                {maker && mode !== "mock" ? (
+                {maker && mode !== "mock" && !owner ? (
+                  <p className="font-sans text-[0.75rem] text-on-surface-dim">
+                    The studio&apos;s owner manages its keys.
+                  </p>
+                ) : null}
+                {maker && mode !== "mock" && owner ? (
                   <ProviderKey
                     provider={h.provider}
                     label={h.label}
@@ -182,6 +192,24 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
             ))}
           </div>
         </section>
+
+        {team ? (
+          <section id="team" className="rounded-card bg-card p-6 shadow-card">
+            <h2
+              className="font-serif text-xl text-foreground"
+              style={{ fontVariationSettings: "'opsz' 40" }}
+            >
+              Team
+            </h2>
+            <p className="mt-1 mb-5 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
+              The people who work in this studio see its products and projects.
+              Make an invitation for their email and send them the link: it
+              opens a page where they make their account, and it lasts 7 days.
+              The keys and the access tokens stay yours to manage.
+            </p>
+            <Team team={team} />
+          </section>
+        ) : null}
 
         <section className="rounded-card bg-card p-6 shadow-card">
           <h2

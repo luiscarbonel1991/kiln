@@ -20,8 +20,12 @@ function files(dir: string, match: RegExp): string[] {
   });
 }
 
-// The first run's own action: it is how the first session comes to exist.
-const OPEN_ACTIONS = new Set([join("app", "actions", "account.ts")]);
+// The first run's own action and the join page's: they are how a session
+// comes to exist (each checks the instance or the invitation itself).
+const OPEN_ACTIONS = new Set([
+  join("app", "actions", "account.ts"),
+  join("app", "actions", "join.ts"),
+]);
 // Better Auth's own endpoints, and a schema file anyone may read.
 const OPEN_ROUTES = new Set([
   join("api", "auth", "[...all]", "route.ts"),
@@ -34,6 +38,7 @@ const OPEN_PAGES = new Set([
   join("sign-in", "page.tsx"),
   join("sign-up", "page.tsx"),
   join("welcome", "page.tsx"),
+  join("invite", "[id]", "page.tsx"),
   join("preview", "page.tsx"),
 ]);
 
@@ -52,7 +57,7 @@ describe("the session guard", () => {
     expect(unguarded.map((path) => relative(app, path))).toEqual([]);
   });
 
-  it("every Server Action is written as a makerAction", () => {
+  it("every Server Action is written as a makerAction or an ownerAction", () => {
     // Any file of Server Functions, wherever it lives (a module's too).
     const actions = files(src, /\.ts$/).filter(
       (path) =>
@@ -66,7 +71,7 @@ describe("the session guard", () => {
         .filter(
           (line) =>
             /^export /.test(line) &&
-            !/^export const \w+ = makerAction\(/.test(line) &&
+            !/^export const \w+ = (makerAction|ownerAction)\(/.test(line) &&
             !/^export (type|interface) /.test(line),
         )
         .map((line) => `${relative(src, path)}: ${line}`),

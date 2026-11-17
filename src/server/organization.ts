@@ -74,16 +74,37 @@ export async function claimInstance(input: {
   return { organizationId };
 }
 
-// The maker a signed-in person works for: their session's organization, else
-// the first they belong to. Null when they belong to none.
+// A person's place in an organization. Two roles for now: the owner manages
+// the team and the keys; a member works on the products and projects.
+export type MemberRole = "owner" | "member";
+
+export interface MemberRef {
+  id: string;
+  userId: string;
+  role: MemberRole;
+}
+
+const roleOf = (role: string): MemberRole =>
+  role.split(",").includes("owner") ? "owner" : "member";
+
+// The maker a signed-in person works for, and their membership: their
+// session's organization, else the first they belong to. Null when they
+// belong to none.
 export async function makerOfMember(input: {
   userId: string;
   activeOrganizationId?: string | null;
-}): Promise<{ id: string; slug: string; name: string } | null> {
+}): Promise<{
+  id: string;
+  slug: string;
+  name: string;
+  member: MemberRef;
+} | null> {
   const members = await db.member.findMany({
     where: { userId: input.userId },
     orderBy: { createdAt: "asc" },
     select: {
+      id: true,
+      role: true,
       organizationId: true,
       organization: {
         select: { maker: { select: { id: true, slug: true, name: true } } },
@@ -93,5 +114,10 @@ export async function makerOfMember(input: {
   const chosen =
     members.find((m) => m.organizationId === input.activeOrganizationId) ??
     members[0];
-  return chosen?.organization.maker ?? null;
+  const maker = chosen?.organization.maker;
+  if (!chosen || !maker) return null;
+  return {
+    ...maker,
+    member: { id: chosen.id, userId: input.userId, role: roleOf(chosen.role) },
+  };
 }

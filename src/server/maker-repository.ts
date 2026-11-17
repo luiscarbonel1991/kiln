@@ -33,13 +33,16 @@ import {
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getAuth } from "@/server/auth";
-import { makerOfMember } from "@/server/organization";
+import { type MemberRef, makerOfMember } from "@/server/organization";
 import { bearerToken, hashToken } from "@/server/token-format";
 
 export interface CurrentMaker {
   id: string;
   slug: string;
   name: string;
+  // Who is working, when a person is (a session). A token, a script or the
+  // worker has none.
+  member?: MemberRef;
 }
 
 // The maker a piece of work is for, handed in by whoever knows it: the

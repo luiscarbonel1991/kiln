@@ -10,7 +10,7 @@ import {
 import { AgentRoutes, MakerRoutes } from "@/domain/model-routing";
 import { providerMode } from "@/providers/mode";
 import { agentRoutesProblem } from "@/server/chat/agent-route";
-import { makerAction } from "@/server/guarded";
+import { makerAction, ownerAction } from "@/server/guarded";
 import { saveMakerRoutes, setSceneLook } from "@/server/maker-repository";
 import { checkKey } from "@/server/provider-health";
 import { removeProviderKey, saveProviderKey } from "@/server/provider-keys";
@@ -70,7 +70,7 @@ const SavedKey = z.object({
 
 // Settings → Providers: keep a provider's key (sealed, never sent back), then
 // check it for free, so the answer the maker reads is the provider's own.
-export const saveProviderKeyAction = makerAction(
+export const saveProviderKeyAction = ownerAction(
   async (maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
     const parsed = SavedKey.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Paste the key first." };
@@ -96,7 +96,7 @@ export const saveProviderKeyAction = makerAction(
   },
 );
 
-export const removeProviderKeyAction = makerAction(
+export const removeProviderKeyAction = ownerAction(
   async (maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
     const parsed = ProviderId.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Which provider?" };

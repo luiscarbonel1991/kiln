@@ -12,22 +12,33 @@ const email = z
   .min(1, "Your email.")
   .pipe(z.email("That does not look like an email."));
 
+const password = z
+  .string()
+  .min(MIN_PASSWORD, `At least ${MIN_PASSWORD} characters.`)
+  .max(128, "At most 128 characters.");
+
+const name = z
+  .string()
+  .trim()
+  .min(1, "Your name.")
+  .max(80, "At most 80 characters.");
+
 export const OwnerForm = z.object({
   company: z
     .string()
     .trim()
     .min(1, "Name your company or studio.")
     .max(80, "At most 80 characters."),
-  name: z
-    .string()
-    .trim()
-    .min(1, "Your name.")
-    .max(80, "At most 80 characters."),
+  name,
   email,
-  password: z
-    .string()
-    .min(MIN_PASSWORD, `At least ${MIN_PASSWORD} characters.`)
-    .max(128, "At most 128 characters."),
+  password,
+});
+
+// Joining a studio by invitation: the email is the invitation's.
+export const JoinForm = z.object({ name, password });
+
+export const InviteForm = z.object({
+  email: email.pipe(z.string().max(254, "At most 254 characters.")),
 });
 
 export const SignInForm = z.object({

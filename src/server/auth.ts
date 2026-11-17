@@ -9,6 +9,23 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { instanceClaimed } from "@/server/organization";
 
+// The header the join page's sign-up carries: the invitation it answers.
+export const INVITATION_HEADER = "x-kiln-invitation";
+const INVITATION_DAYS = 7;
+
+async function invitationFor(id: string, email: string): Promise<boolean> {
+  const found = await db.invitation.findFirst({
+    where: {
+      id,
+      email: { equals: email, mode: "insensitive" },
+      status: "pending",
+      expiresAt: { gt: new Date() },
+    },
+    select: { id: true },
+  });
+  return Boolean(found);
+}
+
 // Accounts (Better Auth, on Kiln's own Postgres): people sign in with an email
 // and a password and belong to an organization, the maker's company. Sessions
 // are cookies. Its secret is derived from KILN_SECRET_KEY, so an install has
@@ -51,16 +68,19 @@ function build() {
     session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
     advanced: { cookiePrefix: "kiln" },
     hooks: {
-      // An instance takes one sign-up: its owner's (the first-run page). After
-      // that, people join by invitation.
+      // An instance takes one open sign-up: its owner's (the first-run page).
+      // After that, an account is made only for the email of an invitation,
+      // by whoever holds its link (the join page sends its id).
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path !== "/sign-up/email") return;
-        if (await instanceClaimed()) {
-          throw new APIError("FORBIDDEN", {
-            message:
-              "This Kiln already has its owner. Ask them for an invitation.",
-          });
-        }
+        if (!(await instanceClaimed())) return;
+        const invitationId = ctx.headers?.get(INVITATION_HEADER);
+        const email = String(ctx.body?.email ?? "").toLowerCase();
+        if (invitationId && (await invitationFor(invitationId, email))) return;
+        throw new APIError("FORBIDDEN", {
+          message:
+            "This Kiln already has its owner. Ask them for an invitation.",
+        });
       }),
     },
     databaseHooks: {
@@ -87,6 +107,7 @@ function build() {
       organization({
         allowUserToCreateOrganization: false,
         disableOrganizationDeletion: true,
+        invitationExpiresIn: INVITATION_DAYS * 24 * 60 * 60,
       }),
       nextCookies(),
     ],

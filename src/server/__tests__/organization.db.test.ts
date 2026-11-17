@@ -68,11 +68,11 @@ describe.skipIf(!enabled)("claiming an instance (database)", async () => {
 
   it("refuses a second claim and leaves no organization behind", async () => {
     const second = await newUser();
-    const count = await db.organization.count();
+    const company = `Another ${second}`;
     await expect(
-      claimInstance({ userId: second, company: "Another" }),
+      claimInstance({ userId: second, company }),
     ).rejects.toBeInstanceOf(AlreadyClaimed);
-    expect(await db.organization.count()).toBe(count);
+    expect(await db.organization.count({ where: { name: company } })).toBe(0);
     expect(await makerOfMember({ userId: second })).toBeNull();
   });
 });

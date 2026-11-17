@@ -55,6 +55,24 @@ export function makerAction<Args extends unknown[], Result>(
   };
 }
 
+export class OwnerOnly extends Error {
+  readonly name = "OwnerOnly";
+  constructor() {
+    super("Only the studio's owner can do that.");
+  }
+}
+
+// A Server Action only the organization's owner may run (the team, the
+// keys). Anyone else is refused before the code inside runs.
+export function ownerAction<Args extends unknown[], Result>(
+  run: (maker: CurrentMaker, ...args: Args) => Promise<Result>,
+): (...args: Args) => Promise<Result> {
+  return makerAction(async (maker, ...args: Args) => {
+    if (maker.member?.role !== "owner") throw new OwnerOnly();
+    return run(maker, ...args);
+  });
+}
+
 // A route handler the app's own pages call with fetch: 401 without a session.
 export function sessionRoute<Args extends unknown[]>(
   run: (maker: CurrentMaker, ...args: Args) => Promise<Response>,

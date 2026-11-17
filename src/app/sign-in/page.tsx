@@ -10,10 +10,17 @@ import { instanceClaimed, makerOfMember } from "@/server/organization";
 export const metadata: Metadata = { title: "Sign in · Kiln" };
 export const dynamic = "force-dynamic";
 
+// Where to go after signing in, when it is an invitation's join page: never
+// an address elsewhere.
+const safeNext = (next: unknown): string | undefined =>
+  typeof next === "string" && /^\/invite\/[\w-]{1,100}$/.test(next)
+    ? next
+    : undefined;
+
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ left?: string }>;
+  searchParams: Promise<{ left?: string; next?: string }>;
 }) {
   if (!hasDatabase() || !hasAuthSecret()) {
     return (
@@ -33,11 +40,14 @@ export default async function SignInPage({
         activeOrganizationId: session.session.activeOrganizationId,
       })
     : null;
+  const { left, next: asked } = await searchParams;
+  const next = safeNext(asked);
+  if (session && next) redirect(next);
   if (belongs) redirect("/projects");
-  const { left } = await searchParams;
   return (
     <AuthCard title="Sign in" lead="Your studio is where you left it.">
       <SignInForm
+        next={next}
         notice={
           left && session
             ? "Your account belongs to no organization on this Kiln. Ask its owner for an invitation, or sign in with another account."

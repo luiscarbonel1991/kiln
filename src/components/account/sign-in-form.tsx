@@ -12,7 +12,13 @@ import { authClient } from "@/lib/auth-client";
 
 type Values = z.input<typeof SignInFields>;
 
-export function SignInForm({ notice }: { notice?: string }) {
+export function SignInForm({
+  notice,
+  next = "/projects",
+}: {
+  notice?: string;
+  next?: string;
+}) {
   const router = useRouter();
   const form = useForm<Values, unknown, z.output<typeof SignInFields>>({
     resolver: zodResolver(SignInFields),
@@ -31,7 +37,7 @@ export function SignInForm({ notice }: { notice?: string }) {
       });
       return;
     }
-    router.replace("/projects");
+    router.replace(next);
     router.refresh();
   });
 

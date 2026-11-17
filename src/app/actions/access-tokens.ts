@@ -8,13 +8,13 @@ import {
   setTokenSpend,
   TokenName,
 } from "@/server/access-tokens";
-import { makerAction } from "@/server/guarded";
+import { ownerAction } from "@/server/guarded";
 
 // Settings → Access tokens. Zod is the trust boundary. The token comes back
 // this once; Kiln keeps only its hash.
 const NewToken = z.object({ name: TokenName, canSpend: z.boolean() });
 
-export const createAccessTokenAction = makerAction(
+export const createAccessTokenAction = ownerAction(
   async (
     maker,
     input: unknown,
@@ -33,7 +33,7 @@ export const createAccessTokenAction = makerAction(
   },
 );
 
-export const revokeAccessTokenAction = makerAction(
+export const revokeAccessTokenAction = ownerAction(
   async (maker, input: unknown): Promise<{ error?: string }> => {
     const parsed = z.string().min(1).safeParse(input);
     if (!parsed.success) return { error: "Which token?" };
@@ -46,7 +46,7 @@ export const revokeAccessTokenAction = makerAction(
 const Spend = z.object({ id: z.string().min(1), canSpend: z.boolean() });
 
 // Let a token run paid tools (after a quote, within the cap), or stop it.
-export const setTokenSpendAction = makerAction(
+export const setTokenSpendAction = ownerAction(
   async (maker, input: unknown): Promise<{ error?: string }> => {
     const parsed = Spend.safeParse(input);
     if (!parsed.success) return { error: "Which token?" };

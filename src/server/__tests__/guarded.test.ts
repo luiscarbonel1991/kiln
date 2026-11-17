@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
+const who = vi.hoisted(() => ({ role: "owner" as "owner" | "member" }));
 vi.mock("@/server/session", () => ({
-  requireMaker: async () => ({ id: "test", slug: "test", name: "Test" }),
+  requireMaker: async () => ({
+    id: "test",
+    slug: "test",
+    name: "Test",
+    member: { id: "m1", userId: "u1", role: who.role },
+  }),
   denyWithoutSession: async () => null,
 }));
 vi.mock("@/server/provider-keys", async () => {
@@ -13,9 +19,8 @@ vi.mock("@/server/provider-keys", async () => {
 });
 
 const { providerKey } = await import("@/providers/keys");
-const { makerAction, makerPage, sessionRoute } = await import(
-  "@/server/guarded"
-);
+const { makerAction, makerPage, OwnerOnly, ownerAction, sessionRoute } =
+  await import("@/server/guarded");
 
 describe("the guarded shapes run as the maker", () => {
   it("an action and a page see the maker's keys and no one else's", async () => {
@@ -46,5 +51,14 @@ describe("the guarded shapes run as the maker", () => {
     const response = await route();
     expect(response.headers.get("x-kind")).toBe("chat");
     expect(await response.text()).toBe("sk-of-test;sk-of-test;");
+  });
+
+  it("an owner's action runs for the owner and refuses a member", async () => {
+    const action = ownerAction(async (maker) => maker.member?.role);
+    who.role = "owner";
+    expect(await action()).toBe("owner");
+    who.role = "member";
+    await expect(action()).rejects.toBeInstanceOf(OwnerOnly);
+    who.role = "owner";
   });
 });
