@@ -86,13 +86,16 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
     expect(await repo.setTokenSpend(row.id, true)).toBe(false);
   });
 
-  it("a token made for another maker does not act here", async () => {
+  it("a token acts for the maker it was made for, and only they revoke it", async () => {
     const { token, prefix, hash } = repo.newToken();
     const row = await db.accessToken.create({
       data: { makerId: other.id, name: "Elsewhere", prefix, hash },
     });
     made.push(row.id);
-    expect(await repo.verifyAccessToken(token)).toBeNull();
+    expect(await repo.verifyAccessToken(token)).toMatchObject({
+      tokenId: row.id,
+      makerId: other.id,
+    });
     expect(await repo.revokeAccessToken(row.id)).toBe(false);
   });
 
