@@ -32,15 +32,12 @@ const EnvSchema = z.object({
     z.array(z.enum(MODULE_IDS)),
   ),
 
-  // Kiln has no login and says so on any address but this machine's. "1"
-  // when the maker's own login sits in front of it: the notice goes away.
-  KILN_ACCESS_GUARDED: z.preprocess(
-    (v) => v === "1" || v === "true",
-    z.boolean(),
-  ),
+  // The address people reach Kiln at (https://kiln.example.com), for sign-in
+  // cookies and links. Not needed on this machine (localhost, any port).
+  KILN_URL: z.preprocess(unsetIfBlank, z.string().url().optional()),
 
   // Kiln's own key for what it keeps sealed (the provider keys saved in
-  // Settings, a connected shop's tokens): 32
+  // Settings, a connected shop's tokens) and for sessions: 32
   // random bytes in base64, made once with `openssl rand -base64 32`.
   KILN_SECRET_KEY: z.preprocess(unsetIfBlank, z.string().min(1).optional()),
   // The Etsy app Kiln acts as (etsy.com/developers/your-apps): its keystring

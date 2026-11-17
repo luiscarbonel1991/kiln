@@ -43,10 +43,10 @@ Open http://localhost:3000. The first build takes a few minutes.
    The agent quotes every paid task and spends only with a token you marked "May
    spend" ([MCP server](#mcp-server)).
 
-**Kiln has no login.** It is made to run on your own machine: the ports are
-published on `127.0.0.1` only. Anyone who can open the app can use your studio and
-spend on your keys up to the monthly cap, so do not put it on a network or the
-internet without your own login in front of it ([SECURITY.md](SECURITY.md)).
+**The first time you open Kiln it asks for the owner's account**: your company (the
+organization), your name, an email and a password. After that Kiln asks everyone to
+sign in. The ports are published on `127.0.0.1` only; to reach Kiln from anywhere
+else, set `KILN_URL` to its address and read [SECURITY.md](SECURITY.md) first.
 
 To look around with nothing real, `KILN_PROVIDERS=mock docker compose --profile app up -d`
 plays the paid parts with stubs, in a database of its own. To stop Kiln:
@@ -344,11 +344,10 @@ approved without the board: from a script, an agent, a scheduled job or another 
 **A token.** Settings → Access tokens: name it after what will use it, then Make a
 token. Copy it at once: Kiln keeps only its SHA-256 and cannot show it again. A token
 acts as this studio; make one per system, so each can be revoked on its own. Every
-call sends `Authorization: Bearer kiln_pat_…`. Kiln itself has no login yet, so
-`pnpm dev`, `pnpm dev:mock` and `pnpm start` listen on 127.0.0.1 only: anyone who can
-open Kiln can open Settings and make a token. To reach it from another machine, put it
-behind your own login (a VPN, a reverse proxy with authentication) and start it with
-`-H 0.0.0.0` there.
+call sends `Authorization: Bearer kiln_pat_…`, and acts for the organization the
+token was made in; the API takes no session. `pnpm dev`, `pnpm dev:mock` and
+`pnpm start` listen on 127.0.0.1 only; to reach Kiln from another machine, start it
+with `-H 0.0.0.0` there and set `KILN_URL` to the address people open.
 
 **The routes.** Answers are JSON; a refusal is `{ "error": "…" }`, in words.
 

@@ -1,4 +1,7 @@
 import type { Prisma } from "@prisma/client";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { cache } from "react";
 import { BrandKit } from "@/domain/brand";
 import { type HeroSetting, heroKey } from "@/domain/hero-setting";
 import {
@@ -29,6 +32,9 @@ import {
 } from "@/domain/shop-ranking";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
 import { env } from "@/lib/env";
+import { getAuth } from "@/server/auth";
+import { makerOfMember } from "@/server/organization";
+import { bearerToken, hashToken } from "@/server/token-format";
 
 export interface CurrentMaker {
   id: string;
@@ -37,14 +43,59 @@ export interface CurrentMaker {
 }
 
 // Per-process cache of slug -> maker. The maker row is created once and never
-// renamed by its slug, so the cache only saves one upsert per request.
+// renamed by its slug, so the cache only saves one upsert per call.
 const makers = new Map<string, CurrentMaker>();
 
-// The maker this instance works for (env KILN_MAKER, default "default"). The
-// one place the "current maker" is resolved, so accounts can replace it later.
-// Upsert on the unique slug: concurrent first requests cannot create two makers.
+// The headers of the request being served, or null when no request is: the
+// generation worker, a script, a test.
+async function requestHeaders(): Promise<Headers | null> {
+  try {
+    return await headers();
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("outside a request scope")
+    ) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+// The maker a request acts for. A personal access token names its own; any
+// other request needs a session, and works for the organization its person
+// belongs to. Without one the person is sent to sign in.
+const requestMaker = cache(async (): Promise<CurrentMaker | null> => {
+  const h = await requestHeaders();
+  if (!h) return null;
+  const token = bearerToken(h.get("authorization"));
+  if (token) {
+    const row = await db.accessToken.findUnique({
+      where: { hash: hashToken(token) },
+      select: { maker: { select: { id: true, slug: true, name: true } } },
+    });
+    if (!row) throw new Error("That access token is not valid here.");
+    return row.maker;
+  }
+  const session = await getAuth().api.getSession({ headers: h });
+  if (!session) redirect("/sign-in");
+  const maker = await makerOfMember({
+    userId: session.user.id,
+    activeOrganizationId: session.session.activeOrganizationId,
+  });
+  if (!maker) redirect("/sign-in?left=1");
+  return maker;
+});
+
+// The maker the caller works for: the one place it is resolved. While a
+// request is served, the maker behind its session or its access token. With no
+// request (the worker, a script, a test), the instance's own maker
+// (env KILN_MAKER, default "default"), upserted on its unique slug so
+// concurrent first calls cannot create two.
 export async function getCurrentMaker(): Promise<CurrentMaker> {
   assertDatabaseUrl();
+  const fromRequest = await requestMaker();
+  if (fromRequest) return fromRequest;
   const slug = env.KILN_MAKER;
   const cached = makers.get(slug);
   if (cached) return cached;
