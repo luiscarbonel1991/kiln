@@ -27,6 +27,7 @@ export interface InvitationView {
 }
 
 export interface TeamView {
+  studio: string;
   members: TeamMemberView[];
   invitations: InvitationView[];
 }
@@ -50,7 +51,11 @@ async function organizationOf(maker: CurrentMaker): Promise<string> {
 
 export async function listTeam(maker: CurrentMaker): Promise<TeamView> {
   const organizationId = await organizationOf(maker);
-  const [members, invitations] = await Promise.all([
+  const [organization, members, invitations] = await Promise.all([
+    db.organization.findUniqueOrThrow({
+      where: { id: organizationId },
+      select: { name: true },
+    }),
     db.member.findMany({
       where: { organizationId },
       orderBy: { createdAt: "asc" },
@@ -72,6 +77,7 @@ export async function listTeam(maker: CurrentMaker): Promise<TeamView> {
     }),
   ]);
   return {
+    studio: organization.name,
     members: members.map((m) => ({
       id: m.id,
       name: m.user.name,
@@ -173,13 +179,22 @@ export async function removeMember(
   // up, and finds none (they land on the sign-in page).
 }
 
-// What the join page shows about an invitation, read without a session: the
-// link is the secret. Null when it is unknown, used, cancelled or expired.
-export async function openInvitation(invitationId: string): Promise<{
+export interface OpenInvitation {
   id: string;
   email: string;
   studio: string;
+  // Who made it, to welcome the person by name.
+  inviter: string;
   hasAccount: boolean;
+}
+
+// What the join page reads about an invitation, without a session: the link
+// is the secret. `open` is null when it is used, cancelled or expired; then
+// only who to ask for a new one is told. Null when the link is unknown.
+export async function readInvitation(invitationId: string): Promise<{
+  open: OpenInvitation | null;
+  inviter: string;
+  studio: string;
 } | null> {
   const found = await db.invitation.findUnique({
     where: { id: invitationId },
@@ -189,19 +204,35 @@ export async function openInvitation(invitationId: string): Promise<{
       status: true,
       expiresAt: true,
       organization: { select: { name: true } },
+      inviter: { select: { name: true } },
     },
   });
-  if (!found || !usable(found)) return null;
+  if (!found) return null;
+  const studio = found.organization.name;
+  const inviter = found.inviter.name;
+  if (!usable(found)) return { open: null, inviter, studio };
   const account = await db.user.findUnique({
     where: { email: found.email.toLowerCase() },
     select: { id: true },
   });
   return {
-    id: found.id,
-    email: found.email,
-    studio: found.organization.name,
-    hasAccount: Boolean(account),
+    inviter,
+    studio,
+    open: {
+      id: found.id,
+      email: found.email,
+      studio,
+      inviter,
+      hasAccount: Boolean(account),
+    },
   };
+}
+
+// An invitation that can still be used, or null.
+export async function openInvitation(
+  invitationId: string,
+): Promise<OpenInvitation | null> {
+  return (await readInvitation(invitationId))?.open ?? null;
 }
 
 // The person behind `userId` joins the invitation's organization: in one

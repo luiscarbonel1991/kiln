@@ -27,7 +27,7 @@ export const OwnerForm = z.object({
   company: z
     .string()
     .trim()
-    .min(1, "Name your company or studio.")
+    .min(1, "Name your studio.")
     .max(80, "At most 80 characters."),
   name,
   email,

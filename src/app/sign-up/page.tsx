@@ -16,8 +16,9 @@ export default async function SignUpPage() {
   if (await instanceClaimed()) redirect("/sign-in");
   return (
     <AuthCard
-      title="Set up this Kiln"
-      lead="The first account owns it. Your company becomes the organization, and the products and projects already here become its work."
+      eyebrow="First time here"
+      title="Open your studio"
+      lead="Name it and make your account. You own it: the products and projects already here become its work, and you invite the people who work with you."
     >
       <SignUpForm />
     </AuthCard>

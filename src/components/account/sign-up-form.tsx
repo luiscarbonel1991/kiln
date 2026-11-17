@@ -33,7 +33,7 @@ export function SignUpForm() {
         <AuthField
           control={form.control}
           name="company"
-          label="Company or studio"
+          label="Your studio's name"
           autoComplete="organization"
         />
         <AuthField
@@ -67,7 +67,7 @@ export function SignUpForm() {
           data-testid="sign-up-submit"
           className="h-10 w-full rounded-field shadow-button"
         >
-          {isSubmitting ? "Setting up…" : "Create the owner account"}
+          {isSubmitting ? "Opening…" : "Open my studio"}
         </Button>
       </FieldGroup>
     </form>

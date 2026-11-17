@@ -45,13 +45,13 @@ const when = (iso: string) =>
 
 const ENV_NAME = { openai: "OPENAI_API_KEY", google: "GOOGLE_API_KEY" };
 
-function keyLine(state: ProviderKeyState | undefined): string {
+function keyLine(state: ProviderKeyState | undefined, owner: boolean): string {
   if (!state) return "No API key yet";
   if (state.unreadable) {
     return `A saved key (ends in ${state.hint}) cannot be read: KILN_SECRET_KEY is missing or changed. Paste the key again.`;
   }
   if (state.source === "saved") return `API key saved, ends in ${state.hint}`;
-  if (state.inEnvironment) {
+  if (state.inEnvironment && owner) {
     return `No API key yet. ${ENV_NAME[state.provider]} is in .env, but the app uses only keys saved here: paste it below.`;
   }
   return "No API key yet";
@@ -131,7 +131,10 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
                   data-testid={`provider-${h.provider}-key`}
                 >
                   <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
-                  {keyLine(keyStates.find((k) => k.provider === h.provider))}
+                  {keyLine(
+                    keyStates.find((k) => k.provider === h.provider),
+                    owner,
+                  )}
                 </div>
                 {h.lastError ? (
                   <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
@@ -201,11 +204,9 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
             >
               Team
             </h2>
-            <p className="mt-1 mb-5 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
-              The people who work in this studio see its products and projects.
-              Make an invitation for their email and send them the link: it
-              opens a page where they make their account, and it lasts 7 days.
-              The keys and the access tokens stay yours to manage.
+            <p className="mt-1 mb-4 max-w-[560px] font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
+              Invite the people who work with you: they see the studio&apos;s
+              products and projects. The keys stay yours.
             </p>
             <Team team={team} />
           </section>

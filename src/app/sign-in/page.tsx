@@ -50,7 +50,7 @@ export default async function SignInPage({
         next={next}
         notice={
           left && session
-            ? "Your account belongs to no organization on this Kiln. Ask its owner for an invitation, or sign in with another account."
+            ? "You are not on a studio here any more. Ask its owner for a new invitation, or sign in with another account."
             : undefined
         }
       />

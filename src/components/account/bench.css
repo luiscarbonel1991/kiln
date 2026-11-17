@@ -10,6 +10,8 @@
   animation-duration: 16s;
   animation-iteration-count: infinite;
   animation-timing-function: linear;
+  /* Open with the pencil already moving, not on blank paper. */
+  animation-delay: -2.5s;
 }
 
 /* The steps, top left: the one being played is dark. */
