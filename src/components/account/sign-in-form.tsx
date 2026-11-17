@@ -2,11 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  AuthError,
-  AuthField,
-  authSubmitClass,
-} from "@/components/account/auth-card";
+import { AuthField } from "@/components/account/auth-field";
+import { Button } from "@/components/ui/button";
+import { FieldError, FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/lib/auth-client";
 
 export function SignInForm({ notice }: { notice?: string }) {
@@ -37,30 +35,33 @@ export function SignInForm({ notice }: { notice?: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4" data-testid="sign-in-form">
-      <AuthField
-        label="Email"
-        name="email"
-        type="email"
-        autoComplete="email"
-        required
-      />
-      <AuthField
-        label="Password"
-        name="password"
-        type="password"
-        autoComplete="current-password"
-        required
-      />
-      <AuthError>{error}</AuthError>
-      <button
-        type="submit"
-        disabled={busy}
-        data-testid="sign-in-submit"
-        className={authSubmitClass}
-      >
-        {busy ? "Signing in…" : "Sign in"}
-      </button>
+    <form onSubmit={submit} data-testid="sign-in-form">
+      <FieldGroup className="gap-4">
+        <AuthField
+          label="Email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+        />
+        <AuthField
+          label="Password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+        />
+        <FieldError>{error}</FieldError>
+        <Button
+          type="submit"
+          size="lg"
+          disabled={busy}
+          data-testid="sign-in-submit"
+          className="h-10 w-full rounded-field shadow-button"
+        >
+          {busy ? "Signing in…" : "Sign in"}
+        </Button>
+      </FieldGroup>
     </form>
   );
 }

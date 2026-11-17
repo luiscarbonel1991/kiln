@@ -1,8 +1,17 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
-// The frame of the sign-in and first-run pages: the wordmark, a title, one
-// line of what happens, and the form.
+// The frame of the sign-in and first-run pages. On a wide screen the form
+// shares the page with a photo from the sample product's kit: what a maker
+// comes here to make, before they have made anything. On a phone, the form
+// alone.
 export function AuthCard({
   title,
   lead,
@@ -13,67 +22,53 @@ export function AuthCard({
   children: ReactNode;
 }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12">
-      <Link
-        href="/"
-        className="font-serif text-3xl italic leading-none text-foreground"
-        style={{ fontVariationSettings: "'opsz' 144" }}
-      >
-        kiln<span className="text-primary">.</span>
-      </Link>
-      <section className="mt-8 w-full max-w-sm rounded-card border border-border-soft bg-card p-7 shadow-card">
-        <h1
-          className="font-serif text-2xl leading-tight text-foreground"
-          style={{ fontVariationSettings: "'opsz' 96" }}
+    <main className="grid min-h-dvh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+      <figure className="relative m-4 mr-0 hidden overflow-hidden rounded-card shadow-card lg:block">
+        {/* biome-ignore lint/performance/noImgElement: a fixed file from public/, the same one the public page serves. */}
+        <img
+          src="/home/board/lifestyle.jpg"
+          alt="The sample product on a set table, from its kit."
+          className="absolute inset-0 size-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#241f18]/70 via-transparent to-transparent" />
+        <figcaption className="absolute inset-x-0 bottom-0 p-8 text-[#fffdf9]">
+          <p
+            className="max-w-sm font-serif text-3xl leading-tight"
+            style={{ fontVariationSettings: "'opsz' 144" }}
+          >
+            Describe it once.{" "}
+            <em className="italic">Photograph it everywhere.</em>
+          </p>
+          <p className="mt-3 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-[#fffdf9]/75">
+            Sample product · made in Kiln · checked
+          </p>
+        </figcaption>
+      </figure>
+      <div className="flex flex-col items-center justify-center px-4 py-12">
+        <Link
+          href="/"
+          className="font-serif text-3xl italic leading-none text-foreground"
+          style={{ fontVariationSettings: "'opsz' 144" }}
         >
-          {title}
-        </h1>
-        <p className="mt-2 font-sans text-sm leading-relaxed text-on-surface-mid">
-          {lead}
-        </p>
-        <div className="mt-6">{children}</div>
-      </section>
+          kiln<span className="text-primary">.</span>
+        </Link>
+        <Card className="mt-8 w-full max-w-sm gap-6 rounded-card py-7 shadow-card ring-border-soft">
+          <CardHeader className="gap-2 px-7">
+            <CardTitle
+              className="font-serif text-2xl leading-tight"
+              style={{ fontVariationSettings: "'opsz' 96" }}
+            >
+              <h1>{title}</h1>
+            </CardTitle>
+            <CardDescription className="leading-relaxed">
+              {lead}
+            </CardDescription>
+          </CardHeader>
+          {children ? (
+            <CardContent className="px-7">{children}</CardContent>
+          ) : null}
+        </Card>
+      </div>
     </main>
   );
 }
-
-export function AuthField({
-  label,
-  hint,
-  ...input
-}: {
-  label: string;
-  hint?: string;
-} & React.ComponentProps<"input">) {
-  return (
-    <label className="block">
-      <span className="font-sans text-[0.8125rem] font-semibold text-foreground">
-        {label}
-      </span>
-      <input
-        {...input}
-        className="mt-1.5 h-10 w-full rounded-field border border-border bg-background px-3 font-sans text-[0.9375rem] text-foreground outline-none transition-colors placeholder:text-on-surface-mid/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25"
-      />
-      {hint ? (
-        <span className="mt-1 block font-sans text-xs text-on-surface-mid">
-          {hint}
-        </span>
-      ) : null}
-    </label>
-  );
-}
-
-export function AuthError({ children }: { children: ReactNode }) {
-  if (!children) return null;
-  return (
-    <p
-      role="alert"
-      className="rounded-field border border-fail/30 bg-fail/10 px-3 py-2 font-sans text-[0.8125rem] leading-snug text-foreground"
-    >
-      {children}
-    </p>
-  );
-}
-
-export const authSubmitClass =
-  "inline-flex h-10 w-full items-center justify-center rounded-field bg-primary px-4 font-sans text-[0.9375rem] font-semibold text-primary-foreground shadow-button transition-colors hover:bg-primary/85 disabled:pointer-events-none disabled:opacity-60";
