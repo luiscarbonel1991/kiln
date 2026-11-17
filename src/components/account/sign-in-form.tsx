@@ -5,22 +5,34 @@ import { useState } from "react";
 import { AuthField } from "@/components/account/auth-field";
 import { Button } from "@/components/ui/button";
 import { FieldError, FieldGroup } from "@/components/ui/field";
+import {
+  type FieldErrors,
+  fieldErrors,
+  SignInForm as SignInFields,
+} from "@/lib/account-forms";
 import { authClient } from "@/lib/auth-client";
 
 export function SignInForm({ notice }: { notice?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(notice ?? null);
+  const [fields, setFields] = useState<
+    FieldErrors<{ email: string; password: string }>
+  >({});
   const [busy, setBusy] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setBusy(true);
+    const parsed = SignInFields.safeParse(
+      Object.fromEntries(new FormData(event.currentTarget)),
+    );
     setError(null);
-    const { error: failed } = await authClient.signIn.email({
-      email: String(form.get("email") ?? "").trim(),
-      password: String(form.get("password") ?? ""),
-    });
+    if (!parsed.success) {
+      setFields(fieldErrors(parsed.error));
+      return;
+    }
+    setFields({});
+    setBusy(true);
+    const { error: failed } = await authClient.signIn.email(parsed.data);
     if (failed) {
       setBusy(false);
       setError(
@@ -35,23 +47,23 @@ export function SignInForm({ notice }: { notice?: string }) {
   }
 
   return (
-    <form onSubmit={submit} data-testid="sign-in-form">
+    <form onSubmit={submit} noValidate data-testid="sign-in-form">
       <FieldGroup className="gap-4">
         <AuthField
           label="Email"
           name="email"
           type="email"
           autoComplete="email"
-          required
+          error={fields.email}
         />
         <AuthField
           label="Password"
           name="password"
           type="password"
           autoComplete="current-password"
-          required
+          error={fields.password}
         />
-        <FieldError>{error}</FieldError>
+        <FieldError data-testid="sign-in-error">{error}</FieldError>
         <Button
           type="submit"
           size="lg"

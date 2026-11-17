@@ -4,6 +4,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { organization } from "better-auth/plugins/organization";
+import { MIN_PASSWORD } from "@/lib/account-forms";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { instanceClaimed } from "@/server/organization";
@@ -13,8 +14,6 @@ import { instanceClaimed } from "@/server/organization";
 // are cookies. Its secret is derived from KILN_SECRET_KEY, so an install has
 // one key to make. Built on first use: a build or a test without that key
 // never constructs it.
-
-export const MIN_PASSWORD = 10;
 
 export class AuthSecretMissing extends Error {
   readonly name = "AuthSecretMissing";

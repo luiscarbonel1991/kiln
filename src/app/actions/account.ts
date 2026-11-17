@@ -3,28 +3,26 @@
 import { APIError } from "better-auth/api";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { z } from "zod";
+import type { z } from "zod";
+import { type FieldErrors, fieldErrors, OwnerForm } from "@/lib/account-forms";
 import { hasDatabase } from "@/lib/db";
-import { getAuth, hasAuthSecret, MIN_PASSWORD } from "@/server/auth";
+import { getAuth, hasAuthSecret } from "@/server/auth";
 import {
   AlreadyClaimed,
   claimInstance,
   instanceClaimed,
 } from "@/server/organization";
 
-const Owner = z.object({
-  company: z.string().trim().min(1, "Name your company or studio.").max(80),
-  name: z.string().trim().min(1, "Your name.").max(80),
-  email: z.string().trim().toLowerCase().pipe(z.email("That is not an email.")),
-  password: z
-    .string()
-    .min(MIN_PASSWORD, `At least ${MIN_PASSWORD} characters.`)
-    .max(128),
-});
-
 export interface OwnerFormState {
+  // A problem with the whole form (the instance is taken, the email is used).
   error: string | null;
+  fields: FieldErrors<OwnerValues>;
+  // What was typed, given back so a refused form is not emptied (never the
+  // password).
+  values: { company: string; name: string; email: string };
 }
+
+type OwnerValues = z.infer<typeof OwnerForm>;
 
 const TAKEN = "This Kiln already has its owner. Ask them for an invitation.";
 
@@ -34,17 +32,27 @@ export async function createOwner(
   _prev: OwnerFormState,
   form: FormData,
 ): Promise<OwnerFormState> {
+  const text = (key: string) => String(form.get(key) ?? "");
+  const values = {
+    company: text("company"),
+    name: text("name"),
+    email: text("email"),
+  };
+  const refuse = (error: string): OwnerFormState => ({
+    error,
+    fields: {},
+    values,
+  });
   if (!hasDatabase() || !hasAuthSecret()) {
-    return {
-      error:
-        "Kiln needs DATABASE_URL and KILN_SECRET_KEY in .env before it can keep accounts.",
-    };
+    return refuse(
+      "Kiln needs DATABASE_URL and KILN_SECRET_KEY in .env before it can keep accounts.",
+    );
   }
-  const parsed = Owner.safeParse(Object.fromEntries(form));
+  const parsed = OwnerForm.safeParse(Object.fromEntries(form));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: null, fields: fieldErrors(parsed.error), values };
   }
-  if (await instanceClaimed()) return { error: TAKEN };
+  if (await instanceClaimed()) return refuse(TAKEN);
   const { company, name, email, password } = parsed.data;
   try {
     const { user } = await getAuth().api.signUpEmail({
@@ -53,9 +61,9 @@ export async function createOwner(
     });
     await claimInstance({ userId: user.id, company });
   } catch (error) {
-    if (error instanceof AlreadyClaimed) return { error: TAKEN };
+    if (error instanceof AlreadyClaimed) return refuse(TAKEN);
     if (error instanceof APIError) {
-      return { error: error.message || "That account could not be made." };
+      return refuse(error.message || "That account could not be made.");
     }
     throw error;
   }

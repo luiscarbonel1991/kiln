@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AuthCard } from "@/components/account/auth-card";
 import { SignUpForm } from "@/components/account/sign-up-form";
 import { hasDatabase } from "@/lib/db";
-import { hasAuthSecret, MIN_PASSWORD } from "@/server/auth";
+import { hasAuthSecret } from "@/server/auth";
 import { instanceClaimed } from "@/server/organization";
 
 export const metadata: Metadata = { title: "Set up · Kiln" };
@@ -19,7 +19,7 @@ export default async function SignUpPage() {
       title="Set up this Kiln"
       lead="The first account owns it. Your company becomes the organization, and the products and projects already here become its work."
     >
-      <SignUpForm minPassword={MIN_PASSWORD} />
+      <SignUpForm />
     </AuthCard>
   );
 }
