@@ -32,13 +32,15 @@ export async function authorize(request: Request): Promise<Response | null> {
 export async function authorizeToken(
   request: Request,
 ): Promise<
-  { tokenId: string; tokenName: string; canSpend: boolean } | Response
+  | { tokenId: string; makerId: string; tokenName: string; canSpend: boolean }
+  | Response
 > {
   const token = bearerToken(request.headers.get("authorization"));
   const verified = token ? await verifyAccessToken(token) : null;
   if (verified) {
     return {
       tokenId: verified.tokenId,
+      makerId: verified.makerId,
       tokenName: verified.name,
       canSpend: verified.canSpend,
     };

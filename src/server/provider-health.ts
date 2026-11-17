@@ -10,7 +10,6 @@ import { hasProviderKey } from "@/providers/keys";
 import { readUnlisted, recordKeyCheck } from "@/server/generation-repository";
 import { CAP_REACHED, NOT_STARTED } from "@/server/generation-worker";
 import { getCurrentMaker } from "@/server/maker-repository";
-import { ensureProviderKeys } from "@/server/provider-keys";
 
 // Each provider's health, free to read (no ping, no paid call): whether its
 // key is set, and what its last live calls did — the queue's jobs and the
@@ -37,7 +36,6 @@ const PROVIDERS: ProviderId[] = ["openai", "google"];
 export async function providerHealth(
   makerId: string | null,
 ): Promise<ProviderHealth[]> {
-  await ensureProviderKeys().catch(() => undefined);
   const ok = new Map<string, Date>();
   const failed = new Map<string, { at: Date; message: string }>();
   const unlisted = makerId && hasDatabase() ? await readUnlisted(makerId) : {};

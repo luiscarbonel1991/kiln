@@ -134,7 +134,12 @@ describe("/api/mcp", () => {
     expect(result.isError).toBeFalsy();
     expect(recorded.at(-1)).toEqual({
       name: "get_frames",
-      ctx: { tokenId: "t1", tokenName: "agent", canSpend: false },
+      ctx: {
+        tokenId: "t1",
+        makerId: "m1",
+        tokenName: "agent",
+        canSpend: false,
+      },
       ok: true,
     });
     expect(result.structuredContent).toMatchObject({

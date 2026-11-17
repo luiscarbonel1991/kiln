@@ -37,14 +37,14 @@ const OPEN_PAGES = new Set([
 ]);
 
 describe("the session guard", () => {
-  it("every page of the studio requires the maker before it renders", () => {
+  it("every page of the studio is a makerPage", () => {
     const pages = files(app, /^page\.tsx$/).filter(
       (path) => !OPEN_PAGES.has(relative(app, path)),
     );
     expect(pages.length).toBeGreaterThan(8);
     const unguarded = pages.filter(
       (path) =>
-        !/^export default async function [\s\S]*?\{\n {2}await requireMaker\(\);/m.test(
+        !/^export default makerPage\(async function /m.test(
           readFileSync(path, "utf8"),
         ),
     );

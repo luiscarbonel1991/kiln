@@ -10,17 +10,20 @@ import {
   draftChoices,
   draftDetail,
 } from "@/server/etsy-drafts";
-import { requireMaker } from "@/server/session";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 
 // One listing of the maker's shop, as Etsy has it now: a draft can be changed
 // here (each save shows what changes first); a live listing only read. Below,
 // every write Kiln sent to it.
-export default async function DraftPage({
-  params,
-}: {
-  params: Promise<{ listingId: string }>;
-}) {
-  await requireMaker();
+export default makerPage(async function DraftPage(
+  _maker: CurrentMaker,
+  {
+    params,
+  }: {
+    params: Promise<{ listingId: string }>;
+  },
+) {
   await dynamic();
   const { listingId } = await params;
   const id = Number(listingId);
@@ -141,4 +144,4 @@ export default async function DraftPage({
       </main>
     </div>
   );
-}
+});

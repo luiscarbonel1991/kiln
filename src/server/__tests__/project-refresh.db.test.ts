@@ -2,7 +2,10 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ refresh: () => {} }));
 // The queue refuses a live job whose provider has no key; tests run key-free.
-vi.mock("@/providers/keys", () => ({ hasProviderKey: () => true }));
+vi.mock("@/providers/keys", async (original) => ({
+  ...(await original<typeof import("@/providers/keys")>()),
+  hasProviderKey: () => true,
+}));
 
 // Integration test against the throwaway Postgres (see
 // project-repository.db.test.ts for the setup).

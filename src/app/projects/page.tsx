@@ -10,13 +10,13 @@ import { hasDatabase } from "@/lib/db";
 import { hasProviderKey } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
 import { budget } from "@/server/generation-repository";
+import { makerPage } from "@/server/guarded";
 import { homeStats, type ProjectStats } from "@/server/home-repository";
 import { followedListings } from "@/server/listing-results";
+import type { CurrentMaker } from "@/server/maker-repository";
 import { getCurrentMaker } from "@/server/maker-repository";
 import { listProducts } from "@/server/product-repository";
 import { listProjects } from "@/server/project-repository";
-import { ensureProviderKeys } from "@/server/provider-keys";
-import { requireMaker } from "@/server/session";
 
 const money = (micros: number) => `$${fromMicros(micros).toFixed(2)}`;
 
@@ -37,8 +37,7 @@ function projectDetail(stats: ProjectStats): string {
 // The maker's work: where they left off, their projects and their products.
 // What Kiln does is told on the public page (/); this is where a maker lands
 // from it. Nothing here calls a model or a shop. Rendered per request.
-export default async function ProjectsPage() {
-  await requireMaker();
+export default makerPage(async function ProjectsPage(_maker: CurrentMaker) {
   await connection();
   if (!hasDatabase()) {
     return (
@@ -68,7 +67,6 @@ export default async function ProjectsPage() {
   ]);
   const followed = listings.filter((l) => l.view.following);
   const mock = providerMode() === "mock";
-  await ensureProviderKeys().catch(() => undefined);
   const keyless =
     !mock && !hasProviderKey("openai") && !hasProviderKey("google");
   const details = Object.fromEntries(
@@ -213,7 +211,7 @@ export default async function ProjectsPage() {
       </main>
     </div>
   );
-}
+});
 
 const MAIN =
   "mx-auto flex w-full max-w-[1120px] flex-col gap-14 px-6 py-10 sm:gap-16 sm:px-8";

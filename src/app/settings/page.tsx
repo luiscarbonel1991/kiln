@@ -17,7 +17,9 @@ import { providerMode } from "@/providers/mode";
 import { listAccessTokens } from "@/server/access-tokens";
 import { SPECIALIST_CHOICES } from "@/server/chat/specialists";
 import { budget } from "@/server/generation-repository";
+import { makerPage } from "@/server/guarded";
 import { listLessons } from "@/server/lessons";
+import type { CurrentMaker } from "@/server/maker-repository";
 import { getCurrentMaker, getMakerModelSetup } from "@/server/maker-repository";
 import { providerHealth } from "@/server/provider-health";
 import {
@@ -25,7 +27,6 @@ import {
   providerKeyStates,
 } from "@/server/provider-keys";
 import { sceneLookSetup } from "@/server/scene-look";
-import { requireMaker } from "@/server/session";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 import { recentToolCalls } from "@/server/tool-calls";
 
@@ -61,15 +62,14 @@ function keyLine(state: ProviderKeyState | undefined): string {
 // Lessons: what Kiln proposes it learned of the maker's taste, and what they
 // kept. Shops: the Etsy connection. Access tokens: for the HTTP API (README
 // "HTTP API").
-export default async function SettingsPage() {
-  await requireMaker();
+export default makerPage(async function SettingsPage(_maker: CurrentMaker) {
   await connection();
   const maker = hasDatabase() ? await getCurrentMaker() : null;
   const [setup, health, keyStates, month, tokens, shop, calls, lessons] =
     await Promise.all([
       getMakerModelSetup(),
       providerHealth(maker?.id ?? null),
-      providerKeyStates(),
+      maker ? providerKeyStates(maker.id) : Promise.resolve([]),
       maker ? budget(maker.id) : Promise.resolve(null),
       maker ? listAccessTokens() : Promise.resolve(null),
       maker ? shopConnection() : Promise.resolve(null),
@@ -334,4 +334,4 @@ export default async function SettingsPage() {
       </main>
     </div>
   );
-}
+});

@@ -14,7 +14,8 @@ import {
   draftableProjects,
   listDrafts,
 } from "@/server/etsy-drafts";
-import { requireMaker } from "@/server/session";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 
 const HEADING = "font-serif text-xl text-foreground";
@@ -24,8 +25,7 @@ const LEAD =
 // The drafts of the maker's Etsy shop (Luis, 2026-11-02): the ones there now,
 // read from Etsy per request, and the projects a new one can be made from.
 // Nothing here publishes.
-export default async function DraftsPage() {
-  await requireMaker();
+export default makerPage(async function DraftsPage(_maker: CurrentMaker) {
   await dynamic();
   const setup = etsySetup();
   const shop = hasDatabase() ? await shopConnection() : null;
@@ -227,4 +227,4 @@ export default async function DraftsPage() {
       </main>
     </div>
   );
-}
+});

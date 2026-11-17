@@ -10,16 +10,19 @@ import {
   draftChoices,
   previewDraft,
 } from "@/server/etsy-drafts";
-import { requireMaker } from "@/server/session";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 
 // A new Etsy draft from a project's destination: everything it would carry,
 // seen and completed before anything is sent.
-export default async function NewDraftPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  await requireMaker();
+export default makerPage(async function NewDraftPage(
+  _maker: CurrentMaker,
+  {
+    searchParams,
+  }: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  },
+) {
   await dynamic();
   const { project, destination } = await searchParams;
   const projectId = typeof project === "string" ? project : "";
@@ -92,4 +95,4 @@ export default async function NewDraftPage({
       </main>
     </div>
   );
-}
+});

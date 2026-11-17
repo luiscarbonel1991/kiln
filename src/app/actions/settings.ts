@@ -71,7 +71,7 @@ const SavedKey = z.object({
 // Settings → Providers: keep a provider's key (sealed, never sent back), then
 // check it for free, so the answer the maker reads is the provider's own.
 export const saveProviderKeyAction = makerAction(
-  async (_maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
+  async (maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
     const parsed = SavedKey.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Paste the key first." };
     if (providerMode() === "mock") {
@@ -81,7 +81,7 @@ export const saveProviderKeyAction = makerAction(
       };
     }
     try {
-      await saveProviderKey(parsed.data.provider, parsed.data.key);
+      await saveProviderKey(maker.id, parsed.data.provider, parsed.data.key);
     } catch (error) {
       return {
         ok: false,
@@ -97,11 +97,11 @@ export const saveProviderKeyAction = makerAction(
 );
 
 export const removeProviderKeyAction = makerAction(
-  async (_maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
+  async (maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
     const parsed = ProviderId.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Which provider?" };
     try {
-      await removeProviderKey(parsed.data);
+      await removeProviderKey(maker.id, parsed.data);
     } catch (error) {
       return {
         ok: false,

@@ -51,6 +51,8 @@ import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 
 export interface WorkerDeps {
   mode: ProviderMode;
+  // Runs a job as its maker: with that maker's provider keys, no other's.
+  asMaker?<T>(makerId: string, work: () => Promise<T>): Promise<T>;
   concurrency: number;
   leaseSec: number;
   renewMs: number;
@@ -496,11 +498,14 @@ export function createWorker(deps: WorkerDeps): Worker {
           if (jobs.length === 0) break;
           for (const job of jobs) {
             running++;
-            void runJob(deps, job).finally(() => {
-              running--;
-              void pump();
-              settleIdle();
-            });
+            const run = () => runJob(deps, job);
+            void (deps.asMaker ? deps.asMaker(job.makerId, run) : run())
+              .catch((error) => deps.log("a job could not start", error))
+              .finally(() => {
+                running--;
+                void pump();
+                settleIdle();
+              });
           }
         }
       } while (again && !stopped);

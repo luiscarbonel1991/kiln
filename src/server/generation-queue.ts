@@ -68,6 +68,7 @@ import {
 import { createWorker, type Worker } from "@/server/generation-worker";
 import { getCurrentMaker, getMakerRoutes } from "@/server/maker-repository";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
+import { withMakerKeys } from "@/server/provider-keys";
 import { checkProjectTake } from "@/server/qc/project-take";
 import { sceneLookPlan } from "@/server/scene-look";
 
@@ -547,6 +548,7 @@ export function ensureGenerationWorker(): Worker | null {
   if (!globalForWorker.kilnGenerationWorker) {
     const worker = createWorker({
       mode: providerMode(),
+      asMaker: withMakerKeys,
       concurrency: env.KILN_GENERATION_CONCURRENCY,
       leaseSec: 120,
       renewMs: 30_000,

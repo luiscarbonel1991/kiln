@@ -16,7 +16,8 @@ import {
 import { hasDatabase } from "@/lib/db";
 import { SHOP_RANK_LABEL, type ShopsQuery, shopsHref } from "@/lib/shops-view";
 import { EtsyError } from "@/providers/shop/etsy";
-import { requireMaker } from "@/server/session";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 import {
   type ConnectProblem,
   etsySetup,
@@ -54,12 +55,14 @@ const said = (error: unknown) =>
 // Shops (Luis, 2026-10-27): the maker's best sellers, read from their connected
 // Etsy shop's orders, and the other shops they compare theirs with, from Etsy's
 // public numbers. Read per request through Etsy's API, never its pages.
-export default async function ShopsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  await requireMaker();
+export default makerPage(async function ShopsPage(
+  _maker: CurrentMaker,
+  {
+    searchParams,
+  }: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  },
+) {
   await dynamic();
   const params = await searchParams;
   const query: ShopsQuery = {
@@ -273,4 +276,4 @@ export default async function ShopsPage({
       </main>
     </div>
   );
-}
+});

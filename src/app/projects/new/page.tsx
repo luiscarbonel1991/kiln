@@ -2,6 +2,8 @@ import { connection } from "next/server";
 import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { etsyListingId, ListingUrl } from "@/domain/live-listing";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 import {
   getMakerBrand,
   getMakerModels,
@@ -10,7 +12,6 @@ import {
 import { describeStoredSvg } from "@/server/product-files";
 import { listProducts } from "@/server/product-repository";
 import { sceneLookPlan } from "@/server/scene-look";
-import { requireMaker } from "@/server/session";
 import { textWorstCase } from "@/server/text-calls";
 
 // New project: product -> type -> destinations -> plan -> Start. Rendered per
@@ -19,12 +20,14 @@ import { textWorstCase } from "@/server/text-calls";
 // opens with it. `?product=` (Home) picks a product. `?listing=` (Shops) starts
 // a Listing kit from that live listing, with `?title=` its title, to ask which
 // product it is.
-export default async function NewProjectPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  await requireMaker();
+export default makerPage(async function NewProjectPage(
+  _maker: CurrentMaker,
+  {
+    searchParams,
+  }: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  },
+) {
   await connection();
   const { design, product, listing, title } = await searchParams;
   const listingUrl =
@@ -70,4 +73,4 @@ export default async function NewProjectPage({
       />
     </div>
   );
-}
+});

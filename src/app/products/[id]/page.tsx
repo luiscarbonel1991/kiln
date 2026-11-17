@@ -8,13 +8,14 @@ import {
   formFromProduct,
   keptWords,
 } from "@/lib/product-form";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 import {
   getProduct,
   listProducts,
   productProjects,
 } from "@/server/product-repository";
 import { productHash } from "@/server/product-version";
-import { requireMaker } from "@/server/session";
 import { textWorstCase } from "@/server/text-calls";
 
 // Where the page may send the maker back to: Home, a project's board, or a
@@ -25,14 +26,16 @@ const BACK =
 // A product's own page: edit it (each project using it then shows what
 // changed and offers its update), see who uses it, download its package,
 // delete it when nothing uses it. Rendered per request.
-export default async function ProductPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  await requireMaker();
+export default makerPage(async function ProductPage(
+  _maker: CurrentMaker,
+  {
+    params,
+    searchParams,
+  }: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  },
+) {
   await connection();
   const { id } = await params;
   const { back } = await searchParams;
@@ -69,4 +72,4 @@ export default async function ProductPage({
       />
     </div>
   );
-}
+});

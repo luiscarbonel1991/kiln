@@ -25,6 +25,8 @@ import {
   projectSpend,
   QueueRefusal,
 } from "@/server/generation-repository";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 import {
   getCurrentMaker,
   getMakerBrand,
@@ -33,7 +35,6 @@ import {
 import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
 import { type ProviderHealth, providerHealth } from "@/server/provider-health";
-import { requireMaker } from "@/server/session";
 import { resultsConnector } from "@/server/shop-connector";
 import { takeRoutes } from "@/server/take-routes";
 import { textWorstCase } from "@/server/text-calls";
@@ -120,14 +121,16 @@ function designLine(
   return `A design: ${drawn.length} of ${drawings.length} drawings drawn, ${traced} traced. They live in the studio, and the chat's SVG specialist works on them too.`;
 }
 
-export default async function ProjectBoardPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ chat?: string }>;
-}) {
-  await requireMaker();
+export default makerPage(async function ProjectBoardPage(
+  _maker: CurrentMaker,
+  {
+    params,
+    searchParams,
+  }: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ chat?: string }>;
+  },
+) {
   const { id } = await params;
   const chatOpen = (await searchParams).chat === "1";
   const loaded = await loadProjectBoard(id);
@@ -257,4 +260,4 @@ export default async function ProjectBoardPage({
       )}
     </div>
   );
-}
+});

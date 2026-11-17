@@ -1,11 +1,14 @@
 import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
-import { providerKeySource, setProviderKey } from "@/providers/keys";
-import { getCurrentMaker } from "@/server/maker-repository";
+import {
+  type ProviderKeys,
+  providerKeySource,
+  withProviderKeys,
+} from "@/providers/keys";
 import { hasSecretKey, seal, unseal } from "@/server/secret-box";
 
-// The provider keys the maker saved in Settings → Providers: sealed in the
-// database, handed to the engine in memory, never sent back to the browser.
+// The provider keys each maker saved in Settings → Providers: sealed in the
+// database, handed to the engine per piece of work (withMakerKeys), never sent back to the browser.
 // A saved key wins over the environment's (OPENAI_API_KEY, GOOGLE_API_KEY),
 // which stays the way for headless runs and for anyone who prefers .env.
 
@@ -22,55 +25,74 @@ export interface ProviderKeyState {
   unreadable: boolean;
 }
 
+// Each maker's keys, read once and unsealed in memory; saving or removing a
+// key drops that maker's entry, and a failed read is tried again.
 const cache = globalThis as typeof globalThis & {
-  __kilnProviderKeysLoaded?: Promise<void>;
+  __kilnMakerKeys?: Map<string, Promise<ProviderKeys>>;
+};
+const loaded = () => {
+  cache.__kilnMakerKeys ??= new Map();
+  return cache.__kilnMakerKeys;
 };
 
-async function load(): Promise<void> {
-  if (!hasDatabase()) return;
-  const maker = await getCurrentMaker();
-  const rows = await db.providerKey.findMany({ where: { makerId: maker.id } });
-  for (const provider of PROVIDERS) {
-    const row = rows.find((r) => r.provider === provider);
-    let key: string | null = null;
-    if (row) {
-      try {
-        key = unseal(row.sealed, purpose(provider));
-      } catch {
-        key = null;
-      }
+async function read(makerId: string): Promise<ProviderKeys> {
+  const rows = await db.providerKey.findMany({ where: { makerId } });
+  const keys: ProviderKeys = {};
+  for (const row of rows) {
+    const provider = row.provider as ProviderId;
+    if (!PROVIDERS.includes(provider)) continue;
+    try {
+      keys[provider] = unseal(row.sealed, purpose(provider));
+    } catch {
+      // KILN_SECRET_KEY is missing or changed: the key reads as unreadable.
     }
-    setProviderKey(provider, key);
   }
+  return keys;
 }
 
-// Hand the saved keys to the engine, once per process (the server's start and
-// anything that reads a key's state); a failed read is tried again.
-export function ensureProviderKeys(): Promise<void> {
-  cache.__kilnProviderKeysLoaded ??= load().catch((error) => {
-    cache.__kilnProviderKeysLoaded = undefined;
-    throw error;
-  });
-  return cache.__kilnProviderKeysLoaded;
+export function makerProviderKeys(makerId: string): Promise<ProviderKeys> {
+  if (!hasDatabase()) return Promise.resolve({});
+  const keys = loaded();
+  let pending = keys.get(makerId);
+  if (!pending) {
+    pending = read(makerId).catch((error) => {
+      keys.delete(makerId);
+      throw error;
+    });
+    keys.set(makerId, pending);
+  }
+  return pending;
 }
 
-export async function providerKeyStates(): Promise<ProviderKeyState[]> {
+const forget = (makerId: string) => loaded().delete(makerId);
+
+// Run `work` with this maker's saved keys, and no other maker's.
+export async function withMakerKeys<T>(
+  makerId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  return withProviderKeys(await makerProviderKeys(makerId), work);
+}
+
+export async function providerKeyStates(
+  makerId: string,
+): Promise<ProviderKeyState[]> {
   const rows = hasDatabase()
-    ? await ensureProviderKeys().then(async () => {
-        const maker = await getCurrentMaker();
-        return db.providerKey.findMany({ where: { makerId: maker.id } });
-      })
+    ? await db.providerKey.findMany({ where: { makerId } })
     : [];
-  return PROVIDERS.map((provider) => {
-    const row = rows.find((r) => r.provider === provider);
-    const source = providerKeySource(provider);
-    return {
-      provider,
-      source,
-      hint: row?.hint ?? null,
-      unreadable: Boolean(row) && source !== "saved",
-    };
-  });
+  const keys = await makerProviderKeys(makerId);
+  return withProviderKeys(keys, () =>
+    PROVIDERS.map((provider) => {
+      const row = rows.find((r) => r.provider === provider);
+      const source = providerKeySource(provider);
+      return {
+        provider,
+        source,
+        hint: row?.hint ?? null,
+        unreadable: Boolean(row) && source !== "saved",
+      };
+    }),
+  );
 }
 
 // What a pasted key must look like before it is kept: one line, no spaces,
@@ -84,6 +106,7 @@ export function keyProblem(key: string): string | null {
 }
 
 export async function saveProviderKey(
+  makerId: string,
   provider: ProviderId,
   raw: string,
 ): Promise<void> {
@@ -96,19 +119,20 @@ export async function saveProviderKey(
       `Kiln has no KILN_SECRET_KEY to keep the ${PROVIDER_LABELS[provider]} key sealed: add one to .env (openssl rand -base64 32) and restart Kiln.`,
     );
   }
-  const maker = await getCurrentMaker();
   const data = { sealed: seal(key, purpose(provider)), hint: key.slice(-4) };
   await db.providerKey.upsert({
-    where: { makerId_provider: { makerId: maker.id, provider } },
-    create: { makerId: maker.id, provider, ...data },
+    where: { makerId_provider: { makerId, provider } },
+    create: { makerId, provider, ...data },
     update: data,
   });
-  setProviderKey(provider, key);
+  forget(makerId);
 }
 
-export async function removeProviderKey(provider: ProviderId): Promise<void> {
+export async function removeProviderKey(
+  makerId: string,
+  provider: ProviderId,
+): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
-  await db.providerKey.deleteMany({ where: { makerId: maker.id, provider } });
-  setProviderKey(provider, null);
+  await db.providerKey.deleteMany({ where: { makerId, provider } });
+  forget(makerId);
 }
