@@ -1,4 +1,4 @@
-import { requireMaker } from "@/server/session";
+import { signedInRoute } from "@/server/guarded";
 import {
   beginConnect,
   CONNECT_COOKIE,
@@ -22,8 +22,7 @@ function redirect(to: string | URL, cookie?: string): Response {
 // to Etsy to approve Kiln (its reads, and drafts), the handshake kept in a
 // sealed cookie for ten minutes. Etsy sends them back to ETSY_REDIRECT_URI, so the
 // connection starts on that address's origin (the cookie must be there).
-export async function GET(request: Request) {
-  await requireMaker();
+export const GET = signedInRoute(async (_maker, request: Request) => {
   const here = new URL(request.url);
   const setup = etsySetup();
   if (setup.redirectUri && here.searchParams.get("hop") === null) {
@@ -49,4 +48,4 @@ export async function GET(request: Request) {
     }
     throw error;
   }
-}
+});

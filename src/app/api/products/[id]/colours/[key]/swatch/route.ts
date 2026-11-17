@@ -1,11 +1,6 @@
 import { MAX_UPLOAD_BYTES } from "@/components/studio/constants";
-import {
-  apiError,
-  apiJson,
-  authorize,
-  megabytes,
-  readBody,
-} from "@/server/http-api";
+import { tokenRoute } from "@/server/guarded";
+import { apiError, apiJson, megabytes, readBody } from "@/server/http-api";
 import { type SwatchFix, setColourSwatch } from "@/server/product-swatch";
 
 type Context = { params: Promise<{ id: string; key: string }> };
@@ -72,44 +67,44 @@ function fixOf(url: URL): SwatchFix | { error: string } | null {
 // 409 for a product from a catalog connector, 413 over the cap, 415 for
 // anything but a PNG, JPEG or WebP, 422 for a correction the photo refuses
 // (a coloured spot, a photo too far from the swatch).
-export async function POST(request: Request, { params }: Context) {
-  const denied = await authorize(request);
-  if (denied) return denied;
-  const { id, key } = await params;
-  const fix = fixOf(new URL(request.url));
-  if (fix && "error" in fix) return apiError(400, fix.error);
-  const tooLarge = () =>
-    apiError(
-      413,
-      `A material photo is at most ${megabytes(MAX_UPLOAD_BYTES)}.`,
+export const POST = tokenRoute(
+  async (_caller, request: Request, { params }: Context) => {
+    const { id, key } = await params;
+    const fix = fixOf(new URL(request.url));
+    if (fix && "error" in fix) return apiError(400, fix.error);
+    const tooLarge = () =>
+      apiError(
+        413,
+        `A material photo is at most ${megabytes(MAX_UPLOAD_BYTES)}.`,
+      );
+    const body = await readBody(
+      request,
+      MAX_UPLOAD_BYTES + (isForm(request) ? FORM_ENVELOPE_BYTES : 0),
     );
-  const body = await readBody(
-    request,
-    MAX_UPLOAD_BYTES + (isForm(request) ? FORM_ENVELOPE_BYTES : 0),
-  );
-  if (!body) return tooLarge();
-  const photo = await photoOf(request, body);
-  if (photo && photo.length > MAX_UPLOAD_BYTES) return tooLarge();
-  if (!photo || photo.length === 0) {
-    return apiError(
-      400,
-      "Send the photo as the body (Content-Type: image/jpeg, image/png or image/webp) or as a multipart form's file field.",
-    );
-  }
-  const outcome = await setColourSwatch(id, key, photo, fix ?? undefined);
-  if (!outcome.ok) return apiError(outcome.status, outcome.error);
-  const { ok: _ok, ...result } = outcome;
-  return apiJson(result);
-}
+    if (!body) return tooLarge();
+    const photo = await photoOf(request, body);
+    if (photo && photo.length > MAX_UPLOAD_BYTES) return tooLarge();
+    if (!photo || photo.length === 0) {
+      return apiError(
+        400,
+        "Send the photo as the body (Content-Type: image/jpeg, image/png or image/webp) or as a multipart form's file field.",
+      );
+    }
+    const outcome = await setColourSwatch(id, key, photo, fix ?? undefined);
+    if (!outcome.ok) return apiError(outcome.status, outcome.error);
+    const { ok: _ok, ...result } = outcome;
+    return apiJson(result);
+  },
+);
 
 // DELETE — the colour's material photo removed; its scenes go back to the
 // plate and the swatch hex alone.
-export async function DELETE(request: Request, { params }: Context) {
-  const denied = await authorize(request);
-  if (denied) return denied;
-  const { id, key } = await params;
-  const outcome = await setColourSwatch(id, key, null);
-  if (!outcome.ok) return apiError(outcome.status, outcome.error);
-  const { ok: _ok, ...result } = outcome;
-  return apiJson(result);
-}
+export const DELETE = tokenRoute(
+  async (_caller, _request: Request, { params }: Context) => {
+    const { id, key } = await params;
+    const outcome = await setColourSwatch(id, key, null);
+    if (!outcome.ok) return apiError(outcome.status, outcome.error);
+    const { ok: _ok, ...result } = outcome;
+    return apiJson(result);
+  },
+);

@@ -1,10 +1,5 @@
-import {
-  apiError,
-  apiJson,
-  authorize,
-  megabytes,
-  readBody,
-} from "@/server/http-api";
+import { tokenRoute } from "@/server/guarded";
+import { apiError, apiJson, megabytes, readBody } from "@/server/http-api";
 import { importPackage, importSummary } from "@/server/product-import";
 
 // POST /api/import — a product package (JSON) for the maker the token acts
@@ -17,9 +12,7 @@ import { importPackage, importSummary } from "@/server/product-import";
 // out: the caller sends the bytes).
 const MAX_PACKAGE_BYTES = 32 * 1024 * 1024;
 
-export async function POST(request: Request) {
-  const denied = await authorize(request);
-  if (denied) return denied;
+export const POST = tokenRoute(async (_caller, request: Request) => {
   const body = await readBody(request, MAX_PACKAGE_BYTES);
   if (!body) {
     return apiError(
@@ -39,4 +32,4 @@ export async function POST(request: Request) {
   const result = await importPackage(input);
   if ("error" in result) return apiError(422, result.error);
   return apiJson(importSummary(result));
-}
+});

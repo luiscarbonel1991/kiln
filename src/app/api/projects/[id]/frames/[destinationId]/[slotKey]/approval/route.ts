@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SlotRefusal } from "@/domain/plan";
-import { apiError, apiJson, authorize, readBody } from "@/server/http-api";
+import { tokenRoute } from "@/server/guarded";
+import { apiError, apiJson, readBody } from "@/server/http-api";
 import { noteApproval } from "@/server/lessons";
 import { projectFrames } from "@/server/project-frames";
 import { setSlotApproval } from "@/server/project-repository";
@@ -21,32 +22,35 @@ const STATUS = { missing: 404, refused: 422, stale: 409 } as const;
 // approved unseen. Both answer { frame }, as GET .../frames reads it. 404 for
 // an unknown project or frame; 422 for a frame that takes no approval (an
 // exact frame, the maker's photo, a shared frame, no finished take).
-export async function PUT(request: Request, context: Context) {
-  const denied = await authorize(request);
-  if (denied) return denied;
-  const body = await readBody(request, MAX_BODY_BYTES);
-  if (!body) return apiError(413, "An approval names one take: send less.");
-  let json: unknown = {};
-  const text = Buffer.from(body).toString("utf8").trim();
-  if (text !== "") {
-    try {
-      json = JSON.parse(text);
-    } catch {
-      return apiError(400, 'The body is not JSON: send { "output": "<url>" }.');
+export const PUT = tokenRoute(
+  async (_caller, request: Request, context: Context) => {
+    const body = await readBody(request, MAX_BODY_BYTES);
+    if (!body) return apiError(413, "An approval names one take: send less.");
+    let json: unknown = {};
+    const text = Buffer.from(body).toString("utf8").trim();
+    if (text !== "") {
+      try {
+        json = JSON.parse(text);
+      } catch {
+        return apiError(
+          400,
+          'The body is not JSON: send { "output": "<url>" }.',
+        );
+      }
     }
-  }
-  const checked = Checked.safeParse(json);
-  if (!checked.success) {
-    return apiError(422, "output is the address of the take you checked.");
-  }
-  return decide(context, true, checked.data.output);
-}
+    const checked = Checked.safeParse(json);
+    if (!checked.success) {
+      return apiError(422, "output is the address of the take you checked.");
+    }
+    return decide(context, true, checked.data.output);
+  },
+);
 
-export async function DELETE(request: Request, context: Context) {
-  const denied = await authorize(request);
-  if (denied) return denied;
-  return decide(context, false);
-}
+export const DELETE = tokenRoute(
+  async (_caller, _request: Request, context: Context) => {
+    return decide(context, false);
+  },
+);
 
 async function decide(
   { params }: Context,

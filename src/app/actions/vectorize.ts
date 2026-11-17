@@ -1,8 +1,8 @@
 "use server";
 
 import { z } from "zod";
+import { makerAction } from "@/server/guarded";
 import { setCardVector } from "@/server/project-repository";
-import { requireMaker } from "@/server/session";
 import { traceToVector, VectorDetail, VectorMode } from "@/server/vectorize";
 
 const VectorizeInput = z.object({
@@ -19,16 +19,18 @@ const VectorizeInput = z.object({
 // (server/vectorize.ts). Only meaningful for high-contrast line art, so the UI
 // only exposes this for line-art cards. A failure comes back with its reason,
 // never silently.
-export async function vectorizeCardAction(
-  input: unknown,
-): Promise<{ url: string } | { error: string }> {
-  await requireMaker();
-  const { imageUrl, mode, detail, projectId, cardId } =
-    VectorizeInput.parse(input);
-  const traced = await traceToVector(imageUrl, mode, detail);
-  if ("error" in traced) return traced;
-  if (projectId && cardId) {
-    await setCardVector(projectId, cardId, imageUrl, traced.url);
-  }
-  return { url: traced.url };
-}
+export const vectorizeCardAction = makerAction(
+  async (
+    _maker,
+    input: unknown,
+  ): Promise<{ url: string } | { error: string }> => {
+    const { imageUrl, mode, detail, projectId, cardId } =
+      VectorizeInput.parse(input);
+    const traced = await traceToVector(imageUrl, mode, detail);
+    if ("error" in traced) return traced;
+    if (projectId && cardId) {
+      await setCardVector(projectId, cardId, imageUrl, traced.url);
+    }
+    return { url: traced.url };
+  },
+);

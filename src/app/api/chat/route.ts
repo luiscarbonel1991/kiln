@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { runTurn, TurnRefusal } from "@/server/chat/run-turn";
 import { SpecialistId } from "@/server/chat/specialists";
+import { sessionRoute } from "@/server/guarded";
 import { apiError, foreignOrigin, readBody } from "@/server/http-api";
-import { denyWithoutSession } from "@/server/session";
 
 // POST /api/chat — one turn of Kiln's chat: the conversation, and what the
 // maker did (a message, or a yes or no to a tool call that waits). It answers
@@ -17,9 +17,7 @@ const Body = z.object({
   specialist: SpecialistId.optional(),
 });
 
-export async function POST(request: Request) {
-  const denied = await denyWithoutSession();
-  if (denied) return denied;
+export const POST = sessionRoute(async (_maker, request: Request) => {
   if (foreignOrigin(request)) {
     return apiError(403, "Kiln's chat answers only Kiln's own pages.");
   }
@@ -38,4 +36,4 @@ export async function POST(request: Request) {
       return apiError(error.status, error.message);
     throw error;
   }
-}
+});

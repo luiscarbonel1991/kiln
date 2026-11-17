@@ -2,9 +2,11 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Nothing a signed-in person can reach runs for anyone else: every Server
-// Action starts by requiring the maker, and every route handler checks a
-// session or an access token. New code that forgets fails here.
+// Nothing a signed-in person can reach runs for anyone else: every page
+// requires the maker, every Server Action is a makerAction and every route
+// handler a session or token route (src/server/guarded.ts), which check who
+// is calling before the code inside runs. New code written any other way
+// fails here.
 const app = join(import.meta.dirname, "..", "..", "app");
 
 function files(dir: string, match: RegExp): string[] {
@@ -49,45 +51,44 @@ describe("the session guard", () => {
     expect(unguarded.map((path) => relative(app, path))).toEqual([]);
   });
 
-  it("every Server Action requires the maker before anything else", () => {
+  it("every Server Action is written as a makerAction", () => {
     const actions = files(join(app, "actions"), /\.ts$/).filter(
       (path) => !OPEN_ACTIONS.has(relative(join(app, "actions"), path)),
     );
     expect(actions.length).toBeGreaterThan(15);
-    const unguarded = actions.flatMap((path) => {
-      const source = readFileSync(path, "utf8");
-      const exported = source.match(/^export async function \w+/gm) ?? [];
-      const guarded =
-        source.match(
-          /^export async function [\s\S]*?\{\n {2}await requireMaker\(\);/gm,
-        ) ?? [];
-      const loose = /^export (const|function) /m.test(source);
-      return exported.length === guarded.length && !loose
-        ? []
-        : [relative(app, path)];
-    });
-    expect(unguarded).toEqual([]);
+    const loose = actions.flatMap((path) =>
+      readFileSync(path, "utf8")
+        .split("\n")
+        .filter(
+          (line) =>
+            /^export /.test(line) &&
+            !/^export const \w+ = makerAction\(/.test(line) &&
+            !/^export (type|interface) /.test(line),
+        )
+        .map((line) => `${relative(app, path)}: ${line}`),
+    );
+    expect(loose).toEqual([]);
   });
 
-  it("every route handler checks a session or a token", () => {
+  it("every route handler is written as a session or a token route", () => {
     const routes = files(app, /^route\.ts$/).filter(
       (path) => !OPEN_ROUTES.has(relative(app, path)),
     );
     expect(routes.length).toBeGreaterThan(10);
-    const unguarded = routes.flatMap((path) => {
-      const source = readFileSync(path, "utf8");
-      // A handler that only answers "method not allowed" has nothing to guard.
-      const handlers = (
-        source.match(
-          /^export async function (GET|POST|PUT|PATCH|DELETE)\b[^{]*\{\n\s+(?!\s|return apiError\(\s*405)/gm,
-        ) ?? []
-      ).length;
-      const checks =
-        source.match(
-          /await (authorize|authorizeToken|denyWithoutSession|requireMaker)\(/g,
-        )?.length ?? 0;
-      return checks >= handlers ? [] : [relative(app, path)];
-    });
-    expect(unguarded).toEqual([]);
+    const loose = routes.flatMap((path) =>
+      readFileSync(path, "utf8")
+        .split("\n")
+        .filter(
+          (line) =>
+            /^export (async function|const) (GET|POST|PUT|PATCH|DELETE)\b/.test(
+              line,
+            ) &&
+            !/= (sessionRoute|signedInRoute|tokenRoute|notAllowed)\(/.test(
+              line,
+            ),
+        )
+        .map((line) => `${relative(app, path)}: ${line}`),
+    );
+    expect(loose).toEqual([]);
   });
 });

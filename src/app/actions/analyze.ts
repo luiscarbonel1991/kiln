@@ -4,7 +4,7 @@ import { z } from "zod";
 import { ProviderId } from "@/domain/model-defaults";
 import type { RanOn } from "@/domain/model-routing";
 import type { BaseUnderstanding } from "@/domain/understanding";
-import { requireMaker } from "@/server/session";
+import { makerAction } from "@/server/guarded";
 import { type Degraded, readProduct } from "@/server/text-calls";
 
 const AnalyzeInput = z.object({
@@ -19,15 +19,19 @@ const AnalyzeInput = z.object({
 // guard is the trust boundary (Server Functions are POST-reachable). Runs on
 // the deep route unless a model is named; a failure comes back as the neutral
 // understanding with why it degraded and the other provider to offer.
-export async function analyzeMaster(input: {
-  assetUrl: string;
-  model?: { provider: ProviderId; model: string };
-}): Promise<{
-  understanding: BaseUnderstanding;
-  degraded?: Degraded;
-  ranOn?: RanOn;
-}> {
-  await requireMaker();
-  const safe = AnalyzeInput.parse(input);
-  return readProduct(safe.assetUrl, safe.model);
-}
+export const analyzeMaster = makerAction(
+  async (
+    _maker,
+    input: {
+      assetUrl: string;
+      model?: { provider: ProviderId; model: string };
+    },
+  ): Promise<{
+    understanding: BaseUnderstanding;
+    degraded?: Degraded;
+    ranOn?: RanOn;
+  }> => {
+    const safe = AnalyzeInput.parse(input);
+    return readProduct(safe.assetUrl, safe.model);
+  },
+);

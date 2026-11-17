@@ -1,4 +1,4 @@
-import { requireMaker } from "@/server/session";
+import { signedInRoute } from "@/server/guarded";
 import {
   CONNECT_COOKIE,
   CONNECT_PATH,
@@ -12,8 +12,7 @@ import {
 // approve Kiln (ETSY_REDIRECT_URI, registered on the app exactly): the code
 // is traded for the shop's tokens, the handshake cookie is cleared either
 // way, and the maker lands on Shops.
-export async function GET(request: Request) {
-  await requireMaker();
+export const GET = signedInRoute(async (_maker, request: Request) => {
   const here = new URL(request.url);
   const clear = `${CONNECT_COOKIE}=; Path=${CONNECT_PATH}; Max-Age=0; HttpOnly; SameSite=Lax`;
   const land = (to: string, note?: string) => {
@@ -48,4 +47,4 @@ export async function GET(request: Request) {
     }
     throw error;
   }
-}
+});

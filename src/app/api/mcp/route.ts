@@ -1,6 +1,6 @@
+import { notAllowed, tokenRoute } from "@/server/guarded";
 import {
   apiError,
-  authorizeToken,
   foreignOrigin,
   megabytes,
   readBody,
@@ -16,12 +16,10 @@ import { MCP_TOOLS } from "@/server/tools";
 // an import's: a product package can travel in a tool call.
 const MAX_BODY_BYTES = 32 * 1024 * 1024;
 
-export async function POST(request: Request) {
+export const POST = tokenRoute(async (caller, request) => {
   if (foreignOrigin(request)) {
     return apiError(403, "Kiln's MCP server answers only its own origin.");
   }
-  const caller = await authorizeToken(request);
-  if (caller instanceof Response) return caller;
   const body = await readBody(request, MAX_BODY_BYTES);
   if (!body) {
     return apiError(
@@ -45,15 +43,8 @@ export async function POST(request: Request) {
   return handleMcp(request, message, MCP_TOOLS, (name, args) =>
     callAndRecord(MCP_TOOLS, name, args, caller),
   );
-}
+});
 
 // Stateless: no stream to open and no session to end.
-export async function GET() {
-  return apiError(405, "Kiln's MCP server takes POST only.", { Allow: "POST" });
-}
-
-export async function DELETE() {
-  return apiError(405, "Kiln's MCP server keeps no session.", {
-    Allow: "POST",
-  });
-}
+export const GET = notAllowed("Kiln's MCP server takes POST only.", "POST");
+export const DELETE = notAllowed("Kiln's MCP server keeps no session.", "POST");
