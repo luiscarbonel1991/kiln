@@ -106,8 +106,8 @@ export async function getRequestMaker(): Promise<CurrentMaker | null> {
 // The maker the caller works for, resolved once at the edge (requireMaker in
 // the guarded shapes) and handed down as a parameter from there: nothing
 // below looks it up again. While a request is served, the maker behind its
-// session or its access token (without either, the person is sent to sign
-// in). With no request (a script, a test), the instance's own maker (env
+// session or its access token (without either, the person goes to the
+// sign-in page). With no request (a script, a test), the instance's own maker (env
 // KILN_MAKER, default "default"), upserted on its unique slug so concurrent
 // first calls cannot create two. The worker never asks: a job carries its
 // maker.

@@ -17,11 +17,15 @@ const {
 const { getOpenAI, hasOpenAIKey } = await import("@/providers/openai/client");
 
 describe("provider keys", () => {
-  it("a key the maker saved wins over the environment's, only inside its scope", () => {
+  it("inside a maker's scope only its own keys count; outside, the environment's", () => {
     expect(providerKeySource("google")).toBe("env");
     withProviderKeys({ google: "g-saved" }, () => {
       expect(providerKey("google")).toBe("g-saved");
       expect(providerKeySource("google")).toBe("saved");
+    });
+    withProviderKeys({}, () => {
+      expect(providerKey("google")).toBeUndefined();
+      expect(providerKeySource("google")).toBeNull();
     });
     expect(providerKey("google")).toBe("g-env");
   });

@@ -749,9 +749,11 @@ before any paid call: the queue's cards, the studio's calls, the text calls and
 the chat (a route moves past it). The catalog's `retired` always wins over the
 list.
 
-Keys can also come from the environment (`OPENAI_API_KEY`, `GOOGLE_API_KEY` in
-`.env`): headless runs read them there, and a key saved in Settings wins over
-them. Tests drop both before any test runs (`vitest.setup.ts`), so a test never makes a paid call.
+The app uses only the keys an organization saved in Settings, so no
+organization ever spends on another's account. Keys in the environment
+(`OPENAI_API_KEY`, `GOOGLE_API_KEY` in `.env`) serve scripts and the CLI only; an
+install that kept its keys there pastes them into Settings once (the page says
+so). Tests drop both before any test runs (`vitest.setup.ts`), so a test never makes a paid call.
 
 ## Generation queue
 

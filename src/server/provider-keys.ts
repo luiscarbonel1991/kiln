@@ -1,6 +1,7 @@
 import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
 import {
+  hasEnvironmentKey,
   type ProviderKeys,
   providerKeySource,
   withProviderKeys,
@@ -8,9 +9,9 @@ import {
 import { hasSecretKey, seal, unseal } from "@/server/secret-box";
 
 // The provider keys each maker saved in Settings → Providers: sealed in the
-// database, handed to the engine per piece of work (withMakerKeys), never sent back to the browser.
-// A saved key wins over the environment's (OPENAI_API_KEY, GOOGLE_API_KEY),
-// which stays the way for headless runs and for anyone who prefers .env.
+// database, handed to the engine per piece of work (withMakerKeys), never
+// sent back to the browser. They are the only keys the app uses; the
+// environment's (OPENAI_API_KEY, GOOGLE_API_KEY) serve scripts and the CLI.
 
 const PROVIDERS: ProviderId[] = ["openai", "google"];
 const purpose = (provider: ProviderId) => `provider-key:${provider}`;
@@ -23,6 +24,9 @@ export interface ProviderKeyState {
   hint: string | null;
   // A key is saved but cannot be read (KILN_SECRET_KEY is missing or changed).
   unreadable: boolean;
+  // The environment holds a key for this provider, which the app does not
+  // use: it has to be saved here.
+  inEnvironment: boolean;
 }
 
 // Each maker's keys, read once and unsealed in memory; saving or removing a
@@ -90,6 +94,7 @@ export async function providerKeyStates(
         source,
         hint: row?.hint ?? null,
         unreadable: Boolean(row) && source !== "saved",
+        inEnvironment: hasEnvironmentKey(provider),
       };
     }),
   );

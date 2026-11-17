@@ -46,6 +46,7 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
       source: "saved",
       hint: "1234",
       unreadable: false,
+      inEnvironment: false,
     });
   });
 

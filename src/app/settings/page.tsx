@@ -49,8 +49,8 @@ function keyLine(state: ProviderKeyState | undefined): string {
     return `A saved key (ends in ${state.hint}) cannot be read: KILN_SECRET_KEY is missing or changed. Paste the key again.`;
   }
   if (state.source === "saved") return `API key saved, ends in ${state.hint}`;
-  if (state.source === "env") {
-    return `API key from the environment (${ENV_NAME[state.provider]})`;
+  if (state.inEnvironment) {
+    return `No API key yet. ${ENV_NAME[state.provider]} is in .env, but the app uses only keys saved here: paste it below.`;
   }
   return "No API key yet";
 }

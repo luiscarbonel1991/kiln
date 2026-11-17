@@ -16,6 +16,7 @@ export type {
 export { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 export {
   currentProviderKeys,
+  hasEnvironmentKey,
   hasProviderKey,
   type ProviderKeys,
   providerKey,
