@@ -10,9 +10,9 @@ type Context = { params: Promise<{ id: string }> };
 // `output` is the take an approval approves. 404 for a project of another
 // maker, or one with no frames (a studio project).
 export const GET = tokenRoute(
-  async (_caller, _request: Request, { params }: Context) => {
+  async ({ maker }, _request: Request, { params }: Context) => {
     const { id } = await params;
-    const frames = await projectFrames(id);
+    const frames = await projectFrames(maker, id);
     if (!frames)
       return apiError(404, "No project of yours with frames has that id.");
     return apiJson(frames);

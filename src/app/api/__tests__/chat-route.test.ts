@@ -14,7 +14,7 @@ vi.mock("@/server/chat/run-turn", () => {
   }
   return {
     TurnRefusal,
-    runTurn: async (input: { sessionId: string }) => {
+    runTurn: async (_maker: unknown, input: { sessionId: string }) => {
       turns.asked.push(input);
       if (input.sessionId === "busy") {
         throw new TurnRefusal("A turn is running in this conversation.", 409);
@@ -27,14 +27,14 @@ vi.mock("@/server/chat/run-turn", () => {
   };
 });
 vi.mock("@/server/chat/chat-repository", () => ({
-  getChat: async (id: string) =>
+  getChat: async (_maker: unknown, id: string) =>
     id === "s1"
       ? { id, title: "Hi", projectId: null, running: false, messages: [] }
       : null,
 }));
 
 vi.mock("@/server/chat/chat-view", () => ({
-  chatRuns: async (id: string) =>
+  chatRuns: async (_maker: unknown, id: string) =>
     id === "s1" ? { runs: { spentMicros: 512_000, queuedMicros: 0 } } : null,
 }));
 

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { currentProviderKeys, withProviderKeys } from "@/providers/keys";
 import { apiError, authorizeToken } from "@/server/http-api";
-import type { CurrentMaker } from "@/server/maker-repository";
+import type { CurrentMaker, MakerRef } from "@/server/maker-repository";
 import { withMakerKeys } from "@/server/provider-keys";
 import { denyWithoutSession, requireMaker } from "@/server/session";
 
@@ -84,7 +84,7 @@ export function signedInRoute<Args extends unknown[]>(
 
 export interface TokenCaller {
   tokenId: string;
-  makerId: string;
+  maker: MakerRef;
   tokenName: string;
   canSpend: boolean;
 }
@@ -100,7 +100,7 @@ export function tokenRoute<Rest extends unknown[]>(
   return async (request, ...rest) => {
     const caller = await authorizeToken(request);
     if (caller instanceof Response) return caller;
-    return withMakerKeys(caller.makerId, async () =>
+    return withMakerKeys(caller.maker.id, async () =>
       keepingKeys(await run(caller, request, ...rest)),
     );
   };

@@ -10,7 +10,12 @@ const { callTool, defineTool, inputJsonSchema, ToolRefusal } = await import(
   "@/server/tools/registry"
 );
 
-const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
+const CTX = {
+  maker: { id: "test" },
+  tokenId: "t1",
+  tokenName: "agent",
+  canSpend: false,
+};
 // The tool list itself: names a client can call, inputs it can read, and no
 // tool that lets an agent pick a model (agents ask for roles).
 

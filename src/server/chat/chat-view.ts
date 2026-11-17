@@ -15,7 +15,8 @@ import {
   sessionSpend,
 } from "@/server/generation-repository";
 import { lessonStatuses } from "@/server/lessons";
-import { getCurrentMaker, getMakerModelSetup } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
+import { getMakerModelSetup } from "@/server/maker-repository";
 import { routeView } from "@/server/text-calls";
 import { TOOLS } from "@/server/tools";
 
@@ -59,23 +60,29 @@ export interface ChatPanelData {
 
 const NOTHING: SessionSpend = { spentMicros: 0, queuedMicros: 0 };
 
-async function runsOf(sessionId: string | null): Promise<SessionSpend | null> {
+async function runsOf(
+  maker: MakerRef,
+  sessionId: string | null,
+): Promise<SessionSpend | null> {
   if (providerMode() === "mock") return null;
   if (!sessionId) return NOTHING;
-  return sessionSpend((await getCurrentMaker()).id, sessionId);
+  return sessionSpend(maker.id, sessionId);
 }
 
 // What a conversation's paid tools spent and hold, as the chat reads it
 // while they run: null when it is not the maker's.
 export async function chatRuns(
+  maker: MakerRef,
   sessionId: string,
 ): Promise<{ runs: SessionSpend | null } | null> {
-  if (!(await chatOwned(sessionId))) return null;
-  return { runs: await runsOf(sessionId) };
+  if (!(await chatOwned(maker, sessionId))) return null;
+  return { runs: await runsOf(maker, sessionId) };
 }
 
-async function estimates(): Promise<Record<SpecialistId, AgentEstimate>> {
-  const setup = await getMakerModelSetup();
+async function estimates(
+  maker: MakerRef,
+): Promise<Record<SpecialistId, AgentEstimate>> {
+  const setup = await getMakerModelSetup(maker);
   const estimate = (
     id: SpecialistId,
     kind: "chatTurn" | "chatPlan",
@@ -99,18 +106,23 @@ async function estimates(): Promise<Record<SpecialistId, AgentEstimate>> {
   ) as Record<SpecialistId, AgentEstimate>;
 }
 
-export async function chatPanelData(target: {
-  projectId?: string;
-  sessionId?: string;
-}): Promise<ChatPanelData> {
+export async function chatPanelData(
+  maker: MakerRef,
+  target: {
+    projectId?: string;
+    sessionId?: string;
+  },
+): Promise<ChatPanelData> {
   const sessionId =
     target.sessionId ??
     (target.projectId
-      ? ((await listChatSessions({ projectId: target.projectId }, 1))[0]?.id ??
-        null)
+      ? ((await listChatSessions(maker, { projectId: target.projectId }, 1))[0]
+          ?.id ?? null)
       : null);
-  const chat = sessionId ? await getChat(sessionId) : null;
-  const design = target.projectId ? await isDesign(target.projectId) : false;
+  const chat = sessionId ? await getChat(maker, sessionId) : null;
+  const design = target.projectId
+    ? await isDesign(maker, target.projectId)
+    : false;
   const proposed = (chat?.messages ?? []).flatMap((m) =>
     m.parts.flatMap((p) => {
       const id =
@@ -124,12 +136,12 @@ export async function chatPanelData(target: {
     sessionId: chat?.id ?? null,
     messages: chat?.messages ?? [],
     running: chat?.running ?? false,
-    estimates: await estimates(),
+    estimates: await estimates(maker),
     toolTitles: Object.fromEntries(TOOLS.map((t) => [t.name, t.title])),
     specialists: SPECIALIST_CHOICES,
     firstSpecialist: design ? "svg" : "kiln",
     design,
-    lessons: await lessonStatuses(proposed),
-    runs: await runsOf(chat?.id ?? null),
+    lessons: await lessonStatuses(maker, proposed),
+    runs: await runsOf(maker, chat?.id ?? null),
   };
 }

@@ -14,7 +14,7 @@ import { makerAction } from "@/server/guarded";
 // cost, like the image calls. The card's length snaps to the nearest one its
 // model renders (Gemini Omni: 3 to 10 s), so the price and the call agree.
 export const animateVideo = makerAction(
-  async (_maker, input: AnimateInput): Promise<GenerationResult> => {
+  async (maker, input: AnimateInput): Promise<GenerationResult> => {
     const raw = AnimateInput.parse(input);
     assertModel(raw.model, "video");
     const parsed = {
@@ -31,6 +31,7 @@ export const animateVideo = makerAction(
       );
     }
     return withDirectSpend(
+      maker,
       videoCall(parsed.model, parsed.durationSec),
       async (beforeCall) =>
         GenerationResult.parse(await provider.animate(parsed, { beforeCall })),

@@ -13,8 +13,8 @@ import { startProject } from "@/server/start-project";
 // called. On success it redirects to the board; on a refusal it returns the
 // reason.
 export const createProjectAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string }> => {
-    const started = await startProject(input);
+  async (maker, input: unknown): Promise<{ error: string }> => {
+    const started = await startProject(maker, input);
     if ("error" in started) return started;
     redirect(`/projects/${started.id}`);
   },
@@ -26,12 +26,12 @@ const LookAsk = z.object({ productId: z.string().min(1), look: Look });
 // free, stored by its bytes. Nothing changes on the product.
 export const lookDesignAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{ design: string } | { error: string }> => {
     const parsed = LookAsk.safeParse(input);
     if (!parsed.success) return { error: "Pick a colour or a style." };
-    const product = await getProduct(parsed.data.productId);
+    const product = await getProduct(maker, parsed.data.productId);
     if (!product) return { error: "That product no longer exists." };
     const chosen = chosenLook(product, parsed.data.look);
     if ("refused" in chosen) return { error: chosen.refused };

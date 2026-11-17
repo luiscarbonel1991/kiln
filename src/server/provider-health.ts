@@ -9,7 +9,7 @@ import { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 import { hasProviderKey } from "@/providers/keys";
 import { readUnlisted, recordKeyCheck } from "@/server/generation-repository";
 import { CAP_REACHED, NOT_STARTED } from "@/server/generation-worker";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 
 // Each provider's health, free to read (no ping, no paid call): whether its
 // key is set, and what its last live calls did — the queue's jobs and the
@@ -104,12 +104,12 @@ export async function providerHealth(
 // compared with the catalog: an offered model it no longer names is kept with
 // the answer, so Settings names it and the queue refuses it before paying.
 export async function checkKey(
+  maker: MakerRef,
   provider: ProviderId,
 ): Promise<KeyCheck & { unlisted?: string[] }> {
   const result = await checkProviderKey(provider);
   const unlisted = result.ok ? unlistedModels(provider, result.models) : [];
   if (result.called && hasDatabase()) {
-    const maker = await getCurrentMaker();
     await recordKeyCheck({
       makerId: maker.id,
       provider,

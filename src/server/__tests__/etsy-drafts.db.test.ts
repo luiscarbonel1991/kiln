@@ -67,6 +67,9 @@ vi.mock("@/server/deliver/delivery", async (original) => {
 });
 
 describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const shops = await import("@/server/shop-connection");
   const drafts = await import("@/server/etsy-drafts");
@@ -149,7 +152,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     );
     vi.stubGlobal("fetch", etsy.fetch);
     const { url, cookie } = shops.beginConnect(now);
-    await shops.finishConnect({
+    await shops.finishConnect(maker, {
       code: "the-code",
       state: new URL(url).searchParams.get("state"),
       cookie,
@@ -166,8 +169,8 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     );
 
   beforeEach(async () => {
-    await shops.disconnectShop();
     const maker = await getCurrentMaker();
+    await shops.disconnectShop(maker);
     await db.shopWrite.deleteMany({ where: { makerId: maker.id } });
     stand.delivery = {
       product,
@@ -190,26 +193,26 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
   });
 
   it("lists the shop's drafts, and writes nothing on a shop connected before drafts", async () => {
-    const listed = await drafts.listDrafts();
+    const maker = await getCurrentMaker();
+    const listed = await drafts.listDrafts(maker);
     expect(listed.drafts.map((d) => d.listingId).sort()).toEqual([
       PLAIN,
       VARIED,
     ]);
     expect(listed.draftsAllowed).toBe(true);
-    const maker = await getCurrentMaker();
     await db.shopConnection.update({
       where: { makerId_platform: { makerId: maker.id, platform: "etsy" } },
       data: { scopes: "shops_r listings_r transactions_r" },
     });
-    expect((await shops.shopConnection())?.draftsAllowed).toBe(false);
+    expect((await shops.shopConnection(maker))?.draftsAllowed).toBe(false);
     await expect(
-      drafts.updateDraft(PLAIN, { title: "New title" }, "Drafts page"),
+      drafts.updateDraft(maker, PLAIN, { title: "New title" }, "Drafts page"),
     ).rejects.toThrow("connect the shop again");
     expect(writes()).toEqual([]);
   });
 
   it("previews a draft from the project, with Kiln's first guesses", async () => {
-    const preview = await drafts.previewDraft(PROJECT, "etsy");
+    const preview = await drafts.previewDraft(maker, PROJECT, "etsy");
     expect(preview.settings).toMatchObject({
       quantity: 10,
       readinessStateId: 8001,
@@ -228,7 +231,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       "02-scale",
     ]);
     expect(preview.notSent).toContain("The video: upload it in Etsy's editor.");
-    const chosen = await drafts.previewDraft(PROJECT, "etsy", {
+    const chosen = await drafts.previewDraft(maker, PROJECT, "etsy", {
       taxonomyId: 1063,
       shippingProfileId: 7001,
     });
@@ -244,7 +247,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       shippingProfileId: 7001,
       readinessStateId: 8001,
     });
-    const made = await drafts.createDraftFromProject({
+    const made = await drafts.createDraftFromProject(maker, {
       projectId: PROJECT,
       destinationId: "etsy",
       settings,
@@ -258,7 +261,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     });
     expect(made.editorUrl).toContain(String(made.listingId));
     await expect(
-      drafts.createDraftFromProject({
+      drafts.createDraftFromProject(maker, {
         projectId: PROJECT,
         destinationId: "etsy",
         settings,
@@ -270,12 +273,12 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       (c) => c.init?.method === "POST" && c.url.pathname.endsWith("/listings"),
     );
     expect(creates).toHaveLength(1);
-    const log = await drafts.draftLog(made.listingId);
+    const log = await drafts.draftLog(maker, made.listingId);
     expect(log.map((l) => [l.action, l.status])).toEqual([
       ["photos", "done"],
       ["create", "done"],
     ]);
-    expect(await drafts.projectDrafts(PROJECT)).toEqual([
+    expect(await drafts.projectDrafts(maker, PROJECT)).toEqual([
       {
         destinationId: "etsy",
         listingId: made.listingId,
@@ -283,12 +286,13 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       },
     ]);
     // The next preview starts from what this draft used.
-    const next = await drafts.previewDraft(PROJECT, "etsy");
+    const next = await drafts.previewDraft(maker, PROJECT, "etsy");
     expect(next.settings.taxonomyId).toBe(1063);
     expect(next.made.map((m) => m.listingId)).toEqual([made.listingId]);
   });
 
   it("sends again a draft Etsy refused: nothing was made, its key is free", async () => {
+    const maker = await getCurrentMaker();
     let refusals = 1;
     failing = (method, path) =>
       method === "POST" && path.endsWith("/listings") && refusals-- > 0
@@ -300,7 +304,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
           )
         : undefined;
     const send = () =>
-      drafts.createDraftFromProject({
+      drafts.createDraftFromProject(maker, {
         projectId: PROJECT,
         destinationId: "etsy",
         settings: DraftSettings.parse({
@@ -318,7 +322,6 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     const made = await send();
     expect(made.photos).toBe(2);
     await expect(send()).rejects.toThrow("already sent");
-    const maker = await getCurrentMaker();
     const rows = await db.shopWrite.findMany({
       where: { makerId: maker.id, requestKey: "key-5" },
     });
@@ -335,7 +338,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       readinessStateId: 8001,
     };
     const send = (extra: object, requestKey: string) =>
-      drafts.createDraftFromProject({
+      drafts.createDraftFromProject(maker, {
         projectId: PROJECT,
         destinationId: "etsy",
         settings: DraftSettings.parse({ ...settings, ...extra }),
@@ -368,12 +371,13 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
   });
 
   it("never sends a create again when Etsy did not answer", async () => {
+    const maker = await getCurrentMaker();
     failing = (method, path) =>
       method === "POST" && path.endsWith("/listings")
         ? new Response("", { status: 502 })
         : undefined;
     await expect(
-      drafts.createDraftFromProject({
+      drafts.createDraftFromProject(maker, {
         projectId: PROJECT,
         destinationId: "etsy",
         settings: DraftSettings.parse({
@@ -387,7 +391,6 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       }),
     ).rejects.toThrow("Etsy did not answer: look in your drafts");
     expect(writes()).toHaveLength(1);
-    const maker = await getCurrentMaker();
     const row = await db.shopWrite.findFirstOrThrow({
       where: { makerId: maker.id, requestKey: "key-2" },
     });
@@ -402,7 +405,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
             status: 400,
           })
         : undefined;
-    const made = await drafts.createDraftFromProject({
+    const made = await drafts.createDraftFromProject(maker, {
       projectId: PROJECT,
       destinationId: "etsy",
       settings: DraftSettings.parse({
@@ -416,18 +419,25 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     });
     expect(made.missingPhotos).toEqual(["01-colours.jpg"]);
     expect(made.readBack).toEqual([]);
-    const again = await drafts.sendMissingPhotos(made.listingId, "Drafts page");
+    const again = await drafts.sendMissingPhotos(
+      maker,
+      made.listingId,
+      "Drafts page",
+    );
     expect(again).toEqual({ sent: 1, missing: [] });
-    expect((await drafts.draftDetail(made.listingId)).images).toHaveLength(2);
+    expect(
+      (await drafts.draftDetail(maker, made.listingId)).images,
+    ).toHaveLength(2);
   });
 
   it("changes nothing on a live listing: no write reaches Etsy", async () => {
     for (const run of [
-      () => drafts.updateDraft(LIVE, { title: "Live" }, "Chat"),
-      () => drafts.updateDraft(LIVE, { price: 1 }, "Chat"),
-      () => drafts.removeDraftPhoto(LIVE, 1, "Chat"),
+      () => drafts.updateDraft(maker, LIVE, { title: "Live" }, "Chat"),
+      () => drafts.updateDraft(maker, LIVE, { price: 1 }, "Chat"),
+      () => drafts.removeDraftPhoto(maker, LIVE, 1, "Chat"),
       () =>
         drafts.addDraftPhoto(
+          maker,
           LIVE,
           { bytes: new Uint8Array([1]), mime: "image/jpeg", filename: "a.jpg" },
           "Chat",
@@ -436,20 +446,26 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       await expect(run()).rejects.toThrow("Kiln changes drafts only");
     }
     expect(writes()).toEqual([]);
-    const detail = await drafts.draftDetail(LIVE);
+    const detail = await drafts.draftDetail(maker, LIVE);
     expect(detail).toMatchObject({ editable: false, state: "active" });
   });
 
   it("keeps a draft's variations: its price is not rewritten, its text not touched", async () => {
     await expect(
-      drafts.updateDraft(VARIED, { title: "Tote", price: 40 }, "Drafts page"),
+      drafts.updateDraft(
+        maker,
+        VARIED,
+        { title: "Tote", price: 40 },
+        "Drafts page",
+      ),
     ).rejects.toThrow("has variations");
     expect(writes()).toEqual([]);
-    expect((await drafts.draftDetail(VARIED)).variations).toBe(true);
+    expect((await drafts.draftDetail(maker, VARIED)).variations).toBe(true);
   });
 
   it("sends only what changed, logs it, and reads it back", async () => {
     const result = await drafts.updateDraft(
+      maker,
       PLAIN,
       {
         title: "Hand-lettered Recipe Card, Set of 4",
@@ -465,7 +481,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     expect(sent[1]).toMatchObject({
       products: [{ offerings: [{ price: 22, quantity: 5 }] }],
     });
-    expect((await drafts.draftLog(PLAIN)).map((l) => l.action)).toEqual([
+    expect((await drafts.draftLog(maker, PLAIN)).map((l) => l.action)).toEqual([
       "price",
       "edit",
     ]);
@@ -473,6 +489,7 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
 
   it("adds and removes a draft's photo", async () => {
     await drafts.addDraftPhoto(
+      maker,
       PLAIN,
       {
         bytes: new Uint8Array([255, 216]),
@@ -481,18 +498,28 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
       },
       "Drafts page",
     );
-    const detail = await drafts.draftDetail(PLAIN);
+    const detail = await drafts.draftDetail(maker, PLAIN);
     expect(detail.images).toHaveLength(2);
-    await drafts.removeDraftPhoto(PLAIN, detail.images[0].id, "Drafts page");
-    expect((await drafts.draftDetail(PLAIN)).images).toHaveLength(1);
+    await drafts.removeDraftPhoto(
+      maker,
+      PLAIN,
+      detail.images[0].id,
+      "Drafts page",
+    );
+    expect((await drafts.draftDetail(maker, PLAIN)).images).toHaveLength(1);
     await expect(
-      drafts.removeDraftPhoto(PLAIN, 999, "Drafts page"),
+      drafts.removeDraftPhoto(maker, PLAIN, 999, "Drafts page"),
     ).rejects.toThrow("not on this draft");
   });
 
   it("never sent a listing's state in any of these writes", async () => {
-    await drafts.updateDraft(PLAIN, { description: "New words." }, "Chat");
-    await drafts.createDraftFromProject({
+    await drafts.updateDraft(
+      maker,
+      PLAIN,
+      { description: "New words." },
+      "Chat",
+    );
+    await drafts.createDraftFromProject(maker, {
       projectId: PROJECT,
       destinationId: "etsy",
       settings: DraftSettings.parse({

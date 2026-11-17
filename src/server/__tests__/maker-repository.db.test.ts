@@ -7,6 +7,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("maker brand kit (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/maker-repository");
   const { importProductsAction } = await import("@/app/actions/products");
@@ -32,7 +35,7 @@ describe.skipIf(!enabled)("maker brand kit (database)", async () => {
       ],
     });
     expect(result).toMatchObject({ rejected: [], brandErrors: [] });
-    expect(await repo.getMakerBrand()).toEqual({
+    expect(await repo.getMakerBrand(maker)).toEqual({
       palette: ["#2F4A3A"],
       handle: "brandtest",
     });
@@ -111,7 +114,7 @@ describe.skipIf(!enabled)("maker brand kit (database)", async () => {
       where: { id: maker.id },
       data: { brand: { palette: "not a list" } },
     });
-    expect(await repo.getMakerBrand()).toBeNull();
+    expect(await repo.getMakerBrand(maker)).toBeNull();
     await db.maker.update({
       where: { id: maker.id },
       data: { brand: null as never },
@@ -138,7 +141,7 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
 
   it("reads Kiln's defaults and no routes until the maker saves them", async () => {
     await db.$executeRaw`UPDATE "Maker" SET "models" = NULL WHERE "id" = ${maker.id}`;
-    expect(await repo.getMakerModelSetup()).toEqual({
+    expect(await repo.getMakerModelSetup(maker)).toEqual({
       models: DEFAULT_MAKER_MODELS,
       routes: null,
       agents: {},
@@ -166,8 +169,8 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
         fallback: true,
       },
     };
-    await repo.saveMakerRoutes(mine);
-    const setup = await repo.getMakerModelSetup();
+    await repo.saveMakerRoutes(maker, mine);
+    const setup = await repo.getMakerModelSetup(maker);
     expect(setup.routes?.deep.models).toEqual(mine.deep.models);
     expect(setup.routes?.final.models).toEqual([
       { provider: "google", model: "gemini-3-pro-image" },
@@ -186,17 +189,18 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
     });
     const astra = { provider: "openai" as const, model: "gpt-6-astra" };
     await repo.saveMakerRoutes(
+      maker,
       { ...routes, deep: { ...routes.deep, effort: "xhigh" } },
       { etsy: { models: [astra], fallback: false, effort: "max" } },
     );
-    const setup = await repo.getMakerModelSetup();
+    const setup = await repo.getMakerModelSetup(maker);
     expect(setup.routes?.deep.effort).toBe("xhigh");
     expect(setup.routes?.fast.effort).toBeUndefined();
     expect(setup.agents).toEqual({
       etsy: { models: [astra], fallback: false, effort: "max" },
     });
     await expect(
-      repo.saveMakerRoutes(routes, {
+      repo.saveMakerRoutes(maker, routes, {
         etsy: {
           models: [{ provider: "openai", model: "gpt-image-2" }],
           fallback: false,
@@ -211,7 +215,7 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
       google: true,
     });
     await expect(
-      repo.saveMakerRoutes({
+      repo.saveMakerRoutes(maker, {
         ...routes,
         video: {
           models: [{ provider: "openai", model: "sora-2" }],
@@ -220,7 +224,7 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
       }),
     ).rejects.toThrow(/Sora 2 was shut down/);
     await expect(
-      repo.saveMakerRoutes({
+      repo.saveMakerRoutes(maker, {
         ...routes,
         fast: {
           models: [routes.fast.models[0], routes.fast.models[0]],
@@ -232,7 +236,7 @@ describe.skipIf(!enabled)("maker models (database)", async () => {
       image: { provider: "openai", model: "gpt-image-1.5", quality: "high" },
       video: { provider: "openai", model: "sora-2" },
     })}::jsonb WHERE "id" = ${maker.id}`;
-    expect(await repo.getMakerModels()).toEqual({
+    expect(await repo.getMakerModels(maker)).toEqual({
       image: { provider: "openai", model: "gpt-image-1.5", quality: "high" },
       video: DEFAULT_MAKER_MODELS.video,
       text: DEFAULT_MAKER_MODELS.text,
@@ -255,16 +259,16 @@ describe.skipIf(!enabled)("maker preferences (database)", async () => {
   });
 
   it("remembers the hero's setting per destination and family, two at once, keeping what else is there", async () => {
+    const maker = await repo.getCurrentMaker();
     await Promise.all([
-      repo.rememberHeroSetting("etsy", "Home", "place"),
-      repo.rememberHeroSetting("etsy", "Kitchen", "sweep"),
+      repo.rememberHeroSetting(maker, "etsy", "Home", "place"),
+      repo.rememberHeroSetting(maker, "etsy", "Kitchen", "sweep"),
     ]);
-    expect((await repo.getMakerPreferences()).heroSetting).toMatchObject({
+    expect((await repo.getMakerPreferences(maker)).heroSetting).toMatchObject({
       "etsy:home": "place",
       "etsy:kitchen": "sweep",
     });
-    await repo.rememberHeroSetting("etsy", "home ", "sweep");
-    const maker = await repo.getCurrentMaker();
+    await repo.rememberHeroSetting(maker, "etsy", "home ", "sweep");
     const row = await db.maker.findUniqueOrThrow({
       where: { id: maker.id },
       select: { preferences: true },

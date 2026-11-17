@@ -11,7 +11,7 @@ import { photoRead } from "@/server/text-calls";
 // `?new=1` (the New project flow's Design tile) opens it empty. Its new cards
 // start on the draft route's first model: the studio explores.
 export default makerPage(async function StudioPage(
-  _maker: CurrentMaker,
+  maker: CurrentMaker,
   {
     searchParams,
   }: {
@@ -19,7 +19,7 @@ export default makerPage(async function StudioPage(
   },
 ) {
   const { new: fresh, open } = await searchParams;
-  const { models, routes } = await getMakerModelSetup();
+  const { models, routes } = await getMakerModelSetup(maker);
   const [draft] = routes?.draft.models ?? [models.image];
   return (
     <ModulesProvider modules={enabledModules()}>
@@ -27,7 +27,7 @@ export default makerPage(async function StudioPage(
         fresh={fresh === "1"}
         openId={typeof open === "string" ? open : undefined}
         makerModels={{ ...models, image: draft }}
-        photoRead={await photoRead()}
+        photoRead={await photoRead(maker)}
       />
     </ModulesProvider>
   );

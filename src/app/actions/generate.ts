@@ -14,14 +14,15 @@ const PromptInput = z.string().trim().min(1, "Describe the image to generate.");
 // Zod guard is the trust boundary (Server Functions are POST-reachable). The
 // studio explores, so it runs on the draft route's first model.
 export const generateImage = makerAction(
-  async (_maker, prompt: string): Promise<GenerationResult> => {
+  async (maker, prompt: string): Promise<GenerationResult> => {
     const safePrompt = PromptInput.parse(prompt);
-    const { models, routes } = await getMakerModelSetup();
+    const { models, routes } = await getMakerModelSetup(maker);
     const input = ImageGenInput.parse({
       prompt: safePrompt,
       model: ModelConfig.parse(routes?.draft.models[0] ?? models.image),
     });
     return withDirectSpend(
+      maker,
       imageCall(input.model, input.model.aspect),
       async (beforeCall) =>
         GenerationResult.parse(

@@ -17,7 +17,7 @@ import type { CurrentMaker } from "@/server/maker-repository";
 // here (each save shows what changes first); a live listing only read. Below,
 // every write Kiln sent to it.
 export default makerPage(async function DraftPage(
-  _maker: CurrentMaker,
+  maker: CurrentMaker,
   {
     params,
   }: {
@@ -32,9 +32,9 @@ export default makerPage(async function DraftPage(
   let error: string | null = null;
   try {
     if (!Number.isInteger(id) || id <= 0) throw new Error("Which listing?");
-    draft = await draftDetail(id);
+    draft = await draftDetail(maker, id);
     categories = draft.editable
-      ? (await draftChoices()).categories.map((c) => ({
+      ? (await draftChoices(maker)).categories.map((c) => ({
           id: c.id,
           path: c.path,
         }))

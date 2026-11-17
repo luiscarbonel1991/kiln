@@ -14,7 +14,6 @@ import { makerPage } from "@/server/guarded";
 import { homeStats, type ProjectStats } from "@/server/home-repository";
 import { followedListings } from "@/server/listing-results";
 import type { CurrentMaker } from "@/server/maker-repository";
-import { getCurrentMaker } from "@/server/maker-repository";
 import { listProducts } from "@/server/product-repository";
 import { listProjects } from "@/server/project-repository";
 
@@ -37,7 +36,7 @@ function projectDetail(stats: ProjectStats): string {
 // The maker's work: where they left off, their projects and their products.
 // What Kiln does is told on the public page (/); this is where a maker lands
 // from it. Nothing here calls a model or a shop. Rendered per request.
-export default makerPage(async function ProjectsPage(_maker: CurrentMaker) {
+export default makerPage(async function ProjectsPage(maker: CurrentMaker) {
   await connection();
   if (!hasDatabase()) {
     return (
@@ -57,13 +56,12 @@ export default makerPage(async function ProjectsPage(_maker: CurrentMaker) {
       </div>
     );
   }
-  const maker = await getCurrentMaker();
   const [projects, products, stats, spend, listings] = await Promise.all([
-    listProjects(),
-    listProducts(),
+    listProjects(maker),
+    listProducts(maker),
     homeStats(maker.id),
     budget(maker.id),
-    followedListings(),
+    followedListings(maker),
   ]);
   const followed = listings.filter((l) => l.view.following);
   const mock = providerMode() === "mock";

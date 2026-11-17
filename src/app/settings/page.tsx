@@ -20,7 +20,7 @@ import { budget } from "@/server/generation-repository";
 import { makerPage } from "@/server/guarded";
 import { listLessons } from "@/server/lessons";
 import type { CurrentMaker } from "@/server/maker-repository";
-import { getCurrentMaker, getMakerModelSetup } from "@/server/maker-repository";
+import { getMakerModelSetup } from "@/server/maker-repository";
 import { providerHealth } from "@/server/provider-health";
 import {
   type ProviderKeyState,
@@ -62,24 +62,24 @@ function keyLine(state: ProviderKeyState | undefined): string {
 // Lessons: what Kiln proposes it learned of the maker's taste, and what they
 // kept. Shops: the Etsy connection. Access tokens: for the HTTP API (README
 // "HTTP API").
-export default makerPage(async function SettingsPage(_maker: CurrentMaker) {
+export default makerPage(async function SettingsPage(current: CurrentMaker) {
   await connection();
-  const maker = hasDatabase() ? await getCurrentMaker() : null;
+  const maker = hasDatabase() ? current : null;
   const [setup, health, keyStates, month, tokens, shop, calls, lessons] =
     await Promise.all([
-      getMakerModelSetup(),
+      getMakerModelSetup(current),
       providerHealth(maker?.id ?? null),
       maker ? providerKeyStates(maker.id) : Promise.resolve([]),
       maker ? budget(maker.id) : Promise.resolve(null),
-      maker ? listAccessTokens() : Promise.resolve(null),
-      maker ? shopConnection() : Promise.resolve(null),
-      maker ? recentToolCalls() : Promise.resolve([]),
+      maker ? listAccessTokens(maker) : Promise.resolve(null),
+      maker ? shopConnection(maker) : Promise.resolve(null),
+      maker ? recentToolCalls(maker) : Promise.resolve([]),
       maker
-        ? listLessons({ status: ["proposed", "kept"] })
+        ? listLessons(maker, { status: ["proposed", "kept"] })
         : Promise.resolve(null),
     ]);
   const mode = providerMode();
-  const look = maker ? await sceneLookSetup() : null;
+  const look = maker ? await sceneLookSetup(maker) : null;
   // A mock run calls nothing, so every provider counts as keyed.
   const keys = {
     openai:

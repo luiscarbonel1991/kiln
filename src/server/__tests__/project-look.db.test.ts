@@ -31,6 +31,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("the project's look (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const { startProject } = await import("@/server/start-project");
@@ -51,8 +54,10 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
   });
 
   it("starts in the colour and style picked, drawn by Kiln, and leaves the product's default alone", async () => {
-    const [saved] = await upsertProducts([Product.parse({ ...DOOR_TAG, sku })]);
-    const started = await startProject({
+    const [saved] = await upsertProducts(maker, [
+      Product.parse({ ...DOOR_TAG, sku }),
+    ]);
+    const started = await startProject(maker, {
       productId: saved.id,
       type: "listing-kit",
       destinationIds: ["etsy"],
@@ -60,7 +65,7 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
     });
     if ("error" in started) throw new Error(started.error);
     created.push(started.id);
-    const loaded = await repo.loadProjectBoard(started.id);
+    const loaded = await repo.loadProjectBoard(maker, started.id);
     const plan = loaded?.board.plan;
     expect(plan?.look).toEqual({
       colour: "gold-black",
@@ -81,15 +86,18 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
       "https://storage.test/products/gold.jpg",
     ]);
     expect(scene?.fields.palette.value).toContain("#D3B66F");
-    expect((await getProduct(saved.id))?.defaultColour).toBe("black-white");
+    expect((await getProduct(maker, saved.id))?.defaultColour).toBe(
+      "black-white",
+    );
   });
 
   it("refuses a look the product does not offer", async () => {
     const saved = await getProduct(
+      maker,
       (await db.product.findFirstOrThrow({ where: { sku } })).id,
     );
     expect(
-      await startProject({
+      await startProject(maker, {
         productId: saved?.id,
         type: "listing-kit",
         destinationIds: ["etsy"],
@@ -100,15 +108,16 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
 
   it("an update draws the project's look again from the product as it is now", async () => {
     const [id] = created;
-    const before = await repo.loadProjectBoard(id);
+    const before = await repo.loadProjectBoard(maker, id);
     const product = before?.product;
     if (!product) throw new Error("no product");
     await updateProduct(
+      maker,
       product.id,
       Product.parse({ ...product, material: "brushed two-tone laminate" }),
     );
     expect(await updateProjectProductAction({ projectId: id })).toBeUndefined();
-    const after = await repo.loadProjectBoard(id);
+    const after = await repo.loadProjectBoard(maker, id);
     const [drawn] = after?.board.plan?.references?.looks ?? [];
     expect(after?.board.plan?.look).toEqual(before?.board.plan?.look);
     expect(drawn.colour).toBe("gold-black");
@@ -145,7 +154,7 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
         style: "original",
       }),
     ).toBeUndefined();
-    const own = await repo.loadProjectBoard(id);
+    const own = await repo.loadProjectBoard(maker, id);
     const hero = own?.board.plan?.destinations[0].slots.find(
       (s) => s.key === "hero",
     );
@@ -181,10 +190,11 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
 
   it("an update that takes the frame's colour away writes the frame in the project's look", async () => {
     const [id] = created;
-    const before = await repo.loadProjectBoard(id);
+    const before = await repo.loadProjectBoard(maker, id);
     const product = before?.product;
     if (!product) throw new Error("no product");
     await updateProduct(
+      maker,
       product.id,
       Product.parse({
         ...product,
@@ -193,7 +203,7 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
       }),
     );
     expect(await updateProjectProductAction({ projectId: id })).toBeUndefined();
-    const after = await repo.loadProjectBoard(id);
+    const after = await repo.loadProjectBoard(maker, id);
     expect(after?.board.plan?.references?.looks?.map((l) => l.colour)).toEqual([
       "gold-black",
     ]);
@@ -213,7 +223,7 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
         style: null,
       }),
     ).toBeUndefined();
-    const back = await repo.loadProjectBoard(id);
+    const back = await repo.loadProjectBoard(maker, id);
     expect(
       back?.board.plan?.destinations[0].slots.find((s) => s.key === "hero"),
     ).not.toHaveProperty("look");
@@ -222,7 +232,7 @@ describe.skipIf(!enabled)("the project's look (database)", async () => {
   it("reads each scene's whole prompt for free, as the queue would build it", async () => {
     const { scenePrompts } = await import("@/server/generation-queue");
     const [id] = created;
-    const prompts = await scenePrompts(id);
+    const prompts = await scenePrompts(maker, id);
     const hero = prompts["etsy.hero"];
     expect(hero.prompt).toContain("gold/black");
     expect(hero.prompt).toContain('"Do not disturb"');

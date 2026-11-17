@@ -11,7 +11,7 @@ import { photoRead } from "@/server/text-calls";
 // bound to this project, opened on the card of the slot the board linked
 // (`?card=`).
 export default makerPage(async function ProjectEditorPage(
-  _maker: CurrentMaker,
+  maker: CurrentMaker,
   {
     params,
     searchParams,
@@ -27,9 +27,9 @@ export default makerPage(async function ProjectEditorPage(
       <StudioShell
         projectId={id}
         focusCardId={typeof card === "string" ? card : undefined}
-        makerModels={await getMakerModels()}
-        takeRoutes={await takeRoutes()}
-        photoRead={await photoRead()}
+        makerModels={await getMakerModels(maker)}
+        takeRoutes={await takeRoutes(maker)}
+        photoRead={await photoRead(maker)}
       />
     </ModulesProvider>
   );

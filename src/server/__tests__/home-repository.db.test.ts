@@ -78,8 +78,9 @@ describe.skipIf(!enabled)("home stats (database)", async () => {
   });
 
   it("counts what each project spent and kept, and this month's approved outputs", async () => {
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const maker = await getCurrentMaker();
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
@@ -94,7 +95,6 @@ describe.skipIf(!enabled)("home stats (database)", async () => {
       },
     });
     created.push(id);
-    const maker = await getCurrentMaker();
     const job = (cardId: string, outputUrl: string, actualMicros: number) => ({
       makerId: maker.id,
       projectId: id,

@@ -32,6 +32,7 @@ import {
 import { kilnPick, threeQuarterFor } from "@/domain/scene-reference";
 import { fetchAsset } from "@/providers/asset-bytes";
 import { noteApproval, noteReason } from "@/server/lessons";
+import type { MakerRef } from "@/server/maker-repository";
 import { framedProjects, projectFrames } from "@/server/project-frames";
 import {
   loadProjectBoard,
@@ -73,8 +74,8 @@ const refOf = (frame: string): SlotRef => {
   return ref;
 };
 
-async function framesOf(project: string) {
-  const frames = await projectFrames(project);
+async function framesOf(maker: MakerRef, project: string) {
+  const frames = await projectFrames(maker, project);
   if (!frames) {
     throw new ToolRefusal("No project of yours with frames has that id.");
   }
@@ -82,10 +83,13 @@ async function framesOf(project: string) {
 }
 
 export async function frameOf(
+  maker: MakerRef,
   project: string,
   frame: string,
 ): Promise<FrameView> {
-  const found = (await framesOf(project)).frames.find((f) => f.frame === frame);
+  const found = (await framesOf(maker, project)).frames.find(
+    (f) => f.frame === frame,
+  );
   if (!found) {
     throw new ToolRefusal(
       `This project has no frame "${frame}": get_frames lists them.`,
@@ -101,7 +105,9 @@ export const listProjects = defineTool({
     "The maker's projects that have frames (started from New project), newest first: id, name, type and phase.",
   input: z.object({}),
   hints: { readOnly: true },
-  run: async () => ({ data: { projects: await framedProjects() } }),
+  run: async (_input, { maker }) => ({
+    data: { projects: await framedProjects(maker) },
+  }),
 });
 
 export const getFrames = defineTool({
@@ -111,8 +117,8 @@ export const getFrames = defineTool({
     "Each frame of a project as the board shows it: its state (queued, generating, to-review, approved, exact, ...), the take an approval approves (output), the approved one, whether it failed and why, Kiln's check of a scene's take (its text and letterforms against the reference: passed, failed with what, or unchecked with why; scale is the size the scene asked for, never measured; seen is what a text model saw when it looked at the take for anything impossible, when the maker has that look on: it can miss a flaw or flag a fine take, so look yourself), and, after a fallback, the model it ran on. Exact frames are drawn from the product at delivery and cost nothing.",
   input: z.object({ project: ProjectId }),
   hints: { readOnly: true },
-  run: async ({ project }) => {
-    const { project: summary, frames } = await framesOf(project);
+  run: async ({ project }, { maker }) => {
+    const { project: summary, frames } = await framesOf(maker, project);
     return { data: { project: summary, frames } };
   },
 });
@@ -124,8 +130,8 @@ export const viewFrame = defineTool({
     "The take a frame shows now, as an image to look at before approving or rejecting it, with the output to pass back to approve_frame or reject_frame, and Kiln's check of it. Kiln never measures scale: compare the product with check.scale in the image.",
   input: FrameRef,
   hints: { readOnly: true, showsImages: true },
-  run: async ({ project, frame }) => {
-    const view = await frameOf(project, frame);
+  run: async ({ project, frame }, { maker }) => {
+    const view = await frameOf(maker, project, frame);
     if (!view.output) {
       throw new ToolRefusal(
         view.fill === "exact"
@@ -162,11 +168,11 @@ export const approveFrame = defineTool({
     "Approve the take a frame shows, as the board's Approve does: name the take you looked at (view_frame), and a newer take that landed since refuses, so nothing is approved unseen. An exact frame, the maker's photo and a shared frame take no approval. Approved takes are what deliver exports.",
   input: FrameRef.extend({ take: Take }),
   hints: { idempotent: true },
-  run: async ({ project, frame, take }) => {
-    await frameOf(project, frame);
-    await setSlotApproval(project, refOf(frame), true, take);
-    await noteApproval(project, refOf(frame));
-    return { data: { frame: await frameOf(project, frame) } };
+  run: async ({ project, frame, take }, { maker }) => {
+    await frameOf(maker, project, frame);
+    await setSlotApproval(maker, project, refOf(frame), true, take);
+    await noteApproval(maker, project, refOf(frame));
+    return { data: { frame: await frameOf(maker, project, frame) } };
   },
 });
 
@@ -177,10 +183,10 @@ export const unapproveFrame = defineTool({
     "Withdraw a frame's approval, as the board's Undo does: the take stays, waiting for a decision again.",
   input: FrameRef,
   hints: { idempotent: true },
-  run: async ({ project, frame }) => {
-    await frameOf(project, frame);
-    await setSlotApproval(project, refOf(frame), false);
-    return { data: { frame: await frameOf(project, frame) } };
+  run: async ({ project, frame }, { maker }) => {
+    await frameOf(maker, project, frame);
+    await setSlotApproval(maker, project, refOf(frame), false);
+    return { data: { frame: await frameOf(maker, project, frame) } };
   },
 });
 
@@ -196,8 +202,8 @@ export const rejectFrame = defineTool({
     ),
   }),
   hints: {},
-  run: async ({ project, frame, take, reason }) => {
-    const view = await frameOf(project, frame);
+  run: async ({ project, frame, take, reason }, { maker }) => {
+    const view = await frameOf(maker, project, frame);
     if (view.fill !== "scene") {
       throw new ToolRefusal(
         `${frame} is not a scene (${view.fill}): only a scene's take moves with a reason.`,
@@ -211,7 +217,7 @@ export const rejectFrame = defineTool({
       );
     }
     const ref = refOf(frame);
-    const loaded = await loadProjectBoard(project);
+    const loaded = await loadProjectBoard(maker, project);
     const slot = loaded?.board.plan?.destinations
       .find((d) => d.destinationId === ref.destinationId)
       ?.slots.find((s) => s.key === ref.slotKey);
@@ -239,9 +245,11 @@ export const rejectFrame = defineTool({
       );
     }
     const unapproved = view.approvedOutput === take;
-    if (unapproved) await setSlotApproval(project, ref, false);
-    await retuneSlot(project, ref, (plan) => withSlotTuning(plan, ref, move));
-    await noteReason(project, ref, reason, move);
+    if (unapproved) await setSlotApproval(maker, project, ref, false);
+    await retuneSlot(maker, project, ref, (plan) =>
+      withSlotTuning(plan, ref, move),
+    );
+    await noteReason(maker, project, ref, reason, move);
     const stops = KNOBS[move.knob].stops as Record<string, { label: string }>;
     return {
       data: {
@@ -395,8 +403,11 @@ export const tuneFrame = defineTool({
       ),
   }),
   hints: { idempotent: true },
-  run: async ({ project, frame, knobs = {}, place, colour, style }) => {
-    const view = await frameOf(project, frame);
+  run: async (
+    { project, frame, knobs = {}, place, colour, style },
+    { maker },
+  ) => {
+    const view = await frameOf(maker, project, frame);
     if (view.fill !== "scene") {
       throw new ToolRefusal(
         `${frame} is not a scene (${view.fill}): only a scene has knobs.`,
@@ -417,13 +428,13 @@ export const tuneFrame = defineTool({
     let tuned: Awaited<ReturnType<typeof retuneSlot>> | null = null;
     try {
       if (relooks) {
-        tuned = await relookSlot(project, ref, {
+        tuned = await relookSlot(maker, project, ref, {
           ...(colour !== undefined ? { colour } : {}),
           ...(style !== undefined ? { style } : {}),
         });
       }
       if (choices.length > 0 || place !== undefined) {
-        tuned = await retuneSlot(project, ref, (plan) =>
+        tuned = await retuneSlot(maker, project, ref, (plan) =>
           choices.reduce(
             (p, choice) => withSlotTuning(p, ref, choice),
             place === undefined ? plan : withSlotPlace(plan, ref, place),
@@ -437,7 +448,7 @@ export const tuneFrame = defineTool({
     const slot = tuned.plan.destinations
       .find((d) => d.destinationId === ref.destinationId)
       ?.slots.find((s) => s.key === ref.slotKey);
-    const loaded = await loadProjectBoard(project);
+    const loaded = await loadProjectBoard(maker, project);
     return {
       data: {
         frame,
@@ -464,10 +475,10 @@ export const switchFrame = defineTool({
     on: z.boolean().describe("true switches it on, false off."),
   }),
   hints: { idempotent: true },
-  run: async ({ project, frame, on }) => {
-    await frameOf(project, frame);
+  run: async ({ project, frame, on }, { maker }) => {
+    await frameOf(maker, project, frame);
     try {
-      await setSlotOff(project, refOf(frame), !on);
+      await setSlotOff(maker, project, refOf(frame), !on);
     } catch (error) {
       throw refusal(error);
     }
@@ -487,21 +498,21 @@ export const makeStillsVideoTool = defineTool({
       .describe("Its length; left out, the frame's."),
   }),
   hints: { idempotent: false },
-  run: async ({ project, frame, seconds }) => {
-    const view = await frameOf(project, frame);
+  run: async ({ project, frame, seconds }, { maker }) => {
+    const view = await frameOf(maker, project, frame);
     if (view.fill !== "video") {
       throw new ToolRefusal(`${frame} is not a video frame (${view.fill}).`);
     }
     const ref = refOf(frame);
     try {
-      await setVideoChoice(project, ref, {
+      await setVideoChoice(maker, project, ref, {
         stills: true,
         ...(seconds ? { seconds } : {}),
       });
     } catch (error) {
       throw refusal(error);
     }
-    const made = await makeStillsVideo(project, ref);
+    const made = await makeStillsVideo(maker, project, ref);
     if ("error" in made) throw new ToolRefusal(made.error);
     return {
       data: {

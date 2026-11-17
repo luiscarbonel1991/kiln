@@ -39,6 +39,7 @@ const product = Product.parse({
 describe("writeListing", () => {
   it("says why it could not write, and offers the other provider with its price", async () => {
     const result = await writeListing(
+      { id: "test" },
       {
         channel: "Etsy",
         product,

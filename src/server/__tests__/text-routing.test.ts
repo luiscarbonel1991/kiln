@@ -31,6 +31,7 @@ vi.mock("@/providers/mode", () => ({ providerMode: () => "live" }));
 vi.mock("@/server/direct-spend", async (original) => ({
   ...(await original<typeof import("@/server/direct-spend")>()),
   withDirectSpend: async (
+    _maker: unknown,
     call: {
       model: string;
       route?: unknown;
@@ -92,7 +93,7 @@ afterEach(() => {
 
 describe("text calls on a route", () => {
   it("runs the role's first model and says nothing more when it answers", async () => {
-    const result = await reviewProduct(fields);
+    const result = await reviewProduct({ id: "test" }, fields);
     expect(result).toMatchObject({ label: "GPT-6 Luna" });
     expect(result.ranOn).toBeUndefined();
     expect(priced.map((p) => p.model)).toEqual(["gpt-6-luna"]);
@@ -100,7 +101,7 @@ describe("text calls on a route", () => {
 
   it("moves down the route after an answered failure, recording the move", async () => {
     answers.set("openai/gpt-6-luna", withStatus(503));
-    const result = await reviewProduct(fields);
+    const result = await reviewProduct({ id: "test" }, fields);
     expect(result.review).toBeDefined();
     expect(result.ranOn).toEqual({
       label: "Gemini 3.5 Flash-Lite",
@@ -125,13 +126,13 @@ describe("text calls on a route", () => {
 
   it("counts every attempt for the conversation whose tool asked", async () => {
     answers.set("openai/gpt-6-luna", withStatus(503));
-    await reviewProduct(fields, undefined, { sessionId: "s1" });
+    await reviewProduct({ id: "test" }, fields, undefined, { sessionId: "s1" });
     expect(priced.map((p) => p.sessionId)).toEqual(["s1", "s1"]);
   });
 
   it("keeps a call with no answer final: it may have been charged", async () => {
     answers.set("openai/gpt-6-luna", new Error("Request timed out"));
-    const result = await reviewProduct(fields);
+    const result = await reviewProduct({ id: "test" }, fields);
     expect(result.review).toBeUndefined();
     expect(result.degraded).toMatchObject({ model: "gpt-6-luna" });
     expect(priced).toHaveLength(1);
@@ -140,7 +141,7 @@ describe("text calls on a route", () => {
   it("skips a model whose provider has no key", async () => {
     answers.set("openai/gpt-6-luna", withStatus(503));
     keys.google = false;
-    const result = await reviewProduct(fields);
+    const result = await reviewProduct({ id: "test" }, fields);
     expect(result.degraded).toMatchObject({
       model: "gpt-6-luna",
       // Not tried, so still offered on a click.
@@ -152,7 +153,7 @@ describe("text calls on a route", () => {
   it("offers no other provider when every provider was tried", async () => {
     answers.set("openai/gpt-6-luna", withStatus(503));
     answers.set("google/gemini-3.5-flash-lite", withStatus(500));
-    const result = await reviewProduct(fields);
+    const result = await reviewProduct({ id: "test" }, fields);
     expect(result.degraded).toMatchObject({
       model: "gemini-3.5-flash-lite",
       alternative: null,
@@ -164,13 +165,15 @@ describe("text calls on a route", () => {
     answers.set("openai/gpt-6-luna", withStatus(503));
     if (!routes) throw new Error("no routes");
     routes = { ...routes, fast: { ...routes.fast, fallback: false } };
-    expect((await reviewProduct(fields)).degraded).toBeDefined();
+    expect(
+      (await reviewProduct({ id: "test" }, fields)).degraded,
+    ).toBeDefined();
     expect(priced).toHaveLength(1);
 
     priced.length = 0;
     routes = null;
     answers.set("openai/gpt-6.1-sol", withStatus(503));
-    const result = await reviewProduct(fields);
+    const result = await reviewProduct({ id: "test" }, fields);
     // Before routes, a call runs the default text model, as it always did.
     expect(result.degraded).toMatchObject({
       model: "gpt-6.1-sol",
@@ -181,7 +184,7 @@ describe("text calls on a route", () => {
 
   it("runs a model asked for by name alone", async () => {
     answers.set("google/gemini-3.8-flash", withStatus(503));
-    const result = await reviewProduct(fields, {
+    const result = await reviewProduct({ id: "test" }, fields, {
       provider: "google",
       model: "gemini-3.8-flash",
     });
@@ -192,8 +195,11 @@ describe("text calls on a route", () => {
   it("runs at its role's effort, a model asked for by name too, and reserves what it buys", async () => {
     if (!routes) throw new Error("no routes");
     routes = { ...routes, fast: { ...routes.fast, effort: "high" } };
-    await reviewProduct(fields);
-    await reviewProduct(fields, { provider: "openai", model: "gpt-6.1-sol" });
+    await reviewProduct({ id: "test" }, fields);
+    await reviewProduct({ id: "test" }, fields, {
+      provider: "openai",
+      model: "gpt-6.1-sol",
+    });
     expect(sent).toEqual([
       { model: "gpt-6-luna", effort: "high" },
       { model: "gpt-6.1-sol", effort: "high" },

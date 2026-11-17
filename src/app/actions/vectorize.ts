@@ -21,7 +21,7 @@ const VectorizeInput = z.object({
 // never silently.
 export const vectorizeCardAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{ url: string } | { error: string }> => {
     const { imageUrl, mode, detail, projectId, cardId } =
@@ -29,7 +29,7 @@ export const vectorizeCardAction = makerAction(
     const traced = await traceToVector(imageUrl, mode, detail);
     if ("error" in traced) return traced;
     if (projectId && cardId) {
-      await setCardVector(projectId, cardId, imageUrl, traced.url);
+      await setCardVector(maker, projectId, cardId, imageUrl, traced.url);
     }
     return { url: traced.url };
   },

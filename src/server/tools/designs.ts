@@ -7,6 +7,7 @@ import {
   listDesigns,
   makeProductHref,
 } from "@/server/designs";
+import type { MakerRef } from "@/server/maker-repository";
 import { setCardVector } from "@/server/project-repository";
 import { defineTool, ToolRefusal } from "@/server/tools/registry";
 import { traceToVector, VectorDetail, VectorMode } from "@/server/vectorize";
@@ -30,8 +31,12 @@ const DrawingRef = DesignRef.extend({
     .describe('The drawing\'s card id (get_design: "recipe-line-art-0").'),
 }).strict();
 
-async function drawingOf(project: string, card: string): Promise<DrawingView> {
-  const design = await designView(project);
+async function drawingOf(
+  maker: MakerRef,
+  project: string,
+  card: string,
+): Promise<DrawingView> {
+  const design = await designView(maker, project);
   if (!design) throw new ToolRefusal("No design of yours has that id.");
   const drawing = design.drawings.find((d) => d.card === card);
   if (!drawing) {
@@ -49,7 +54,9 @@ export const listDesignsTool = defineTool({
     "The maker's design projects (an image drawn as line art, then traced into SVG), newest first, with how many drawings each has drawn and traced. Designs have no frames: get_design reads one.",
   input: z.object({}).strict(),
   hints: { readOnly: true },
-  run: async () => ({ data: { designs: await listDesigns() } }),
+  run: async (_input, { maker }) => ({
+    data: { designs: await listDesigns(maker) },
+  }),
 });
 
 export const getDesign = defineTool({
@@ -59,8 +66,8 @@ export const getDesign = defineTool({
     "A design's image and each drawing: its state (to-draw, drawing, drawn, vectorized, failed), its line art and its vector, and the link where the maker makes a vector into a product.",
   input: DesignRef,
   hints: { readOnly: true },
-  run: async ({ project }) => {
-    const design = await designView(project);
+  run: async ({ project }, { maker }) => {
+    const design = await designView(maker, project);
     if (!design) throw new ToolRefusal("No design of yours has that id.");
     const waiting = design.drawings.filter(
       (d) => d.state === "to-draw" || d.state === "failed",
@@ -89,8 +96,8 @@ export const viewDesign = defineTool({
     show: z.enum(["line-art", "vector"]).default("line-art"),
   }).strict(),
   hints: { readOnly: true, showsImages: true },
-  run: async ({ project, card, show }) => {
-    const drawing = await drawingOf(project, card);
+  run: async ({ project, card, show }, { maker }) => {
+    const drawing = await drawingOf(maker, project, card);
     const url = show === "vector" ? drawing.vector : drawing.lineArt;
     if (!url) {
       throw new ToolRefusal(
@@ -130,8 +137,8 @@ export const vectorizeTool = defineTool({
     detail: VectorDetail.default("balanced"),
   }).strict(),
   hints: {},
-  run: async ({ project, card, mode, detail }) => {
-    const drawing = await drawingOf(project, card);
+  run: async ({ project, card, mode, detail }, { maker }) => {
+    const drawing = await drawingOf(maker, project, card);
     if (!drawing.lineArt) {
       throw new ToolRefusal(
         drawing.state === "drawing"
@@ -141,7 +148,9 @@ export const vectorizeTool = defineTool({
     }
     const traced = await traceToVector(drawing.lineArt, mode, detail);
     if ("error" in traced) throw new ToolRefusal(traced.error);
-    if (!(await setCardVector(project, card, drawing.lineArt, traced.url))) {
+    if (
+      !(await setCardVector(maker, project, card, drawing.lineArt, traced.url))
+    ) {
       throw new ToolRefusal(
         `${drawing.label} changed while it was traced: read get_design again.`,
       );

@@ -19,7 +19,7 @@ const MAX_READ_BYTES = 16 * 1024;
 // number that is not a whole count, a destination neither delivered nor
 // given the day its photos went up).
 export const PUT = tokenRoute(
-  async (_caller, request: Request, { params }: Context) => {
+  async ({ maker }, request: Request, { params }: Context) => {
     const { id, destinationId, read } = await params;
     const key = ReadKey.safeParse(read);
     if (!key.success) {
@@ -38,7 +38,7 @@ export const PUT = tokenRoute(
       return apiError(422, "Dates are YYYY-MM-DD and the source is text.");
     }
     try {
-      const saved = await saveRead({
+      const saved = await saveRead(maker, {
         projectId: id,
         destinationId,
         key: key.data,

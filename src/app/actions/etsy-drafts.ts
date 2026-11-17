@@ -43,13 +43,13 @@ const CreateInput = z.object({
 
 export const createDraftAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{ made: DraftMade } | { error: string }> => {
     const parsed = CreateInput.safeParse(input);
     if (!parsed.success) return { error: "Which draft?" };
     try {
-      const made = await createDraftFromProject({
+      const made = await createDraftFromProject(maker, {
         ...parsed.data,
         by: "Drafts page",
       });
@@ -85,7 +85,7 @@ const UpdateInput = z.object({
 
 export const updateDraftAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<
     { changes: FieldChange[]; readBack: ReadBack[] } | { error: string }
@@ -98,6 +98,7 @@ export const updateDraftAction = makerAction(
     }
     try {
       const result = await updateDraft(
+        maker,
         parsed.data.listingId,
         parsed.data.change,
         "Drafts page",
@@ -113,7 +114,7 @@ export const updateDraftAction = makerAction(
 // A photo the maker adds to a draft: a JPEG or PNG as it is (Etsy takes no
 // WebP), 15 MB at most.
 export const addDraftPhotoAction = makerAction(
-  async (_maker, formData: FormData): Promise<{ error?: string }> => {
+  async (maker, formData: FormData): Promise<{ error?: string }> => {
     const listingId = ListingId.safeParse(Number(formData.get("listingId")));
     const file = formData.get("file");
     if (!listingId.success || !(file instanceof File)) {
@@ -129,6 +130,7 @@ export const addDraftPhotoAction = makerAction(
     }
     try {
       await addDraftPhoto(
+        maker,
         listingId.data,
         { bytes, mime, filename: file.name },
         "Drafts page",
@@ -147,11 +149,12 @@ const PhotoInput = z.object({
 });
 
 export const removeDraftPhotoAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error?: string }> => {
+  async (maker, input: unknown): Promise<{ error?: string }> => {
     const parsed = PhotoInput.safeParse(input);
     if (!parsed.success) return { error: "Which photo?" };
     try {
       await removeDraftPhoto(
+        maker,
         parsed.data.listingId,
         parsed.data.imageId,
         "Drafts page",
@@ -166,13 +169,14 @@ export const removeDraftPhotoAction = makerAction(
 
 export const sendMissingPhotosAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{ sent: number; missing: string[] } | { error: string }> => {
     const parsed = z.object({ listingId: ListingId }).safeParse(input);
     if (!parsed.success) return { error: "Which draft?" };
     try {
       const result = await sendMissingPhotos(
+        maker,
         parsed.data.listingId,
         "Drafts page",
       );

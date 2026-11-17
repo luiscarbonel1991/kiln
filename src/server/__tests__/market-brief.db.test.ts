@@ -9,6 +9,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("a market brief (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const { upsertProducts } = await import("@/server/product-repository");
@@ -50,7 +53,7 @@ describe.skipIf(!enabled)("a market brief (database)", async () => {
     });
 
   async function start(name: string) {
-    const [product] = await upsertProducts([
+    const [product] = await upsertProducts(maker, [
       Product.parse({
         id: "pkg:MB",
         sku,
@@ -72,7 +75,7 @@ describe.skipIf(!enabled)("a market brief (database)", async () => {
       destinationIds: ["etsy", "instagram"],
       catalog: CATALOG,
     });
-    const id = await repo.createProject({
+    const id = await repo.createProject(maker, {
       type: "launch",
       product,
       plan,
@@ -83,35 +86,35 @@ describe.skipIf(!enabled)("a market brief (database)", async () => {
         master: photoReference(product),
       }),
     });
-    await repo.renameProject(id, name);
+    await repo.renameProject(maker, id, name);
     created.push(id);
     return { id, product };
   }
 
   it("is kept per destination, read back on the board, and cleared when empty", async () => {
     const { id } = await start("Brief board");
-    await repo.setBrief(id, "etsy", brief("cork coaster"));
-    const loaded = await repo.loadProjectBoard(id);
+    await repo.setBrief(maker, id, "etsy", brief("cork coaster"));
+    const loaded = await repo.loadProjectBoard(maker, id);
     const [etsy, instagram] = loaded?.board.plan?.destinations ?? [];
     expect(etsy.brief).toEqual(brief("cork coaster"));
     expect(instagram.brief).toBeUndefined();
-    await repo.setBrief(id, "etsy", undefined);
+    await repo.setBrief(maker, id, "etsy", undefined);
     expect(
-      (await repo.loadProjectBoard(id))?.board.plan?.destinations[0],
+      (await repo.loadProjectBoard(maker, id))?.board.plan?.destinations[0],
     ).not.toHaveProperty("brief");
-    await expect(repo.setBrief(id, "nowhere", brief("x"))).rejects.toThrow(
-      /not a destination/,
-    );
+    await expect(
+      repo.setBrief(maker, id, "nowhere", brief("x")),
+    ).rejects.toThrow(/not a destination/);
   });
 
   it("the product's newest brief per destination is the one a new project starts from", async () => {
     const older = await start("Older listing kit");
-    await repo.setBrief(older.id, "etsy", brief("coaster set"));
+    await repo.setBrief(maker, older.id, "etsy", brief("coaster set"));
     const newer = await start("Newer listing kit");
-    await repo.setBrief(newer.id, "etsy", brief("cork coaster"));
+    await repo.setBrief(maker, newer.id, "etsy", brief("cork coaster"));
     // A project without a brief there does not hide the newest one.
     await start("No brief yet");
-    const found = await repo.latestBriefs(newer.product.id);
+    const found = await repo.latestBriefs(maker, newer.product.id);
     expect(found.etsy).toEqual({
       brief: brief("cork coaster"),
       projectName: "Newer listing kit",

@@ -14,12 +14,16 @@ const Decision = z.object({
 
 export const decideLessonAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{ status: "kept" | "dismissed" } | { error: string }> => {
     const parsed = Decision.safeParse(input);
     if (!parsed.success) return { error: "Which lesson?" };
-    const lesson = await decideLesson(parsed.data.id, parsed.data.status);
+    const lesson = await decideLesson(
+      maker,
+      parsed.data.id,
+      parsed.data.status,
+    );
     if (!lesson) return { error: "That lesson is not yours, or is gone." };
     refresh();
     return { status: parsed.data.status };

@@ -16,9 +16,6 @@ vi.mock("@/server/generation-repository", () => ({
   closeDirectCall,
   readUnlisted: async () => unlisted.found,
 }));
-vi.mock("@/server/maker-repository", () => ({
-  getCurrentMaker: async () => ({ id: "maker-1" }),
-}));
 
 const { imageCall, openDirectCall, textCall, videoCall, withDirectSpend } =
   await import("@/server/direct-spend");
@@ -39,6 +36,7 @@ afterEach(() => vi.clearAllMocks());
 describe("direct spend", () => {
   it("a video reserves its pinned max and records the seconds it generated", async () => {
     const result = await withDirectSpend(
+      { id: "maker-1" },
       videoCall(OMNI, 8),
       async (beforeCall) => {
         await beforeCall();
@@ -65,10 +63,14 @@ describe("direct spend", () => {
       outputTokens: 28960,
       outputTextTokens: 352,
     };
-    await withDirectSpend(videoCall(OMNI, 5), async (beforeCall) => {
-      await beforeCall();
-      return { ...video, usage };
-    });
+    await withDirectSpend(
+      { id: "maker-1" },
+      videoCall(OMNI, 5),
+      async (beforeCall) => {
+        await beforeCall();
+        return { ...video, usage };
+      },
+    );
     expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
       usage,
       actualMicros: 511_818,
@@ -81,7 +83,7 @@ describe("direct spend", () => {
     };
     const call = vi.fn();
     await expect(
-      withDirectSpend(videoCall(OMNI, 8), call),
+      withDirectSpend({ id: "maker-1" }, videoCall(OMNI, 8), call),
     ).rejects.toMatchObject({
       name: "CapabilityError",
       message:
@@ -94,9 +96,9 @@ describe("direct spend", () => {
 
   it("a length the model does not render has no price, so nothing is reserved", async () => {
     const call = vi.fn();
-    await expect(withDirectSpend(videoCall(OMNI, 12), call)).rejects.toThrow(
-      "No pinned price",
-    );
+    await expect(
+      withDirectSpend({ id: "maker-1" }, videoCall(OMNI, 12), call),
+    ).rejects.toThrow("No pinned price");
     expect(reserveDirectCall).not.toHaveBeenCalled();
     expect(call).not.toHaveBeenCalled();
   });
@@ -104,6 +106,7 @@ describe("direct spend", () => {
   it("an image model without a pinned price reserves nothing (never $0)", async () => {
     await expect(
       withDirectSpend(
+        { id: "maker-1" },
         imageCall({ provider: "openai", model: "gpt-image-0" }, "1:1"),
         vi.fn(),
       ),
@@ -116,7 +119,11 @@ describe("direct spend", () => {
   });
 
   it("a call that never went out (a stub) records no cost", async () => {
-    await withDirectSpend(videoCall(OMNI, 8), async () => video);
+    await withDirectSpend(
+      { id: "maker-1" },
+      videoCall(OMNI, 8),
+      async () => video,
+    );
     expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
       usage: undefined,
       actualMicros: null,
@@ -126,6 +133,7 @@ describe("direct spend", () => {
   it("a render with no answer after its call counts at the estimate", async () => {
     await expect(
       withDirectSpend(
+        { id: "maker-1" },
         imageCall({ provider: "openai", model: "gpt-image-2" }, "1:1"),
         async (beforeCall) => {
           await beforeCall();
@@ -141,7 +149,10 @@ describe("direct spend", () => {
 
   it("a call opened around a stream closes once, with its measured cost", async () => {
     const luna = { provider: "openai" as const, model: "gpt-6-luna" };
-    const direct = await openDirectCall(textCall<string>(luna, "chatTurn"));
+    const direct = await openDirectCall(
+      { id: "maker-1" },
+      textCall<string>(luna, "chatTurn"),
+    );
     expect(reserveDirectCall).toHaveBeenCalledWith(
       expect.objectContaining({ model: "gpt-6-luna" }),
     );
@@ -163,7 +174,10 @@ describe("direct spend", () => {
 
   it("a stream that answered an HTTP error counts nothing", async () => {
     const luna = { provider: "openai" as const, model: "gpt-6-luna" };
-    const direct = await openDirectCall(textCall<string>(luna, "chatTurn"));
+    const direct = await openDirectCall(
+      { id: "maker-1" },
+      textCall<string>(luna, "chatTurn"),
+    );
     await direct.beforeCall();
     await direct.failed(
       Object.assign(new Error("Bad Request"), { status: 400 }),

@@ -15,6 +15,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("versions and shared frames (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const { estimateProjectCards } = await import("@/server/generation-queue");
@@ -35,7 +38,7 @@ describe.skipIf(!enabled)("versions and shared frames (database)", async () => {
   });
 
   it("the post waits for Etsy's in-use scene, then re-frames the approved image", async () => {
-    const [product] = await upsertProducts([
+    const [product] = await upsertProducts(maker, [
       Product.parse({
         id: "pkg:VR",
         sku,
@@ -59,7 +62,7 @@ describe.skipIf(!enabled)("versions and shared frames (database)", async () => {
       destinationIds: ["etsy", "instagram"],
       catalog: CATALOG,
     });
-    const id = await repo.createProject({
+    const id = await repo.createProject(maker, {
       type: "launch",
       product,
       plan,
@@ -67,22 +70,23 @@ describe.skipIf(!enabled)("versions and shared frames (database)", async () => {
     });
     created.push(id);
 
-    await expect(estimateProjectCards(id, ["instagram.post"])).rejects.toThrow(
-      QueueRefusal,
-    );
-    await expect(estimateProjectCards(id, ["instagram.post"])).rejects.toThrow(
-      'Approve "In-use mockup" first',
-    );
+    await expect(
+      estimateProjectCards(maker, id, ["instagram.post"]),
+    ).rejects.toThrow(QueueRefusal);
+    await expect(
+      estimateProjectCards(maker, id, ["instagram.post"]),
+    ).rejects.toThrow('Approve "In-use mockup" first');
 
     const approved = "https://stub.local/in-use-take.png";
-    await repo.changePlan(id, (p) =>
+    await repo.changePlan(maker, id, (p) =>
       approveSlot(
         p,
         { destinationId: "etsy", slotKey: "in-use" },
         { status: "done", outputs: [approved] },
       ),
     );
-    const [post] = (await estimateProjectCards(id, ["instagram.post"])).cards;
+    const [post] = (await estimateProjectCards(maker, id, ["instagram.post"]))
+      .cards;
     expect(post.request).toMatchObject({
       kind: "image",
       masterAssetUrl: approved,
@@ -91,7 +95,7 @@ describe.skipIf(!enabled)("versions and shared frames (database)", async () => {
     expect(post.request.prompt).toContain("square 1:1 frame");
 
     // The carousel's own "in place" is Etsy's approved scene, shared.
-    const board = await repo.loadProjectBoard(id);
+    const board = await repo.loadProjectBoard(maker, id);
     const shared = board?.board.plan?.destinations
       .find((d) => d.destinationId === "instagram")
       ?.slots.find((s) => s.key === "in-place");

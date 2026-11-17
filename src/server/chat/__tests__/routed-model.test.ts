@@ -23,16 +23,18 @@ const opened: {
   done: ReturnType<typeof vi.fn>;
   failed: ReturnType<typeof vi.fn>;
 }[] = [];
-const openDirectCall = vi.fn(async (priced: { model: string }) => {
-  const call = {
-    model: priced.model,
-    beforeCall: vi.fn(async () => {}),
-    done: vi.fn(async () => {}),
-    failed: vi.fn(async () => {}),
-  };
-  opened.push(call);
-  return call;
-});
+const openDirectCall = vi.fn(
+  async (_maker: unknown, priced: { model: string }) => {
+    const call = {
+      model: priced.model,
+      beforeCall: vi.fn(async () => {}),
+      done: vi.fn(async () => {}),
+      failed: vi.fn(async () => {}),
+    };
+    opened.push(call);
+    return call;
+  },
+);
 const models = new Map<string, LanguageModelV4>();
 
 vi.mock("@/server/text-calls", () => ({
@@ -115,7 +117,7 @@ describe("the chat's routed model", () => {
     const seen: LanguageModelV4CallOptions[] = [];
     models.set(LUNA.model, streaming(answer("Hola."), seen));
     const ledger = newLedger();
-    const model = routedChatModel("chatTurn", {
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
       ...ROUTE,
       projectId: "p1",
       ledger,
@@ -123,6 +125,7 @@ describe("the chat's routed model", () => {
     const { stream } = await model.doStream(CALL);
     await read(stream);
     expect(openDirectCall).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({ model: LUNA.model, projectId: "p1" }),
     );
     expect(opened[0].beforeCall).toHaveBeenCalledTimes(1);
@@ -149,7 +152,7 @@ describe("the chat's routed model", () => {
     });
     const seen: LanguageModelV4CallOptions[] = [];
     models.set(FLASH.model, streaming(answer("Hola."), seen));
-    const model = routedChatModel("chatTurn", {
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
       candidates: [FLASH],
       effort: "max",
       ledger: newLedger(),
@@ -159,7 +162,7 @@ describe("the chat's routed model", () => {
     // Gemini thinks at most at high: 2,000 x 4.
     expect(seen[0].maxOutputTokens).toBe(8_000);
     // 20,000 in at $0.75 and 8,000 out at $3.75 per 1M.
-    expect(openDirectCall.mock.calls[0][0]).toMatchObject({
+    expect(openDirectCall.mock.calls[0][1]).toMatchObject({
       estimateMax: 0.045,
     });
     vi.useRealTimers();
@@ -176,13 +179,16 @@ describe("the chat's routed model", () => {
     );
     models.set(FLASH.model, streaming(answer("Hola.")));
     const ledger = newLedger();
-    const model = routedChatModel("chatTurn", { ...ROUTE, ledger });
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
+      ...ROUTE,
+      ledger,
+    });
     await read((await model.doStream(CALL)).stream);
     expect(opened.map((o) => o.model)).toEqual([LUNA.model, FLASH.model]);
     expect(opened[0].failed).toHaveBeenCalledWith(
       expect.objectContaining({ status: 503 }),
     );
-    expect(openDirectCall.mock.calls[1][0]).toMatchObject({
+    expect(openDirectCall.mock.calls[1][1]).toMatchObject({
       route: { switched: [{ from: LUNA, to: FLASH }] },
     });
     expect(ledger.models).toEqual(["Gemini 3.8 Flash · low"]);
@@ -200,7 +206,7 @@ describe("the chat's routed model", () => {
         },
       }),
     );
-    const model = routedChatModel("chatTurn", {
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
       candidates: [ARGON],
       effort: "high",
       ledger: newLedger(),
@@ -224,7 +230,7 @@ describe("the chat's routed model", () => {
         },
       }),
     );
-    const model = routedChatModel("chatTurn", {
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
       ...ROUTE,
       ledger: newLedger(),
     });
@@ -240,7 +246,7 @@ describe("the chat's routed model", () => {
     );
     const doStream = vi.fn();
     models.set(LUNA.model, new MockLanguageModelV4({ doStream }));
-    const model = routedChatModel("chatTurn", {
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
       ...ROUTE,
       ledger: newLedger(),
     });
@@ -261,7 +267,7 @@ describe("the chat's routed model", () => {
         }),
       }),
     );
-    const model = routedChatModel("chatTurn", {
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
       ...ROUTE,
       ledger: newLedger(),
     });

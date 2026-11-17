@@ -22,14 +22,20 @@ vi.mock("@/providers/asset-bytes", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("@/server/product-repository", () => ({
-  getProduct: async (id: string) => (id === board.id ? board : null),
+  getProduct: async (_maker: unknown, id: string) =>
+    id === board.id ? board : null,
 }));
 vi.mock("@/server/product-reference", () => ({
   lookedReference: async () => ({ master: null, drawn: null }),
 }));
 const remembered: Record<string, "sweep" | "place"> = {};
 const rememberHeroSetting = vi.fn(
-  async (_destinationId: string, _family: string, _setting: string) => {},
+  async (
+    _maker: unknown,
+    _destinationId: string,
+    _family: string,
+    _setting: string,
+  ) => {},
 );
 vi.mock("@/server/maker-repository", () => ({
   getMakerModels: async () => DEFAULT_MAKER_MODELS,
@@ -43,11 +49,12 @@ const kept: {
   stop: string;
 }[] = [];
 vi.mock("@/server/lessons", () => ({
-  keptMoves: async (family: string) => (family === board.family ? kept : []),
+  keptMoves: async (_maker: unknown, family: string) =>
+    family === board.family ? kept : [],
 }));
 const briefs: Record<string, { brief: MarketBrief; projectName: string }> = {};
 vi.mock("@/server/project-repository", () => ({
-  createProject: async (input: { plan: ProjectPlan }) => {
+  createProject: async (_maker: unknown, input: { plan: ProjectPlan }) => {
     created.push(input);
     return "project-1";
   },
@@ -195,6 +202,7 @@ describe("createProjectAction: the hero's setting", () => {
     await start({ etsy: "place" });
     expect(heroOf()).toBe("place");
     expect(rememberHeroSetting).toHaveBeenCalledWith(
+      expect.anything(),
       "etsy",
       board.family,
       "place",

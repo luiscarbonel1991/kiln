@@ -12,7 +12,7 @@ import { importPackage, importSummary } from "@/server/product-import";
 // out: the caller sends the bytes).
 const MAX_PACKAGE_BYTES = 32 * 1024 * 1024;
 
-export const POST = tokenRoute(async (_caller, request: Request) => {
+export const POST = tokenRoute(async ({ maker }, request: Request) => {
   const body = await readBody(request, MAX_PACKAGE_BYTES);
   if (!body) {
     return apiError(
@@ -29,7 +29,7 @@ export const POST = tokenRoute(async (_caller, request: Request) => {
       "The body is not JSON: send the product package itself, as application/json.",
     );
   }
-  const result = await importPackage(input);
+  const result = await importPackage(maker, input);
   if ("error" in result) return apiError(422, result.error);
   return apiJson(importSummary(result));
 });

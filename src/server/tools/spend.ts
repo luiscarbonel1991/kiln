@@ -1,3 +1,4 @@
+import type { MakerRef } from "@/server/maker-repository";
 import {
   claimQuote,
   type QuoteAction,
@@ -9,6 +10,7 @@ import { type ToolContext, ToolRefusal } from "@/server/tools/registry";
 // spend, and the quote is taken for this action (once). A token that may not
 // spend leaves the quote as it was.
 export async function takeQuote(
+  maker: MakerRef,
   ctx: ToolContext,
   id: string,
   action: QuoteAction,
@@ -18,5 +20,5 @@ export async function takeQuote(
       `The token "${ctx.tokenName}" may not spend: the maker turns that on in Settings → Access tokens. The quote stays valid until it expires.`,
     );
   }
-  return claimQuote(id, action);
+  return claimQuote(maker, id, action);
 }

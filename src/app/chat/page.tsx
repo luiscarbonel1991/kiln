@@ -20,7 +20,7 @@ const when = (iso: string) =>
 // project's, newest first; one open beside them. `?session=` opens one; none
 // opens a new conversation of the maker's own.
 export default makerPage(async function ChatPage(
-  _maker: CurrentMaker,
+  maker: CurrentMaker,
   {
     searchParams,
   }: {
@@ -28,9 +28,9 @@ export default makerPage(async function ChatPage(
   },
 ) {
   const { session } = await searchParams;
-  const sessions = await listChatSessions();
+  const sessions = await listChatSessions(maker);
   const open = sessions.find((s) => s.id === session) ?? null;
-  const data = await chatPanelData(open ? { sessionId: open.id } : {});
+  const data = await chatPanelData(maker, open ? { sessionId: open.id } : {});
   const title = open
     ? open.projectName
       ? `${open.projectName} · ${open.title}`

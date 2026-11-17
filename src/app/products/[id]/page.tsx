@@ -27,7 +27,7 @@ const BACK =
 // changed and offers its update), see who uses it, download its package,
 // delete it when nothing uses it. Rendered per request.
 export default makerPage(async function ProductPage(
-  _maker: CurrentMaker,
+  maker: CurrentMaker,
   {
     params,
     searchParams,
@@ -39,14 +39,14 @@ export default makerPage(async function ProductPage(
   await connection();
   const { id } = await params;
   const { back } = await searchParams;
-  const product = await getProduct(id);
+  const product = await getProduct(maker, id);
   if (!product) notFound();
-  const products = await listProducts();
+  const products = await listProducts(maker);
   // Priced at the dearest model of each call's route (deep, fast).
-  const draft = await textWorstCase("productDraft");
-  const review = await textWorstCase("productReview");
+  const draft = await textWorstCase(maker, "productDraft");
+  const review = await textWorstCase(maker, "productReview");
   const now = productHash(product);
-  const uses = (await productProjects(id)).map((use) => ({
+  const uses = (await productProjects(maker, id)).map((use) => ({
     projectId: use.projectId,
     name: use.name,
     behind: use.hash !== now,

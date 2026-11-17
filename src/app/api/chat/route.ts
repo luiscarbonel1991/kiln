@@ -17,7 +17,7 @@ const Body = z.object({
   specialist: SpecialistId.optional(),
 });
 
-export const POST = sessionRoute(async (_maker, request: Request) => {
+export const POST = sessionRoute(async (maker, request: Request) => {
   if (foreignOrigin(request)) {
     return apiError(403, "Kiln's chat answers only Kiln's own pages.");
   }
@@ -30,7 +30,7 @@ export const POST = sessionRoute(async (_maker, request: Request) => {
     return apiError(400, "Send a conversation and a message.");
   }
   try {
-    return await runTurn(parsed);
+    return await runTurn(maker, parsed);
   } catch (error) {
     if (error instanceof TurnRefusal)
       return apiError(error.status, error.message);

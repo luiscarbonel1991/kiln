@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("@/server/session", () => ({
+  requireMaker: async () => ({ id: "test", slug: "test", name: "Test" }),
+  denyWithoutSession: async () => null,
+}));
 vi.mock("@/server/provider-keys", async () => {
   const { withProviderKeys } = await import("@/providers/keys");
   return {

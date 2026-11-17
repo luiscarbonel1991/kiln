@@ -3,6 +3,7 @@ import { SlotRefusal } from "@/domain/plan";
 import { tokenRoute } from "@/server/guarded";
 import { apiError, apiJson, readBody } from "@/server/http-api";
 import { noteApproval } from "@/server/lessons";
+import type { MakerRef } from "@/server/maker-repository";
 import { projectFrames } from "@/server/project-frames";
 import { setSlotApproval } from "@/server/project-repository";
 
@@ -23,7 +24,7 @@ const STATUS = { missing: 404, refused: 422, stale: 409 } as const;
 // an unknown project or frame; 422 for a frame that takes no approval (an
 // exact frame, the maker's photo, a shared frame, no finished take).
 export const PUT = tokenRoute(
-  async (_caller, request: Request, context: Context) => {
+  async ({ maker }, request: Request, context: Context) => {
     const body = await readBody(request, MAX_BODY_BYTES);
     if (!body) return apiError(413, "An approval names one take: send less.");
     let json: unknown = {};
@@ -42,25 +43,32 @@ export const PUT = tokenRoute(
     if (!checked.success) {
       return apiError(422, "output is the address of the take you checked.");
     }
-    return decide(context, true, checked.data.output);
+    return decide(maker, context, true, checked.data.output);
   },
 );
 
 export const DELETE = tokenRoute(
-  async (_caller, _request: Request, context: Context) => {
-    return decide(context, false);
+  async ({ maker }, _request: Request, context: Context) => {
+    return decide(maker, context, false);
   },
 );
 
 async function decide(
+  maker: MakerRef,
   { params }: Context,
   approved: boolean,
   checked?: string,
 ): Promise<Response> {
   const { id, destinationId, slotKey } = await params;
   try {
-    await setSlotApproval(id, { destinationId, slotKey }, approved, checked);
-    if (approved) await noteApproval(id, { destinationId, slotKey });
+    await setSlotApproval(
+      maker,
+      id,
+      { destinationId, slotKey },
+      approved,
+      checked,
+    );
+    if (approved) await noteApproval(maker, id, { destinationId, slotKey });
   } catch (error) {
     if (error instanceof Error && error.message === "project not found") {
       return apiError(404, "No project of yours has that id.");
@@ -70,7 +78,7 @@ async function decide(
     }
     throw error;
   }
-  const frame = (await projectFrames(id))?.frames.find(
+  const frame = (await projectFrames(maker, id))?.frames.find(
     (f) => f.destinationId === destinationId && f.slotKey === slotKey,
   );
   return apiJson({ frame });

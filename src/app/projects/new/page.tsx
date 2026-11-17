@@ -21,7 +21,7 @@ import { textWorstCase } from "@/server/text-calls";
 // a Listing kit from that live listing, with `?title=` its title, to ask which
 // product it is.
 export default makerPage(async function NewProjectPage(
-  _maker: CurrentMaker,
+  maker: CurrentMaker,
   {
     searchParams,
   }: {
@@ -43,14 +43,14 @@ export default makerPage(async function NewProjectPage(
       : null;
   const initialDesign =
     typeof design === "string" ? await describeStoredSvg(design) : null;
-  const products = await listProducts();
-  const brand = await getMakerBrand();
-  const models = await getMakerModels();
-  const { heroSetting } = await getMakerPreferences();
+  const products = await listProducts(maker);
+  const brand = await getMakerBrand(maker);
+  const models = await getMakerModels(maker);
+  const { heroSetting } = await getMakerPreferences(maker);
   // Priced at the dearest model of each call's route (deep, fast).
-  const draft = await textWorstCase("productDraft");
-  const review = await textWorstCase("productReview");
-  const look = await sceneLookPlan();
+  const draft = await textWorstCase(maker, "productDraft");
+  const review = await textWorstCase(maker, "productReview");
+  const look = await sceneLookPlan(maker);
   return (
     <div className="flex min-h-full flex-col">
       <ProjectsHeader />

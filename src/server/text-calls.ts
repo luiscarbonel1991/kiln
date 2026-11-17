@@ -51,6 +51,7 @@ import {
   textCall,
   withDirectSpend,
 } from "@/server/direct-spend";
+import type { MakerRef } from "@/server/maker-repository";
 import { getMakerModelSetup } from "@/server/maker-repository";
 
 // Vision, the art director and the product and listing text, on their role's
@@ -128,10 +129,11 @@ class RouteFailed extends Error {
 // by name alone, else its role's route (the default text model alone until
 // the maker saves routes); the role's effort either way.
 export async function textCandidates(
+  maker: MakerRef,
   kind: TextCallKind,
   asked?: TextModel,
 ): Promise<{ candidates: RouteEntry[]; effort: Effort }> {
-  return roleCandidates(await getMakerModelSetup(), kind, asked);
+  return roleCandidates(await getMakerModelSetup(maker), kind, asked);
 }
 
 export function roleCandidates(
@@ -164,12 +166,13 @@ export const textRunnable = (kind: TextCallKind) => (entry: RouteEntry) =>
 // against the cap (reserved first, its row naming its model and the move that
 // led to it); a failure moves on only as fallbackAfter allows.
 async function runText<T>(
+  maker: MakerRef,
   kind: TextCallKind,
   asked: TextModel | undefined,
   call: (model: TextModel, options: TextCallOptions) => Promise<TextResult<T>>,
   counts: SpendFor = {},
 ): Promise<{ value: T; label: string; ranOn?: RanOn }> {
-  const { candidates, effort } = await textCandidates(kind, asked);
+  const { candidates, effort } = await textCandidates(maker, kind, asked);
   let [current] = candidates;
   let rest = candidates.slice(1);
   const tried: TextModel[] = [];
@@ -182,6 +185,7 @@ async function runText<T>(
     try {
       assertModel(model, "text");
       const result = await withDirectSpend(
+        maker,
         {
           ...textCall<T>(model, kind, effort),
           ...counts,
@@ -252,6 +256,7 @@ function routeDegraded(
 }
 
 export async function readProduct(
+  maker: MakerRef,
   assetUrl: string,
   model?: TextModel,
 ): Promise<{
@@ -261,6 +266,7 @@ export async function readProduct(
 }> {
   try {
     const { value, ranOn } = await runText<BaseUnderstanding>(
+      maker,
       "vision",
       model,
       (m, options) =>
@@ -277,6 +283,7 @@ export async function readProduct(
 }
 
 export async function directScenes(
+  maker: MakerRef,
   input: {
     understanding: BaseUnderstanding;
     recipe: Recipe;
@@ -291,6 +298,7 @@ export async function directScenes(
 }> {
   try {
     const { value, ranOn } = await runText<VariantDirection[]>(
+      maker,
       "artDirection",
       model,
       (m, options) =>
@@ -310,11 +318,13 @@ export async function directScenes(
 // saved on its own. Hex colours the model got wrong are dropped. On failure the
 // form stays as it was and the answer says why.
 export async function draftProduct(
+  maker: MakerRef,
   assetUrl: string,
   model?: TextModel,
 ): Promise<{ draft?: ProductDraft; degraded?: Degraded; ranOn?: RanOn }> {
   try {
     const { value: draft, ranOn } = await runText<ProductDraft>(
+      maker,
       "productDraft",
       model,
       (m, options) =>
@@ -342,6 +352,7 @@ export async function draftProduct(
 // shows what to fix. On failure the listing stays as it was and the answer
 // says why.
 export async function writeListing(
+  maker: MakerRef,
   input: {
     channel: string;
     product: Product;
@@ -355,6 +366,7 @@ export async function writeListing(
 ): Promise<{ copy?: ListingCopy; degraded?: Degraded; ranOn?: RanOn }> {
   try {
     const { value, ranOn } = await runText<ListingCopy>(
+      maker,
       "listingCopy",
       model,
       (m, options) => getArtDirector(m.provider).writeListing(input, options),
@@ -381,6 +393,7 @@ export async function writeListing(
 // (cleanReview keeps what the form can take, the maker accepts each). On
 // failure the form stays as it was and the answer says why.
 export async function reviewProduct(
+  maker: MakerRef,
   fields: ReviewField[],
   model?: TextModel,
   // The conversation whose paid tool asked for it.
@@ -394,6 +407,7 @@ export async function reviewProduct(
 }> {
   try {
     const { value, label, ranOn } = await runText<ProductReview>(
+      maker,
       "productReview",
       model,
       (m, options) =>
@@ -411,8 +425,11 @@ export async function reviewProduct(
 // route's models that may run (the first always) at its effort, what the
 // first costs, and the most it can cost, one charged call at most, so the
 // dearest model's. Null prices when a model has none pinned.
-export async function textRoute(kind: TextCallKind): Promise<TextRouteView> {
-  const { candidates, effort } = await textCandidates(kind);
+export async function textRoute(
+  maker: MakerRef,
+  kind: TextCallKind,
+): Promise<TextRouteView> {
+  const { candidates, effort } = await textCandidates(maker, kind);
   return routeView(kind, candidates, effort);
 }
 
@@ -450,18 +467,19 @@ export function routeView(
 
 // What reading an uploaded photo runs on and costs at most (the studio's
 // upload says it before the paid read).
-export async function photoRead(): Promise<{
+export async function photoRead(maker: MakerRef): Promise<{
   label: string;
   usd: number | null;
 }> {
-  const route = await textRoute("vision");
+  const route = await textRoute(maker, "vision");
   return { label: route.labels[0], usd: route.max };
 }
 
 // The most a text call of this kind can cost along its route (the price
 // shown before asking).
 export async function textWorstCase(
+  maker: MakerRef,
   kind: TextCallKind,
 ): Promise<number | null> {
-  return (await textRoute(kind)).max;
+  return (await textRoute(maker, kind)).max;
 }

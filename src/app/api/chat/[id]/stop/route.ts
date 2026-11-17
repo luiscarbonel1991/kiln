@@ -7,7 +7,7 @@ import { apiError, foreignOrigin } from "@/server/http-api";
 // did stays; a model call stopped midway counts at its estimate.
 export const POST = sessionRoute(
   async (
-    _maker,
+    maker,
     request: Request,
     { params }: { params: Promise<{ id: string }> },
   ) => {
@@ -15,7 +15,7 @@ export const POST = sessionRoute(
       return apiError(403, "Kiln's chat answers only Kiln's own pages.");
     }
     const { id } = await params;
-    if (!(await getChat(id))) {
+    if (!(await getChat(maker, id))) {
       return apiError(404, "No conversation of yours has that id.");
     }
     return Response.json({ stopped: stopTurn(id) });

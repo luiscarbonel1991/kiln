@@ -6,6 +6,7 @@ import { Look, lookLabel } from "@/domain/product-look";
 import { ProjectType } from "@/domain/project";
 import { CATALOG } from "@/lib/recipes";
 import { deliverDestination } from "@/server/deliver/deliver-destination";
+import type { MakerRef } from "@/server/maker-repository";
 import { findProduct } from "@/server/product-repository";
 import { projectFrames, waitingProjectFrames } from "@/server/project-frames";
 import { addProjectReference } from "@/server/project-reference";
@@ -42,8 +43,8 @@ const NewProject = z.object({
   ),
 });
 
-async function productOf(id: string) {
-  const product = await findProduct(id);
+async function productOf(maker: MakerRef, id: string) {
+  const product = await findProduct(maker, id);
   if (!product) {
     throw new ToolRefusal("No product of yours has that id or SKU.");
   }
@@ -57,9 +58,9 @@ export const planProjectTool = defineTool({
     "The frames a project would start with, without starting it: the look it shows (its colour and style), each destination's slots, what fills each (scene: a paid take; exact: drawn from the product, free; video; shared: repeats an approved scene) and the hero's setting. Nothing is saved.",
   input: NewProject,
   hints: { readOnly: true },
-  run: async ({ product, type, destinations, off, look }) => {
-    const found = await productOf(product);
-    const { plan } = await startingPlan(found, {
+  run: async ({ product, type, destinations, off, look }, { maker }) => {
+    const found = await productOf(maker, product);
+    const { plan } = await startingPlan(maker, found, {
       type,
       destinationIds: destinations,
       offSlots: off,
@@ -103,17 +104,17 @@ export const createProjectTool = defineTool({
     "Start a project as New project does: its plan, the product's reference and a draft for every scene. No model is called and nothing is paid; quote generate next to take its scenes.",
   input: NewProject,
   hints: {},
-  run: async ({ product, type, destinations, off, look }) => {
-    const started = await startProject({
-      productId: (await productOf(product)).id,
+  run: async ({ product, type, destinations, off, look }, { maker }) => {
+    const started = await startProject(maker, {
+      productId: (await productOf(maker, product)).id,
       type,
       destinationIds: destinations,
       offSlots: off,
       ...(look ? { look } : {}),
     });
     if ("error" in started) throw new ToolRefusal(started.error);
-    const frames = await projectFrames(started.id);
-    const state = await waitingProjectFrames(started.id);
+    const frames = await projectFrames(maker, started.id);
+    const state = await waitingProjectFrames(maker, started.id);
     return {
       data: {
         project: started.id,
@@ -146,7 +147,7 @@ export const addReferenceTool = defineTool({
       .describe("The photo's bytes in base64, with or without a data: prefix."),
   }),
   hints: {},
-  run: async ({ project, image }) => {
+  run: async ({ project, image }, { maker }) => {
     const base64 = image.replace(/^data:[^,]*,/, "").replace(/\s+/g, "");
     if (!/^[A-Za-z0-9+/]+=*$/.test(base64)) {
       throw new ToolRefusal("The image is not base64.");
@@ -157,7 +158,7 @@ export const addReferenceTool = defineTool({
         "The image is over 6 MB: send it with `kiln reference <project> <photo>` or POST /api/projects/<id>/reference.",
       );
     }
-    const outcome = await addProjectReference(project, bytes);
+    const outcome = await addProjectReference(maker, project, bytes);
     if (!outcome.ok) throw new ToolRefusal(outcome.error);
     return {
       data: {
@@ -179,8 +180,8 @@ export const deliverTool = defineTool({
     destination: z.string().min(1).describe('The destination ("etsy").'),
   }),
   hints: { idempotent: true },
-  run: async ({ project, destination }) => {
-    const result = await deliverDestination(project, destination);
+  run: async ({ project, destination }, { maker }) => {
+    const result = await deliverDestination(maker, project, destination);
     if ("error" in result) throw new ToolRefusal(result.error);
     return { data: { project, destination, ...result } };
   },

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { assertDatabaseUrl, db } from "@/lib/db";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import { hashToken, newToken } from "@/server/token-format";
 
 export {
@@ -61,9 +61,10 @@ function view(row: {
 }
 
 // The current maker's tokens, newest first.
-export async function listAccessTokens(): Promise<AccessTokenView[]> {
+export async function listAccessTokens(
+  maker: MakerRef,
+): Promise<AccessTokenView[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = await db.accessToken.findMany({
     where: { makerId: maker.id },
     select: SELECT,
@@ -75,11 +76,11 @@ export async function listAccessTokens(): Promise<AccessTokenView[]> {
 // Make a token for the current maker: the token itself is returned this once.
 // It may spend only when the maker says so.
 export async function createAccessToken(
+  maker: MakerRef,
   name: string,
   canSpend = false,
 ): Promise<{ token: string; created: AccessTokenView }> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const { token, prefix, hash } = newToken();
   const row = await db.accessToken.create({
     data: {
@@ -97,11 +98,11 @@ export async function createAccessToken(
 // Let one of the current maker's tokens spend, or stop it; false when it is
 // not there. The next call reads the change.
 export async function setTokenSpend(
+  maker: MakerRef,
   id: string,
   canSpend: boolean,
 ): Promise<boolean> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const { count } = await db.accessToken.updateMany({
     where: { id, makerId: maker.id },
     data: { canSpend },
@@ -111,9 +112,11 @@ export async function setTokenSpend(
 
 // Revoke (delete) one of the current maker's tokens; false when it was not
 // there. A call already on its way with it finishes; the next is refused.
-export async function revokeAccessToken(id: string): Promise<boolean> {
+export async function revokeAccessToken(
+  maker: MakerRef,
+  id: string,
+): Promise<boolean> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const { count } = await db.accessToken.deleteMany({
     where: { id, makerId: maker.id },
   });

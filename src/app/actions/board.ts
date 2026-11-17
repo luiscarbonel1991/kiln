@@ -65,11 +65,17 @@ const Approval = z.object({
 });
 
 export const setSlotApprovalAction = makerAction(
-  async (_maker, input: unknown): Promise<void> => {
+  async (maker, input: unknown): Promise<void> => {
     const { projectId, destinationId, slotKey, approved } =
       Approval.parse(input);
-    await setSlotApproval(projectId, { destinationId, slotKey }, approved);
-    if (approved) await noteApproval(projectId, { destinationId, slotKey });
+    await setSlotApproval(
+      maker,
+      projectId,
+      { destinationId, slotKey },
+      approved,
+    );
+    if (approved)
+      await noteApproval(maker, projectId, { destinationId, slotKey });
     refresh();
   },
 );
@@ -82,10 +88,10 @@ const Switch = z.object({
 });
 
 export const setSlotOffAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string } | undefined> => {
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
     const { projectId, destinationId, slotKey, off } = Switch.parse(input);
     try {
-      await setSlotOff(projectId, { destinationId, slotKey }, off);
+      await setSlotOff(maker, projectId, { destinationId, slotKey }, off);
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Could not switch it.",
@@ -104,10 +110,10 @@ const Frame = z.object({
 // Read a scene's shown take again (free): one from before the check, or one
 // left unchecked.
 export const checkTakeAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string } | undefined> => {
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
     const { projectId, destinationId, slotKey } = Frame.parse(input);
     try {
-      await recheckTake(projectId, { destinationId, slotKey });
+      await recheckTake(maker, projectId, { destinationId, slotKey });
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Could not check it.",
@@ -128,15 +134,15 @@ const KnobWrite = z.object({
 
 // Turn one of a scene's knobs.
 export const setSlotKnobAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string } | undefined> => {
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
     const { projectId, destinationId, slotKey, choice, reason } =
       KnobWrite.parse(input);
     const ref = { destinationId, slotKey };
     try {
-      const { product } = await retuneSlot(projectId, ref, (plan) =>
+      const { product } = await retuneSlot(maker, projectId, ref, (plan) =>
         withSlotTuning(plan, ref, choice),
       );
-      if (reason) await noteReason(projectId, ref, reason, choice);
+      if (reason) await noteReason(maker, projectId, ref, reason, choice);
       // A hero's setting chosen on the board is proposed next time for this
       // family on this destination.
       if (
@@ -144,7 +150,12 @@ export const setSlotKnobAction = makerAction(
         (choice.stop === "sweep" || choice.stop === "place") &&
         product
       ) {
-        await rememberHeroSetting(destinationId, product.family, choice.stop);
+        await rememberHeroSetting(
+          maker,
+          destinationId,
+          product.family,
+          choice.stop,
+        );
       }
     } catch (error) {
       return {
@@ -168,12 +179,13 @@ const LookWrite = z.object({
 // Show one scene in a colour and style of its own, or the project's again
 // (null): free, its card is written again in it.
 export const setSlotLookAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string } | undefined> => {
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
     const parsed = LookWrite.safeParse(input);
     if (!parsed.success) return { error: "Pick a colour or a style." };
     const { projectId, destinationId, slotKey, colour, style } = parsed.data;
     try {
       await relookSlot(
+        maker,
         projectId,
         { destinationId, slotKey },
         {
@@ -201,20 +213,25 @@ const PlaceWrite = z.object({
 // product's places (null or blank). A hero given a place stands in it, and
 // that setting is remembered for the family like one chosen in Tune.
 export const setSlotPlaceAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string } | undefined> => {
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
     const parsed = PlaceWrite.safeParse(input);
     if (!parsed.success) return { error: "A place is at most 160 characters." };
     const { projectId, destinationId, slotKey, place } = parsed.data;
     const ref = { destinationId, slotKey };
     try {
-      const { product, plan } = await retuneSlot(projectId, ref, (p) =>
+      const { product, plan } = await retuneSlot(maker, projectId, ref, (p) =>
         withSlotPlace(p, ref, place || null),
       );
       const slot = plan.destinations
         .find((d) => d.destinationId === destinationId)
         ?.slots.find((s) => s.key === slotKey);
       if (place && slot?.knobs?.setting !== undefined && product) {
-        await rememberHeroSetting(destinationId, product.family, "place");
+        await rememberHeroSetting(
+          maker,
+          destinationId,
+          product.family,
+          "place",
+        );
       }
     } catch (error) {
       return {
@@ -236,11 +253,12 @@ const _EXTENSION: Record<(typeof ACCEPTED_IMAGE_MIME)[number], string> = {
 // renderer) and make it the project's anchor. The file and the project id come
 // in one form, so no client-supplied URL is ever fetched by the server.
 export const addReferenceAction = makerAction(
-  async (_maker, formData: FormData): Promise<void> => {
+  async (maker, formData: FormData): Promise<void> => {
     const projectId = z.string().min(1).parse(formData.get("projectId"));
     const file = formData.get("file");
     if (!(file instanceof File)) throw new Error("No file provided.");
     const outcome = await addProjectReference(
+      maker,
       projectId,
       new Uint8Array(await file.arrayBuffer()),
     );
@@ -254,11 +272,11 @@ export const addReferenceAction = makerAction(
 // locally). The maker's own card edits are kept; outputs and approvals stay,
 // and the board marks scenes made from the earlier version.
 export const updateProjectProductAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string } | undefined> => {
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
     const { projectId } = z
       .object({ projectId: z.string().min(1) })
       .parse(input);
-    const loaded = await loadProjectBoard(projectId);
+    const loaded = await loadProjectBoard(maker, projectId);
     if (!loaded?.board.plan || !loaded.product) {
       return { error: "Only a planned project with a product can be updated." };
     }
@@ -294,11 +312,16 @@ export const updateProjectProductAction = makerAction(
       const cards = master
         ? refreshCards(
             board.cards,
-            slotCards(viewed(plan), master, product, await getMakerModels()),
+            slotCards(
+              viewed(plan),
+              master,
+              product,
+              await getMakerModels(maker),
+            ),
             master.id,
           )
         : board.cards;
-      await refreshProjectProduct(projectId, {
+      await refreshProjectProduct(maker, projectId, {
         product,
         understanding,
         master: fresh,
@@ -329,13 +352,18 @@ const ListingWrite = z.object({
 // like the draft.
 export const writeListingAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{ degraded?: Degraded; ranOn?: RanOn; error?: string }> => {
     const parsed = ListingWrite.safeParse(input);
     if (!parsed.success) return { error: "Nothing to write for." };
     const { projectId, destinationId, model } = parsed.data;
-    const result = await writeProjectListing(projectId, destinationId, model);
+    const result = await writeProjectListing(
+      maker,
+      projectId,
+      destinationId,
+      model,
+    );
     if ("error" in result) return { error: result.error };
     if ("degraded" in result) return { degraded: result.degraded };
     refresh();
@@ -352,13 +380,13 @@ const ListingSave = z.object({
 // Save a destination's listing text as the maker left it (the fields they
 // edited say so). Free; checked again on every read.
 export const saveListingAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string } | undefined> => {
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
     const parsed = ListingSave.safeParse(input);
     if (!parsed.success)
       return { error: "The listing text could not be read." };
     const { projectId, destinationId, listing } = parsed.data;
     try {
-      await setListing(projectId, destinationId, listing);
+      await setListing(maker, projectId, destinationId, listing);
     } catch (error) {
       return { error: (error as Error).message };
     }
@@ -375,9 +403,9 @@ const Move = z.object({
 
 // Reorder a destination's photos: make a slot photo 1, or move it one place.
 export const moveSlotAction = makerAction(
-  async (_maker, input: z.infer<typeof Move>) => {
+  async (maker, input: z.infer<typeof Move>) => {
     const { projectId, destinationId, slotKey, move } = Move.parse(input);
-    await setSlotOrder(projectId, { destinationId, slotKey }, move);
+    await setSlotOrder(maker, projectId, { destinationId, slotKey }, move);
     refresh();
   },
 );
@@ -391,9 +419,9 @@ const Video = z.object({
 
 // Change a video slot's start frame, motion, length or orientation.
 export const setVideoChoiceAction = makerAction(
-  async (_maker, input: z.infer<typeof Video>) => {
+  async (maker, input: z.infer<typeof Video>) => {
     const { projectId, destinationId, slotKey, choice } = Video.parse(input);
-    await setVideoChoice(projectId, { destinationId, slotKey }, choice);
+    await setVideoChoice(maker, projectId, { destinationId, slotKey }, choice);
     refresh();
   },
 );
@@ -407,11 +435,14 @@ const Stills = z.object({
 // Make the stills-in-motion video from the approved scenes: free, local,
 // the video card's take to review.
 export const makeStillsVideoAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string } | undefined> => {
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
     const parsed = Stills.safeParse(input);
     if (!parsed.success) return { error: "Name the video frame." };
     const { projectId, destinationId, slotKey } = parsed.data;
-    const made = await makeStillsVideo(projectId, { destinationId, slotKey });
+    const made = await makeStillsVideo(maker, projectId, {
+      destinationId,
+      slotKey,
+    });
     if ("error" in made) return made;
     refresh();
   },
@@ -425,13 +456,14 @@ const AddVideo = z.object({
 // Give a project made before video its destination's video slot.
 export const addVideoAction = makerAction(
   async (
-    _maker,
+    maker,
     input: z.infer<typeof AddVideo>,
   ): Promise<{ error?: string }> => {
     const { projectId, destinationId } = AddVideo.parse(input);
     try {
-      const models = await getMakerModels();
+      const models = await getMakerModels(maker);
       await addVideoToPlan(
+        maker,
         projectId,
         destinationId,
         CATALOG.shotLists,
@@ -468,12 +500,12 @@ const CardModel = z.object({
 // does not offer it or has no price for it.
 export const setCardModelAction = makerAction(
   async (
-    _maker,
+    maker,
     input: z.infer<typeof CardModel>,
   ): Promise<{ error?: string }> => {
     const { projectId, cardId, model } = CardModel.parse(input);
     try {
-      await setCardModel(projectId, cardId, model);
+      await setCardModel(maker, projectId, cardId, model);
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) };
     }

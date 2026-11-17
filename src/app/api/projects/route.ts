@@ -4,6 +4,6 @@ import { framedProjects } from "@/server/project-frames";
 
 // GET /api/projects — the projects that have frames (started from New
 // project), newest first: { projects: [{ id, name, type, phase, updatedAt }] }.
-export const GET = tokenRoute(async (_caller, _request: Request) => {
-  return apiJson({ projects: await framedProjects() });
+export const GET = tokenRoute(async ({ maker }, _request: Request) => {
+  return apiJson({ projects: await framedProjects(maker) });
 });

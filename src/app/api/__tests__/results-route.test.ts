@@ -13,11 +13,14 @@ vi.mock("@/server/listing-results", async (original) => {
   const real = await original<typeof import("@/server/listing-results")>();
   return {
     ...real,
-    saveRead: async (input: {
-      projectId: string;
-      destinationId: string;
-      read: Record<string, unknown>;
-    }) => {
+    saveRead: async (
+      _maker: unknown,
+      input: {
+        projectId: string;
+        destinationId: string;
+        read: Record<string, unknown>;
+      },
+    ) => {
       calls.saved.push(input);
       if (input.projectId === "gone") throw new Error("project not found");
       if (input.destinationId === "instagram") {

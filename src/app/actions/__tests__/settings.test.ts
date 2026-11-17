@@ -5,7 +5,7 @@ import { proposeRoutes } from "@/domain/model-routing";
 const saved: unknown[][] = [];
 vi.mock("next/cache", () => ({ refresh: () => {} }));
 vi.mock("@/server/maker-repository", () => ({
-  saveMakerRoutes: async (...args: unknown[]) => {
+  saveMakerRoutes: async (_maker: unknown, ...args: unknown[]) => {
     saved.push(args);
   },
 }));

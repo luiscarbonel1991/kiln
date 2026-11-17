@@ -27,12 +27,12 @@ const Enqueue = z.object({
 
 export const enqueueGenerationAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{ queued: number } | { error: string }> => {
     const parsed = Enqueue.parse(input);
     try {
-      const result = await enqueueProjectCards(parsed);
+      const result = await enqueueProjectCards(maker, parsed);
       refresh();
       return { queued: result.queued };
     } catch (error) {

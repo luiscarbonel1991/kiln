@@ -22,7 +22,7 @@ const SavedRoutes = z.object({ routes: MakerRoutes, agents: AgentRoutes });
 // price, once per route; an agent Kiln has, on models that read images when
 // it looks at them.
 export const saveMakerRoutesAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error?: string }> => {
+  async (maker, input: unknown): Promise<{ error?: string }> => {
     const parsed = SavedRoutes.safeParse(input);
     if (!parsed.success) {
       return {
@@ -32,7 +32,7 @@ export const saveMakerRoutesAction = makerAction(
     const problem = agentRoutesProblem(parsed.data.agents);
     if (problem) return { error: problem };
     try {
-      await saveMakerRoutes(parsed.data.routes, parsed.data.agents);
+      await saveMakerRoutes(maker, parsed.data.routes, parsed.data.agents);
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) };
     }
@@ -44,10 +44,10 @@ export const saveMakerRoutesAction = makerAction(
 // Settings → Providers: a key checked for free, the answer kept as the
 // provider's latest call.
 export const checkProviderKeyAction = makerAction(
-  async (_maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
+  async (maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
     const parsed = ProviderId.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Which provider?" };
-    const result = await checkKey(parsed.data);
+    const result = await checkKey(maker, parsed.data);
     if (result.called) refresh();
     if (!result.ok) return { ok: false, message: result.message };
     const label = PROVIDER_LABELS[parsed.data];
@@ -115,11 +115,11 @@ export const removeProviderKeyAction = makerAction(
 
 // Settings → Checks: the paid look at every scene, on or off.
 export const setSceneLookAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error?: string }> => {
+  async (maker, input: unknown): Promise<{ error?: string }> => {
     const parsed = z.boolean().safeParse(input);
     if (!parsed.success) return { error: "On or off?" };
     try {
-      await setSceneLook(parsed.data);
+      await setSceneLook(maker, parsed.data);
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) };
     }

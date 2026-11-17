@@ -80,7 +80,7 @@ function grade(task: Task, reply: KilnMessage | undefined): string[] {
 // project's image, its first drawing standing in as drawn.
 async function designForEval(sources: string[]): Promise<string | undefined> {
   const { listDesigns } = await import("@/server/designs");
-  const found = (await listDesigns()).find(
+  const found = (await listDesigns({ id: "test" })).find(
     (d) => d.drawn > 0 && d.drawn < d.drawings,
   );
   if (found) return found.id;
@@ -92,7 +92,7 @@ async function designForEval(sources: string[]): Promise<string | undefined> {
   const { SEED_BRAND } = await import("@/domain/seed");
   const { SEED_RECIPE_LINE_ART } = await import("@/lib/recipes");
   for (const id of sources) {
-    const record = await loadProject(id);
+    const record = await loadProject({ id: "test" }, id);
     if (!record?.master || !record.understanding) continue;
     const { master, understanding } = record;
     const recipe = SEED_RECIPE_LINE_ART;
@@ -102,15 +102,18 @@ async function designForEval(sources: string[]): Promise<string | undefined> {
         ? { ...card, outputs: [master.assetUrl], status: "done" as const }
         : card,
     );
-    return saveProject({
-      name: "Eval design",
-      phase: "generation",
-      master,
-      understanding,
-      recipeId: recipe.id,
-      planning,
-      cards,
-    });
+    return saveProject(
+      { id: "test" },
+      {
+        name: "Eval design",
+        phase: "generation",
+        master,
+        understanding,
+        recipeId: recipe.id,
+        planning,
+        cards,
+      },
+    );
   }
   return undefined;
 }
@@ -118,7 +121,7 @@ async function designForEval(sources: string[]): Promise<string | undefined> {
 describe("the chat agent's fixed tasks", async () => {
   const { textRoute } = await import("@/server/text-calls");
   const { MAX_STEPS, runTurn } = await import("@/server/chat/run-turn");
-  const route = await textRoute("chatTurn");
+  const route = await textRoute({ id: "test" }, "chatTurn");
   const typical = tasks.length * 3 * (route.typical ?? 0);
   const most = tasks.length * MAX_STEPS * (route.max ?? 0);
   process.stdout.write(
@@ -147,11 +150,11 @@ describe("the chat agent's fixed tasks", async () => {
   const projects: { waiting?: string; review?: string; design?: string } = {};
   for (const { id } of candidates) {
     if (!projects.waiting) {
-      const w = await waitingProjectFrames(id);
+      const w = await waitingProjectFrames(maker, id);
       if (w?.reference && w.waiting.length > 0) projects.waiting = id;
     }
     if (!projects.review) {
-      const f = await projectFrames(id);
+      const f = await projectFrames(maker, id);
       if (
         f?.frames.some(
           (x) => x.frame === "etsy.hero" && x.state === "to-review",
@@ -172,13 +175,13 @@ describe("the chat agent's fixed tasks", async () => {
       distinct: ["productId"],
     });
     for (const { productId } of products) {
-      const started = await startProject({
+      const started = await startProject(maker, {
         productId,
         type: "listing-kit",
         destinationIds: ["etsy"],
       });
       if (!("id" in started)) continue;
-      const w = await waitingProjectFrames(started.id);
+      const w = await waitingProjectFrames(maker, started.id);
       if (w?.reference && w.waiting.length > 0) {
         projects.waiting = started.id;
         break;
@@ -192,10 +195,10 @@ describe("the chat agent's fixed tasks", async () => {
   );
   const { listingDraft } = await import("@/domain/listing");
   async function lengthenTitle(projectId: string) {
-    const target = await listingTarget(projectId, "etsy");
+    const target = await listingTarget(maker, projectId, "etsy");
     if (!target) throw new Error("The mock's project has no Etsy listing.");
     const name = listingDraft(target.product, target.rules).title.value;
-    await setListing(projectId, "etsy", {
+    await setListing(maker, projectId, "etsy", {
       ...target.current,
       title: {
         value: `${name}, handmade in a small studio, a thoughtful gift for any home, made to order with care`,
@@ -227,10 +230,10 @@ describe("the chat agent's fixed tasks", async () => {
       if (task.longTitle && projectId) await lengthenTitle(projectId);
       if (task.frameOn && projectId) {
         const [destinationId, slotKey] = task.frameOn.split(".");
-        await setSlotOff(projectId, { destinationId, slotKey }, false);
+        await setSlotOff(maker, projectId, { destinationId, slotKey }, false);
       }
-      const { id } = await chats.createChatSession(projectId);
-      const response = await runTurn({
+      const { id } = await chats.createChatSession(maker, projectId);
+      const response = await runTurn(maker, {
         sessionId: id,
         specialist: task.specialist ?? "kiln",
         message: {
@@ -240,10 +243,14 @@ describe("the chat agent's fixed tasks", async () => {
         },
       });
       await response.text();
-      for (let i = 0; i < 100 && (await chats.getChat(id))?.running; i++) {
+      for (
+        let i = 0;
+        i < 100 && (await chats.getChat(maker, id))?.running;
+        i++
+      ) {
         await new Promise((r) => setTimeout(r, 100));
       }
-      const reply = (await chats.getChat(id))?.messages.at(-1);
+      const reply = (await chats.getChat(maker, id))?.messages.at(-1);
       const failures = grade(task, reply);
       results.push({
         id: task.id,

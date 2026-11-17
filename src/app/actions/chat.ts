@@ -10,13 +10,13 @@ const NewChat = z.object({ projectId: z.string().min(1).optional() });
 
 export const createChatAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{ id: string } | { error: string }> => {
     const parsed = NewChat.safeParse(input ?? {});
     if (!parsed.success) return { error: "That project cannot be read." };
     try {
-      return await createChatSession(parsed.data.projectId);
+      return await createChatSession(maker, parsed.data.projectId);
     } catch (error) {
       return {
         error:

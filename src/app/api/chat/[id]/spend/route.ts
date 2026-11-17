@@ -7,12 +7,12 @@ import { apiError } from "@/server/http-api";
 // reads while that work runs.
 export const GET = sessionRoute(
   async (
-    _maker,
+    maker,
     _request: Request,
     { params }: { params: Promise<{ id: string }> },
   ) => {
     const { id } = await params;
-    const found = await chatRuns(id);
+    const found = await chatRuns(maker, id);
     if (!found) return apiError(404, "No conversation of yours has that id.");
     return Response.json(found, { headers: { "Cache-Control": "no-store" } });
   },

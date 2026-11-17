@@ -21,7 +21,7 @@ const AnalyzeInput = z.object({
 // understanding with why it degraded and the other provider to offer.
 export const analyzeMaster = makerAction(
   async (
-    _maker,
+    maker,
     input: {
       assetUrl: string;
       model?: { provider: ProviderId; model: string };
@@ -32,6 +32,6 @@ export const analyzeMaster = makerAction(
     ranOn?: RanOn;
   }> => {
     const safe = AnalyzeInput.parse(input);
-    return readProduct(safe.assetUrl, safe.model);
+    return readProduct(maker, safe.assetUrl, safe.model);
   },
 );

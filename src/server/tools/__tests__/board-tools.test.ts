@@ -31,7 +31,7 @@ const frame = (over: Record<string, unknown> = {}) => ({
 
 vi.mock("@/server/project-frames", () => ({
   framedProjects: async () => [],
-  projectFrames: async (id: string) =>
+  projectFrames: async (_maker: unknown, id: string) =>
     id === "p1"
       ? {
           project: { id, name: "Planter", type: "listing-kit", phase: "x" },
@@ -71,6 +71,7 @@ vi.mock("@/server/project-repository", async () => {
       board: { plan, master: { assetUrl: "https://x/master.png" } },
     }),
     setSlotApproval: async (
+      _maker: unknown,
       project: string,
       ref: unknown,
       approved: boolean,
@@ -84,13 +85,19 @@ vi.mock("@/server/project-repository", async () => {
       }
       state.approvals.push([project, ref, approved, checked]);
     },
-    setSlotOff: async (project: string, ref: unknown, off: boolean) => {
+    setSlotOff: async (
+      _maker: unknown,
+      project: string,
+      ref: unknown,
+      off: boolean,
+    ) => {
       state.switched.push([project, ref, off]);
     },
   };
 });
 vi.mock("@/server/slot-tuning", () => ({
   relookSlot: async (
+    _maker: unknown,
     _project: string,
     _ref: unknown,
     asked: { colour?: string | null },
@@ -107,6 +114,7 @@ vi.mock("@/server/slot-tuning", () => ({
     return { product, plan: { ...plan, destinations: [{ ...d, slots }] } };
   },
   retuneSlot: async (
+    _maker: unknown,
     _project: string,
     _ref: unknown,
     tune: (p: ProjectPlan) => ProjectPlan,
@@ -119,17 +127,22 @@ vi.mock("@/server/slot-tuning", () => ({
 }));
 vi.mock("@/providers/asset-bytes", () => ({ fetchAsset: vi.fn() }));
 vi.mock("@/server/lessons", () => ({
-  noteApproval: async (...args: unknown[]) => {
+  noteApproval: async (_maker: unknown, ...args: unknown[]) => {
     state.noted.push(["approval", ...args]);
   },
-  noteReason: async (...args: unknown[]) => {
+  noteReason: async (_maker: unknown, ...args: unknown[]) => {
     state.noted.push(["reason", ...args]);
   },
 }));
 
 const { TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
-const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
+const CTX = {
+  maker: { id: "test" },
+  tokenId: "t1",
+  tokenName: "agent",
+  canSpend: false,
+};
 const call = (name: string, args: Record<string, unknown>) =>
   callTool(TOOLS, name, args, CTX);
 

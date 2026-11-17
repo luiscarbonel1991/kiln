@@ -24,6 +24,7 @@ import { startEditorState } from "@/lib/project-start";
 import { CATALOG } from "@/lib/recipes";
 import { isAllowedAssetUrl } from "@/providers/asset-bytes";
 import { keptMoves } from "@/server/lessons";
+import type { MakerRef } from "@/server/maker-repository";
 import {
   getMakerModels,
   getMakerPreferences,
@@ -64,6 +65,7 @@ export type StartProject = z.output<typeof StartProject>;
 // destination: the catalog's slots, those switched off, each hero's setting,
 // and the product's last market brief per destination. Nothing is saved.
 export async function startingPlan(
+  maker: MakerRef,
   product: Product,
   input: Omit<StartProject, "productId">,
 ): Promise<{ plan: ProjectPlan; proposed: (id: string) => HeroSetting }> {
@@ -89,13 +91,13 @@ export async function startingPlan(
   // The frames start with the knobs the maker's kept lessons set for the
   // family.
   const looked = chosen.look ? { ...planned, look: chosen.look } : planned;
-  const learned = withLearned(looked, await keptMoves(product.family));
-  const { heroSetting: remembered } = await getMakerPreferences();
+  const learned = withLearned(looked, await keptMoves(maker, product.family));
+  const { heroSetting: remembered } = await getMakerPreferences(maker);
   const proposed = (id: string) =>
     heroProposal(product, id, remembered).setting;
   // Each destination starts from the product's last market brief there,
   // named where it came from.
-  const carried = await latestBriefs(product.id);
+  const carried = await latestBriefs(maker, product.id);
   const plan = Object.entries(carried).reduce(
     (p, [destinationId, { brief, projectName }]) =>
       p.destinations.some((d) => d.destinationId === destinationId)
@@ -114,6 +116,7 @@ export async function startingPlan(
 // make one for free), draft cards for the scene slots. No model is called. Answers the new
 // project's id, or the reason it was refused.
 export async function startProject(
+  maker: MakerRef,
   input: unknown,
 ): Promise<{ id: string } | { error: string }> {
   const parsed = StartProject.safeParse(input);
@@ -130,10 +133,14 @@ export async function startProject(
   ) {
     return { error: "Add the listing's photos here first, then start." };
   }
-  const product = await getProduct(productId);
+  const product = await getProduct(maker, productId);
   if (!product) return { error: "That product no longer exists." };
   try {
-    const { plan: shaped, proposed } = await startingPlan(product, parsed.data);
+    const { plan: shaped, proposed } = await startingPlan(
+      maker,
+      product,
+      parsed.data,
+    );
     // The reference in the project's look; a product with a part lying flat
     // also gets its view from above.
     const { master, drawn, refused } = await lookedReference(
@@ -148,14 +155,19 @@ export async function startProject(
       type,
       plan,
       master,
-      models: await getMakerModels(),
+      models: await getMakerModels(maker),
     });
-    const id = await createProject({ type, product, plan, editor });
+    const id = await createProject(maker, { type, product, plan, editor });
     // A hero the maker set apart from the proposal is proposed so next time
     // for this family on that destination; an accepted guess stays a guess.
     for (const { destinationId, setting } of heroSettingsOf(plan)) {
       if (setting !== proposed(destinationId)) {
-        await rememberHeroSetting(destinationId, product.family, setting);
+        await rememberHeroSetting(
+          maker,
+          destinationId,
+          product.family,
+          setting,
+        );
       }
     }
     return { id };

@@ -42,7 +42,7 @@ vi.mock("@/server/designs", () => ({
       vectorized: 1,
     },
   ],
-  designView: async (id: string) =>
+  designView: async (_maker: unknown, id: string) =>
     id === "d1"
       ? {
           project: { id: "d1", name: "Fern", updatedAt: "" },
@@ -66,7 +66,7 @@ vi.mock("@/server/vectorize", async () => {
   };
 });
 vi.mock("@/server/project-repository", () => ({
-  setCardVector: async (...args: unknown[]) => {
+  setCardVector: async (_maker: unknown, ...args: unknown[]) => {
     s.vectors.push(args);
     return s.stillShown;
   },
@@ -88,7 +88,12 @@ vi.mock("@/providers/asset-bytes", () => ({
 
 const { TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
-const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
+const CTX = {
+  maker: { id: "test" },
+  tokenId: "t1",
+  tokenName: "agent",
+  canSpend: false,
+};
 const call = (name: string, args: unknown) => callTool(TOOLS, name, args, CTX);
 
 afterEach(() => {

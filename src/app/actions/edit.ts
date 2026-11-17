@@ -12,10 +12,11 @@ import { makerAction } from "@/server/guarded";
 // reserves against the monthly cap and records its cost (the queue does the
 // same for planned projects).
 export const editImage = makerAction(
-  async (_maker, input: ImageEditInput): Promise<GenerationResult> => {
+  async (maker, input: ImageEditInput): Promise<GenerationResult> => {
     const parsed = ImageEditInput.parse(input);
     assertModel(parsed.model, "image");
     return withDirectSpend(
+      maker,
       imageCall(parsed.model, parsed.model.aspect, parsed.imageInputs.length),
       async (beforeCall) =>
         GenerationResult.parse(

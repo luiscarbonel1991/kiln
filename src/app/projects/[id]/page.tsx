@@ -26,12 +26,8 @@ import {
   QueueRefusal,
 } from "@/server/generation-repository";
 import { makerPage } from "@/server/guarded";
-import type { CurrentMaker } from "@/server/maker-repository";
-import {
-  getCurrentMaker,
-  getMakerBrand,
-  getMakerPreferences,
-} from "@/server/maker-repository";
+import type { CurrentMaker, MakerRef } from "@/server/maker-repository";
+import { getMakerBrand, getMakerPreferences } from "@/server/maker-repository";
 import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
 import { type ProviderHealth, providerHealth } from "@/server/provider-health";
@@ -44,6 +40,7 @@ import { textWorstCase } from "@/server/text-calls";
 // it uses that may not answer. The queue's refusal comes back as its reason;
 // null when there is nothing to generate or no reference yet.
 async function batchEstimate(
+  maker: MakerRef,
   projectId: string,
   cardIds: string[],
   plan: ProjectPlan,
@@ -52,6 +49,7 @@ async function batchEstimate(
   if (cardIds.length === 0) return null;
   try {
     const { cards, models, fallbacks, look } = await estimateProjectCards(
+      maker,
       projectId,
       cardIds,
     );
@@ -122,7 +120,7 @@ function designLine(
 }
 
 export default makerPage(async function ProjectBoardPage(
-  _maker: CurrentMaker,
+  maker: CurrentMaker,
   {
     params,
     searchParams,
@@ -133,7 +131,7 @@ export default makerPage(async function ProjectBoardPage(
 ) {
   const { id } = await params;
   const chatOpen = (await searchParams).chat === "1";
-  const loaded = await loadProjectBoard(id);
+  const loaded = await loadProjectBoard(maker, id);
   if (!loaded) notFound();
   const { board, product, version } = loaded;
   // Whether the product changed since the project was built from it, and the
@@ -156,12 +154,11 @@ export default makerPage(async function ProjectBoardPage(
       return fact && c.type === "image" ? [[c.id, fact.check]] : [];
     }),
   );
-  const maker = await getCurrentMaker();
-  const writeUsd = await textWorstCase("listingCopy");
+  const writeUsd = await textWorstCase(maker, "listingCopy");
   const listingPrice = writeUsd === null ? null : `≈ $${writeUsd.toFixed(2)}`;
   const generation = await projectGenerationState(maker.id, board.id);
-  const brand = await getMakerBrand();
-  const { searchColumns } = await getMakerPreferences();
+  const brand = await getMakerBrand(maker);
+  const { searchColumns } = await getMakerPreferences(maker);
   const health = await providerHealth(maker.id);
   const plan = board.plan;
   const spend = plan ? await projectSpend(board.id) : null;
@@ -170,13 +167,16 @@ export default makerPage(async function ProjectBoardPage(
   const estimate =
     plan && board.master
       ? await batchEstimate(
+          maker,
           board.id,
           waitingCardIds(boardRows({ ...board, plan }, generation.jobs)),
           plan,
           health,
         )
       : null;
-  const chat = chatOpen ? await chatPanelData({ projectId: board.id }) : null;
+  const chat = chatOpen
+    ? await chatPanelData(maker, { projectId: board.id })
+    : null;
   const content =
     board.plan && product ? (
       <ProjectBoard
@@ -195,12 +195,12 @@ export default makerPage(async function ProjectBoardPage(
         listingPrice={listingPrice}
         searchSources={searchColumns}
         today={new Date().toLocaleDateString("en-CA")}
-        shop={(await resultsConnector())?.label ?? null}
+        shop={(await resultsConnector(maker))?.label ?? null}
         cost={cost}
-        takeRoutes={await takeRoutes()}
-        prompts={board.master ? await scenePrompts(board.id) : {}}
+        takeRoutes={await takeRoutes(maker)}
+        prompts={board.master ? await scenePrompts(maker, board.id) : {}}
         checks={checks}
-        drafts={await projectDrafts(board.id)}
+        drafts={await projectDrafts(maker, board.id)}
       />
     ) : (
       <main className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">

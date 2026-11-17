@@ -8,10 +8,10 @@ import { followedListings, followedView } from "@/server/listing-results";
 // agent or a scheduled job that reads the shop's stats and sends the numbers
 // back (PUT /api/projects/:id/results/:destinationId/:read). Each read names
 // its window; `comparison` is before against the latest after, in words.
-export const GET = tokenRoute(async (_caller, _request: Request) => {
+export const GET = tokenRoute(async ({ maker }, _request: Request) => {
   const today = localDate();
   return apiJson({
     today,
-    listings: followedView(await followedListings(today)),
+    listings: followedView(await followedListings(maker, today)),
   });
 });

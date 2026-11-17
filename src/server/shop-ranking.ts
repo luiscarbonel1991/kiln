@@ -31,10 +31,8 @@ import {
   type EtsyReceipt,
   etsyListingUrl,
 } from "@/providers/shop/etsy";
-import {
-  getCurrentMaker,
-  getMakerPreferences,
-} from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
+import { getMakerPreferences } from "@/server/maker-repository";
 import {
   connectedEtsy,
   publicEtsy,
@@ -152,15 +150,15 @@ async function projectsByListing(
 // The connected shop's listings over the last `window` days, ranked `by`
 // orders, units or revenue; null when no shop is connected.
 export async function yourBestSellers(
+  maker: MakerRef,
   window: RankWindow,
   options: { by?: RankBy; fresh?: boolean; now?: Date } = {},
 ): Promise<BestSellersView | null> {
   const now = options.now ?? new Date();
   const by = options.by ?? "orders";
   const fresh = options.fresh === true;
-  const etsy = await connectedEtsy({ now });
+  const etsy = await connectedEtsy(maker, { now });
   if (!etsy) return null;
-  const maker = await getCurrentMaker();
   const nowSec = Math.floor(now.getTime() / 1000);
   const minCreated = nowSec - window * DAY_SEC;
   const revokedOn401 = async <T>(read: () => Promise<T>): Promise<T> => {
@@ -207,7 +205,7 @@ export async function yourBestSellers(
   }
   const [projects, { leftOutListings }] = await Promise.all([
     projectsByListing(maker.id),
-    getMakerPreferences(),
+    getMakerPreferences(maker),
   ]);
   const leftOut = new Set(leftOutListings);
   const rows: BestSeller[] = sold.map((row) => {
@@ -254,6 +252,7 @@ export interface WatchedView {
 // The shops the maker compares theirs with, with theirs beside them, by the
 // past year (reviews) or by lifetime sales.
 export async function watchedShops(
+  maker: MakerRef,
   options: { by?: ShopRankBy; fresh?: boolean } = {},
 ): Promise<WatchedView | null> {
   const etsy = publicEtsy();
@@ -261,8 +260,8 @@ export async function watchedShops(
   const by = options.by ?? "recent";
   const fresh = options.fresh === true;
   const [{ watchedShops: watched }, yours] = await Promise.all([
-    getMakerPreferences(),
-    shopConnection(),
+    getMakerPreferences(maker),
+    shopConnection(maker),
   ]);
   const standings: ShopStanding[] = [];
   const failed: WatchedView["failed"] = [];

@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { expect, vi } from "vitest";
 
 // Tests never make a paid call: the provider keys are dropped before any
 // module reads the environment, so every adapter takes its key-free path even
@@ -14,9 +14,21 @@ process.env.KILN_SECRET_KEY = Buffer.alloc(32, 7).toString("base64");
 
 // Server Actions and the app's own route handlers start by requiring a
 // session (src/server/session.ts). Tests call them directly, with no request,
-// so the guard lets them through; the guard's presence is its own test
-// (session-guard.test.ts).
+// so the guard lets them through as a maker: with the database tests on, the
+// instance's maker (KILN_MAKER, the one the rows belong to), else a stand-in. The guard's
+// presence is its own test (session-guard.test.ts).
 vi.mock("@/server/session", () => ({
-  requireMaker: async () => ({ id: "test", slug: "test", name: "Test" }),
+  requireMaker: async () => {
+    if (
+      process.env.KILN_DB_TESTS === "1" &&
+      expect.getState().testPath?.includes("__tests__")
+    ) {
+      const { getCurrentMaker } = await vi.importActual<
+        typeof import("@/server/maker-repository")
+      >("@/server/maker-repository");
+      return getCurrentMaker();
+    }
+    return { id: "test", slug: "test", name: "Test" };
+  },
   denyWithoutSession: async () => null,
 }));

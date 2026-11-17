@@ -7,6 +7,7 @@ import { type SlotRef, slotCardId, videoSettings } from "@/domain/plan";
 import type { VideoOrientation } from "@/domain/video";
 import { CATALOG } from "@/lib/recipes";
 import { fetchAsset, storeAsset } from "@/providers/asset-bytes";
+import type { MakerRef } from "@/server/maker-repository";
 import { loadProjectBoard, setStillsVideo } from "@/server/project-repository";
 
 const run = promisify(execFile);
@@ -105,10 +106,11 @@ export async function renderStills(
 // the destination's approved scenes, the start frame first and the rest in
 // their order, at the slot's length and orientation. Free; refused with why.
 export async function makeStillsVideo(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
 ): Promise<{ url: string } | { error: string }> {
-  const loaded = await loadProjectBoard(projectId);
+  const loaded = await loadProjectBoard(maker, projectId);
   const destination = loaded?.board.plan?.destinations.find(
     (d) => d.destinationId === ref.destinationId,
   );
@@ -148,6 +150,7 @@ export async function makeStillsVideo(
     );
     const url = await storeAsset(mp4, "video/mp4", "stills");
     await setStillsVideo(
+      maker,
       projectId,
       slotCardId(ref.destinationId, ref.slotKey),
       url,

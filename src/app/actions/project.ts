@@ -16,33 +16,33 @@ import {
 // only path from the client into the database (mirrors @/app/actions/* for
 // @/providers). Inputs are validated here before reaching the repository.
 export const saveProjectAction = makerAction(
-  async (_maker, input: unknown, id?: string): Promise<{ id: string }> => {
+  async (maker, input: unknown, id?: string): Promise<{ id: string }> => {
     const parsed = PersistedProject.parse(input);
-    const savedId = await saveProject(parsed, id);
+    const savedId = await saveProject(maker, parsed, id);
     return { id: savedId };
   },
 );
 
-export const loadProjectAction = makerAction(async (_maker, id: string) => {
-  return loadProject(id);
+export const loadProjectAction = makerAction(async (maker, id: string) => {
+  return loadProject(maker, id);
 });
 
-export const listProjectsAction = makerAction(async (_maker) => {
-  return listProjects();
+export const listProjectsAction = makerAction(async (maker) => {
+  return listProjects(maker);
 });
 
 export const deleteProjectAction = makerAction(
-  async (_maker, id: unknown): Promise<void> => {
+  async (maker, id: unknown): Promise<void> => {
     const parsed = z.string().min(1).parse(id);
-    await deleteProject(parsed);
+    await deleteProject(maker, parsed);
   },
 );
 
 export const renameProjectAction = makerAction(
-  async (_maker, id: unknown, name: unknown): Promise<void> => {
+  async (maker, id: unknown, name: unknown): Promise<void> => {
     const parsedId = z.string().min(1).parse(id);
     const parsedName = z.string().trim().min(1).max(80).parse(name);
-    await renameProject(parsedId, parsedName);
+    await renameProject(maker, parsedId, parsedName);
   },
 );
 
@@ -53,8 +53,8 @@ const CardOutput = z.object({
 });
 
 export const saveCardOutputAction = makerAction(
-  async (_maker, input: unknown): Promise<void> => {
+  async (maker, input: unknown): Promise<void> => {
     const { projectId, cardId, url } = CardOutput.parse(input);
-    await saveCardOutput(projectId, cardId, url);
+    await saveCardOutput(maker, projectId, cardId, url);
   },
 );

@@ -22,16 +22,19 @@ vi.mock("@/server/spend-quotes", () => ({
   QUOTE_ACTIONS: ["generate", "draw", "write_listing", "review_product"],
   QUOTE_MINUTES: 30,
   QuoteRefusal: class QuoteRefusal extends Error {},
-  createQuote: async (q: {
-    action: string;
-    input: unknown;
-    maxMicros: number;
-  }) => {
+  createQuote: async (
+    _maker: unknown,
+    q: {
+      action: string;
+      input: unknown;
+      maxMicros: number;
+    },
+  ) => {
     const id = `q${s.quotes.size + 1}`;
     s.quotes.set(id, q);
     return { id, expiresAt: new Date("2026-10-29T12:30:00Z") };
   },
-  claimQuote: async (id: string, action: string) => {
+  claimQuote: async (_maker: unknown, id: string, action: string) => {
     const q = s.quotes.get(id);
     if (!q || q.action !== action) throw new Error("no such quote");
     return { id, ...q, typicalMicros: 0, expiresAt: new Date() };
@@ -62,7 +65,7 @@ vi.mock("@/server/generation-repository", () => {
 vi.mock("@/server/project-frames", () => ({
   framedProjects: async () => [],
   projectFrames: async () => null,
-  waitingProjectFrames: async (id: string) =>
+  waitingProjectFrames: async (_maker: unknown, id: string) =>
     id === "p1"
       ? { waiting: s.waiting, reference: true }
       : id === "bare"
@@ -74,7 +77,11 @@ const request = (provider: string, model: string) => ({
   model: { provider, model, quality: "medium" },
 });
 vi.mock("@/server/generation-queue", () => ({
-  estimateProjectCards: async (_project: string, ids: string[]) => ({
+  estimateProjectCards: async (
+    _maker: unknown,
+    _project: string,
+    ids: string[],
+  ) => ({
     cards: ids.map((cardId) => ({
       cardId,
       request: cardId.endsWith(".video")
@@ -93,7 +100,7 @@ vi.mock("@/server/generation-queue", () => ({
       next: [{ provider: "google", model: "gemini-3.1-flash-image" }],
     })),
   }),
-  enqueueProjectCards: async (input: unknown) => {
+  enqueueProjectCards: async (_maker: unknown, input: unknown) => {
     if (s.enqueueError) throw s.enqueueError;
     s.enqueued.push(input);
     return { batchId: "b1", queued: 2, skipped: [] };
@@ -105,14 +112,16 @@ vi.mock("@/server/text-calls", () => ({
     typical: 0.003,
     max: s.textMax,
   }),
-  reviewProduct: async (fields: unknown) => {
+  reviewProduct: async (_maker: unknown, fields: unknown) => {
     s.reviewed.push(fields);
     return { review: { suggestions: [], checks: [] }, label: "GPT-6 Luna" };
   },
 }));
 vi.mock("@/server/listing-write", () => ({
-  listingTarget: async (project: string) => (project === "p1" ? {} : null),
+  listingTarget: async (_maker: unknown, project: string) =>
+    project === "p1" ? {} : null,
   writeProjectListing: async (
+    _maker: unknown,
     project: string,
     destination: string,
     _model?: unknown,
@@ -129,7 +138,7 @@ vi.mock("@/server/product-repository", () => ({
   findProduct: async () => null,
 }));
 vi.mock("@/server/designs", () => ({
-  designView: async (id: string) =>
+  designView: async (_maker: unknown, id: string) =>
     id === "d1"
       ? {
           project: { id: "d1", name: "Fern", updatedAt: "" },
@@ -149,7 +158,12 @@ const { TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
 const { QueueRefusal } = await import("@/server/generation-repository");
 
-const SPENDER = { tokenId: "t1", tokenName: "Agent", canSpend: true };
+const SPENDER = {
+  maker: { id: "test" },
+  tokenId: "t1",
+  tokenName: "Agent",
+  canSpend: true,
+};
 const call = (name: string, args: unknown, ctx: ToolContext = SPENDER) =>
   callTool(TOOLS, name, args, ctx);
 
@@ -372,7 +386,11 @@ describe("write_listing", () => {
 });
 
 describe("a paid tool run from the chat", () => {
-  const CHAT = { ...SPENDER, tokenId: null, sessionId: "s1" };
+  const CHAT = {
+    ...SPENDER,
+    tokenId: null,
+    sessionId: "s1",
+  };
 
   it("counts what it spends for that conversation", async () => {
     await call("quote", { action: "generate", project: "p1" }, CHAT);

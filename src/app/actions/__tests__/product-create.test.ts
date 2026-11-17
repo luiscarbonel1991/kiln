@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const upsertProducts = vi.fn(async (products: { sku: string }[]) =>
-  products.map((p) => ({ ...p, id: `db-${p.sku}` })),
+const upsertProducts = vi.fn(
+  async (_maker: unknown, products: { sku: string }[]) =>
+    products.map((p) => ({ ...p, id: `db-${p.sku}` })),
 );
 const storeAsset = vi.fn(
   async (
@@ -16,12 +17,13 @@ const storeAsset = vi.fn(
       : "http://storage.test/products/p.png",
 );
 
-const importCatalog = vi.fn(async (products: { sku: string }[]) =>
-  products.map((p) => ({
-    product: { ...p, id: `db-${p.sku}` },
-    status: "new",
-    changed: [],
-  })),
+const importCatalog = vi.fn(
+  async (_maker: unknown, products: { sku: string }[]) =>
+    products.map((p) => ({
+      product: { ...p, id: `db-${p.sku}` },
+      status: "new",
+      changed: [],
+    })),
 );
 
 vi.mock("@/server/product-repository", () => ({
@@ -229,7 +231,7 @@ describe("importProductsAction", () => {
       rejected: [],
       imported: [{ status: "new" }],
     });
-    expect(importCatalog.mock.calls[0][0][0]).toMatchObject({
+    expect(importCatalog.mock.calls[0][1][0]).toMatchObject({
       source: { kind: "photo", assetUrl: "http://storage.test/products/p.png" },
     });
     // Named by its bytes: the same photo re-imported keeps one URL.
@@ -261,7 +263,7 @@ describe("importProductsAction: material samples", () => {
       withSample(`data:image/png;base64,${png}`),
     );
     expect(result).toMatchObject({ rejected: [] });
-    expect(importCatalog.mock.calls[0][0][0]).toMatchObject({
+    expect(importCatalog.mock.calls[0][1][0]).toMatchObject({
       colours: [{ swatchUrl: "http://storage.test/products/p.png" }],
     });
     expect(storeAsset.mock.calls.at(-1)?.[3]).toEqual({ byContent: true });
@@ -322,7 +324,7 @@ describe("importProductsAction: views", () => {
       { byContent: true },
     ]);
     expect(Buffer.from(bytes).subarray(1, 4).toString()).toBe("PNG");
-    expect(importCatalog.mock.calls[0][0][0]).toMatchObject({
+    expect(importCatalog.mock.calls[0][1][0]).toMatchObject({
       views: [{ label: "side", url: "http://storage.test/products/p.png" }],
     });
   });

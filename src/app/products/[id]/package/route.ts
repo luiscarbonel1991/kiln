@@ -5,12 +5,12 @@ import { getProduct } from "@/server/product-repository";
 // (parts, variants…) and import it again: the same sku updates it in place.
 export const GET = signedInRoute(
   async (
-    _maker,
+    maker,
     _request: Request,
     { params }: { params: Promise<{ id: string }> },
   ) => {
     const { id } = await params;
-    const product = await getProduct(id);
+    const product = await getProduct(maker, id);
     if (!product) return new Response("Not found", { status: 404 });
     return new Response(
       `${JSON.stringify({ products: [{ ...product, id: product.sku }] }, null, 2)}\n`,

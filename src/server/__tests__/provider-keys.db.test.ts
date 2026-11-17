@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Against a migrated throwaway Postgres (see project-repository.db.test.ts).
 const enabled =
@@ -17,11 +17,12 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
     withMakerKeys,
   } = await import("@/server/provider-keys");
 
-  const a = await db.maker.create({
-    data: { slug: `keys-a-${stamp}`, name: "A" },
-  });
-  const b = await db.maker.create({
-    data: { slug: `keys-b-${stamp}`, name: "B" },
+  let a: { id: string };
+  let b: { id: string };
+
+  beforeAll(async () => {
+    a = await db.maker.create({ data: { slug: `keys-a-${stamp}`, name: "A" } });
+    b = await db.maker.create({ data: { slug: `keys-b-${stamp}`, name: "B" } });
   });
 
   afterAll(async () => {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SlotRefusal } from "@/domain/plan";
 import { QueueRefusal } from "@/server/generation-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import { QuoteRefusal } from "@/server/spend-quotes";
 
 // Kiln's actions as typed tools: one list, served over MCP (/api/mcp) and the
@@ -9,11 +10,13 @@ import { QuoteRefusal } from "@/server/spend-quotes";
 // run gets only what its schema allows. No tool takes a model: an agent asks
 // for a task, and the task runs on its role's route (Settings → Models).
 
-// Who is calling: the access token the request carried and whether the
+// Who is calling, and for which maker: the access token the request carried and whether the
 // maker lets it spend (Settings → Access tokens), or a chat session
 // (`tokenName` "Chat"), where a paid tool runs only once the maker approved
 // that call in the chat.
 export interface ToolContext {
+  // The maker the call runs for: the token's, or the chat session's.
+  maker: MakerRef;
   tokenId: string | null;
   tokenName: string;
   canSpend: boolean;

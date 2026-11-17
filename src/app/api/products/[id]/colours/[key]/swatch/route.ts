@@ -68,7 +68,7 @@ function fixOf(url: URL): SwatchFix | { error: string } | null {
 // anything but a PNG, JPEG or WebP, 422 for a correction the photo refuses
 // (a coloured spot, a photo too far from the swatch).
 export const POST = tokenRoute(
-  async (_caller, request: Request, { params }: Context) => {
+  async ({ maker }, request: Request, { params }: Context) => {
     const { id, key } = await params;
     const fix = fixOf(new URL(request.url));
     if (fix && "error" in fix) return apiError(400, fix.error);
@@ -90,7 +90,13 @@ export const POST = tokenRoute(
         "Send the photo as the body (Content-Type: image/jpeg, image/png or image/webp) or as a multipart form's file field.",
       );
     }
-    const outcome = await setColourSwatch(id, key, photo, fix ?? undefined);
+    const outcome = await setColourSwatch(
+      maker,
+      id,
+      key,
+      photo,
+      fix ?? undefined,
+    );
     if (!outcome.ok) return apiError(outcome.status, outcome.error);
     const { ok: _ok, ...result } = outcome;
     return apiJson(result);
@@ -100,9 +106,9 @@ export const POST = tokenRoute(
 // DELETE — the colour's material photo removed; its scenes go back to the
 // plate and the swatch hex alone.
 export const DELETE = tokenRoute(
-  async (_caller, _request: Request, { params }: Context) => {
+  async ({ maker }, _request: Request, { params }: Context) => {
     const { id, key } = await params;
-    const outcome = await setColourSwatch(id, key, null);
+    const outcome = await setColourSwatch(maker, id, key, null);
     if (!outcome.ok) return apiError(outcome.status, outcome.error);
     const { ok: _ok, ...result } = outcome;
     return apiJson(result);

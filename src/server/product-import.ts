@@ -12,6 +12,7 @@ import {
   storeAsset,
 } from "@/providers/asset-bytes";
 import { measureOutline, rasterize } from "@/providers/plates/svg";
+import type { MakerRef } from "@/server/maker-repository";
 import {
   type ImportedProduct,
   importCatalog,
@@ -218,6 +219,7 @@ export interface ImportResult {
 // brand kit. `error` when nothing in it reads as a package, or the save failed
 // (then nothing was saved).
 export async function importPackage(
+  maker: MakerRef,
   input: unknown,
 ): Promise<ImportResult | { error: string }> {
   const parsed = parseProductPackage(input);
@@ -254,6 +256,7 @@ export async function importPackage(
   if (measured.length > 0 || parsed.brand) {
     try {
       imported = await importCatalog(
+        maker,
         measured.map((m) => m.product),
         parsed.brand,
       );

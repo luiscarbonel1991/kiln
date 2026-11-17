@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { assertDatabaseUrl, db } from "@/lib/db";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 
 // A paid tool runs in two calls: `quote` stores the action, its input and its
 // estimate here and answers an id; the paid tool takes only that id and runs
@@ -30,6 +30,7 @@ export interface StoredQuote {
 export class QuoteRefusal extends Error {}
 
 export async function createQuote(
+  maker: MakerRef,
   quote: {
     action: QuoteAction;
     input: Prisma.InputJsonValue;
@@ -40,7 +41,6 @@ export async function createQuote(
   now = new Date(),
 ): Promise<{ id: string; expiresAt: Date }> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   return db.spendQuote.create({
     data: {
       ...quote,
@@ -54,12 +54,12 @@ export async function createQuote(
 // Take a quote for its action: the one write that marks it used, so two
 // calls with the same id cannot both run it. A refusal says why.
 export async function claimQuote(
+  maker: MakerRef,
   id: string,
   action: QuoteAction,
   now = new Date(),
 ): Promise<StoredQuote> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const { count } = await db.spendQuote.updateMany({
     where: {
       id,

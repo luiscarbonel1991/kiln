@@ -40,7 +40,7 @@ vi.mock("@/server/project-frames", () => ({
       updatedAt: "2026-10-29T12:00:00.000Z",
     },
   ],
-  projectFrames: async (id: string) =>
+  projectFrames: async (_maker: unknown, id: string) =>
     id === "p1"
       ? {
           project: { id, name: "Planter", type: "listing-kit", phase: "x" },
@@ -136,7 +136,7 @@ describe("/api/mcp", () => {
       name: "get_frames",
       ctx: {
         tokenId: "t1",
-        makerId: "m1",
+        maker: { id: "m1" },
         tokenName: "agent",
         canSpend: false,
       },

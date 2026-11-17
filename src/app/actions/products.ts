@@ -64,8 +64,8 @@ import {
 // Server Functions are POST-reachable: the package parse is the trust boundary.
 
 export const listProductsAction = makerAction(
-  async (_maker): Promise<Product[]> => {
-    return listProducts();
+  async (maker): Promise<Product[]> => {
+    return listProducts(maker);
   },
 );
 
@@ -75,8 +75,8 @@ export type { ImportResult } from "@/server/product-import";
 // the same import as POST /api/import): the valid products are saved, the
 // others come back with their reasons.
 export const importProductsAction = makerAction(
-  async (_maker, input: unknown): Promise<ImportResult | { error: string }> => {
-    return importPackage(input);
+  async (maker, input: unknown): Promise<ImportResult | { error: string }> => {
+    return importPackage(maker, input);
   },
 );
 
@@ -144,7 +144,7 @@ export const correctSampleAction = makerAction(
 // (its file where Kiln fetches, a design's outline measured against its size).
 export const createProductAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<
     | { product: Product; warning?: string }
@@ -172,7 +172,7 @@ export const createProductAction = makerAction(
       };
     }
     const measured = await withOutline(stored);
-    const [saved] = await upsertProducts([measured.product]);
+    const [saved] = await upsertProducts(maker, [measured.product]);
     return {
       product: saved,
       ...(measured.warning ? { warning: measured.warning } : {}),
@@ -192,7 +192,7 @@ const Draft = z.object({
 // cap. The photo must be in Kiln's storage.
 export const draftProductAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{
     draft?: ProductDraft;
@@ -207,7 +207,7 @@ export const draftProductAction = makerAction(
     } catch {
       return { error: "Upload the photo first." };
     }
-    return draftProduct(parsed.data.assetUrl, parsed.data.model);
+    return draftProduct(maker, parsed.data.assetUrl, parsed.data.model);
   },
 );
 
@@ -226,7 +226,7 @@ const Review = z.object({
 // model that answered; nothing is saved.
 export const reviewProductAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{
     review?: CleanReview & { model: string };
@@ -240,12 +240,12 @@ export const reviewProductAction = makerAction(
     if (!form.name.trim() && !form.whatItIs.trim()) {
       return { error: "Name the product or say what it is first." };
     }
-    const stored = productId ? await getProduct(productId) : null;
+    const stored = productId ? await getProduct(maker, productId) : null;
     const fields = reviewFields(
       form,
       stored ? editLimits(stored) : FORM_LIMITS,
     );
-    const result = await reviewProduct(fields, model);
+    const result = await reviewProduct(maker, fields, model);
     if (!result.review) return { degraded: result.degraded };
     return {
       ...(result.ranOn ? { ranOn: result.ranOn } : {}),
@@ -265,7 +265,7 @@ const Edit = z.object({ id: z.string().min(1), form: z.unknown() });
 // changed in the catalog, not here.
 export const updateProductAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<
     | {
@@ -278,7 +278,7 @@ export const updateProductAction = makerAction(
     | { error: string; issues?: FormIssue[] }
   > => {
     const { id, form } = Edit.parse(input);
-    const stored = await getProduct(id);
+    const stored = await getProduct(maker, id);
     if (!stored) return { error: "That product no longer exists." };
     if (stored.source.kind === "catalog") {
       return {
@@ -300,9 +300,9 @@ export const updateProductAction = makerAction(
       };
     }
     const measured = await withOutline(withImages);
-    const saved = await updateProduct(id, measured.product);
+    const saved = await updateProduct(maker, id, measured.product);
     const now = productHash(saved.product);
-    const behind = (await productProjects(id))
+    const behind = (await productProjects(maker, id))
       .filter((use) => use.hash !== now)
       .map(({ projectId, name }) => ({ projectId, name }));
     return {
@@ -316,7 +316,7 @@ export const updateProductAction = makerAction(
 // Delete a product no project uses; otherwise say which projects do.
 export const deleteProductAction = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<
     | { deleted: true }
@@ -324,7 +324,7 @@ export const deleteProductAction = makerAction(
   > => {
     const id = z.string().min(1).parse(input);
     try {
-      const result = await deleteProduct(id);
+      const result = await deleteProduct(maker, id);
       if ("deleted" in result) return result;
       const names = result.usedBy.map((u) => u.name).join(", ");
       return {

@@ -61,7 +61,7 @@ function briefError(error: z.ZodError): string {
 // Save a destination's market brief (an empty one clears it), and the column
 // mapping a pasted table was read with, for its source.
 export const saveBriefAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error: string } | undefined> => {
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
     const parsed = BriefSave.safeParse(input);
     if (!parsed.success) return { error: "The brief could not be read." };
     const { projectId, destinationId, columns } = parsed.data;
@@ -69,11 +69,13 @@ export const saveBriefAction = makerAction(
     if (!brief.success) return { error: briefError(brief.error) };
     try {
       await setBrief(
+        maker,
         projectId,
         destinationId,
         isEmptyBrief(brief.data) ? undefined : brief.data,
       );
-      if (columns) await rememberSearchColumns(columns.source, columns.columns);
+      if (columns)
+        await rememberSearchColumns(maker, columns.source, columns.columns);
     } catch (error) {
       return {
         error:

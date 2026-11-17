@@ -32,8 +32,8 @@ const said = (error: unknown) =>
       : String(error);
 
 export const disconnectShopAction = makerAction(
-  async (_maker): Promise<{ error?: string }> => {
-    const gone = await disconnectShop();
+  async (maker): Promise<{ error?: string }> => {
+    const gone = await disconnectShop(maker);
     refresh();
     return gone ? {} : { error: "No shop was connected." };
   },
@@ -56,10 +56,10 @@ export const findShopsAction = makerAction(
 );
 
 export const watchShopAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error?: string }> => {
+  async (maker, input: unknown): Promise<{ error?: string }> => {
     const parsed = WatchedShop.safeParse(input);
     if (!parsed.success) return { error: "Which shop?" };
-    const { watchedShops } = await getMakerPreferences();
+    const { watchedShops } = await getMakerPreferences(maker);
     if (watchedShops.some((s) => s.shopId === parsed.data.shopId)) {
       return { error: `${parsed.data.name} is already on the list.` };
     }
@@ -68,17 +68,17 @@ export const watchShopAction = makerAction(
         error: `At most ${MAX_WATCHED_SHOPS} shops: take one off first.`,
       };
     }
-    await watchShop(parsed.data);
+    await watchShop(maker, parsed.data);
     refresh();
     return {};
   },
 );
 
 export const unwatchShopAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error?: string }> => {
+  async (maker, input: unknown): Promise<{ error?: string }> => {
     const parsed = WatchedShop.shape.shopId.safeParse(input);
     if (!parsed.success) return { error: "Which shop?" };
-    await unwatchShop(parsed.data);
+    await unwatchShop(maker, parsed.data);
     refresh();
     return {};
   },
@@ -105,16 +105,16 @@ export const shopFavouritesAction = makerAction(
 // Leave one of the maker's listings out of their best sellers (an add-on, a
 // sample), or put it back.
 export const leaveOutListingAction = makerAction(
-  async (_maker, input: unknown): Promise<{ error?: string }> => {
+  async (maker, input: unknown): Promise<{ error?: string }> => {
     const parsed = z
       .object({ listingId: ListingId, out: z.boolean() })
       .safeParse(input);
     if (!parsed.success) return { error: "Which listing?" };
-    const { leftOutListings } = await getMakerPreferences();
+    const { leftOutListings } = await getMakerPreferences(maker);
     if (parsed.data.out && leftOutListings.length >= MAX_LEFT_OUT) {
       return { error: `At most ${MAX_LEFT_OUT} listings can be left out.` };
     }
-    await leaveOutListing(parsed.data.listingId, parsed.data.out);
+    await leaveOutListing(maker, parsed.data.listingId, parsed.data.out);
     refresh();
     return {};
   },

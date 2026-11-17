@@ -19,9 +19,9 @@ const Input = z.object({
 });
 
 export const deliverAction = makerAction(
-  async (_maker, input: unknown): Promise<DeliverResult> => {
+  async (maker, input: unknown): Promise<DeliverResult> => {
     const { projectId, destinationId } = Input.parse(input);
-    const result = await deliverDestination(projectId, destinationId);
+    const result = await deliverDestination(maker, projectId, destinationId);
     if ("url" in result) refresh();
     return result;
   },

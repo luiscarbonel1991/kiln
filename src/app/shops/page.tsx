@@ -56,7 +56,7 @@ const said = (error: unknown) =>
 // Etsy shop's orders, and the other shops they compare theirs with, from Etsy's
 // public numbers. Read per request through Etsy's API, never its pages.
 export default makerPage(async function ShopsPage(
-  _maker: CurrentMaker,
+  maker: CurrentMaker,
   {
     searchParams,
   }: {
@@ -72,26 +72,29 @@ export default makerPage(async function ShopsPage(
   };
   const fresh = params.fresh === "1";
   const setup = etsySetup();
-  const connected = hasDatabase() ? await shopConnection() : null;
+  const connected = hasDatabase() ? await shopConnection(maker) : null;
 
   let best: BestSellersView | null = null;
   let bestError: string | null = null;
   if (connected && !connected.needsReconnect) {
     try {
-      best = await yourBestSellers(query.window, { by: query.by, fresh });
+      best = await yourBestSellers(maker, query.window, {
+        by: query.by,
+        fresh,
+      });
     } catch (error) {
       bestError =
         error instanceof ShopNeedsReconnect ? error.message : said(error);
     }
   }
   // A failed read may have found the access revoked.
-  const shop = bestError && connected ? await shopConnection() : connected;
+  const shop = bestError && connected ? await shopConnection(maker) : connected;
 
   let others: Awaited<ReturnType<typeof watchedShops>> = null;
   let othersError: string | null = null;
   if (setup.publicReads && hasDatabase()) {
     try {
-      others = await watchedShops({ by: query.shops, fresh });
+      others = await watchedShops(maker, { by: query.shops, fresh });
     } catch (error) {
       othersError = said(error);
     }

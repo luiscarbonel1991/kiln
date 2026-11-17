@@ -16,6 +16,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("project repository (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const { upsertProducts } = await import("@/server/product-repository");
@@ -130,15 +133,15 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   });
 
   it("creates a planned project with its product, master and cards", async () => {
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
       editor,
     });
     created.push(id);
-    const loaded = await repo.loadProjectBoard(id);
+    const loaded = await repo.loadProjectBoard(maker, id);
     expect(loaded?.board.type).toBe("launch");
     expect(loaded?.board.plan?.destinations[0].slots).toHaveLength(2);
     expect(loaded?.board.cards.map((c) => c.id)).toEqual([
@@ -152,7 +155,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       hash: productHash(saved),
       snapshot: { sku: product.sku, material: "hardwood" },
     });
-    const [again] = await upsertProducts([product]);
+    const [again] = await upsertProducts(maker, [product]);
     expect(again.id).toBe(saved.id);
   });
 
@@ -170,8 +173,8 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       ...listingDraft(product),
       title: { value: "A title of my own", source: "maker" as const },
     };
-    await repo.setListing(id, "etsy", listing);
-    const loaded = await repo.loadProjectBoard(id);
+    await repo.setListing(maker, id, "etsy", listing);
+    const loaded = await repo.loadProjectBoard(maker, id);
     expect(loaded?.board.plan?.destinations[0].listing).toEqual(listing);
     expect(loaded?.board.plan?.destinations[0].slots[0].approvedOutput).toBe(
       "https://stub.local/kept.png",
@@ -180,7 +183,11 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
 
   it("an editor autosave keeps a planned project's type and plan", async () => {
     const id = created[0];
-    await repo.saveProject({ ...editor, recipeId: "recipe-line-art" }, id);
+    await repo.saveProject(
+      maker,
+      { ...editor, recipeId: "recipe-line-art" },
+      id,
+    );
     const row = await db.project.findUniqueOrThrow({ where: { id } });
     expect(row.type).toBe("launch");
     expect(row.plan).not.toBeNull();
@@ -197,6 +204,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     // card, plus one real edit (a prompt override) that must land.
     const [hero] = editor.cards;
     await repo.saveProject(
+      maker,
       {
         ...editor,
         master: {
@@ -226,8 +234,8 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   });
 
   it("a stale tab never writes back a vector the worker cleared", async () => {
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
@@ -249,6 +257,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const [, inUse] = editor.cards;
     const save = (outputs: string[], vectorUrl: string) =>
       repo.saveProject(
+        maker,
         {
           ...editor,
           cards: [{ ...inUse, outputs, status: "done", vectorUrl }],
@@ -268,6 +277,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   it("the editor's direct output write does not apply to a planned project", async () => {
     const id = created[0];
     await repo.saveCardOutput(
+      maker,
       id,
       "etsy.in-use",
       "https://stub.local/direct.png",
@@ -282,17 +292,19 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const id = created[0];
     await Promise.all([
       repo.setSlotApproval(
+        maker,
         id,
         { destinationId: "etsy", slotKey: "hero" },
         true,
       ),
       repo.setSlotApproval(
+        maker,
         id,
         { destinationId: "etsy", slotKey: "in-use" },
         true,
       ),
     ]);
-    const loaded = await repo.loadProjectBoard(id);
+    const loaded = await repo.loadProjectBoard(maker, id);
     expect(
       loaded?.board.plan?.destinations[0].slots.map((s) => s.approvedOutput),
     ).toEqual([
@@ -305,15 +317,15 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     const { estimateProjectCards } = await import("@/server/generation-queue");
     const queueRepo = await import("@/server/generation-repository");
     const { createWorker } = await import("@/server/generation-worker");
-    const { getCurrentMaker } = await import("@/server/maker-repository");
     const id = created[0];
-    const { cards, model } = await estimateProjectCards(id, ["etsy.in-use"]);
+    const { cards, model } = await estimateProjectCards(maker, id, [
+      "etsy.in-use",
+    ]);
     expect(cards[0].request).toMatchObject({
       kind: "image",
       masterAssetUrl: master.assetUrl,
     });
     expect(cards[0].request.model.provider).toBe("openai");
-    const maker = await getCurrentMaker();
     await queueRepo.enqueueBatch({
       makerId: maker.id,
       projectId: id,
@@ -380,17 +392,15 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   it("deleting a project cancels its queued jobs, and nothing is paid for an orphan", async () => {
     const { estimateProjectCards } = await import("@/server/generation-queue");
     const queueRepo = await import("@/server/generation-repository");
-    const { getCurrentMaker } = await import("@/server/maker-repository");
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
       editor,
     });
     created.push(id);
-    const maker = await getCurrentMaker();
-    const { cards, model } = await estimateProjectCards(id, [
+    const { cards, model } = await estimateProjectCards(maker, id, [
       "etsy.hero",
       "etsy.in-use",
     ]);
@@ -408,7 +418,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       })),
     });
     const [inFlight] = await queueRepo.claimJobs(mode, 1, 60);
-    await repo.deleteProject(id);
+    await repo.deleteProject(maker, id);
 
     const jobs = await db.generationJob.findMany({ where: { batchId } });
     // Each job remembers the product version its request was built from.
@@ -448,17 +458,17 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   it("a delete racing an enqueue leaves no job queued for the deleted project", async () => {
     const { estimateProjectCards } = await import("@/server/generation-queue");
     const queueRepo = await import("@/server/generation-repository");
-    const { getCurrentMaker } = await import("@/server/maker-repository");
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
       editor,
     });
     created.push(id);
-    const maker = await getCurrentMaker();
-    const { cards, model } = await estimateProjectCards(id, ["etsy.hero"]);
+    const { cards, model } = await estimateProjectCards(maker, id, [
+      "etsy.hero",
+    ]);
     const mode = "delete-race" as never;
     await Promise.allSettled([
       queueRepo.enqueueBatch({
@@ -472,7 +482,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
           estimateMicros: c.maxMicros,
         })),
       }),
-      repo.deleteProject(id),
+      repo.deleteProject(maker, id),
     ]);
     expect(await db.project.findUnique({ where: { id } })).toBeNull();
     const left = await db.generationJob.findMany({ where: { mode } });
@@ -483,18 +493,18 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   it("a slot switched off is never queued, and a queued scene cannot be switched off", async () => {
     const { estimateProjectCards } = await import("@/server/generation-queue");
     const queueRepo = await import("@/server/generation-repository");
-    const { getCurrentMaker } = await import("@/server/maker-repository");
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
       editor,
     });
     created.push(id);
-    const maker = await getCurrentMaker();
     const hero = { destinationId: "etsy", slotKey: "hero" };
-    const { cards, model } = await estimateProjectCards(id, ["etsy.hero"]);
+    const { cards, model } = await estimateProjectCards(maker, id, [
+      "etsy.hero",
+    ]);
     // A mode no worker claims, so the job stays queued for the test.
     const mode = "off-test" as never;
     const enqueue = () =>
@@ -510,12 +520,12 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
         })),
       });
 
-    await repo.setSlotOff(id, hero, true);
+    await repo.setSlotOff(maker, id, hero, true);
     await expect(enqueue()).rejects.toMatchObject({ reason: "not-in-plan" });
 
-    await repo.setSlotOff(id, hero, false);
+    await repo.setSlotOff(maker, id, hero, false);
     const { batchId } = await enqueue();
-    await expect(repo.setSlotOff(id, hero, true)).rejects.toThrow(
+    await expect(repo.setSlotOff(maker, id, hero, true)).rejects.toThrow(
       "in the queue",
     );
     await db.generationBatch.delete({ where: { id: batchId } });
@@ -524,9 +534,8 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   it("refuses a scene on a model its provider's last key check no longer lists, before any call", async () => {
     const { estimateProjectCards } = await import("@/server/generation-queue");
     const queueRepo = await import("@/server/generation-repository");
-    const { getCurrentMaker } = await import("@/server/maker-repository");
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
@@ -534,11 +543,10 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     });
     created.push(id);
     // A model no other suite queues, so the shared maker's check is harmless.
-    await repo.setCardModel(id, "etsy.hero", {
+    await repo.setCardModel(maker, id, "etsy.hero", {
       provider: "google",
       model: "gemini-3-pro-image",
     });
-    const maker = await getCurrentMaker();
     await queueRepo.recordKeyCheck({
       makerId: maker.id,
       provider: "google",
@@ -547,7 +555,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     });
     try {
       await expect(
-        estimateProjectCards(id, ["etsy.hero"]),
+        estimateProjectCards(maker, id, ["etsy.hero"]),
       ).rejects.toMatchObject({
         reason: "model",
         message: expect.stringMatching(
@@ -566,16 +574,15 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
         },
       });
     }
-    expect((await estimateProjectCards(id, ["etsy.hero"])).cards).toHaveLength(
-      1,
-    );
+    expect(
+      (await estimateProjectCards(maker, id, ["etsy.hero"])).cards,
+    ).toHaveLength(1);
   });
 
   it("a video is queued from an approved scene, at its pinned price; never without one", async () => {
     const { estimateProjectCards } = await import("@/server/generation-queue");
     const queueRepo = await import("@/server/generation-repository");
-    const { getCurrentMaker } = await import("@/server/maker-repository");
-    const [saved] = await upsertProducts([product]);
+    const [saved] = await upsertProducts(maker, [product]);
     const videoPlan = {
       destinations: [
         {
@@ -593,7 +600,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
         },
       ],
     };
-    const id = await repo.createProject({
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan: videoPlan,
@@ -623,14 +630,17 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     });
     created.push(id);
     await expect(
-      estimateProjectCards(id, ["etsy.video"]),
+      estimateProjectCards(maker, id, ["etsy.video"]),
     ).rejects.toMatchObject({ reason: "needs-scene" });
     await repo.setSlotApproval(
+      maker,
       id,
       { destinationId: "etsy", slotKey: "in-use" },
       true,
     );
-    const { cards, model } = await estimateProjectCards(id, ["etsy.video"]);
+    const { cards, model } = await estimateProjectCards(maker, id, [
+      "etsy.video",
+    ]);
     // Gemini Omni Flash at 720p: $0.1014 a second, plus $0.01 a clip.
     expect(cards[0]).toMatchObject({
       typicalMicros: 821_200,
@@ -651,7 +661,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     keys.present = false;
     try {
       await expect(
-        estimateProjectCards(id, ["etsy.video"]),
+        estimateProjectCards(maker, id, ["etsy.video"]),
       ).rejects.toMatchObject({
         reason: "provider",
         message:
@@ -660,7 +670,6 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     } finally {
       keys.present = true;
     }
-    const maker = await getCurrentMaker();
     const mode = "video-test" as never;
     const { queued, batchId } = await queueRepo.enqueueBatch({
       makerId: maker.id,
@@ -677,6 +686,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     // A video switched off is never queued.
     await queueRepo.cancelBatch(maker.id, batchId);
     await repo.setSlotOff(
+      maker,
       id,
       { destinationId: "etsy", slotKey: "video" },
       true,
@@ -699,8 +709,8 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   it("a project made before video gets its video slot and card, once; its choices persist", async () => {
     const { CATALOG } = await import("@/lib/recipes");
     const { videoSlotCard } = await import("@/lib/project-start");
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
@@ -709,6 +719,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     created.push(id);
     const add = () =>
       repo.addVideoToPlan(
+        maker,
         id,
         "etsy",
         CATALOG.shotLists,
@@ -716,7 +727,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
           videoSlotCard("etsy", shotListId, slot, m, understanding),
       );
     await add();
-    const loaded = await repo.loadProjectBoard(id);
+    const loaded = await repo.loadProjectBoard(maker, id);
     const slots = loaded?.board.plan?.destinations[0].slots ?? [];
     expect(slots.at(-1)).toMatchObject({ key: "video", fill: "video" });
     const video = loaded?.board.cards.find((c) => c.id === "etsy.video");
@@ -724,11 +735,12 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     await expect(add()).rejects.toThrow("already has its video");
 
     await repo.setVideoChoice(
+      maker,
       id,
       { destinationId: "etsy", slotKey: "video" },
       { motion: "pan", seconds: 12 },
     );
-    const after = await repo.loadProjectBoard(id);
+    const after = await repo.loadProjectBoard(maker, id);
     expect(after?.board.plan?.destinations[0].slots.at(-1)?.video).toEqual({
       motion: "pan",
       seconds: 12,
@@ -737,15 +749,18 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
 
   it("the batch estimate names every model its cards run", async () => {
     const { estimateProjectCards } = await import("@/server/generation-queue");
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
       editor,
     });
     created.push(id);
-    const one = await estimateProjectCards(id, ["etsy.hero", "etsy.in-use"]);
+    const one = await estimateProjectCards(maker, id, [
+      "etsy.hero",
+      "etsy.in-use",
+    ]);
     expect(one.models).toEqual([
       {
         provider: "openai",
@@ -770,7 +785,10 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
         },
       },
     });
-    const two = await estimateProjectCards(id, ["etsy.hero", "etsy.in-use"]);
+    const two = await estimateProjectCards(maker, id, [
+      "etsy.hero",
+      "etsy.in-use",
+    ]);
     expect(two.models.map((m) => [m.provider, m.model, m.count])).toEqual([
       ["openai", "gpt-image-2", 1],
       ["google", "gemini-3.1-flash-image", 1],
@@ -786,13 +804,13 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       },
     });
     await expect(
-      estimateProjectCards(id, ["etsy.hero", "etsy.in-use"]),
+      estimateProjectCards(maker, id, ["etsy.hero", "etsy.in-use"]),
     ).rejects.toMatchObject({ reason: "model" });
   });
 
   it("reordering photos and approving at once both persist", async () => {
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
@@ -805,11 +823,13 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     });
     await Promise.all([
       repo.setSlotOrder(
+        maker,
         id,
         { destinationId: "etsy", slotKey: "in-use" },
         "first",
       ),
       repo.setSlotApproval(
+        maker,
         id,
         { destinationId: "etsy", slotKey: "hero" },
         true,
@@ -825,8 +845,8 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   });
 
   it("a delivery stamps what it exported; a new approval clears the stamp", async () => {
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
@@ -840,9 +860,10 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
         data: { status: "done", outputs: [url] },
       });
     await setOutput("https://x/hero-1.png");
-    await repo.setSlotApproval(id, hero, true);
+    await repo.setSlotApproval(maker, id, hero, true);
     const at = "2026-10-06T10:00:00.000Z";
     await repo.setDelivered(
+      maker,
       id,
       "etsy",
       [
@@ -865,7 +886,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
     );
 
     await setOutput("https://x/hero-2.png");
-    await repo.setSlotApproval(id, hero, true);
+    await repo.setSlotApproval(maker, id, hero, true);
     expect((await slots()).find((s) => s.key === "hero")).not.toHaveProperty(
       "deliveredAt",
     );
@@ -874,26 +895,34 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   it("switching a slot off and approving another at once both persist", async () => {
     const id = created[0];
     await repo.setSlotApproval(
+      maker,
       id,
       { destinationId: "etsy", slotKey: "in-use" },
       false,
     );
     await Promise.all([
-      repo.setSlotOff(id, { destinationId: "etsy", slotKey: "hero" }, true),
+      repo.setSlotOff(
+        maker,
+        id,
+        { destinationId: "etsy", slotKey: "hero" },
+        true,
+      ),
       repo.setSlotApproval(
+        maker,
         id,
         { destinationId: "etsy", slotKey: "in-use" },
         true,
       ),
     ]);
-    const slots = (await repo.loadProjectBoard(id))?.board.plan?.destinations[0]
-      .slots;
+    const slots = (await repo.loadProjectBoard(maker, id))?.board.plan
+      ?.destinations[0].slots;
     const inUse = await db.card.findUniqueOrThrow({
       where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
     });
     expect(slots?.[0].off).toBe(true);
     expect(slots?.[1].approvedOutput).toBe((inUse.outputs as string[])[0]);
     await repo.setSlotOff(
+      maker,
       id,
       { destinationId: "etsy", slotKey: "hero" },
       false,
@@ -901,12 +930,16 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
   });
 
   it("a studio project still follows its recipe's type on autosave", async () => {
-    const id = await repo.saveProject({
+    const id = await repo.saveProject(maker, {
       ...editor,
       recipeId: "recipe-etsy-hero",
     });
     created.push(id);
-    await repo.saveProject({ ...editor, recipeId: "recipe-line-art" }, id);
+    await repo.saveProject(
+      maker,
+      { ...editor, recipeId: "recipe-line-art" },
+      id,
+    );
     const row = await db.project.findUniqueOrThrow({ where: { id } });
     expect(row.type).toBe("design");
     expect(row.plan).toBeNull();

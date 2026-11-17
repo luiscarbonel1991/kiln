@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProjectPlan } from "@/domain/plan";
 
-const saveRead = vi.fn(async (_input: unknown) => ({}));
-const readFromShop = vi.fn(async (_input: unknown) => ({}));
+const saveRead = vi.fn(async (_maker: unknown, _input: unknown) => ({}));
+const readFromShop = vi.fn(async (_maker: unknown, _input: unknown) => ({}));
 const changed: ProjectPlan[] = [];
 vi.mock("next/cache", () => ({ refresh: () => {} }));
 vi.mock("@/server/listing-results", async (original) => ({
@@ -11,7 +11,11 @@ vi.mock("@/server/listing-results", async (original) => ({
   readFromShop,
 }));
 vi.mock("@/server/project-repository", () => ({
-  changePlan: async (_id: string, change: (p: ProjectPlan) => ProjectPlan) => {
+  changePlan: async (
+    _maker: unknown,
+    _id: string,
+    change: (p: ProjectPlan) => ProjectPlan,
+  ) => {
     const { planProject } = await import("@/domain/plan");
     const { CATALOG } = await import("@/lib/recipes");
     const { Product } = await import("@/domain/product");
@@ -57,7 +61,7 @@ describe("the results panel's actions", () => {
         read: { visits: 12, source: "Etsy stats" },
       }),
     ).toBeUndefined();
-    expect(saveRead).toHaveBeenCalledWith({
+    expect(saveRead).toHaveBeenCalledWith(expect.anything(), {
       ...where,
       key: "day14",
       read: { visits: 12, source: "Etsy stats" },

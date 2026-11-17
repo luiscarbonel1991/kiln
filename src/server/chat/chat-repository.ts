@@ -5,7 +5,7 @@ import {
   EVENT_PREFIX,
   type KilnMessage,
 } from "@/server/chat/messages";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 
 // The chat's sessions and messages, scoped to the current maker. A session
 // holds a lock while a turn runs; a message is stored as the chat shows it, and
@@ -36,10 +36,10 @@ const lockFresh = (lockedAt: Date | null, now = new Date()) =>
   now.getTime() - lockedAt.getTime() < LOCK_MINUTES * 60_000;
 
 export async function createChatSession(
+  maker: MakerRef,
   projectId?: string,
 ): Promise<{ id: string }> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   if (projectId) {
     const project = await db.project.findFirst({
       where: { id: projectId, makerId: maker.id },
@@ -54,11 +54,11 @@ export async function createChatSession(
 }
 
 export async function listChatSessions(
+  maker: MakerRef,
   filter: { projectId?: string } = {},
   take = 50,
 ): Promise<ChatSessionView[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = await db.chatSession.findMany({
     where: {
       makerId: maker.id,
@@ -101,9 +101,8 @@ function messageOf(row: {
 }
 
 // Whether a conversation is the current maker's, without reading it.
-export async function chatOwned(id: string): Promise<boolean> {
+export async function chatOwned(maker: MakerRef, id: string): Promise<boolean> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const session = await db.chatSession.findFirst({
     where: { id, makerId: maker.id },
     select: { id: true },
@@ -111,9 +110,11 @@ export async function chatOwned(id: string): Promise<boolean> {
   return session !== null;
 }
 
-export async function getChat(id: string): Promise<StoredChat | null> {
+export async function getChat(
+  maker: MakerRef,
+  id: string,
+): Promise<StoredChat | null> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const session = await db.chatSession.findFirst({
     where: { id, makerId: maker.id },
     select: {
@@ -140,11 +141,11 @@ export async function getChat(id: string): Promise<StoredChat | null> {
 // Take the session for one turn: refused while another turn holds it. A lock
 // older than LOCK_MINUTES is a turn that died, and is taken over (`stale`).
 export async function lockChat(
+  maker: MakerRef,
   id: string,
   now = new Date(),
 ): Promise<{ locked: boolean; stale: boolean }> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const expired = new Date(now.getTime() - LOCK_MINUTES * 60_000);
   const before = await db.chatSession.findFirst({
     where: { id, makerId: maker.id },
@@ -165,9 +166,8 @@ export async function lockChat(
   };
 }
 
-export async function unlockChat(id: string): Promise<void> {
+export async function unlockChat(maker: MakerRef, id: string): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.chatSession.updateMany({
     where: { id, makerId: maker.id },
     data: { lockedAt: null },
@@ -189,11 +189,11 @@ function titleOf(messages: KilnMessage[]): string | null {
 // stored, one already stored in its place. Messages stored apart from the
 // turn (Kiln's notices) are left as they are.
 export async function saveChatMessages(
+  maker: MakerRef,
   sessionId: string,
   messages: KilnMessage[],
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const session = await tx.chatSession.findFirst({
       where: { id: sessionId, makerId: maker.id },

@@ -11,6 +11,7 @@ const { chatTools, LEFT_OUT, TOOL_APPROVAL } = await import(
 const { SPECIALISTS } = await import("@/server/chat/specialists");
 
 const CTX = {
+  maker: { id: "test" },
   tokenId: null,
   tokenName: "Chat",
   canSpend: true,

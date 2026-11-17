@@ -2,6 +2,7 @@ import { type ListingText, listingDraft, withCopy } from "@/domain/listing";
 import type { ProviderId } from "@/domain/model-defaults";
 import type { RanOn } from "@/domain/model-routing";
 import { CATALOG } from "@/lib/recipes";
+import type { MakerRef } from "@/server/maker-repository";
 import { loadProjectBoard, setListing } from "@/server/project-repository";
 import { type Degraded, writeListing } from "@/server/text-calls";
 
@@ -9,8 +10,12 @@ import { type Degraded, writeListing } from "@/server/text-calls";
 // the board's action and the write_listing tool run it the same way.
 
 // The destination's listing as it stands, when it takes listing text.
-export async function listingTarget(projectId: string, destinationId: string) {
-  const loaded = await loadProjectBoard(projectId);
+export async function listingTarget(
+  maker: MakerRef,
+  projectId: string,
+  destinationId: string,
+) {
+  const loaded = await loadProjectBoard(maker, projectId);
   const plan = loaded?.board.plan?.destinations.find(
     (d) => d.destinationId === destinationId,
   );
@@ -30,6 +35,7 @@ export async function listingTarget(projectId: string, destinationId: string) {
 // listing's prose, under the cap. Only the fields the maker has not written
 // are replaced; the result is saved and checked like the draft.
 export async function writeProjectListing(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
   model?: { provider: ProviderId; model: string },
@@ -40,9 +46,10 @@ export async function writeProjectListing(
   | { degraded: Degraded | undefined }
   | { listing: ListingText; ranOn?: RanOn }
 > {
-  const target = await listingTarget(projectId, destinationId);
+  const target = await listingTarget(maker, projectId, destinationId);
   if (!target) return { error: "This destination has no listing text." };
   const result = await writeListing(
+    maker,
     {
       channel: target.destination.name,
       product: target.product,
@@ -55,7 +62,7 @@ export async function writeProjectListing(
   if (!result.copy) return { degraded: result.degraded };
   const listing = withCopy(target.current, result.copy);
   try {
-    await setListing(projectId, destinationId, listing);
+    await setListing(maker, projectId, destinationId, listing);
   } catch (error) {
     return { error: (error as Error).message };
   }

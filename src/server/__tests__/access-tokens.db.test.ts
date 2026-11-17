@@ -30,11 +30,14 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
   });
 
   it("a token is listed by name and prefix, never by its value or hash", async () => {
-    const { token, created } = await repo.createAccessToken(" CLI test ");
+    const { token, created } = await repo.createAccessToken(
+      maker,
+      " CLI test ",
+    );
     made.push(created.id);
     expect(created).toMatchObject({ name: "CLI test", lastUsedAt: null });
     expect(token.startsWith(created.prefix)).toBe(true);
-    const listed = (await repo.listAccessTokens()).find(
+    const listed = (await repo.listAccessTokens(maker)).find(
       (t) => t.id === created.id,
     );
     expect(listed).toEqual(created);
@@ -47,7 +50,10 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
   });
 
   it("verifying a token gives its maker and stamps its last use; an unknown one gives nothing", async () => {
-    const { token, created } = await repo.createAccessToken("Verify test");
+    const { token, created } = await repo.createAccessToken(
+      maker,
+      "Verify test",
+    );
     made.push(created.id);
     expect(await repo.verifyAccessToken(token)).toEqual({
       tokenId: created.id,
@@ -55,7 +61,7 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
       name: "Verify test",
       canSpend: false,
     });
-    const used = (await repo.listAccessTokens()).find(
+    const used = (await repo.listAccessTokens(maker)).find(
       (t) => t.id === created.id,
     );
     expect(used?.lastUsedAt).not.toBeNull();
@@ -63,14 +69,21 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
   });
 
   it("a token may spend only once the maker lets it, and that can be undone", async () => {
-    const { token, created } = await repo.createAccessToken("Spend test");
+    const { token, created } = await repo.createAccessToken(
+      maker,
+      "Spend test",
+    );
     made.push(created.id);
     expect(created.canSpend).toBe(false);
-    expect(await repo.setTokenSpend(created.id, true)).toBe(true);
+    expect(await repo.setTokenSpend(maker, created.id, true)).toBe(true);
     expect((await repo.verifyAccessToken(token))?.canSpend).toBe(true);
-    expect(await repo.setTokenSpend(created.id, false)).toBe(true);
+    expect(await repo.setTokenSpend(maker, created.id, false)).toBe(true);
     expect((await repo.verifyAccessToken(token))?.canSpend).toBe(false);
-    const allowed = await repo.createAccessToken("Spend from the start", true);
+    const allowed = await repo.createAccessToken(
+      maker,
+      "Spend from the start",
+      true,
+    );
     made.push(allowed.created.id);
     expect(allowed.created.canSpend).toBe(true);
     const theirs = repo.newToken();
@@ -83,7 +96,7 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
       },
     });
     made.push(row.id);
-    expect(await repo.setTokenSpend(row.id, true)).toBe(false);
+    expect(await repo.setTokenSpend(maker, row.id, true)).toBe(false);
   });
 
   it("a token acts for the maker it was made for, and only they revoke it", async () => {
@@ -96,16 +109,19 @@ describe.skipIf(!enabled)("access tokens (database)", async () => {
       tokenId: row.id,
       makerId: other.id,
     });
-    expect(await repo.revokeAccessToken(row.id)).toBe(false);
+    expect(await repo.revokeAccessToken(maker, row.id)).toBe(false);
   });
 
   it("a revoked token is refused at once", async () => {
-    const { token, created } = await repo.createAccessToken("Revoke test");
-    expect(await repo.revokeAccessToken(created.id)).toBe(true);
+    const { token, created } = await repo.createAccessToken(
+      maker,
+      "Revoke test",
+    );
+    expect(await repo.revokeAccessToken(maker, created.id)).toBe(true);
     expect(await repo.verifyAccessToken(token)).toBeNull();
-    expect(await repo.revokeAccessToken(created.id)).toBe(false);
+    expect(await repo.revokeAccessToken(maker, created.id)).toBe(false);
     expect(
-      (await repo.listAccessTokens()).some((t) => t.id === created.id),
+      (await repo.listAccessTokens(maker)).some((t) => t.id === created.id),
     ).toBe(false);
   });
 });

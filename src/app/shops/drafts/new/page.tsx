@@ -16,7 +16,7 @@ import type { CurrentMaker } from "@/server/maker-repository";
 // A new Etsy draft from a project's destination: everything it would carry,
 // seen and completed before anything is sent.
 export default makerPage(async function NewDraftPage(
-  _maker: CurrentMaker,
+  maker: CurrentMaker,
   {
     searchParams,
   }: {
@@ -35,8 +35,8 @@ export default makerPage(async function NewDraftPage(
       throw new DraftRefusal("Pick a project on the Drafts page.");
     }
     [preview, choices] = await Promise.all([
-      previewDraft(projectId, destinationId),
-      draftChoices(),
+      previewDraft(maker, projectId, destinationId),
+      draftChoices(maker),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);

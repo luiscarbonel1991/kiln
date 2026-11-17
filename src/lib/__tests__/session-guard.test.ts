@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 // handler a session or token route (src/server/guarded.ts), which check who
 // is calling before the code inside runs. New code written any other way
 // fails here.
-const app = join(import.meta.dirname, "..", "..", "app");
+const src = join(import.meta.dirname, "..", "..");
+const app = join(src, "app");
 
 function files(dir: string, match: RegExp): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -20,7 +21,7 @@ function files(dir: string, match: RegExp): string[] {
 }
 
 // The first run's own action: it is how the first session comes to exist.
-const OPEN_ACTIONS = new Set(["account.ts"]);
+const OPEN_ACTIONS = new Set([join("app", "actions", "account.ts")]);
 // Better Auth's own endpoints, and a schema file anyone may read.
 const OPEN_ROUTES = new Set([
   join("api", "auth", "[...all]", "route.ts"),
@@ -52,8 +53,11 @@ describe("the session guard", () => {
   });
 
   it("every Server Action is written as a makerAction", () => {
-    const actions = files(join(app, "actions"), /\.ts$/).filter(
-      (path) => !OPEN_ACTIONS.has(relative(join(app, "actions"), path)),
+    // Any file of Server Functions, wherever it lives (a module's too).
+    const actions = files(src, /\.ts$/).filter(
+      (path) =>
+        /^"use server";/.test(readFileSync(path, "utf8")) &&
+        !OPEN_ACTIONS.has(relative(src, path)),
     );
     expect(actions.length).toBeGreaterThan(15);
     const loose = actions.flatMap((path) =>
@@ -65,7 +69,7 @@ describe("the session guard", () => {
             !/^export const \w+ = makerAction\(/.test(line) &&
             !/^export (type|interface) /.test(line),
         )
-        .map((line) => `${relative(app, path)}: ${line}`),
+        .map((line) => `${relative(src, path)}: ${line}`),
     );
     expect(loose).toEqual([]);
   });
@@ -87,7 +91,7 @@ describe("the session guard", () => {
               line,
             ),
         )
-        .map((line) => `${relative(app, path)}: ${line}`),
+        .map((line) => `${relative(src, path)}: ${line}`),
     );
     expect(loose).toEqual([]);
   });

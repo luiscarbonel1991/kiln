@@ -26,6 +26,7 @@ import {
   mergeIncoming,
   withoutImageData,
 } from "@/server/chat/messages";
+import type { MakerRef } from "@/server/maker-repository";
 import "@/server/chat/no-gateway";
 import { newLedger, routedChatModel } from "@/server/chat/routed-model";
 import { SPECIALISTS, type SpecialistId } from "@/server/chat/specialists";
@@ -77,17 +78,20 @@ function wordsFor(error: unknown, signal: AbortSignal, ms: number): string {
 const stored = (messages: KilnMessage[]) =>
   messages.filter((m) => !isEvent(m)).map(withoutImageData);
 
-export async function runTurn(input: {
-  sessionId: string;
-  message: unknown;
-  plan?: boolean;
-  specialist?: SpecialistId;
-}): Promise<Response> {
+export async function runTurn(
+  maker: MakerRef,
+  input: {
+    sessionId: string;
+    message: unknown;
+    plan?: boolean;
+    specialist?: SpecialistId;
+  },
+): Promise<Response> {
   const { sessionId } = input;
-  const chat = await getChat(sessionId);
+  const chat = await getChat(maker, sessionId);
   if (!chat)
     throw new TurnRefusal("No conversation of yours has that id.", 404);
-  const lock = await lockChat(sessionId);
+  const lock = await lockChat(maker, sessionId);
   if (!lock.locked) {
     throw new TurnRefusal(
       "A turn is running in this conversation: wait for it, or stop it.",
@@ -105,16 +109,22 @@ export async function runTurn(input: {
       );
     }
     const messages = merged.messages;
-    await saveChatMessages(sessionId, stored(messages));
+    await saveChatMessages(maker, sessionId, stored(messages));
 
     const role = input.plan ? "deep" : "fast";
     const ledger = newLedger();
-    const ctx = { tokenId: null, tokenName: "Chat", canSpend: true, sessionId };
+    const ctx = {
+      maker,
+      tokenId: null,
+      tokenName: "Chat",
+      canSpend: true,
+      sessionId,
+    };
     const specialist = SPECIALISTS[input.specialist ?? "kiln"];
     const tools = chatTools(ctx, specialist);
     const kind = input.plan ? "chatPlan" : "chatTurn";
-    const { candidates, effort } = await agentRoute(specialist.id, kind);
-    const model = routedChatModel(kind, {
+    const { candidates, effort } = await agentRoute(maker, specialist.id, kind);
+    const model = routedChatModel(maker, kind, {
       candidates,
       effort,
       ...(chat.projectId ? { projectId: chat.projectId } : {}),
@@ -142,12 +152,12 @@ export async function runTurn(input: {
       if (ended) return;
       ended = true;
       running.delete(sessionId);
-      await unlockChat(sessionId);
+      await unlockChat(maker, sessionId);
     };
 
     const result = streamText({
       model,
-      instructions: await chatInstructions(chat.projectId, specialist),
+      instructions: await chatInstructions(maker, chat.projectId, specialist),
       tools,
       toolApproval: TOOL_APPROVAL,
       messages: await convertToModelMessages(forModel(messages), {
@@ -173,7 +183,7 @@ export async function runTurn(input: {
           ? metadata()
           : undefined,
       onStepEnd: async ({ messages: now }) => {
-        await saveChatMessages(sessionId, stored(now)).catch((error) =>
+        await saveChatMessages(maker, sessionId, stored(now)).catch((error) =>
           console.error("[kiln chat] could not store a step", error),
         );
       },
@@ -192,7 +202,7 @@ export async function runTurn(input: {
                 }
               : m,
           );
-          await saveChatMessages(sessionId, stored(final));
+          await saveChatMessages(maker, sessionId, stored(final));
         } catch (error) {
           console.error("[kiln chat] could not store a turn", error);
         } finally {
@@ -211,7 +221,7 @@ export async function runTurn(input: {
     });
   } catch (error) {
     running.delete(sessionId);
-    await unlockChat(sessionId);
+    await unlockChat(maker, sessionId);
     throw error;
   }
 }

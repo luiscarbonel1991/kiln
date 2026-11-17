@@ -9,7 +9,12 @@ const s = vi.hoisted(() => ({
   shop: true,
 }));
 vi.mock("@/server/project-repository", () => ({
-  setBrief: async (project: string, destination: string, brief: unknown) => {
+  setBrief: async (
+    _maker: unknown,
+    project: string,
+    destination: string,
+    brief: unknown,
+  ) => {
     if (project === "gone") throw new Error("project not found");
     s.briefs.push([project, destination, brief]);
   },
@@ -19,7 +24,10 @@ vi.mock("@/server/listing-results", async (original) => {
   return {
     ...real,
     followedListings: async () => [],
-    saveRead: async (input: { destinationId: string; read: unknown }) => {
+    saveRead: async (
+      _maker: unknown,
+      input: { destinationId: string; read: unknown },
+    ) => {
       if (input.destinationId === "instagram") {
         throw new real.ResultsRefusal('"instagram" is not a sale destination.');
       }
@@ -37,7 +45,12 @@ vi.mock("@/server/shop-ranking", () => ({
 
 const { TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
-const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
+const CTX = {
+  maker: { id: "test" },
+  tokenId: "t1",
+  tokenName: "agent",
+  canSpend: false,
+};
 const call = (name: string, args: unknown) => callTool(TOOLS, name, args, CTX);
 
 afterEach(() => {

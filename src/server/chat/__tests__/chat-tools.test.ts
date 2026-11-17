@@ -21,6 +21,7 @@ const { chatTools, LEFT_OUT, modelOutput, NEEDS_CLICK, ToolRefused } =
 const { withoutImageData } = await import("@/server/chat/messages");
 
 const CTX = {
+  maker: { id: "test" },
   tokenId: null,
   tokenName: "Chat",
   canSpend: true,

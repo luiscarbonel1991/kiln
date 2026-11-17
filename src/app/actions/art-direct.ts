@@ -25,7 +25,7 @@ const ProposeInput = z.object({
 // chooses between them and the other provider. Zod is the trust boundary.
 export const proposeVariants = makerAction(
   async (
-    _maker,
+    maker,
     input: unknown,
   ): Promise<{
     variants: VariantDirection[];
@@ -35,6 +35,7 @@ export const proposeVariants = makerAction(
     const { understanding, recipeId, model } = ProposeInput.parse(input);
     const recipe = findRecipe(recipeId) ?? SEED_RECIPES[0];
     return directScenes(
+      maker,
       {
         understanding,
         recipe,

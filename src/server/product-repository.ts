@@ -4,7 +4,7 @@ import type { Product } from "@/domain/product";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { keepSwatches } from "@/lib/kept-swatches";
 import { productChanges } from "@/lib/product-diff";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import { productToRow, rowToProduct } from "@/server/product-mapper";
 import { productHash } from "@/server/product-version";
 
@@ -17,9 +17,8 @@ const SELECT = {
 } as const;
 
 // The current maker's products, by name. Rows that no longer parse are skipped.
-export async function listProducts(): Promise<Product[]> {
+export async function listProducts(maker: MakerRef): Promise<Product[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = await db.product.findMany({
     where: { makerId: maker.id },
     select: SELECT,
@@ -31,9 +30,11 @@ export async function listProducts(): Promise<Product[]> {
   });
 }
 
-export async function getProduct(id: string): Promise<Product | null> {
+export async function getProduct(
+  maker: MakerRef,
+  id: string,
+): Promise<Product | null> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const row = await db.product.findFirst({
     where: { id, makerId: maker.id },
     select: SELECT,
@@ -43,9 +44,11 @@ export async function getProduct(id: string): Promise<Product | null> {
 
 // A product by Kiln's id or, failing that, by its sku: what an API caller
 // knows of it.
-export async function findProduct(ref: string): Promise<Product | null> {
+export async function findProduct(
+  maker: MakerRef,
+  ref: string,
+): Promise<Product | null> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const row =
     (await db.product.findFirst({
       where: { id: ref, makerId: maker.id },
@@ -60,9 +63,11 @@ export async function findProduct(ref: string): Promise<Product | null> {
 
 // Insert or update by [makerId, sku], so re-importing a package keeps each
 // product's id (and every project that uses it). All or nothing.
-export async function upsertProducts(products: Product[]): Promise<Product[]> {
+export async function upsertProducts(
+  maker: MakerRef,
+  products: Product[],
+): Promise<Product[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = await db.$transaction(
     products.map((product) => {
       const { sku, name, spec, source } = productToRow(product);
@@ -101,11 +106,11 @@ export interface ImportedProduct {
 // brand kit in the same transaction. A material photo the package does not
 // give is kept. All or nothing.
 export async function importCatalog(
+  maker: MakerRef,
   products: Product[],
   brand?: BrandKit,
 ): Promise<ImportedProduct[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const skus = products.map((p) => p.sku);
   return db.$transaction(async (tx) => {
     // The rows being replaced are locked first: a material photo set at the
@@ -173,11 +178,11 @@ export async function importCatalog(
 // the name), or leave it alone when its content is the same, so a project
 // is never marked behind for nothing. Says what changed.
 export async function updateProduct(
+  maker: MakerRef,
   id: string,
   product: Product,
 ): Promise<ImportedProduct> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   return db.$transaction(async (tx) => {
     const row = await tx.product.findFirst({
       where: { id, makerId: maker.id },
@@ -213,12 +218,12 @@ export async function updateProduct(
 // colours both land, and an import waits for it. Unchanged when the colour
 // already reads so; null when the product or the colour is not there.
 export async function setSwatchUrl(
+  maker: MakerRef,
   id: string,
   key: string,
   swatchUrl: string | null,
 ): Promise<ImportedProduct | null> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   return db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Product"
@@ -266,9 +271,11 @@ export interface ProductUse {
 }
 
 // The projects that use a product, by name.
-export async function productProjects(id: string): Promise<ProductUse[]> {
+export async function productProjects(
+  maker: MakerRef,
+  id: string,
+): Promise<ProductUse[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const links = await db.projectProduct.findMany({
     where: { productId: id, project: { makerId: maker.id } },
     select: {
@@ -286,11 +293,11 @@ export async function productProjects(id: string): Promise<ProductUse[]> {
 
 // Delete a product no project uses; otherwise say which projects do.
 export async function deleteProduct(
+  maker: MakerRef,
   id: string,
 ): Promise<{ deleted: true } | { usedBy: ProductUse[] }> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
-  const usedBy = await productProjects(id);
+  const usedBy = await productProjects(maker, id);
   if (usedBy.length > 0) return { usedBy };
   try {
     const { count } = await db.product.deleteMany({
@@ -301,7 +308,7 @@ export async function deleteProduct(
   } catch (error) {
     // A project started from it in between: the foreign key refuses.
     if ((error as { code?: string }).code === "P2003") {
-      return { usedBy: await productProjects(id) };
+      return { usedBy: await productProjects(maker, id) };
     }
     throw error;
   }

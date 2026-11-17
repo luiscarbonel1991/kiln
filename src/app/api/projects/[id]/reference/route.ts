@@ -12,7 +12,7 @@ type Context = { params: Promise<{ id: string }> };
 // empty body or a project with no plan, 404 for an unknown project, 413 over
 // the cap, 415 for anything but a PNG, JPEG or WebP.
 export const POST = tokenRoute(
-  async (_caller, request: Request, { params }: Context) => {
+  async ({ maker }, request: Request, { params }: Context) => {
     const { id } = await params;
     const body = await readBody(request, MAX_UPLOAD_BYTES);
     if (!body) {
@@ -21,7 +21,7 @@ export const POST = tokenRoute(
         `A reference image is at most ${megabytes(MAX_UPLOAD_BYTES)}.`,
       );
     }
-    const outcome = await addProjectReference(id, body);
+    const outcome = await addProjectReference(maker, id, body);
     if (!outcome.ok) return apiError(outcome.status, outcome.error);
     const { ok: _ok, ...result } = outcome;
     return apiJson(result);

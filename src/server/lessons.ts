@@ -28,7 +28,7 @@ import {
 import { db } from "@/lib/db";
 import { CATALOG } from "@/lib/recipes";
 import { appendChatEvent } from "@/server/chat/chat-repository";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import { loadProjectBoard } from "@/server/project-repository";
 
 // The maker's lessons. Kiln records what the maker does on the board that says
@@ -75,13 +75,13 @@ const destinationName = (id: string) =>
 // The lessons of the maker, newest first: by status, for a family (with
 // those for every family), on some topics.
 export async function listLessons(
+  maker: MakerRef,
   filter: {
     status?: LessonStatus[];
     family?: string | null;
     topics?: LessonTopic[] | null;
   } = {},
 ): Promise<LessonView[]> {
-  const maker = await getCurrentMaker();
   const rows = await db.lesson.findMany({
     where: {
       makerId: maker.id,
@@ -105,16 +105,19 @@ export async function listLessons(
 // The kept lessons an agent follows: for the conversation's family (and
 // every family), on its mode's topics.
 export async function keptLessons(
+  maker: MakerRef,
   family: string | null,
   topics: LessonTopic[] | null,
 ): Promise<LessonView[]> {
-  return listLessons({ status: ["kept"], family, topics });
+  return listLessons(maker, { status: ["kept"], family, topics });
 }
 
 // The knobs the maker's kept scene lessons set for a family: a new project
 // of the family starts its frames with them (withLearned).
-export async function keptMoves(family: string): Promise<LessonMove[]> {
-  const maker = await getCurrentMaker();
+export async function keptMoves(
+  maker: MakerRef,
+  family: string,
+): Promise<LessonMove[]> {
   const rows = await db.lesson.findMany({
     where: {
       makerId: maker.id,
@@ -133,10 +136,10 @@ export async function keptMoves(family: string): Promise<LessonMove[]> {
 // The status of the maker's lessons named, by id (a chat shows each one an
 // agent proposed as it stands now).
 export async function lessonStatuses(
+  maker: MakerRef,
   ids: string[],
 ): Promise<Record<string, string>> {
   if (ids.length === 0) return {};
-  const maker = await getCurrentMaker();
   const rows = await db.lesson.findMany({
     where: { id: { in: ids }, makerId: maker.id },
     select: { id: true, status: true },
@@ -147,10 +150,10 @@ export async function lessonStatuses(
 // The maker keeps a lesson, or sets it aside (a kept one too: it stops
 // counting). Null when it is not theirs.
 export async function decideLesson(
+  maker: MakerRef,
   id: string,
   status: "kept" | "dismissed",
 ): Promise<LessonView | null> {
-  const maker = await getCurrentMaker();
   const changed = await db.lesson.updateMany({
     where: { id, makerId: maker.id },
     data: { status, decidedAt: new Date() },
@@ -160,12 +163,14 @@ export async function decideLesson(
 }
 
 // A lesson an agent proposes in words; the maker keeps it or not.
-export async function proposeLesson(input: {
-  topic: LessonTopic;
-  text: string;
-  family?: string | null;
-}): Promise<LessonView> {
-  const maker = await getCurrentMaker();
+export async function proposeLesson(
+  maker: MakerRef,
+  input: {
+    topic: LessonTopic;
+    text: string;
+    family?: string | null;
+  },
+): Promise<LessonView> {
   const row = await db.lesson.create({
     data: {
       makerId: maker.id,
@@ -188,8 +193,8 @@ async function announce(projectId: string, lesson: LessonView, key: string) {
 }
 
 // A frame's scene and the product's family, as the signals record them.
-async function sceneOf(projectId: string, ref: SlotRef) {
-  const loaded = await loadProjectBoard(projectId);
+async function sceneOf(maker: MakerRef, projectId: string, ref: SlotRef) {
+  const loaded = await loadProjectBoard(maker, projectId);
   const family = loaded?.product?.family?.trim();
   const slot = loaded?.board.plan?.destinations
     .find((d) => d.destinationId === ref.destinationId)
@@ -277,6 +282,7 @@ async function proposeFromTaste(input: {
 // The maker gave a reason for a take and it moved a knob: one vote for the
 // stop it moved to.
 export async function noteReason(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
   reason: ReasonKey,
@@ -284,9 +290,8 @@ export async function noteReason(
 ): Promise<void> {
   try {
     if (move.stop === null || move.stop === "any") return;
-    const scene = await sceneOf(projectId, ref);
+    const scene = await sceneOf(maker, projectId, ref);
     if (!scene) return;
-    const maker = await getCurrentMaker();
     await db.tasteSignal.create({
       data: {
         makerId: maker.id,
@@ -316,17 +321,17 @@ export async function noteReason(
 // The maker approved a scene's take: one vote for each knob they set on it,
 // once per project and stop (approving again after an undo adds nothing).
 export async function noteApproval(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
 ): Promise<void> {
   try {
-    const scene = await sceneOf(projectId, ref);
+    const scene = await sceneOf(maker, projectId, ref);
     const tuned = KnobKey.options.flatMap((knob) => {
       const stop = scene?.slot.tuned?.[knob];
       return stop && stop !== "any" ? [[knob, stop] as const] : [];
     });
     if (!scene || tuned.length === 0) return;
-    const maker = await getCurrentMaker();
     for (const [knob, stop] of tuned) {
       const where = {
         makerId: maker.id,
@@ -364,11 +369,12 @@ export async function noteApproval(
 // visits to tell: a sentence on which frames came with which change, for
 // the family. One per project and destination; a later read rewrites it.
 export async function noteRead(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
 ): Promise<void> {
   try {
-    const loaded = await loadProjectBoard(projectId);
+    const loaded = await loadProjectBoard(maker, projectId);
     const family = loaded?.product?.family?.trim();
     const destination = loaded?.board.plan?.destinations.find(
       (d) => d.destinationId === destinationId,
@@ -391,7 +397,6 @@ export async function noteRead(
     if (frames.length === 0) return;
     const days = destination.results?.reads.day30 ? 30 : 14;
     const text = `${family}, ${destinationName(destinationId)}: after the new ${frames.join(", ")}, the first ${days} days showed ${line} (${loaded.board.name}).`;
-    const maker = await getCurrentMaker();
     const key = `read:${projectId}:${destinationId}`;
     const evidence = [
       {

@@ -21,13 +21,14 @@ const stored = productFromForm(
 );
 
 const getProduct = vi.fn(
-  async (_id: string): Promise<Product | null> => ({
+  async (_maker: unknown, _id: string): Promise<Product | null> => ({
     ...stored,
     id: "row-1",
   }),
 );
 const updateProduct = vi.fn(
   async (
+    _maker: unknown,
     _id: string,
     product: Product,
   ): Promise<{
@@ -36,11 +37,11 @@ const updateProduct = vi.fn(
     changed: string[];
   }> => ({ product, status: "updated", changed: ["size", "text lines"] }),
 );
-const productProjects = vi.fn(async (_id: string) => [
+const productProjects = vi.fn(async (_maker: unknown, _id: string) => [
   { projectId: "p-old", name: "Keychain — Listing kit", hash: "old" },
 ]);
 const deleteProduct = vi.fn(
-  async (_id: string) => ({ deleted: true }) as const,
+  async (_maker: unknown, _id: string) => ({ deleted: true }) as const,
 );
 
 vi.mock("@/server/product-repository", () => ({
@@ -75,7 +76,7 @@ describe("updateProductAction", () => {
     expect(result.behind).toEqual([
       { projectId: "p-old", name: "Keychain — Listing kit" },
     ]);
-    const saved = updateProduct.mock.calls[0][1];
+    const saved = updateProduct.mock.calls[0][2];
     expect(saved).toMatchObject({
       sku: stored.sku,
       dimensions: { w: 2.5 },
@@ -91,11 +92,13 @@ describe("updateProductAction", () => {
         hash: productHash({ ...stored, id: "row-1" }),
       },
     ]);
-    updateProduct.mockImplementationOnce(async (_id, product) => ({
-      product,
-      status: "unchanged",
-      changed: [],
-    }));
+    updateProduct.mockImplementationOnce(
+      async (_maker: unknown, _id: string, product: Product) => ({
+        product,
+        status: "unchanged",
+        changed: [],
+      }),
+    );
     const result = await updateProductAction({
       id: "row-1",
       form: formFromProduct(stored),

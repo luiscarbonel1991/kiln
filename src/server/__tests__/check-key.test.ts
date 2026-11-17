@@ -25,11 +25,13 @@ describe("checkKey", () => {
     listed.models = offered("google").filter(
       (id) => id !== "gemini-omni-1.1-flash",
     );
-    expect(await checkKey("google")).toMatchObject({
+    expect(await checkKey({ id: "test" }, "google")).toMatchObject({
       ok: true,
       unlisted: ["gemini-omni-1.1-flash"],
     });
     listed.models = offered("google");
-    expect(await checkKey("google")).toMatchObject({ unlisted: [] });
+    expect(await checkKey({ id: "test" }, "google")).toMatchObject({
+      unlisted: [],
+    });
   });
 });

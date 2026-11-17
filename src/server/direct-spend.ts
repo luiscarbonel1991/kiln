@@ -28,7 +28,7 @@ import {
   readUnlisted,
   reserveDirectCall,
 } from "@/server/generation-repository";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 
 // The monthly cap covers every paid call made from Kiln, not only the queue.
 // Mock runs neither reserve nor count. Without a database (tests) both are
@@ -138,6 +138,7 @@ const UNCOUNTED: DirectCall<never> = {
 // provider's last key check no longer lists is refused before anything, as a
 // model that cannot run (a route moves past it).
 export async function openDirectCall<T extends { usage?: unknown }>(
+  maker: MakerRef,
   priced: PricedCall<T>,
 ): Promise<DirectCall<T>> {
   if (!hasDatabase() || providerMode() === "mock") return UNCOUNTED;
@@ -146,7 +147,6 @@ export async function openDirectCall<T extends { usage?: unknown }>(
       `No pinned price for ${priced.model}, so it cannot run under the cap.`,
     );
   }
-  const maker = await getCurrentMaker();
   const provider = ProviderId.safeParse(priced.provider);
   if (provider.success) {
     const gone = (await readUnlisted(maker.id))[provider.data];
@@ -201,10 +201,11 @@ export async function openDirectCall<T extends { usage?: unknown }>(
 
 // Run one direct (studio) call against the cap (openDirectCall).
 export async function withDirectSpend<T extends { usage?: unknown }>(
+  maker: MakerRef,
   priced: PricedCall<T>,
   call: (beforeCall: () => Promise<void>) => Promise<T>,
 ): Promise<T> {
-  const direct = await openDirectCall(priced);
+  const direct = await openDirectCall(maker, priced);
   let result: T;
   try {
     result = await call(() => direct.beforeCall());

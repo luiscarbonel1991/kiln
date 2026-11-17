@@ -9,13 +9,13 @@ const s = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/lessons", () => ({
-  listLessons: async (filter: unknown) => {
+  listLessons: async (_maker: unknown, filter: unknown) => {
     s.listed.push(filter);
     return [
       { id: "l1", text: "Kitchen, Etsy's Hero: the camera a little above." },
     ];
   },
-  proposeLesson: async (input: { text: string }) => {
+  proposeLesson: async (_maker: unknown, input: { text: string }) => {
     s.proposed.push(input);
     return { id: "l2", status: "proposed", ...input };
   },
@@ -23,7 +23,12 @@ vi.mock("@/server/lessons", () => ({
 
 const { TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
-const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
+const CTX = {
+  maker: { id: "test" },
+  tokenId: "t1",
+  tokenName: "agent",
+  canSpend: false,
+};
 const call = (name: string, args: unknown) => callTool(TOOLS, name, args, CTX);
 
 afterEach(() => {

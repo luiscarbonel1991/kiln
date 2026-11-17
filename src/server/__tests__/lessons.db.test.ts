@@ -110,20 +110,20 @@ describe.skipIf(!enabled)("lessons (database)", async () => {
   let maker: { id: string };
 
   const newProject = async () => {
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "listing-kit",
       product: saved,
       plan,
       editor,
     });
     projects.push(id);
-    await chats.createChatSession(id);
+    await chats.createChatSession(maker, id);
     return id;
   };
   const notices = async (projectId: string) => {
-    const [session] = await chats.listChatSessions({ projectId }, 1);
-    return ((await chats.getChat(session.id))?.messages ?? [])
+    const [session] = await chats.listChatSessions(maker, { projectId }, 1);
+    return ((await chats.getChat(maker, session.id))?.messages ?? [])
       .filter((m) => m.id.startsWith("event-lesson-"))
       .map((m) => (m.parts[0] as { data: { text: string } }).data.text);
   };
@@ -155,10 +155,10 @@ describe.skipIf(!enabled)("lessons (database)", async () => {
   it("two reasons that agree propose a lesson for the family, and the project's chat hears it", async () => {
     const id = await newProject();
     const above = { knob: "camera" as const, stop: "above" as const };
-    await lessons.noteReason(id, hero, "top", above);
-    expect(await lessons.listLessons({ family })).toEqual([]);
-    await lessons.noteReason(id, hero, "top", above);
-    const [lesson] = await lessons.listLessons({ family });
+    await lessons.noteReason(maker, id, hero, "top", above);
+    expect(await lessons.listLessons(maker, { family })).toEqual([]);
+    await lessons.noteReason(maker, id, hero, "top", above);
+    const [lesson] = await lessons.listLessons(maker, { family });
     expect(lesson).toMatchObject({
       family: family.toLowerCase(),
       topic: "scenes",
@@ -179,28 +179,30 @@ describe.skipIf(!enabled)("lessons (database)", async () => {
       `Kiln proposes a lesson: ${lesson.text} Keep it or not in Settings → Lessons.`,
     ]);
     // Not kept yet: nothing starts from it.
-    expect(await lessons.keptMoves(family)).toEqual([]);
+    expect(await lessons.keptMoves(maker, family)).toEqual([]);
   });
 
   it("kept, it starts new plans of the family and agents read it; a lesson for another family does not reach it", async () => {
-    const [lesson] = await lessons.listLessons({ family });
-    expect(await lessons.decideLesson(lesson.id, "kept")).toMatchObject({
+    const [lesson] = await lessons.listLessons(maker, { family });
+    expect(await lessons.decideLesson(maker, lesson.id, "kept")).toMatchObject({
       status: "kept",
     });
-    expect(await lessons.keptMoves(family.toUpperCase())).toEqual([
+    expect(await lessons.keptMoves(maker, family.toUpperCase())).toEqual([
       { destinationId: "etsy", slotKey: "hero", knob: "camera", stop: "above" },
     ]);
     expect(
-      (await lessons.keptLessons(family, ["scenes"])).map((l) => l.id),
+      (await lessons.keptLessons(maker, family, ["scenes"])).map((l) => l.id),
     ).toEqual([lesson.id]);
-    expect(await lessons.keptLessons(family, ["listing"])).toEqual([]);
+    expect(await lessons.keptLessons(maker, family, ["listing"])).toEqual([]);
     expect(
-      (await lessons.keptLessons("Another family", null)).map((l) => l.id),
+      (await lessons.keptLessons(maker, "Another family", null)).map(
+        (l) => l.id,
+      ),
     ).not.toContain(lesson.id);
-    expect(await lessons.lessonStatuses([lesson.id, "nope"])).toEqual({
+    expect(await lessons.lessonStatuses(maker, [lesson.id, "nope"])).toEqual({
       [lesson.id]: "kept",
     });
-    expect(await lessons.decideLesson("nope", "kept")).toBeNull();
+    expect(await lessons.decideLesson(maker, "nope", "kept")).toBeNull();
   });
 
   it("an approval with the maker's knob is one vote, once per project; when the taste moves, the kept lesson comes back as a proposal", async () => {
@@ -214,24 +216,24 @@ describe.skipIf(!enabled)("lessons (database)", async () => {
       ],
     });
     await setPlan(id, tuned("overhead"));
-    await lessons.noteApproval(id, hero);
-    await lessons.noteApproval(id, hero);
+    await lessons.noteApproval(maker, id, hero);
+    await lessons.noteApproval(maker, id, hero);
     expect(
       await db.tasteSignal.count({
         where: { projectId: id, kind: "approval" },
       }),
     ).toBe(1);
-    let [lesson] = await lessons.listLessons({ family });
+    let [lesson] = await lessons.listLessons(maker, { family });
     expect(lesson).toMatchObject({ status: "kept", move: { stop: "above" } });
     // A second project approved overhead too: two votes, more than above's.
     const other = await newProject();
     await setPlan(other, tuned("overhead"));
-    await lessons.noteApproval(other, hero);
-    await lessons.noteReason(other, hero, "top", {
+    await lessons.noteApproval(maker, other, hero);
+    await lessons.noteReason(maker, other, hero, "top", {
       knob: "camera",
       stop: "overhead",
     });
-    [lesson] = await lessons.listLessons({ family });
+    [lesson] = await lessons.listLessons(maker, { family });
     expect(lesson).toMatchObject({
       status: "proposed",
       move: { stop: "overhead" },
@@ -241,14 +243,14 @@ describe.skipIf(!enabled)("lessons (database)", async () => {
   });
 
   it("set aside, it stays aside while the votes agree with it", async () => {
-    let [lesson] = await lessons.listLessons({ family });
-    await lessons.decideLesson(lesson.id, "dismissed");
+    let [lesson] = await lessons.listLessons(maker, { family });
+    await lessons.decideLesson(maker, lesson.id, "dismissed");
     const id = projects[0];
-    await lessons.noteReason(id, hero, "top", {
+    await lessons.noteReason(maker, id, hero, "top", {
       knob: "camera",
       stop: "overhead",
     });
-    [lesson] = await lessons.listLessons({ family });
+    [lesson] = await lessons.listLessons(maker, { family });
     expect(lesson.status).toBe("dismissed");
   });
 
@@ -292,9 +294,9 @@ describe.skipIf(!enabled)("lessons (database)", async () => {
         read(12, 1, "2026-09-01", "2026-09-30"),
       ),
     );
-    await lessons.noteRead(id, "etsy");
+    await lessons.noteRead(maker, id, "etsy");
     expect(
-      (await lessons.listLessons({ family })).filter(
+      (await lessons.listLessons(maker, { family })).filter(
         (l) => l.source === "read",
       ),
     ).toEqual([]);
@@ -305,9 +307,9 @@ describe.skipIf(!enabled)("lessons (database)", async () => {
         read(300, 9, "2026-09-01", "2026-09-30"),
       ),
     );
-    await lessons.noteRead(id, "etsy");
-    await lessons.noteRead(id, "etsy");
-    const reads = (await lessons.listLessons({ family })).filter(
+    await lessons.noteRead(maker, id, "etsy");
+    await lessons.noteRead(maker, id, "etsy");
+    const reads = (await lessons.listLessons(maker, { family })).filter(
       (l) => l.source === "read",
     );
     expect(reads).toHaveLength(1);
@@ -319,7 +321,7 @@ describe.skipIf(!enabled)("lessons (database)", async () => {
   });
 
   it("an agent's proposal waits for the maker, for every family when none is named", async () => {
-    const proposed = await lessons.proposeLesson({
+    const proposed = await lessons.proposeLesson(maker, {
       topic: "listing",
       text: "Lesson test: titles never use the word handmade.",
     });
@@ -329,11 +331,11 @@ describe.skipIf(!enabled)("lessons (database)", async () => {
       status: "proposed",
     });
     expect(
-      (await lessons.keptLessons(family, null)).map((l) => l.id),
+      (await lessons.keptLessons(maker, family, null)).map((l) => l.id),
     ).not.toContain(proposed.id);
-    await lessons.decideLesson(proposed.id, "kept");
+    await lessons.decideLesson(maker, proposed.id, "kept");
     expect(
-      (await lessons.keptLessons(family, ["listing"])).map((l) => l.id),
+      (await lessons.keptLessons(maker, family, ["listing"])).map((l) => l.id),
     ).toContain(proposed.id);
   });
 });
