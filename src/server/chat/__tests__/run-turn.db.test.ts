@@ -194,6 +194,29 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
     ]);
   });
 
+  // A turn's tool calls are recorded in the name of the person who
+  // sent it (the session's maker carries its member down).
+  it("records each tool call of a turn with the person who sent it", async () => {
+    const { id } = await session();
+    const person = {
+      ...maker,
+      member: { id: "m-chat", userId: "u-chat", role: "member" as const },
+    };
+    replies.push(call("c9", "peek", {}), say("I see 3."));
+    const response = await runTurn(person, {
+      sessionId: id,
+      message: user("u1", "What do you see?"),
+    });
+    await response.text();
+    for (let i = 0; i < 50 && (await repo.getChat(maker, id))?.running; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const recorded = await db.toolCall.findMany({ where: { sessionId: id } });
+    expect(recorded.map((r) => [r.tool, r.memberId])).toEqual([
+      ["peek", "m-chat"],
+    ]);
+  });
+
   it("a paid tool waits for the maker's click, then runs the stored call once", async () => {
     const { id } = await session();
     replies.push(call("c2", "generate", { quote: "q1" }));

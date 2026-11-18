@@ -47,6 +47,7 @@ export async function callAndRecord(
         makerId: ctx.maker.id,
         tokenId: ctx.tokenId,
         sessionId: ctx.sessionId ?? null,
+        memberId: ctx.maker.member?.id ?? null,
         tokenName: ctx.tokenName,
         tool: name.slice(0, 80),
         args: recordedArgs(args),

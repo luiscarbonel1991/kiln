@@ -146,6 +146,43 @@ describe.skipIf(!enabled)(
       });
     });
 
+    // A tool call records the person behind it; a token's (MCP,
+    // the HTTP API, `kiln call`) records no one.
+    it("records a call with the person behind it, and a token's with no one", async () => {
+      const tool = defineTool({
+        name: "member_test",
+        title: "Member test",
+        description: "Answers.",
+        input: z.object({}),
+        hints: { readOnly: true },
+        run: async () => ({ data: {} }),
+      });
+      const token = {
+        maker,
+        tokenId: "tok-quotes",
+        tokenName: "Agent",
+        canSpend: false,
+      };
+      const chat = {
+        ...token,
+        maker: {
+          ...maker,
+          member: { id: "m-tool", userId: "u-tool", role: "member" as const },
+        },
+        tokenName: "Chat",
+      };
+      await calls.callAndRecord([tool], "member_test", {}, token);
+      await calls.callAndRecord([tool], "member_test", {}, chat);
+      const rows = await db.toolCall.findMany({
+        where: { tokenId: "tok-quotes", tool: "member_test" },
+        orderBy: { at: "asc" },
+      });
+      expect(rows.map((r) => [r.tokenName, r.memberId])).toEqual([
+        ["Agent", null],
+        ["Chat", "m-tool"],
+      ]);
+    });
+
     it("folds the same call back to back into one row with its count", async () => {
       const tool = defineTool({
         name: "poll_test",
