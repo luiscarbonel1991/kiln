@@ -27,7 +27,6 @@ export function useMonthFit({
   useEffect(() => {
     if (!enabled) return;
     let stale = false;
-    setFit("checking");
     monthFitAction({ projectId, cardIds: key.split("\n") })
       .then((answer) => {
         if (stale) return;
@@ -41,8 +40,11 @@ export function useMonthFit({
           });
         }
       });
+    // Closed (or other cards): the next open starts from "checking", so an
+    // earlier answer never shows, nor enables Generate, for a frame.
     return () => {
       stale = true;
+      setFit("checking");
     };
   }, [projectId, key, enabled]);
   return fit;
