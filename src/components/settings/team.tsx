@@ -10,11 +10,11 @@ import {
   inviteMemberAction,
   removeMemberAction,
 } from "@/app/actions/team";
+import { PersonMark } from "@/components/settings/person-mark";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { InviteForm } from "@/lib/account-forms";
-import { cn } from "@/lib/utils";
 import type { InvitationView, TeamMemberView, TeamView } from "@/server/team";
 
 type Values = z.input<typeof InviteForm>;
@@ -24,45 +24,6 @@ const day = (iso: string) =>
 
 const fullLink = (path: string) =>
   typeof window === "undefined" ? path : `${window.location.origin}${path}`;
-
-// A person's mark: their initials on one of the provenance colours, the same
-// colour every time for the same name.
-const MARKS = [
-  "bg-prov-local/15 text-prov-local",
-  "bg-prov-image/15 text-prov-image",
-  "bg-prov-recipe/15 text-prov-recipe",
-  "bg-prov-brand/15 text-prov-brand",
-];
-
-function Mark({ name, faded }: { name: string; faded?: boolean }) {
-  // An invitation has only an email: its first letter.
-  const words = name.includes("@")
-    ? [name]
-    : name.trim().split(/\s+/).filter(Boolean);
-  const initials =
-    words
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("") || "?";
-  const tone =
-    MARKS[
-      [...name].reduce((sum, c) => sum + c.charCodeAt(0), 0) % MARKS.length
-    ];
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-full font-serif text-[0.95rem]",
-        faded
-          ? "border border-dashed border-border bg-transparent text-on-surface-mid"
-          : tone,
-      )}
-      style={{ fontVariationSettings: "'opsz' 40" }}
-    >
-      {initials}
-    </span>
-  );
-}
 
 // Send the link the way the phone sends anything (a chat, a message, mail);
 // where the browser cannot share, copy it.
@@ -136,7 +97,7 @@ function Person({
   return (
     <li className="flex flex-col gap-2 py-3">
       <div className="flex items-center gap-3">
-        <Mark name={member.name} />
+        <PersonMark name={member.name} />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-sans text-[0.9rem] font-semibold text-foreground">
             {member.name}
@@ -252,7 +213,7 @@ export function Team({ team }: { team: TeamView }) {
             data-testid="invitation"
           >
             <div className="flex items-center gap-3">
-              <Mark name={invitation.email} faded />
+              <PersonMark name={invitation.email} faded />
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-sans text-[0.9rem] text-foreground">
                   {invitation.email}
