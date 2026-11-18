@@ -3,6 +3,7 @@ import { ProjectPlan } from "@/domain/plan";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { budget, spendByMember } from "@/server/generation-repository";
 import type { CurrentMaker } from "@/server/maker-repository";
+import { readsStudioAmounts } from "@/server/month-limit";
 
 // What a maker cares about on Home: what each project has spent and kept, and
 // this month's cost per approved output — not per output made. Spend follows
@@ -36,7 +37,7 @@ export type MonthSpent =
 // reach their page.
 export async function monthSpent(maker: CurrentMaker): Promise<MonthSpent> {
   const member = maker.member;
-  if (member && member.role !== "owner") {
+  if (member && !readsStudioAmounts(maker)) {
     const [own] = await spendByMember(maker, { memberId: member.id });
     return { whose: "yours", spentMicros: own?.spentMicros ?? 0 };
   }
