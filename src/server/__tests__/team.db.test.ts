@@ -148,3 +148,163 @@ describe.skipIf(!enabled)(
     });
   },
 );
+
+// The month's spend per person.
+// The owner sees one line per person, named only from their own studio; a
+// member sees only their own line. Two studios, each with its own people.
+describe.skipIf(!enabled)(
+  "the month's spend per person (database)",
+  async () => {
+    const { db } = await import("@/lib/db");
+    const { spendByMember } = await import("@/server/generation-repository");
+    const { monthSpend } = await import("@/server/team");
+
+    const stamp = randomUUID().slice(0, 8);
+    const studios = {
+      a: { org: randomUUID(), maker: "" },
+      b: { org: randomUUID(), maker: "" },
+    };
+    const people = {
+      ownerA: { member: randomUUID(), user: randomUUID(), name: "Olga Owner" },
+      ana: { member: randomUUID(), user: randomUUID(), name: "Ana Ruiz" },
+      ownerB: { member: randomUUID(), user: randomUUID(), name: "Bruno Other" },
+    };
+    let bare = "";
+
+    const as = (
+      studio: "a" | "b",
+      person: keyof typeof people,
+      role: "owner" | "member",
+    ) => ({
+      id: studios[studio].maker,
+      slug: "",
+      name: "",
+      member: { id: people[person].member, userId: people[person].user, role },
+    });
+
+    const spent = (
+      makerId: string,
+      memberId: string | null,
+      micros: number,
+    ) => ({
+      makerId,
+      memberId,
+      cardId: "direct",
+      mode: "live",
+      status: "done",
+      maxAttempts: 1,
+      estimateMicros: micros,
+      actualMicros: micros,
+      finishedAt: new Date(),
+    });
+
+    beforeAll(async () => {
+      for (const [key, studio] of Object.entries(studios)) {
+        await db.organization.create({
+          data: {
+            id: studio.org,
+            name: `Spend ${key}`,
+            slug: `spend-${key}-${stamp}`,
+            createdAt: new Date(),
+          },
+        });
+        const maker = await db.maker.create({
+          data: {
+            slug: `spend-${key}-${stamp}`,
+            name: `Spend ${key}`,
+            organizationId: studio.org,
+          },
+        });
+        studio.maker = maker.id;
+      }
+      const join = [
+        [people.ownerA, studios.a.org, "owner"],
+        [people.ana, studios.a.org, "member"],
+        [people.ownerB, studios.b.org, "owner"],
+      ] as const;
+      for (const [person, organizationId, role] of join) {
+        await db.user.create({
+          data: {
+            id: person.user,
+            name: person.name,
+            email: `${person.user}@kiln.test`,
+          },
+        });
+        await db.member.create({
+          data: {
+            id: person.member,
+            organizationId,
+            userId: person.user,
+            role,
+            createdAt: new Date(),
+          },
+        });
+      }
+      bare = (
+        await db.maker.create({
+          data: { slug: `spend-bare-${stamp}`, name: "No team" },
+        })
+      ).id;
+      await db.generationJob.createMany({
+        data: [
+          spent(studios.a.maker, people.ownerA.member, 4_000),
+          spent(studios.a.maker, people.ana.member, 9_000),
+          spent(studios.a.maker, null, 800),
+          // Another studio's member id on A's work: never named by A.
+          spent(studios.a.maker, people.ownerB.member, 3_100),
+          spent(studios.b.maker, people.ownerB.member, 6_000),
+        ],
+      });
+    });
+
+    afterAll(async () => {
+      const makers = [studios.a.maker, studios.b.maker, bare];
+      await db.generationJob.deleteMany({ where: { makerId: { in: makers } } });
+      await db.maker.deleteMany({ where: { id: { in: makers } } });
+      await db.organization.deleteMany({
+        where: { id: { in: [studios.a.org, studios.b.org] } },
+      });
+      await db.user.deleteMany({
+        where: { id: { in: Object.values(people).map((p) => p.user) } },
+      });
+    });
+
+    const lines = (rows: { name: string; spentMicros: number }[]) =>
+      rows.map((r) => [r.name, r.spentMicros]);
+
+    it("the owner sees one line per person, highest first, named only from their own studio", async () => {
+      const rows = await monthSpend(as("a", "ownerA", "owner"));
+      expect(lines(rows)).toEqual([
+        ["Ana Ruiz", 9_000],
+        ["Olga Owner", 4_000],
+        ["Someone who left", 3_100],
+        ["No one named", 800],
+      ]);
+      expect(JSON.stringify(rows)).not.toContain("Bruno Other");
+    });
+
+    it("a member sees only their own line, as You", async () => {
+      expect(lines(await monthSpend(as("a", "ana", "member")))).toEqual([
+        ["You", 9_000],
+      ]);
+    });
+
+    it("each studio reads only its own rows and names only its own people", async () => {
+      expect(lines(await monthSpend(as("b", "ownerB", "owner")))).toEqual([
+        ["Bruno Other", 6_000],
+      ]);
+      expect(await spendByMember({ id: studios.b.maker })).toEqual([
+        { memberId: people.ownerB.member, spentMicros: 6_000 },
+      ]);
+      expect(
+        (await spendByMember({ id: studios.a.maker })).map(
+          (r) => r.spentMicros,
+        ),
+      ).toEqual([9_000, 4_000, 3_100, 800]);
+    });
+
+    it("a studio with no team reads no lines instead of failing Settings", async () => {
+      expect(await monthSpend({ id: bare, slug: "", name: "" })).toEqual([]);
+    });
+  },
+);

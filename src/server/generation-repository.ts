@@ -28,6 +28,7 @@ import {
 } from "@/domain/queue";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { noteBatchEnd } from "@/server/batch-end";
+import type { MakerRef } from "@/server/maker-repository";
 
 // Persistence for the background generation queue. Every closing write on a
 // job is guarded by its lease token, so a worker that lost its lease (another
@@ -129,6 +130,33 @@ async function spend(
     FROM "GenerationJob"
     WHERE "makerId" = ${makerId} AND "mode" = 'live'`;
   return { spentMicros: row.spent, reservedMicros: row.reserved };
+}
+
+export interface MemberSpend {
+  // Who started the work; null for a token, a script, or work from before
+  // Kiln recorded it.
+  memberId: string | null;
+  spentMicros: number;
+}
+
+// This calendar month's live spend per person, highest first, by the cap's
+// own rule (its rows add up to budget's spentMicros); a person with nothing
+// spent has no row. With `only`, the one person's sum alone: a member never
+// reads the others'.
+export async function spendByMember(
+  maker: MakerRef,
+  only?: { memberId: string },
+): Promise<MemberSpend[]> {
+  assertDatabaseUrl();
+  const rows = await db.$queryRaw<{ memberId: string | null; spent: number }[]>`
+    SELECT "memberId", COALESCE(SUM(${SPENT_THIS_MONTH}), 0)::float8 AS "spent"
+    FROM "GenerationJob"
+    WHERE "makerId" = ${maker.id} AND "mode" = 'live'
+      ${only ? Prisma.sql`AND "memberId" = ${only.memberId}` : Prisma.empty}
+    GROUP BY "memberId"
+    HAVING COALESCE(SUM(${SPENT_THIS_MONTH}), 0) > 0
+    ORDER BY "spent" DESC, "memberId" NULLS LAST`;
+  return rows.map((r) => ({ memberId: r.memberId, spentMicros: r.spent }));
 }
 
 export async function budget(makerId: string): Promise<Budget> {

@@ -3,6 +3,7 @@ import { APIError } from "better-auth/api";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { getAuth } from "@/server/auth";
+import { spendByMember } from "@/server/generation-repository";
 import type { CurrentMaker } from "@/server/maker-repository";
 
 // The studio's team: the people of the organization behind a maker, and the
@@ -40,13 +41,79 @@ const usable = (
 ): invitation is { status: string; expiresAt: Date } =>
   invitation?.status === "pending" && invitation.expiresAt > new Date();
 
-async function organizationOf(maker: CurrentMaker): Promise<string> {
+// The maker's organization, or null for a studio with no team yet.
+async function organizationIdOf(maker: CurrentMaker): Promise<string | null> {
   const row = await db.maker.findUnique({
     where: { id: maker.id },
     select: { organizationId: true },
   });
-  if (!row?.organizationId) throw new Error("This studio has no team yet.");
-  return row.organizationId;
+  return row?.organizationId ?? null;
+}
+
+async function organizationOf(maker: CurrentMaker): Promise<string> {
+  const organizationId = await organizationIdOf(maker);
+  if (!organizationId) throw new Error("This studio has no team yet.");
+  return organizationId;
+}
+
+// One line of the month's spend per person. `who`: a person of the studio,
+// the member reading their own line, someone no longer on the team, or work
+// no person started (a token, a script, from before Kiln recorded it).
+export interface MonthSpendLine {
+  memberId: string | null;
+  who: "person" | "you" | "left" | "none";
+  name: string;
+  // The name their mark is drawn from (initials); null for a faded mark.
+  markName: string | null;
+  spentMicros: number;
+}
+
+// This month's spend per person, for Settings. The owner reads every line,
+// named only from their own studio's people; a member reads only their own
+// (the others' sums are never read for them). No team: no lines.
+export async function monthSpend(
+  maker: CurrentMaker,
+): Promise<MonthSpendLine[]> {
+  const member = maker.member;
+  if (!member) return [];
+  const organizationId = await organizationIdOf(maker);
+  if (!organizationId) return [];
+  const names = async (ids: string[]) =>
+    new Map(
+      (
+        await db.member.findMany({
+          where: { organizationId, id: { in: ids } },
+          select: { id: true, user: { select: { name: true } } },
+        })
+      ).map((m) => [m.id, m.user.name]),
+    );
+  if (member.role !== "owner") {
+    const [own] = await spendByMember(maker, { memberId: member.id });
+    if (!own) return [];
+    const mine = (await names([member.id])).get(member.id) ?? null;
+    return [
+      {
+        memberId: member.id,
+        who: "you",
+        name: "You",
+        markName: mine,
+        spentMicros: own.spentMicros,
+      },
+    ];
+  }
+  const rows = await spendByMember(maker);
+  const known = await names(
+    rows.flatMap((r) => (r.memberId ? [r.memberId] : [])),
+  );
+  return rows.map((r): MonthSpendLine => {
+    const name = r.memberId ? known.get(r.memberId) : undefined;
+    if (name !== undefined) {
+      return { ...r, who: "person", name, markName: name };
+    }
+    return r.memberId
+      ? { ...r, who: "left", name: "Someone who left", markName: null }
+      : { ...r, who: "none", name: "No one named", markName: null };
+  });
 }
 
 export async function listTeam(maker: CurrentMaker): Promise<TeamView> {

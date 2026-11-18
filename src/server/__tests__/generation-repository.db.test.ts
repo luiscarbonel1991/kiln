@@ -807,6 +807,89 @@ describe.skipIf(!enabled)(
       }
     });
 
+    // The month's spend per person, by the cap's own rule; its rows
+    // add up to what the budget counts as spent.
+    it("the month's spend per person adds up to the budget's spent, by the cap's rule", async () => {
+      const solo = await db.maker.create({
+        data: {
+          slug: `${slug}-by-member`,
+          name: "Spend by member test",
+          monthlyCapCents: 100_000,
+        },
+      });
+      const now = new Date();
+      const lastMonth = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 15),
+      );
+      const row = (
+        memberId: string | null,
+        data: { status: string } & Record<string, unknown>,
+      ) => ({
+        makerId: solo.id,
+        memberId,
+        cardId: "direct",
+        mode: "live",
+        maxAttempts: 1,
+        estimateMicros: 5_000,
+        ...data,
+      });
+      try {
+        await db.generationJob.createMany({
+          data: [
+            // m1: a measured cost, and a call with no answer at its estimate.
+            row("m1", { status: "done", actualMicros: 7_000, finishedAt: now }),
+            row("m1", {
+              status: "failed",
+              callStartedAt: now,
+              finishedAt: now,
+            }),
+            // Not spent: a failure before the call, queued and running work,
+            // a mock run, last month.
+            row("m1", { status: "failed", finishedAt: now }),
+            row("m1", { status: "running", startedAt: now }),
+            row("m2", { status: "queued" }),
+            row("m1", {
+              status: "done",
+              mode: "mock",
+              actualMicros: 99_000,
+              finishedAt: now,
+            }),
+            row("m2", {
+              status: "done",
+              actualMicros: 50_000,
+              finishedAt: lastMonth,
+            }),
+            row("m2", { status: "done", actualMicros: 3_000, finishedAt: now }),
+            row(null, { status: "done", actualMicros: 800, finishedAt: now }),
+            // A free key check: a person with nothing spent has no row.
+            row("m3", { status: "done", actualMicros: 0, finishedAt: now }),
+          ],
+        });
+        const maker = { id: solo.id };
+        const [rows, budget] = await Promise.all([
+          repo.spendByMember(maker),
+          repo.budget(solo.id),
+        ]);
+        expect(rows).toEqual([
+          { memberId: "m1", spentMicros: 12_000 },
+          { memberId: "m2", spentMicros: 3_000 },
+          { memberId: null, spentMicros: 800 },
+        ]);
+        expect(rows.reduce((sum, r) => sum + r.spentMicros, 0)).toBe(
+          budget.spentMicros,
+        );
+        // A member's read is filtered in SQL to their own sum.
+        expect(await repo.spendByMember(maker, { memberId: "m2" })).toEqual([
+          { memberId: "m2", spentMicros: 3_000 },
+        ]);
+        // Another maker reads none of it.
+        expect(await repo.spendByMember({ id: "someone-else" })).toEqual([]);
+      } finally {
+        await db.generationJob.deleteMany({ where: { makerId: solo.id } });
+        await db.maker.delete({ where: { id: solo.id } });
+      }
+    });
+
     it("deleting the project keeps the month's spend", async () => {
       const spentBefore = (await repo.budget(makerId)).spentMicros;
       expect(spentBefore).toBeGreaterThan(0);
