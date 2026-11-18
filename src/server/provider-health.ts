@@ -115,6 +115,7 @@ export async function checkKey(
       provider,
       error: result.ok ? null : result.message,
       ...(result.ok ? { unlisted } : {}),
+      memberId: maker.member?.id ?? null,
     });
   }
   return result.ok ? { ...result, unlisted } : result;

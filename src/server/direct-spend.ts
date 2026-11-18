@@ -168,6 +168,7 @@ export async function openDirectCall<T extends { usage?: unknown }>(
     ...(priced.projectId ? { projectId: priced.projectId } : {}),
     ...(priced.sessionId ? { sessionId: priced.sessionId } : {}),
     ...(priced.route ? { route: priced.route } : {}),
+    memberId: maker.member?.id ?? null,
   });
   let callStarted = false;
   let closed = false;

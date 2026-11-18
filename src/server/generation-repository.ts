@@ -642,6 +642,8 @@ export async function reserveDirectCall(input: {
   route?: JobRoute;
   // The chat conversation whose paid tool made it.
   sessionId?: string;
+  // The person who made it; none for a token or a script.
+  memberId?: string | null;
 }): Promise<string> {
   assertDatabaseUrl();
   return db.$transaction(async (tx) => {
@@ -665,6 +667,7 @@ export async function reserveDirectCall(input: {
         makerId: input.makerId,
         projectId: input.projectId ?? null,
         sessionId: input.sessionId ?? null,
+        memberId: input.memberId ?? null,
         cardId: "direct",
         mode: "live",
         status: "running",
@@ -695,12 +698,15 @@ export async function recordKeyCheck(input: {
   error: string | null;
   // The offered models the provider no longer lists (domain unlistedModels).
   unlisted?: string[];
+  // The person who ran the check.
+  memberId?: string | null;
 }): Promise<void> {
   assertDatabaseUrl();
   const now = new Date();
   await db.generationJob.create({
     data: {
       makerId: input.makerId,
+      memberId: input.memberId ?? null,
       cardId: "key-check",
       mode: "live",
       status: input.error === null ? "done" : "failed",

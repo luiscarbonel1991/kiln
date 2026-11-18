@@ -44,11 +44,13 @@ describe("direct spend", () => {
       },
     );
     expect(result).toBe(video);
+    // Work with no person records none.
     expect(reserveDirectCall).toHaveBeenCalledWith({
       makerId: "maker-1",
       provider: "google",
       model: OMNI.model,
       estimateMicros: 821_200,
+      memberId: null,
     });
     expect(closeDirectCall).toHaveBeenCalledWith("row-1", {
       usage: undefined,
@@ -170,6 +172,32 @@ describe("direct spend", () => {
       usage,
       actualMicros: 1_500,
     });
+  });
+
+  // The person behind the session reaches the reserved row, for a
+  // call and for one opened around a stream (the chat's model steps).
+  it("a direct call by a person reserves its row in their name", async () => {
+    const session = {
+      id: "maker-1",
+      member: { id: "m1", userId: "u1", role: "member" as const },
+    };
+    await withDirectSpend(session, videoCall(OMNI, 8), async (beforeCall) => {
+      await beforeCall();
+      return video;
+    });
+    expect(reserveDirectCall).toHaveBeenCalledWith({
+      makerId: "maker-1",
+      provider: "google",
+      model: OMNI.model,
+      estimateMicros: 821_200,
+      memberId: "m1",
+    });
+    vi.clearAllMocks();
+    const luna = { provider: "openai" as const, model: "gpt-6-luna" };
+    await openDirectCall(session, textCall<string>(luna, "chatTurn"));
+    expect(reserveDirectCall).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "gpt-6-luna", memberId: "m1" }),
+    );
   });
 
   it("a stream that answered an HTTP error counts nothing", async () => {

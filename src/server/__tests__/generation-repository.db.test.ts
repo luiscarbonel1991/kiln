@@ -751,6 +751,62 @@ describe.skipIf(!enabled)(
       });
     });
 
+    // A direct call and a key check record the person who made
+    // them, or no one.
+    it("a direct call and a key check store who made them, or null", async () => {
+      const solo = await db.maker.create({
+        data: {
+          slug: `${slug}-direct-member`,
+          name: "Direct member test",
+          monthlyCapCents: 100,
+        },
+      });
+      try {
+        const reserve = (memberId?: string) =>
+          repo.reserveDirectCall({
+            makerId: solo.id,
+            provider: "openai",
+            model: "gpt-image-2",
+            estimateMicros: 1_000,
+            ...(memberId ? { memberId } : {}),
+          });
+        const theirs = await reserve("m1");
+        const nobody = await reserve();
+        await repo.recordKeyCheck({
+          makerId: solo.id,
+          provider: "google",
+          error: null,
+          memberId: "m1",
+        });
+        await repo.recordKeyCheck({
+          makerId: solo.id,
+          provider: "openai",
+          error: null,
+        });
+        const rows = await db.generationJob.findMany({
+          where: { makerId: solo.id },
+        });
+        const byId = new Map(rows.map((r) => [r.id, r.memberId]));
+        expect(byId.get(theirs)).toBe("m1");
+        expect(byId.get(nobody)).toBeNull();
+        const checks = rows.filter((r) => r.cardId === "key-check");
+        expect(
+          checks
+            .map((r) => [
+              (r.request as { provider: string }).provider,
+              r.memberId,
+            ])
+            .sort(),
+        ).toEqual([
+          ["google", "m1"],
+          ["openai", null],
+        ]);
+      } finally {
+        await db.generationJob.deleteMany({ where: { makerId: solo.id } });
+        await db.maker.delete({ where: { id: solo.id } });
+      }
+    });
+
     it("deleting the project keeps the month's spend", async () => {
       const spentBefore = (await repo.budget(makerId)).spentMicros;
       expect(spentBefore).toBeGreaterThan(0);
