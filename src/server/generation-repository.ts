@@ -99,23 +99,28 @@ const STOPPED = Prisma.sql`(
 
 type Tx = Prisma.TransactionClient;
 
+// What one job spent this calendar month (UTC), the cap's own rule: a
+// finished job counts its measured cost; without one, its estimate if its
+// paid call went out (the outcome is unknown), else nothing. Queued and
+// running work is not spent. Every read of the month's spend sums this, so
+// none can drift from the cap.
+const SPENT_THIS_MONTH = Prisma.sql`CASE
+  WHEN "status" IN ('done', 'failed', 'canceled')
+    AND "finishedAt" >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+  THEN COALESCE("actualMicros", CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)
+  ELSE 0 END`;
+
 // What this calendar month (UTC) has spent on live generations, and what live
 // jobs in the queue have reserved (their recorded cost, else their estimate);
 // a queued job whose project is gone reserves nothing (it is never claimed).
-// A finished job counts its measured cost; without one, its estimate if its
-// paid call went out (the outcome is unknown), else nothing. One statement, so
-// a job moving to done mid-read is counted exactly once.
+// One statement, so a job moving to done mid-read is counted exactly once.
 async function spend(
   tx: Tx | typeof db,
   makerId: string,
 ): Promise<{ spentMicros: number; reservedMicros: number }> {
   const [row] = await tx.$queryRaw<{ spent: number; reserved: number }[]>`
     SELECT
-      COALESCE(SUM(CASE
-        WHEN "status" IN ('done', 'failed', 'canceled')
-          AND "finishedAt" >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
-        THEN COALESCE("actualMicros", CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)
-        ELSE 0 END), 0)::float8 AS "spent",
+      COALESCE(SUM(${SPENT_THIS_MONTH}), 0)::float8 AS "spent",
       COALESCE(SUM(CASE
         WHEN "status" = 'running'
           OR ("status" = 'queued' AND "projectId" IS NOT NULL)
