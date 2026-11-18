@@ -206,6 +206,9 @@ model ToolCall {
   makerId   String
   tokenId   String?
   sessionId String?
+  // Who started it (a Member id), null for a token, a script or the worker.
+  // No foreign key: the spend and the log outlive a member who leaves.
+  memberId  String?
   tokenName String
   tool      String
   args      Json
@@ -370,6 +373,9 @@ model ShopWrite {
   productId     String?
   sent          Json
   by            String
+  // Who started it (a Member id), null for a token, a script or the worker.
+  // No foreign key: the spend and the log outlive a member who leaves.
+  memberId      String?
   status        String
   error         String?
   at            DateTime @default(now()) @db.Timestamptz(3)
@@ -561,6 +567,9 @@ model GenerationJob {
   // The chat conversation whose paid tool started it (generate, draw,
   // write_listing, review_product): what the chat says that work spent.
   sessionId      String?
+  // Who started it (a Member id), null for a token, a script or the worker.
+  // No foreign key: the spend and the log outlive a member who leaves.
+  memberId       String?
   // What Kiln read in its image before it landed (domain TakeCheck): text,
   // letterforms and the scale asked for. Free and local; null for a video,
   // a direct call, or a take from before the check.
