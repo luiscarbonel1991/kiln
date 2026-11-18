@@ -62,6 +62,10 @@ vi.mock("@/server/generation-repository", () => {
     }),
   };
 });
+vi.mock("@/server/month-limit", async (original) => ({
+  ...(await original<typeof import("@/server/month-limit")>()),
+  whomToAsk: async () => "Ana",
+}));
 vi.mock("@/server/project-frames", () => ({
   framedProjects: async () => [],
   projectFrames: async () => null,
@@ -207,6 +211,37 @@ describe("quote", () => {
       input: { project: "p1", frames: ["etsy.hero", "etsy.lifestyle"] },
       maxMicros: 140_000,
     });
+  });
+
+  // A member of the studio (a chat turn of theirs) reads whether it fits and
+  // whom to ask, never what is left; the owner reads it as a token does.
+  it("tells a member whether it fits, never what is left of the cap", async () => {
+    const chat = (role: "owner" | "member") => ({
+      ...SPENDER,
+      tokenId: null,
+      maker: { id: "test", member: { id: "m1", userId: "u1", role } },
+    });
+    const asMember = await call(
+      "quote",
+      { action: "generate", project: "p1" },
+      chat("member"),
+    );
+    expect(asMember).toMatchObject({
+      ok: true,
+      output: { data: { fitsCap: false, ask: "Ana" } },
+    });
+    const data = asMember.ok ? asMember.output.data : {};
+    expect(data).not.toHaveProperty("capLeftUsd");
+    const asOwner = await call(
+      "quote",
+      { action: "generate", project: "p1" },
+      chat("owner"),
+    );
+    expect(asOwner).toMatchObject({
+      ok: true,
+      output: { data: { capLeftUsd: 0.1, fitsCap: false } },
+    });
+    expect(asOwner.ok ? asOwner.output.data : {}).not.toHaveProperty("ask");
   });
 
   it("names a video line by its resolution", async () => {

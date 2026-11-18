@@ -14,6 +14,7 @@ import {
 import { budget, QueueRefusal } from "@/server/generation-repository";
 import { listingTarget, writeProjectListing } from "@/server/listing-write";
 import type { MakerRef } from "@/server/maker-repository";
+import { readsStudioAmounts, whomToAsk } from "@/server/month-limit";
 import { findProduct, getProduct } from "@/server/product-repository";
 import { waitingProjectFrames } from "@/server/project-frames";
 import {
@@ -305,7 +306,7 @@ async function priceOf(
 export const quote = defineTool({
   name: "quote",
   title: "Quote a paid task",
-  description: `Price a paid task before it runs, for free: the models it runs on (and may fall back to), what it typically costs and the most it can cost, and what is left of the month's cap. Answers a quote id that generate, draw, write_listing or review_product take; it runs exactly what was quoted, once, within ${QUOTE_MINUTES} minutes, and only for a token the maker lets spend (canSpend says whether this one may).`,
+  description: `Price a paid task before it runs, for free: the models it runs on (and may fall back to), what it typically costs and the most it can cost, and whether it fits the month's cap (fitsCap): the owner and access tokens also read what is left (capLeftUsd), a member of the studio reads instead whom to ask (ask) about the cap. Answers a quote id that generate, draw, write_listing or review_product take; it runs exactly what was quoted, once, within ${QUOTE_MINUTES} minutes, and only for a token the maker lets spend (canSpend says whether this one may).`,
   input: QuoteInput,
   // It stores the quote and nothing the maker sees: free, and safe to ask.
   hints: { readOnly: true },
@@ -333,7 +334,10 @@ export const quote = defineTool({
         typicalUsd: usd(priced.typicalMicros),
         atMostUsd: usd(priced.maxMicros),
         lines: priced.lines,
-        capLeftUsd: left === null ? null : usd(left),
+        // A member never reads the studio's amounts (Luis, 2026-11-17).
+        ...(readsStudioAmounts(maker)
+          ? { capLeftUsd: left === null ? null : usd(left) }
+          : { ask: await whomToAsk(maker) }),
         fitsCap: left === null || priced.maxMicros <= left,
         expiresAt: made.expiresAt.toISOString(),
         canSpend: ctx.canSpend,
