@@ -76,6 +76,8 @@ export interface ClaimedJob {
   request: unknown;
   route: unknown;
   estimateMicros: number;
+  // Who queued it; the worker still runs it as its maker.
+  memberId: string | null;
 }
 
 export interface Budget {
@@ -332,6 +334,7 @@ export async function claimJobs(
     request: j.request,
     route: j.route,
     estimateMicros: j.estimateMicros,
+    memberId: j.memberId,
   }));
 }
 

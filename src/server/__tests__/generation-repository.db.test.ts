@@ -34,7 +34,7 @@ describe.skipIf(!enabled)(
     const KEYS = [
       ...["a", "b", "c", "d", "e", "f", "dup", "cx", "cy", "sx", "sy"],
       ...["ra", "rb", "rc", "sa", "sb", "sc"],
-      ...["ma", "mb", "mn"],
+      ...["ma", "mb", "mn", "mr"],
     ];
     const plan = {
       destinations: [
@@ -698,6 +698,55 @@ describe.skipIf(!enabled)(
       expect(unnamed.memberId).toBeNull();
       await db.generationJob.updateMany({
         where: { batchId: { in: [byPerson.batchId, byNoOne.batchId] } },
+        data: { status: "canceled", finishedAt: new Date() },
+      });
+    });
+
+    // The worker knows whose job it runs, across a retry and a route move.
+    it("a claimed job carries who queued it, kept across a retry and a move down its route", async () => {
+      const mode = "member-claim" as never;
+      const { batchId } = await repo.enqueueBatch({
+        ...base(),
+        mode,
+        memberId: "m1",
+        jobs: [job("mr", 1)],
+      });
+      const [first] = await repo.claimJobs(mode, 1, 60);
+      expect(first).toMatchObject({ cardId: "q.mr", memberId: "m1" });
+
+      expect(
+        await repo.failJob(first.id, first.leaseToken, "503", {
+          retry: true,
+          mayBeCharged: false,
+        }),
+      ).toBe(true);
+      // Skip the retry's backoff.
+      await db.generationJob.update({
+        where: { id: first.id },
+        data: { availableAt: new Date(Date.now() - 1000) },
+      });
+      const [retried] = await repo.claimJobs(mode, 1, 60);
+      expect(retried).toMatchObject({
+        id: first.id,
+        attempt: 2,
+        memberId: "m1",
+      });
+
+      const flash = {
+        provider: "google" as const,
+        model: "gemini-3.1-flash-image",
+      };
+      expect(
+        await repo.fallBackJob(
+          { id: retried.id, leaseToken: retried.leaseToken },
+          { to: flash, rest: [], reason: "OpenAI answered 503" },
+          () => true,
+        ),
+      ).toBe(true);
+      const [moved] = await repo.claimJobs(mode, 1, 60);
+      expect(moved).toMatchObject({ id: first.id, memberId: "m1" });
+      await db.generationJob.updateMany({
+        where: { batchId },
         data: { status: "canceled", finishedAt: new Date() },
       });
     });
