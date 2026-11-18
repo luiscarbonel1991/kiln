@@ -512,6 +512,73 @@ describe.skipIf(!enabled)("Etsy drafts (database)", async () => {
     ).rejects.toThrow("not on this draft");
   });
 
+  // Every write to the shop records the person it ran for; a write
+  // with the maker's id alone (a token, a script) records no one. A failed
+  // create sent again is recorded in the name of whoever sent it again.
+  it("records each write to the shop with the person who sent it, or no one", async () => {
+    const maker = await getCurrentMaker();
+    const person = {
+      ...maker,
+      member: { id: "m-shop", userId: "u-shop", role: "member" as const },
+    };
+    const settings = DraftSettings.parse({
+      taxonomyId: 1063,
+      quantity: 10,
+      shippingProfileId: 7001,
+      readinessStateId: 8001,
+    });
+    let refusals = 1;
+    failing = (method, path) =>
+      method === "POST" && path.endsWith("/listings") && refusals-- > 0
+        ? new Response(JSON.stringify({ error: "Try again." }), {
+            status: 400,
+          })
+        : undefined;
+    const send = (by: { id: string }) =>
+      drafts.createDraftFromProject(by, {
+        projectId: PROJECT,
+        destinationId: "etsy",
+        settings,
+        requestKey: "key-member",
+        by: "Board",
+      });
+    await expect(send({ id: maker.id })).rejects.toThrow("Etsy said");
+    const made = await send(person);
+    await drafts.updateDraft(person, PLAIN, { title: "By a person" }, "Chat");
+    await drafts.updateDraft(maker, PLAIN, { price: 21 }, "Drafts page");
+    await drafts.addDraftPhoto(
+      person,
+      PLAIN,
+      {
+        bytes: new Uint8Array([255, 216]),
+        mime: "image/jpeg",
+        filename: "c.jpg",
+      },
+      "Drafts page",
+    );
+    const [first] = (await drafts.draftDetail(maker, PLAIN)).images;
+    await drafts.removeDraftPhoto(maker, PLAIN, first.id, "Drafts page");
+    const rows = await db.shopWrite.findMany({
+      where: { makerId: maker.id },
+      orderBy: { at: "asc" },
+    });
+    expect(
+      rows.map((r) => [
+        r.action,
+        r.listingId === String(made.listingId) ? "made" : "plain",
+        r.by,
+        r.memberId,
+      ]),
+    ).toEqual([
+      ["create", "made", "Board", "m-shop"],
+      ["photos", "made", "Board", "m-shop"],
+      ["edit", "plain", "Chat", "m-shop"],
+      ["price", "plain", "Drafts page", null],
+      ["photo-add", "plain", "Drafts page", "m-shop"],
+      ["photo-remove", "plain", "Drafts page", null],
+    ]);
+  });
+
   it("never sent a listing's state in any of these writes", async () => {
     await drafts.updateDraft(
       maker,

@@ -146,8 +146,9 @@ export interface ShopWriteView {
   sent: Record<string, unknown>;
 }
 
-async function logWrite(data: {
-  makerId: string;
+// A write is logged for the maker ref it ran for, and its person when it
+// has one (a session); a token or a script records none.
+type ShopWriteData = {
   shopId: number;
   listingId?: number;
   action: WriteAction;
@@ -159,10 +160,14 @@ async function logWrite(data: {
   projectId?: string;
   destinationId?: string;
   productId?: string;
-}) {
+};
+
+async function logWrite(maker: MakerRef, data: ShopWriteData) {
   return db.shopWrite.create({
     data: {
       ...data,
+      makerId: maker.id,
+      memberId: maker.member?.id ?? null,
       platform: PLATFORM,
       shopId: String(data.shopId),
       listingId: data.listingId === undefined ? null : String(data.listingId),
@@ -175,7 +180,7 @@ async function logWrite(data: {
 // or unanswered (it may have). A failure reaches the maker in words.
 async function loggedWrite(
   etsy: ConnectedEtsy,
-  makerId: string,
+  maker: MakerRef,
   listingId: number,
   write: {
     action: WriteAction;
@@ -184,18 +189,18 @@ async function loggedWrite(
   },
   run: () => Promise<unknown>,
 ): Promise<void> {
-  const row = { makerId, shopId: etsy.shopId, listingId, ...write };
+  const row = { shopId: etsy.shopId, listingId, ...write };
   try {
     await run();
   } catch (error) {
-    await logWrite({
+    await logWrite(maker, {
       ...row,
       status: refusedByEtsy(error) ? "failed" : "unanswered",
       error: said(error),
     });
     throw new DraftRefusal(said(error));
   }
-  await logWrite({ ...row, status: "done" });
+  await logWrite(maker, { ...row, status: "done" });
 }
 
 const viewOf = (row: {
@@ -723,8 +728,7 @@ export async function createDraftFromProject(
   // The key is claimed before Etsy is called: the same preview makes one
   // draft, however often it is sent. A send Etsy refused (or that never
   // reached it) made nothing, so its key may be sent again.
-  const row = await claimKey({
-    makerId: maker.id,
+  const row = await claimKey(maker, {
     shopId: etsy.shopId,
     action: "create",
     by: input.by,
@@ -763,8 +767,7 @@ export async function createDraftFromProject(
     .filter((f) => f.meta.kind !== "video" && f.meta.photo !== null)
     .slice(0, ETSY_MAX_PHOTOS);
   const missing = await uploadPhotos(etsy, made.listing_id, photos, 1);
-  await logWrite({
-    makerId: maker.id,
+  await logWrite(maker, {
     shopId: etsy.shopId,
     listingId: made.listing_id,
     action: "photos",
@@ -794,10 +797,11 @@ export async function createDraftFromProject(
 }
 
 async function claimKey(
-  write: Parameters<typeof logWrite>[0] & { requestKey: string },
+  maker: MakerRef,
+  write: ShopWriteData & { requestKey: string },
 ): Promise<{ id: string }> {
   try {
-    return await logWrite(write);
+    return await logWrite(maker, write);
   } catch (error) {
     if (
       !(error instanceof Prisma.PrismaClientKnownRequestError) ||
@@ -808,19 +812,21 @@ async function claimKey(
   }
   const retried = await db.shopWrite.updateMany({
     where: {
-      makerId: write.makerId,
+      makerId: maker.id,
       requestKey: write.requestKey,
       status: "failed",
     },
+    // Like `sent` and `at`, the person describes the attempt that runs.
     data: {
       status: "pending",
       error: null,
       at: new Date(),
       sent: write.sent as Prisma.InputJsonValue,
+      memberId: maker.member?.id ?? null,
     },
   });
   const row = await db.shopWrite.findFirst({
-    where: { makerId: write.makerId, requestKey: write.requestKey },
+    where: { makerId: maker.id, requestKey: write.requestKey },
     select: { id: true },
   });
   if (retried.count === 0 || !row) {
@@ -894,8 +900,7 @@ export async function sendMissingPhotos(
     photos,
     (listing.images?.length ?? 0) + 1,
   );
-  await logWrite({
-    makerId: maker.id,
+  await logWrite(maker, {
     shopId: etsy.shopId,
     listingId,
     action: "photos",
@@ -977,7 +982,7 @@ export async function updateDraft(
     action: WriteAction,
     sent: Record<string, unknown>,
     run: () => Promise<unknown>,
-  ) => loggedWrite(etsy, maker.id, listingId, { action, by, sent }, run);
+  ) => loggedWrite(etsy, maker, listingId, { action, by, sent }, run);
   // Only what differs is sent.
   const changed: DraftChange = Object.fromEntries(
     Object.entries(text).filter(([f]) => changes.some((c) => c.field === f)),
@@ -1027,7 +1032,7 @@ export async function addDraftPhoto(
   }
   await loggedWrite(
     etsy,
-    maker.id,
+    maker,
     listingId,
     {
       action: "photo-add",
@@ -1055,7 +1060,7 @@ export async function removeDraftPhoto(
   }
   await loggedWrite(
     etsy,
-    maker.id,
+    maker,
     listingId,
     { action: "photo-remove", by, sent: { imageId } },
     () => etsy.drafts.removePhoto(etsy.shopId, listingId, imageId),
