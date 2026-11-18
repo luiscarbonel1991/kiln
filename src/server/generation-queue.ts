@@ -68,7 +68,7 @@ import {
 import { createWorker, type Worker } from "@/server/generation-worker";
 import type { MakerRef } from "@/server/maker-repository";
 import { getMakerRoutes } from "@/server/maker-repository";
-import { inMembersWords } from "@/server/month-limit";
+import { fitsThisMonth, inMembersWords } from "@/server/month-limit";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
 import { withMakerKeys } from "@/server/provider-keys";
 import { checkProjectTake } from "@/server/qc/project-take";
@@ -477,6 +477,26 @@ export async function estimateProjectCards(
       return look && count > 0 ? { label: look.label, count } : null;
     })(),
   };
+}
+
+// Whether a batch of these cards would fit this month's limit, priced as
+// enqueueProjectCards prices it (each card's dearest model): a member's yes
+// or no before the click, from the cards' saved state, never an amount the
+// browser sends. Only live work counts against the limit.
+export async function fitsProjectCards(
+  maker: MakerRef,
+  input: { projectId: string; cardIds: string[] },
+): Promise<boolean> {
+  if (providerMode() !== "live") return true;
+  const { cards } = await estimateProjectCards(
+    maker,
+    input.projectId,
+    input.cardIds,
+  );
+  return fitsThisMonth(
+    maker,
+    cards.reduce((total, c) => total + c.maxMicros, 0),
+  );
 }
 
 // Queue a planned project's cards, or a design's drawings (an agent's draw:

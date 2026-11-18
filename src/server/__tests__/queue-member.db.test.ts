@@ -33,7 +33,8 @@ const enabled =
 describe.skipIf(!enabled)("a batch queued by a person (database)", async () => {
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
-  const { enqueueProjectCards } = await import("@/server/generation-queue");
+  const { enqueueProjectCards, estimateProjectCards, fitsProjectCards } =
+    await import("@/server/generation-queue");
   mode.current = "queue-member";
 
   const slug = `queue-member-${Date.now()}`;
@@ -114,6 +115,37 @@ describe.skipIf(!enabled)("a batch queued by a person (database)", async () => {
         data: { monthlyCapCents: 100 },
       });
     }
+  });
+
+  // The yes or no a member reads before the click, from the card's own
+  // estimate: within a $1 cap it fits, under a $0 cap it does not.
+  it("a batch fits this month's limit by its own estimate", async () => {
+    const member = {
+      id: makerId,
+      member: { id: "m1", userId: "u1", role: "member" as const },
+    };
+    const ask = { projectId, cardIds: ["recipe-line-art-2"] };
+    mode.current = "live";
+    try {
+      const { cards } = await estimateProjectCards(member, projectId, [
+        "recipe-line-art-2",
+      ]);
+      expect(cards[0].maxMicros).toBeGreaterThan(0);
+      expect(await fitsProjectCards(member, ask)).toBe(true);
+      await db.maker.update({
+        where: { id: makerId },
+        data: { monthlyCapCents: 0 },
+      });
+      expect(await fitsProjectCards(member, ask)).toBe(false);
+    } finally {
+      mode.current = "queue-member";
+      await db.maker.update({
+        where: { id: makerId },
+        data: { monthlyCapCents: 100 },
+      });
+    }
+    // Work that is not live counts nothing against the limit.
+    expect(await fitsProjectCards(member, ask)).toBe(true);
   });
 
   // A token, a script or the worker hands down { id } alone.
