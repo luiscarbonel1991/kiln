@@ -45,14 +45,7 @@ export const enqueueGenerationAction = makerAction(
   },
 );
 
-const Fit = z.object({
-  projectId: z.string().min(1),
-  cardIds: z
-    .array(z.string().min(1))
-    .min(1)
-    .max(50)
-    .transform((ids) => [...new Set(ids)]),
-});
+const Fit = Enqueue.pick({ projectId: true, cardIds: true });
 
 // Whether these cards would fit this month's limit, for a member, who never
 // reads the amounts: the server prices them from the saved project, so the
