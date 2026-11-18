@@ -299,7 +299,7 @@ export function GenerationPanel({
               className={cn(
                 // A member's answer may take two lines at 390 px: the row keeps
                 // them from "checking" on, so the dialog does not move.
-                member && "min-h-[2lh]",
+                member && "min-h-[2lh] sm:min-h-0",
                 member && fit !== "fits" && fit !== "checking"
                   ? "text-fail"
                   : "text-foreground",
