@@ -65,12 +65,15 @@ export interface MonthSpendLine {
   name: string;
   // The name their mark is drawn from (initials); null for a faded mark.
   markName: string | null;
+  // The reader's own line (the owner's reads "<name> · you").
+  you: boolean;
   spentMicros: number;
 }
 
 // This month's spend per person, for Settings. The owner reads every line,
-// named only from their own studio's people; a member reads only their own
-// (the others' sums are never read for them). No team: no lines.
+// named only from their own studio's people; a member reads only their own,
+// at $0 when they spent nothing (the others' sums are never read for them).
+// No team: no lines.
 export async function monthSpend(
   maker: CurrentMaker,
 ): Promise<MonthSpendLine[]> {
@@ -88,16 +91,18 @@ export async function monthSpend(
       ).map((m) => [m.id, m.user.name]),
     );
   if (member.role !== "owner") {
-    const [own] = await spendByMember(maker, { memberId: member.id });
-    if (!own) return [];
-    const mine = (await names([member.id])).get(member.id) ?? null;
+    const [[own], mine] = await Promise.all([
+      spendByMember(maker, { memberId: member.id }),
+      names([member.id]),
+    ]);
     return [
       {
         memberId: member.id,
         who: "you",
         name: "You",
-        markName: mine,
-        spentMicros: own.spentMicros,
+        markName: mine.get(member.id) ?? null,
+        you: true,
+        spentMicros: own?.spentMicros ?? 0,
       },
     ];
   }
@@ -107,12 +112,13 @@ export async function monthSpend(
   );
   return rows.map((r): MonthSpendLine => {
     const name = r.memberId ? known.get(r.memberId) : undefined;
+    const you = r.memberId === member.id;
     if (name !== undefined) {
-      return { ...r, who: "person", name, markName: name };
+      return { ...r, who: "person", name, markName: name, you };
     }
     return r.memberId
-      ? { ...r, who: "left", name: "Someone who left", markName: null }
-      : { ...r, who: "none", name: "No one named", markName: null };
+      ? { ...r, who: "left", name: "Someone who left", markName: null, you }
+      : { ...r, who: "none", name: "No one named", markName: null, you };
   });
 }
 

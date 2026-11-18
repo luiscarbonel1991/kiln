@@ -4,6 +4,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { AccessTokens } from "@/components/settings/access-tokens";
 import { KeyCheck } from "@/components/settings/key-check";
 import { Lessons } from "@/components/settings/lessons";
+import { MonthSpend } from "@/components/settings/month-spend";
 import { ProviderKey } from "@/components/settings/provider-key";
 import { RoutesForm } from "@/components/settings/routes-form";
 import { SceneLookSwitch } from "@/components/settings/scene-look-switch";
@@ -29,7 +30,7 @@ import {
 } from "@/server/provider-keys";
 import { sceneLookSetup } from "@/server/scene-look";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
-import { listTeam } from "@/server/team";
+import { listTeam, monthSpend } from "@/server/team";
 import { recentToolCalls } from "@/server/tool-calls";
 
 const money = (usd: number) => `$${usd.toFixed(2)}`;
@@ -60,7 +61,8 @@ function keyLine(state: ProviderKeyState | undefined, owner: boolean): string {
 // Settings (per request: it reads the maker's routes and the providers'
 // health). Models: a route per role, Kiln's proposal until saved. Providers: each key and its last
 // calls, read for free, and a free key check on a click (the provider lists
-// its models; no paid call). The month's cap, read only.
+// its models; no paid call). The month's cap, read only: the owner sees the
+// studio's total and each person's spend, a member only their own.
 // Lessons: what Kiln proposes it learned of the maker's taste, and what they
 // kept. Shops: the Etsy connection. Access tokens: for the HTTP API (README
 // "HTTP API").
@@ -69,20 +71,31 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
   const maker = hasDatabase() ? current : null;
   // The team, the keys and the access tokens are the owner's to manage.
   const owner = current.member?.role === "owner";
-  const [setup, health, keyStates, month, tokens, shop, calls, lessons, team] =
-    await Promise.all([
-      getMakerModelSetup(current),
-      providerHealth(maker?.id ?? null),
-      maker ? providerKeyStates(maker.id) : Promise.resolve([]),
-      maker ? budget(maker.id) : Promise.resolve(null),
-      maker && owner ? listAccessTokens(maker) : Promise.resolve(null),
-      maker ? shopConnection(maker) : Promise.resolve(null),
-      maker ? recentToolCalls(maker) : Promise.resolve([]),
-      maker
-        ? listLessons(maker, { status: ["proposed", "kept"] })
-        : Promise.resolve(null),
-      maker && owner ? listTeam(maker) : Promise.resolve(null),
-    ]);
+  const [
+    setup,
+    health,
+    keyStates,
+    month,
+    spenders,
+    tokens,
+    shop,
+    calls,
+    lessons,
+    team,
+  ] = await Promise.all([
+    getMakerModelSetup(current),
+    providerHealth(maker?.id ?? null),
+    maker ? providerKeyStates(maker.id) : Promise.resolve([]),
+    maker && owner ? budget(maker.id) : Promise.resolve(null),
+    maker ? monthSpend(maker) : Promise.resolve([]),
+    maker && owner ? listAccessTokens(maker) : Promise.resolve(null),
+    maker ? shopConnection(maker) : Promise.resolve(null),
+    maker ? recentToolCalls(maker) : Promise.resolve([]),
+    maker
+      ? listLessons(maker, { status: ["proposed", "kept"] })
+      : Promise.resolve(null),
+    maker && owner ? listTeam(maker) : Promise.resolve(null),
+  ]);
   const mode = providerMode();
   const look = maker ? await sceneLookSetup(maker) : null;
   // A mock run calls nothing, so every provider counts as keyed.
@@ -292,20 +305,34 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
           </section>
         ) : null}
 
-        {month ? (
-          <section className="rounded-card bg-card p-6 shadow-card">
+        {month || spenders.length > 0 ? (
+          <section
+            id="month"
+            className="rounded-card bg-card p-6 shadow-card"
+            data-testid="month"
+          >
             <h2
               className="font-serif text-xl text-foreground"
               style={{ fontVariationSettings: "'opsz' 40" }}
             >
               This month
             </h2>
-            <p className="mt-1 font-sans text-[0.8125rem] text-on-surface-mid">
-              {money(fromMicros(month.spentMicros))} spent +{" "}
-              {money(fromMicros(month.reservedMicros))} queued of{" "}
-              {money(fromMicros(month.capMicros))}, one cap for both providers
-              (calendar month, UTC).
-            </p>
+            {month ? (
+              <p
+                className="mt-1 font-sans text-[0.8125rem] text-on-surface-mid"
+                data-testid="month-studio"
+              >
+                {money(fromMicros(month.spentMicros))} spent +{" "}
+                {money(fromMicros(month.reservedMicros))} queued of{" "}
+                {money(fromMicros(month.capMicros))}, one cap for both providers
+                (calendar month, UTC).
+              </p>
+            ) : (
+              <p className="mt-1 font-sans text-[0.8125rem] text-on-surface-mid">
+                What your work cost this month (calendar month, UTC).
+              </p>
+            )}
+            <MonthSpend lines={spenders} />
           </section>
         ) : null}
 

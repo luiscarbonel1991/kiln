@@ -149,9 +149,9 @@ describe.skipIf(!enabled)(
   },
 );
 
-// The month's spend per person.
-// The owner sees one line per person, named only from their own studio; a
-// member sees only their own line. Two studios, each with its own people.
+// The month's spend per person: the owner sees one line per person, named
+// only from their own studio, their own marked as theirs; a member sees only
+// their own line. Three studios, each with its own people; C has no work.
 describe.skipIf(!enabled)(
   "the month's spend per person (database)",
   async () => {
@@ -163,16 +163,18 @@ describe.skipIf(!enabled)(
     const studios = {
       a: { org: randomUUID(), maker: "" },
       b: { org: randomUUID(), maker: "" },
+      c: { org: randomUUID(), maker: "" },
     };
     const people = {
       ownerA: { member: randomUUID(), user: randomUUID(), name: "Olga Owner" },
       ana: { member: randomUUID(), user: randomUUID(), name: "Ana Ruiz" },
       ownerB: { member: randomUUID(), user: randomUUID(), name: "Bruno Other" },
+      cleo: { member: randomUUID(), user: randomUUID(), name: "Cleo New" },
     };
     let bare = "";
 
     const as = (
-      studio: "a" | "b",
+      studio: keyof typeof studios,
       person: keyof typeof people,
       role: "owner" | "member",
     ) => ({
@@ -221,6 +223,7 @@ describe.skipIf(!enabled)(
         [people.ownerA, studios.a.org, "owner"],
         [people.ana, studios.a.org, "member"],
         [people.ownerB, studios.b.org, "owner"],
+        [people.cleo, studios.c.org, "member"],
       ] as const;
       for (const [person, organizationId, role] of join) {
         await db.user.create({
@@ -258,11 +261,11 @@ describe.skipIf(!enabled)(
     });
 
     afterAll(async () => {
-      const makers = [studios.a.maker, studios.b.maker, bare];
+      const makers = [...Object.values(studios).map((s) => s.maker), bare];
       await db.generationJob.deleteMany({ where: { makerId: { in: makers } } });
       await db.maker.deleteMany({ where: { id: { in: makers } } });
       await db.organization.deleteMany({
-        where: { id: { in: [studios.a.org, studios.b.org] } },
+        where: { id: { in: Object.values(studios).map((s) => s.org) } },
       });
       await db.user.deleteMany({
         where: { id: { in: Object.values(people).map((p) => p.user) } },
@@ -281,11 +284,21 @@ describe.skipIf(!enabled)(
         ["No one named", 800],
       ]);
       expect(JSON.stringify(rows)).not.toContain("Bruno Other");
+      // Their own line reads "Olga Owner · you".
+      expect(rows.filter((r) => r.you).map((r) => r.name)).toEqual([
+        "Olga Owner",
+      ]);
     });
 
     it("a member sees only their own line, as You", async () => {
       expect(lines(await monthSpend(as("a", "ana", "member")))).toEqual([
         ["You", 9_000],
+      ]);
+    });
+
+    it("a member who spent nothing sees their own line at $0", async () => {
+      expect(lines(await monthSpend(as("c", "cleo", "member")))).toEqual([
+        ["You", 0],
       ]);
     });
 
