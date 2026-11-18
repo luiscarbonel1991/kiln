@@ -37,8 +37,8 @@ export function MonthSpend({ lines }: { lines: MonthSpendLine[] }) {
       </ul>
       {lines.some((line) => line.who === "none") ? (
         <p className="font-sans text-[0.75rem] leading-snug text-on-surface-mid">
-          Access tokens, scripts, and work from before Kiln recorded who started
-          it.
+          Not started by a person: access tokens, scripts, work Kiln did on its
+          own, and work from before Kiln recorded who started it.
         </p>
       ) : null}
     </div>

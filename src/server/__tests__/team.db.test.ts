@@ -281,7 +281,7 @@ describe.skipIf(!enabled)(
         ["Ana Ruiz", 9_000],
         ["Olga Owner", 4_000],
         ["Someone who left", 3_100],
-        ["No one named", 800],
+        ["Not started by a person", 800],
       ]);
       expect(JSON.stringify(rows)).not.toContain("Bruno Other");
       // Their own line reads "Olga Owner · you".

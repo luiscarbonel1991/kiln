@@ -133,8 +133,8 @@ async function spend(
 }
 
 export interface MemberSpend {
-  // Who started the work; null for a token, a script, or work from before
-  // Kiln recorded it.
+  // Who started the work; null for a token, a script, work Kiln did on its
+  // own, or work from before Kiln recorded it.
   memberId: string | null;
   spentMicros: number;
 }

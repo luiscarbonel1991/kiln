@@ -58,7 +58,8 @@ async function organizationOf(maker: CurrentMaker): Promise<string> {
 
 // One line of the month's spend per person. `who`: a person of the studio,
 // the member reading their own line, someone no longer on the team, or work
-// no person started (a token, a script, from before Kiln recorded it).
+// no person started (a token, a script, work Kiln did on its own, or from
+// before Kiln recorded it).
 export interface MonthSpendLine {
   memberId: string | null;
   who: "person" | "you" | "left" | "none";
@@ -118,7 +119,13 @@ export async function monthSpend(
     }
     return r.memberId
       ? { ...r, who: "left", name: "Someone who left", markName: null, you }
-      : { ...r, who: "none", name: "No one named", markName: null, you };
+      : {
+          ...r,
+          who: "none",
+          name: "Not started by a person",
+          markName: null,
+          you,
+        };
   });
 }
 
