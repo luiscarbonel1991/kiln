@@ -435,6 +435,7 @@ export function ProjectBoard({
               : limit.whose === "studio"
                 ? {
                     line: `${money(limit.spentMicros + limit.reservedMicros)} of ${money(limit.capMicros)} used`,
+                    studio: limit,
                   }
                 : { ask: limit.ask };
           return (
