@@ -46,10 +46,11 @@ export interface CurrentMaker {
 }
 
 // The maker a piece of work is for, handed in by whoever knows it: the
-// session or token behind a request, or a job's own maker in the worker.
+// session or token behind a request, or a job's own maker in the worker;
+// and, for a session, the person working, so what they start records them.
 // An object rather than a bare id, so it cannot be passed where another id
 // was meant.
-export type MakerRef = Pick<CurrentMaker, "id">;
+export type MakerRef = Pick<CurrentMaker, "id" | "member">;
 
 // Per-process cache of slug -> maker. The maker row is created once and never
 // renamed by its slug, so the cache only saves one upsert per call.
