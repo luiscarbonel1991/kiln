@@ -84,7 +84,8 @@ export interface MemberRef {
   role: MemberRole;
 }
 
-const roleOf = (role: string): MemberRole =>
+// Better Auth keeps a member's roles comma-separated ("owner,admin").
+export const roleOf = (role: string): MemberRole =>
   role.split(",").includes("owner") ? "owner" : "member";
 
 // The maker a signed-in person works for, and their membership: their

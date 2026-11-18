@@ -20,6 +20,8 @@ describe.skipIf(!enabled)(
     const organizationId = randomUUID();
     const ownerUserId = randomUUID();
     const ownerMemberId = randomUUID();
+    // A role that only contains the word: never taken for the owner.
+    const coUserId = randomUUID();
     let makerId = "";
     let loneId = "";
 
@@ -50,6 +52,22 @@ describe.skipIf(!enabled)(
           name: "Limit Studio",
           slug: `limit-${stamp}`,
           createdAt: new Date(),
+        },
+      });
+      await db.user.create({
+        data: {
+          id: coUserId,
+          name: "Cora Diaz",
+          email: `limit-co-${stamp}@kiln.test`,
+        },
+      });
+      await db.member.create({
+        data: {
+          id: randomUUID(),
+          organizationId,
+          userId: coUserId,
+          role: "co-owner",
+          createdAt: new Date(Date.now() - 86_400_000),
         },
       });
       await db.member.create({
@@ -114,7 +132,9 @@ describe.skipIf(!enabled)(
       });
       await db.maker.deleteMany({ where: { id: { in: [makerId, loneId] } } });
       await db.organization.deleteMany({ where: { id: organizationId } });
-      await db.user.deleteMany({ where: { id: ownerUserId } });
+      await db.user.deleteMany({
+        where: { id: { in: [ownerUserId, coUserId] } },
+      });
     });
 
     it("the owner reads the studio's amounts", async () => {
@@ -137,6 +157,10 @@ describe.skipIf(!enabled)(
       const limit = await monthLimit(member());
       expect(limit).toEqual({ whose: "member", ask: "Ana" });
       expect(JSON.stringify(limit)).not.toMatch(/Micros|cap|spent|reserved/i);
+    });
+
+    it("the owner is named by their role, not a role that contains the word", async () => {
+      expect(await whomToAsk(member())).toBe("Ana");
     });
 
     it("a studio with no team names no one", async () => {

@@ -12,7 +12,9 @@ vi.mock("@/lib/db", () => ({
   hasDatabase: () => true,
   // The studio's owner, whom a member over the limit is told to ask.
   db: {
-    member: { findFirst: async () => ({ user: { name: "Ana Ruiz" } }) },
+    member: {
+      findMany: async () => [{ role: "owner", user: { name: "Ana Ruiz" } }],
+    },
   },
 }));
 vi.mock("@/providers/mode", () => ({ providerMode: () => "live" }));
