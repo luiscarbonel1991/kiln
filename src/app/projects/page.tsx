@@ -9,9 +9,12 @@ import { buyerSizeLabel, type Product } from "@/domain/product";
 import { hasDatabase } from "@/lib/db";
 import { hasProviderKey } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
-import { budget } from "@/server/generation-repository";
 import { makerPage } from "@/server/guarded";
-import { homeStats, type ProjectStats } from "@/server/home-repository";
+import {
+  homeStats,
+  monthSpent,
+  type ProjectStats,
+} from "@/server/home-repository";
 import { followedListings } from "@/server/listing-results";
 import type { CurrentMaker } from "@/server/maker-repository";
 import { listProducts } from "@/server/product-repository";
@@ -60,7 +63,7 @@ export default makerPage(async function ProjectsPage(maker: CurrentMaker) {
     listProjects(maker),
     listProducts(maker),
     homeStats(maker.id),
-    budget(maker.id),
+    monthSpent(maker),
     followedListings(maker),
   ]);
   const followed = listings.filter((l) => l.view.following);
@@ -90,7 +93,9 @@ export default makerPage(async function ProjectsPage(maker: CurrentMaker) {
       value: mock ? "mock mode" : money(spend.spentMicros),
       note: mock
         ? "nothing is paid or counted"
-        : `of ${money(spend.capMicros)} (calendar month, UTC)`,
+        : spend.whose === "studio"
+          ? `of ${money(spend.capMicros)} (calendar month, UTC)`
+          : "what your work cost (calendar month, UTC)",
     },
     {
       label: "Approved this month",
@@ -100,10 +105,13 @@ export default makerPage(async function ProjectsPage(maker: CurrentMaker) {
     {
       label: "Per approved output",
       value:
-        !mock && stats.monthApproved > 0
+        !mock && spend.whose === "studio" && stats.monthApproved > 0
           ? money(spend.spentMicros / stats.monthApproved)
           : "—",
-      note: "this month's spend over what was kept",
+      note:
+        spend.whose === "studio"
+          ? "this month's spend over what was kept"
+          : "the studio's, shown to its owner",
     },
   ];
 
