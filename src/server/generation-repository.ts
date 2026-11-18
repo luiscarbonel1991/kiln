@@ -849,12 +849,12 @@ export interface GenerationState {
     { status: string; outputs: string[]; vectorUrl: string | null }
   >;
   batch: BatchProgress | null;
-  budget: Budget;
 }
 
 // What the board and the slot editor poll: each card's latest job, the cards'
-// generation state, the running batch's progress and the month's budget, plus
-// a version that changes whenever any of it does.
+// generation state and the running batch's progress, plus a version that
+// changes whenever any of it does. No amount of this month's: a member polls
+// it too (the owner's amounts are monthLimit's).
 const withRanOn = (route: unknown) => {
   const ran = ranOn(readJobRoute(route));
   return ran ? { ranOn: ran } : {};
@@ -935,7 +935,6 @@ export async function projectGenerationState(
       ]),
     ),
     batch,
-    budget: await budget(makerId),
   };
   const version = createHash("sha1")
     .update(JSON.stringify([state.jobs, state.cards, state.batch]))

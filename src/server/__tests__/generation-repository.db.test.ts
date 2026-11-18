@@ -355,11 +355,15 @@ describe.skipIf(!enabled)(
       ]);
     });
 
-    it("the polled state carries each card's latest job, the budget and a changing version", async () => {
+    it("the polled state carries each card's latest job and a changing version, and no amount", async () => {
       const before = await repo.projectGenerationState(makerId, projectId);
       expect(before.jobs["q.f"].status).toBe("canceled");
       expect(before.cards["q.f"].status).toBe("draft");
-      expect(before.budget.capMicros).toBe(1_000_000);
+      // A member polls it too: this month's amounts are read for the owner
+      // alone (monthLimit), never sent with the poll.
+      expect(JSON.stringify(before)).not.toMatch(
+        /capMicros|spentMicros|reservedMicros/,
+      );
       await repo.enqueueBatch({ ...base(), jobs: [job("f", 10_000)] });
       const after = await repo.projectGenerationState(makerId, projectId);
       expect(after.jobs["q.f"].status).toBe("queued");
