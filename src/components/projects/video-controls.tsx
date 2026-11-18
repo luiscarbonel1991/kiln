@@ -27,6 +27,7 @@ import {
   type VideoOrientation,
   type VideoSeconds,
 } from "@/domain/video";
+import { cn } from "@/lib/utils";
 
 const money = (usd: number) => `$${usd.toFixed(2)}`;
 
@@ -300,11 +301,14 @@ export function VideoControls({
           <dt className="text-on-surface-mid">This month</dt>
           <dd
             data-testid="video-confirm-month"
-            className={
+            className={cn(
+              // A member's answer may take two lines at 390 px: the row keeps
+              // them from "checking" on, so the dialog does not move.
+              ask !== null && "min-h-[2lh]",
               ask !== null && fit !== "fits" && fit !== "checking"
                 ? "text-fail"
-                : "text-foreground"
-            }
+                : "text-foreground",
+            )}
           >
             {"line" in month ? month.line : monthFitLine(fit, month.ask)}
           </dd>

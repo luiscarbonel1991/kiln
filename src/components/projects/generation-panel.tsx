@@ -11,6 +11,7 @@ import { UpdateProjectButton } from "@/components/projects/product-changed";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { canAfford, fromMicros } from "@/domain/generation-cost";
+import { cn } from "@/lib/utils";
 import type { BatchProgress } from "@/server/generation-repository";
 import type { MonthLimit } from "@/server/month-limit";
 
@@ -295,11 +296,14 @@ export function GenerationPanel({
             <dt className="text-on-surface-mid">This month</dt>
             <dd
               data-testid="generate-month"
-              className={
+              className={cn(
+                // A member's answer may take two lines at 390 px: the row keeps
+                // them from "checking" on, so the dialog does not move.
+                member && "min-h-[2lh]",
                 member && fit !== "fits" && fit !== "checking"
                   ? "text-fail"
-                  : "text-foreground"
-              }
+                  : "text-foreground",
+              )}
             >
               {mode === "mock"
                 ? "mock mode, not counted"
