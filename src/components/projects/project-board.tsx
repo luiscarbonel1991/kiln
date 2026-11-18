@@ -115,7 +115,8 @@ import {
   tuneView,
 } from "@/lib/slot-tune";
 import { versionMark } from "@/lib/version-mark";
-import type { BatchProgress, Budget } from "@/server/generation-repository";
+import type { BatchProgress } from "@/server/generation-repository";
+import type { MonthLimit } from "@/server/month-limit";
 import type { ProductDrift } from "@/server/product-version";
 import type { ProjectBoard as Board } from "@/server/project-mapper";
 
@@ -249,6 +250,7 @@ export function ProjectBoard({
   product,
   jobs,
   generation,
+  limit,
   estimate,
   mode,
   brand,
@@ -270,7 +272,10 @@ export function ProjectBoard({
   board: Board & { plan: ProjectPlan };
   product: Product;
   jobs: Record<string, JobView>;
-  generation: { version: string; batch: BatchProgress | null; budget: Budget };
+  generation: { version: string; batch: BatchProgress | null };
+  // This month's limit as the reader may know it: the owner's amounts, or a
+  // member's whom to ask (monthLimit).
+  limit: MonthLimit;
   estimate: BatchEstimate | { refusal: string } | null;
   mode: "live" | "mock";
   brand: BrandKit | null;
@@ -424,10 +429,14 @@ export function ProjectBoard({
           ];
           const results =
             destination.kind === "sale" ? resultsView(plan, today) : null;
-          const budgetLine =
+          const month =
             mode === "mock"
-              ? "mock mode, not counted"
-              : `${money(generation.budget.spentMicros + generation.budget.reservedMicros)} of ${money(generation.budget.capMicros)} used`;
+              ? { line: "mock mode, not counted" }
+              : limit.whose === "studio"
+                ? {
+                    line: `${money(limit.spentMicros + limit.reservedMicros)} of ${money(limit.capMicros)} used`,
+                  }
+                : { ask: limit.ask };
           return (
             <section key={plan.destinationId} className="flex flex-col gap-3">
               <h2 className="flex items-baseline gap-3">
@@ -563,7 +572,7 @@ export function ProjectBoard({
                                   settings: video,
                                   scenes: approvedScenes,
                                   rendered: card.outputs.length > 0,
-                                  budgetLine,
+                                  month,
                                   route: takeRoutes.video,
                                 }
                               : null
@@ -770,7 +779,7 @@ export function ProjectBoard({
             cardIds={waiting}
             estimate={estimate}
             batch={generation.batch}
-            budget={generation.budget}
+            limit={limit}
             mode={mode}
             staleProduct={drift?.stale === true}
           />
@@ -1066,7 +1075,7 @@ function SlotActions({
     settings: VideoSettings;
     scenes: { key: string; label: string }[];
     rendered: boolean;
-    budgetLine: string;
+    month: { line: string } | { ask: string };
     route: Route | null;
   } | null;
   model: ModelValue | null;
@@ -1145,7 +1154,7 @@ function SlotActions({
               scenes={video.scenes}
               busy={view.inBatch === true || view.state === "generating"}
               rendered={video.rendered}
-              budgetLine={video.budgetLine}
+              month={video.month}
               route={video.route}
               blocked={blocked}
             />

@@ -6,11 +6,13 @@ import {
   cancelBatchAction,
   enqueueGenerationAction,
 } from "@/app/actions/generation";
+import { monthFitLine, useMonthFit } from "@/components/projects/month-fit";
 import { UpdateProjectButton } from "@/components/projects/product-changed";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { canAfford, fromMicros } from "@/domain/generation-cost";
-import type { BatchProgress, Budget } from "@/server/generation-repository";
+import type { BatchProgress } from "@/server/generation-repository";
+import type { MonthLimit } from "@/server/month-limit";
 
 const money = (micros: number) => `$${fromMicros(micros).toFixed(2)}`;
 
@@ -55,7 +57,8 @@ const range = (typical: number, max: number) =>
 
 // The board's generate panel (cost before spend, one approval per batch): one
 // button for every waiting scene, a confirmation that names every card's model
-// and price, the total and the month's budget, then the running batch's
+// and price, the total and the month's limit (its amounts for the owner,
+// whether it fits for a member), then the running batch's
 // progress with Cancel. Generation runs in the background. When the queue would
 // refuse the batch (a retired model, a provider without a key), the panel says
 // why instead of offering it.
@@ -64,7 +67,7 @@ export function GenerationPanel({
   cardIds,
   estimate: given,
   batch,
-  budget,
+  limit,
   mode,
   staleProduct = false,
 }: {
@@ -72,7 +75,7 @@ export function GenerationPanel({
   cardIds: string[];
   estimate: BatchEstimate | { refusal: string } | null;
   batch: BatchProgress | null;
-  budget: Budget;
+  limit: MonthLimit;
   mode: "live" | "mock";
   // The product changed since the project was built: these scenes would show
   // the earlier version. Said, never blocked (Luis, 2026-10-08).
@@ -83,15 +86,23 @@ export function GenerationPanel({
   const [pending, startTransition] = useTransition();
   const estimate = given && "refusal" in given ? null : given;
   const refusal = given && "refusal" in given ? given.refusal : null;
+  const member = limit.whose === "member" && mode === "live" ? limit : null;
+  const fit = useMonthFit({
+    projectId,
+    cardIds,
+    enabled: confirming && member !== null && estimate !== null,
+  });
   const fits =
     mode === "mock" ||
     (estimate !== null &&
-      canAfford({
-        spentMicros: budget.spentMicros,
-        reservedMicros: budget.reservedMicros,
-        requestMicros: estimate.maxMicros,
-        capMicros: budget.capMicros,
-      }));
+      (limit.whose === "studio"
+        ? canAfford({
+            spentMicros: limit.spentMicros,
+            reservedMicros: limit.reservedMicros,
+            requestMicros: estimate.maxMicros,
+            capMicros: limit.capMicros,
+          })
+        : fit === "fits"));
 
   function generate() {
     if (!estimate) return;
@@ -189,11 +200,15 @@ export function GenerationPanel({
           ))
         : null}
 
-      <p className="font-mono text-[0.65rem] leading-snug text-on-surface-mid">
-        {mode === "mock"
-          ? "Mock mode: nothing is paid or counted."
-          : `This month: ${money(budget.spentMicros)} spent${budget.reservedMicros > 0 ? ` + ${money(budget.reservedMicros)} queued` : ""} of ${money(budget.capMicros)} (this calendar month, UTC).`}
-      </p>
+      {mode === "mock" ? (
+        <p className="font-mono text-[0.65rem] leading-snug text-on-surface-mid">
+          Mock mode: nothing is paid or counted.
+        </p>
+      ) : limit.whose === "studio" ? (
+        <p className="font-mono text-[0.65rem] leading-snug text-on-surface-mid">
+          {`This month: ${money(limit.spentMicros)} spent${limit.reservedMicros > 0 ? ` + ${money(limit.reservedMicros)} queued` : ""} of ${money(limit.capMicros)} (this calendar month, UTC).`}
+        </p>
+      ) : null}
 
       {estimate ? (
         <ConfirmDialog
@@ -278,10 +293,19 @@ export function GenerationPanel({
                 : ""}
             </dd>
             <dt className="text-on-surface-mid">This month</dt>
-            <dd className="text-foreground">
+            <dd
+              data-testid="generate-month"
+              className={
+                member && fit !== "fits" && fit !== "checking"
+                  ? "text-fail"
+                  : "text-foreground"
+              }
+            >
               {mode === "mock"
                 ? "mock mode, not counted"
-                : `${money(budget.spentMicros + budget.reservedMicros)} of ${money(budget.capMicros)} used`}
+                : limit.whose === "studio"
+                  ? `${money(limit.spentMicros + limit.reservedMicros)} of ${money(limit.capMicros)} used`
+                  : monthFitLine(fit, limit.ask)}
             </dd>
           </dl>
           <p className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
@@ -309,7 +333,7 @@ export function GenerationPanel({
               {w}
             </p>
           ))}
-          {!fits ? (
+          {!fits && !member ? (
             <p className="font-mono text-[0.7rem] text-fail">
               This batch would go over the monthly cap.
             </p>

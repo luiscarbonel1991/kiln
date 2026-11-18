@@ -20,7 +20,6 @@ import { chatPanelData } from "@/server/chat/chat-view";
 import { projectDrafts } from "@/server/etsy-drafts";
 import { estimateProjectCards, scenePrompts } from "@/server/generation-queue";
 import {
-  budget,
   outputFacts,
   projectGenerationState,
   projectSpend,
@@ -29,6 +28,7 @@ import {
 import { makerPage } from "@/server/guarded";
 import type { CurrentMaker, MakerRef } from "@/server/maker-repository";
 import { getMakerBrand, getMakerPreferences } from "@/server/maker-repository";
+import { monthLimit } from "@/server/month-limit";
 import { productDrift } from "@/server/product-version";
 import { loadProjectBoard } from "@/server/project-repository";
 import { type ProviderHealth, providerHealth } from "@/server/provider-health";
@@ -157,10 +157,9 @@ export default makerPage(async function ProjectBoardPage(
   );
   const writeUsd = await textWorstCase(maker, "listingCopy");
   const listingPrice = writeUsd === null ? null : `≈ $${writeUsd.toFixed(2)}`;
-  const generation = {
-    ...(await projectGenerationState(maker.id, board.id)),
-    budget: await budget(maker.id),
-  };
+  const generation = await projectGenerationState(maker.id, board.id);
+  // This month's limit as this person may know it: a member reads no amount.
+  const limit = await monthLimit(maker);
   const brand = await getMakerBrand(maker);
   const { searchColumns } = await getMakerPreferences(maker);
   const health = await providerHealth(maker.id);
@@ -189,6 +188,7 @@ export default makerPage(async function ProjectBoardPage(
         product={product}
         jobs={generation.jobs}
         generation={generation}
+        limit={limit}
         estimate={estimate}
         mode={providerMode()}
         brand={brand}
