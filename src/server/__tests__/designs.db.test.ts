@@ -1,4 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  lineArtDrawing as drawing,
+  lineArtDesign,
+} from "@/server/__tests__/fixtures/line-art-design";
 
 // A design project against the throwaway Postgres (see
 // project-repository.db.test.ts for the setup): the tools' read of its
@@ -19,65 +23,11 @@ describe.skipIf(!enabled)("a design (database)", async () => {
   const repo = await import("@/server/project-repository");
   const designs = await import("@/server/designs");
 
-  const field = { value: "x", source: "recipe" as const, locked: false };
-  const fields = {
-    subject: field,
-    materials: field,
-    scene: field,
-    composition: field,
-    lighting: field,
-    mood: field,
-    palette: field,
-  };
-  const drawing = (i: number, direction: string, outputs: string[]) => ({
-    id: `recipe-line-art-${i}`,
-    parentId: null,
-    masterAssetId: "m-1",
-    recipeId: "recipe-line-art",
-    type: "image" as const,
-    direction,
-    fields,
-    references: [],
-    model: {
-      provider: "openai" as const,
-      model: "gpt-image-2",
-      aspect: "1:1",
-      guidance: 7.5,
-      strength: 0.65,
-    },
-    outputs,
-    status: outputs.length ? ("done" as const) : ("draft" as const),
-  });
-  const editor = {
-    name: "DB test design",
-    phase: "generation" as const,
-    master: {
-      id: "m-1",
-      origin: "upload" as const,
-      sourcePrompt: null,
-      assetUrl: "https://stub.local/fern.png",
-      mime: "image/png",
-    },
-    understanding: {
-      subject: "a fern leaf",
-      productType: "",
-      useContext: "",
-      sceneProps: "",
-      avoid: "",
-      materials: "ink",
-      lighting: "flat",
-      composition: "centered",
-      mood: "calm",
-      palette: ["#000000"],
-    },
-    recipeId: "recipe-line-art",
-    planning: null,
-    cards: [
-      drawing(0, "Outline", ["https://stub.local/outline.png"]),
-      drawing(1, "Detail", []),
-      drawing(2, "Badge", []),
-    ],
-  };
+  const editor = lineArtDesign("DB test design", [
+    drawing(0, "Outline", ["https://stub.local/outline.png"]),
+    drawing(1, "Detail"),
+    drawing(2, "Badge"),
+  ]);
   let id: string;
   let other: string;
   const card = (cardId: string) =>

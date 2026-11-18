@@ -521,6 +521,7 @@ export async function enqueueProjectCards(
     })),
     shownMaxMicros: input.shownMaxMicros,
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+    memberId: maker.member?.id ?? null,
   });
   ensureGenerationWorker()?.wake();
   return result;

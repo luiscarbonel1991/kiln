@@ -151,6 +151,8 @@ export async function enqueueBatch(input: {
   shownMaxMicros?: number;
   // The chat conversation whose paid tool queued it.
   sessionId?: string;
+  // The person who queued it; none for a token, a script or the worker.
+  memberId?: string | null;
 }): Promise<{ batchId: string; queued: number; skipped: string[] }> {
   assertDatabaseUrl();
   const { makerId, projectId, mode } = input;
@@ -273,6 +275,7 @@ export async function enqueueBatch(input: {
         estimateMicros: j.estimateMicros,
         productHash: link?.productHash ?? null,
         sessionId: input.sessionId ?? null,
+        memberId: input.memberId ?? null,
       })),
     });
     return { batchId: batch.id, queued: fresh.length, skipped: [...busy] };

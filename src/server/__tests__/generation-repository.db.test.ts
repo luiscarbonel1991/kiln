@@ -34,6 +34,7 @@ describe.skipIf(!enabled)(
     const KEYS = [
       ...["a", "b", "c", "d", "e", "f", "dup", "cx", "cy", "sx", "sy"],
       ...["ra", "rb", "rc", "sa", "sb", "sc"],
+      ...["ma", "mb", "mn"],
     ];
     const plan = {
       destinations: [
@@ -665,6 +666,38 @@ describe.skipIf(!enabled)(
       });
       await db.generationJob.updateMany({
         where: { batchId: mock.batchId },
+        data: { status: "canceled", finishedAt: new Date() },
+      });
+    });
+
+    // A batch records the person who queued it; work with no
+    // person (a token, a script, the worker) records none and still queues.
+    it("a batch queued by a person stores them on every job; one with no person stores null", async () => {
+      // A mode no worker claims, so the rows stay as queued.
+      const mode = "member-batch" as never;
+      const byPerson = await repo.enqueueBatch({
+        ...base(),
+        mode,
+        memberId: "m1",
+        jobs: [job("ma", 1), job("mb", 1)],
+      });
+      const theirs = await db.generationJob.findMany({
+        where: { batchId: byPerson.batchId },
+      });
+      expect(theirs.map((j) => j.memberId)).toEqual(["m1", "m1"]);
+
+      const byNoOne = await repo.enqueueBatch({
+        ...base(),
+        mode,
+        jobs: [job("mn", 1)],
+      });
+      expect(byNoOne.queued).toBe(1);
+      const unnamed = await db.generationJob.findFirstOrThrow({
+        where: { batchId: byNoOne.batchId },
+      });
+      expect(unnamed.memberId).toBeNull();
+      await db.generationJob.updateMany({
+        where: { batchId: { in: [byPerson.batchId, byNoOne.batchId] } },
         data: { status: "canceled", finishedAt: new Date() },
       });
     });
