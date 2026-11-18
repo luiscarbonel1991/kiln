@@ -1,16 +1,33 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GenerationResult } from "@/providers/types";
 
-const reserveDirectCall = vi.fn(async () => "row-1");
+const reserveDirectCall = vi.fn(async (): Promise<string> => "row-1");
 const markDirectCall = vi.fn(async () => {});
 const closeDirectCall = vi.fn(async () => {});
 const unlisted = vi.hoisted(() => ({
   found: {} as Record<string, { models: string[]; at: string }>,
 }));
 
-vi.mock("@/lib/db", () => ({ hasDatabase: () => true }));
+vi.mock("@/lib/db", () => ({
+  hasDatabase: () => true,
+  // The studio's owner, whom a member over the limit is told to ask.
+  db: {
+    member: { findFirst: async () => ({ user: { name: "Ana Ruiz" } }) },
+  },
+}));
 vi.mock("@/providers/mode", () => ({ providerMode: () => "live" }));
+const { QueueRefusal } = vi.hoisted(() => ({
+  QueueRefusal: class QueueRefusal extends Error {
+    constructor(
+      readonly reason: string,
+      message: string,
+    ) {
+      super(message);
+    }
+  },
+}));
 vi.mock("@/server/generation-repository", () => ({
+  QueueRefusal,
   reserveDirectCall,
   markDirectCall,
   closeDirectCall,
@@ -198,6 +215,34 @@ describe("direct spend", () => {
     expect(reserveDirectCall).toHaveBeenCalledWith(
       expect.objectContaining({ model: "gpt-6-luna", memberId: "m1" }),
     );
+  });
+
+  // The cap's refusal, as the reservation throws it: a member reads whom to
+  // ask and no amount; the owner reads it as it was.
+  it("a member over this month's limit is told whom to ask", async () => {
+    const over = new QueueRefusal(
+      "cap",
+      "This generation would go over this month's spending cap.",
+    );
+    reserveDirectCall.mockRejectedValue(over);
+    const luna = { provider: "openai" as const, model: "gpt-6-luna" };
+    const call = textCall<string>(luna, "chatTurn");
+    const member = {
+      id: "maker-1",
+      member: { id: "m1", userId: "u1", role: "member" as const },
+    };
+    await expect(openDirectCall(member, call)).rejects.toMatchObject({
+      reason: "cap",
+      message: "Over this month's limit: ask Ana.",
+    });
+    const owner = {
+      id: "maker-1",
+      member: { id: "o1", userId: "u0", role: "owner" as const },
+    };
+    await expect(openDirectCall(owner, call)).rejects.toBe(over);
+    await expect(openDirectCall({ id: "maker-1" }, call)).rejects.toBe(over);
+    reserveDirectCall.mockReset();
+    reserveDirectCall.mockImplementation(async () => "row-1");
   });
 
   it("a stream that answered an HTTP error counts nothing", async () => {

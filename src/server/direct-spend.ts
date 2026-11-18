@@ -29,6 +29,7 @@ import {
   reserveDirectCall,
 } from "@/server/generation-repository";
 import type { MakerRef } from "@/server/maker-repository";
+import { inMembersWords } from "@/server/month-limit";
 
 // The monthly cap covers every paid call made from Kiln, not only the queue.
 // Mock runs neither reserve nor count. Without a database (tests) both are
@@ -169,6 +170,8 @@ export async function openDirectCall<T extends { usage?: unknown }>(
     ...(priced.sessionId ? { sessionId: priced.sessionId } : {}),
     ...(priced.route ? { route: priced.route } : {}),
     memberId: maker.member?.id ?? null,
+  }).catch(async (error) => {
+    throw await inMembersWords(maker, error);
   });
   let callStarted = false;
   let closed = false;

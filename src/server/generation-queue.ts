@@ -68,6 +68,7 @@ import {
 import { createWorker, type Worker } from "@/server/generation-worker";
 import type { MakerRef } from "@/server/maker-repository";
 import { getMakerRoutes } from "@/server/maker-repository";
+import { inMembersWords } from "@/server/month-limit";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
 import { withMakerKeys } from "@/server/provider-keys";
 import { checkProjectTake } from "@/server/qc/project-take";
@@ -522,6 +523,8 @@ export async function enqueueProjectCards(
     shownMaxMicros: input.shownMaxMicros,
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
     memberId: maker.member?.id ?? null,
+  }).catch(async (error) => {
+    throw await inMembersWords(maker, error);
   });
   ensureGenerationWorker()?.wake();
   return result;

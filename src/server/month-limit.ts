@@ -1,6 +1,11 @@
 import { canAfford } from "@/domain/generation-cost";
 import { db } from "@/lib/db";
-import { type Budget, budget } from "@/server/generation-repository";
+import { overLimitLine } from "@/lib/month-limit-words";
+import {
+  type Budget,
+  budget,
+  QueueRefusal,
+} from "@/server/generation-repository";
 import type { MakerRef } from "@/server/maker-repository";
 
 // What a caller may know of this month's limit (Luis, 2026-11-17). The owner,
@@ -45,4 +50,20 @@ export async function fitsThisMonth(
   requestMicros: number,
 ): Promise<boolean> {
   return canAfford({ ...(await budget(maker.id)), requestMicros });
+}
+
+// The cap's refusal in a member's words: whom to ask, and no amount. The
+// owner's, a token's and a script's stay as the queue says them.
+export async function inMembersWords(
+  maker: MakerRef,
+  error: unknown,
+): Promise<unknown> {
+  if (
+    error instanceof QueueRefusal &&
+    error.reason === "cap" &&
+    !readsStudioAmounts(maker)
+  ) {
+    return new QueueRefusal("cap", `${overLimitLine(await whomToAsk(maker))}.`);
+  }
+  return error;
 }
