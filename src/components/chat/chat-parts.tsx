@@ -24,7 +24,7 @@ import {
   MessageFooter,
 } from "@/components/ui/message";
 import { draftApprovalLines } from "@/lib/drafts-view";
-import { overLimitLine } from "@/lib/month-limit-words";
+import { memberOverLimit, overLimitLine } from "@/lib/month-limit-words";
 import type { KilnMessage } from "@/server/chat/messages";
 import type { SpecialistId } from "@/server/chat/specialists";
 
@@ -182,7 +182,7 @@ function ApprovalCard({
       <div className="flex items-center gap-2">
         <Button
           size="sm"
-          disabled={disabled}
+          disabled={disabled || memberOverLimit(quote)}
           data-testid={`chat-approve-${name}`}
           onClick={() => onAnswer(true)}
         >
