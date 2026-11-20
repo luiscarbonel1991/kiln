@@ -740,7 +740,10 @@ export async function createDraftFromProject(
     productId: delivery.product.id,
   });
   const settle = (status: ShopWriteView["status"], extra: object = {}) =>
-    db.shopWrite.update({ where: { id: row.id }, data: { status, ...extra } });
+    db.shopWrite.update({
+      where: { id: row.id, makerId: maker.id },
+      data: { status, ...extra },
+    });
   let files: Awaited<ReturnType<typeof deliveredFiles>>;
   try {
     files = await deliveredFiles(delivered);
