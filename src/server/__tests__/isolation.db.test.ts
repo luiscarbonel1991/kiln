@@ -234,10 +234,10 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
       Product.parse({
         id: `pkg:${sku}`,
         sku,
-        name: `Studio ${label} coaster`,
+        name: `Studio ${label} item`,
         family: "Kitchen",
         dimensions: { w: 4, h: 4, unit: "in" },
-        shape: "round coaster",
+        shape: "round",
         material: "cork",
         treatment: "engraved",
         colours: [{ key: "cork", name: "Cork", face: "#C9A27A" }],

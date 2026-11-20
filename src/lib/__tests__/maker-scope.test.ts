@@ -1168,7 +1168,7 @@ describe("every repository function names the maker", () => {
     ],
     [
       "src/server/qc/project-take.ts takeContext",
-      "the worker reads the project of the job it claimed",
+      "the worker's claimed job, or a project recheckTake read under its maker",
     ],
     [
       "src/server/chat/chat-repository.ts appendChatEvent",
