@@ -79,16 +79,22 @@ type RequestMaker =
   | { maker: CurrentMaker }
   | { refused: "token" | "session" | "organization" };
 
+// Takes no maker: this is how the edge learns which maker a token names.
+async function makerOfToken(token: string): Promise<CurrentMaker | null> {
+  const row = await db.accessToken.findUnique({
+    where: { hash: hashToken(token) },
+    select: { maker: { select: { id: true, slug: true, name: true } } },
+  });
+  return row?.maker ?? null;
+}
+
 const requestMaker = cache(async (): Promise<RequestMaker | null> => {
   const h = await requestHeaders();
   if (!h) return null;
   const token = bearerToken(h.get("authorization"));
   if (token) {
-    const row = await db.accessToken.findUnique({
-      where: { hash: hashToken(token) },
-      select: { maker: { select: { id: true, slug: true, name: true } } },
-    });
-    return row ? { maker: row.maker } : { refused: "token" };
+    const maker = await makerOfToken(token);
+    return maker ? { maker } : { refused: "token" };
   }
   const session = await getAuth().api.getSession({ headers: h });
   if (!session) return { refused: "session" };
