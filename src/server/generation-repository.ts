@@ -642,18 +642,19 @@ export async function cancelBatch(
   batchId: string,
 ): Promise<number> {
   assertDatabaseUrl();
-  const canceled = await db.$transaction(async (tx) => {
+  const { canceled, own } = await db.$transaction(async (tx) => {
     const jobs = await tx.generationJob.updateMany({
       where: { batchId, makerId, status: "queued" },
       data: { status: "canceled", finishedAt: new Date() },
     });
-    await tx.generationBatch.updateMany({
+    const batch = await tx.generationBatch.updateMany({
       where: { id: batchId, makerId },
       data: { canceledAt: new Date() },
     });
-    return jobs.count;
+    return { canceled: jobs.count, own: batch.count === 1 };
   });
-  await noteBatchEnd(batchId);
+  // Only the maker's own batch is ended: the id comes from the client.
+  if (own) await noteBatchEnd(batchId);
   return canceled;
 }
 

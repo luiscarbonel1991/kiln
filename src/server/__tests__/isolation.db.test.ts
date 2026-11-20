@@ -1153,6 +1153,118 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
     });
   });
 
+  // A batch whose jobs have all ended but which was never marked finished:
+  // canceling it is what ends it, and says so in its project's conversation.
+  // These batches live only here (the studios' own never end), cost nothing,
+  // and go with the note they leave before any other case reads the rows.
+  describe("canceling a batch ends it only for the studio it belongs to", () => {
+    const made = { batches: [] as string[], jobs: [] as string[] };
+    let mine: string;
+    let theirs: string;
+
+    const endedBatch = async (s: Studio) => {
+      const batch = await db.generationBatch.create({
+        data: {
+          makerId: s.maker.id,
+          projectId: s.projectId,
+          mode: "live",
+          count: 2,
+          estimateMicros: 0,
+          model: "gpt-image-2",
+        },
+        select: { id: true },
+      });
+      made.batches.push(batch.id);
+      for (const status of ["canceled", "failed"]) {
+        const job = await db.generationJob.create({
+          data: {
+            makerId: s.maker.id,
+            projectId: s.projectId,
+            batchId: batch.id,
+            cardId: `iso.ended.${status}`,
+            mode: "live",
+            maxAttempts: 2,
+            request: request(s.label),
+            status,
+            estimateMicros: 0,
+            finishedAt: new Date(),
+          },
+          select: { id: true },
+        });
+        made.jobs.push(job.id);
+      }
+      return batch.id;
+    };
+
+    const batchOf = (s: Studio, id: string) =>
+      db.generationBatch.findFirst({
+        where: { id, makerId: s.maker.id },
+        select: { finishedAt: true, canceledAt: true },
+      });
+    const statusesOf = async (s: Studio, batchId: string) =>
+      (
+        await db.generationJob.findMany({
+          where: { batchId, makerId: s.maker.id },
+          select: { status: true },
+        })
+      )
+        .map((job) => job.status)
+        .sort();
+    const messagesOf = async (s: Studio) =>
+      (
+        await db.chatMessage.findMany({
+          where: { sessionId: s.sessionId },
+          orderBy: { seq: "asc" },
+          select: { messageId: true },
+        })
+      ).map((message) => message.messageId);
+
+    beforeAll(async () => {
+      mine = await endedBatch(a);
+      theirs = await endedBatch(b);
+    });
+
+    afterAll(async () => {
+      await db.chatMessage.deleteMany({
+        where: {
+          sessionId: { in: [a.sessionId, b.sessionId] },
+          OR: made.batches.map((id) => ({
+            messageId: { endsWith: `batch-${id}` },
+          })),
+        },
+      });
+      await db.generationJob.deleteMany({ where: { id: { in: made.jobs } } });
+      await db.generationBatch.deleteMany({
+        where: { id: { in: made.batches } },
+      });
+    });
+
+    it("the other studio's ended batch is not finished, and nothing is said in their conversation", async () => {
+      const before = await messagesOf(b);
+      expect(await generation.cancelBatch(a.maker.id, theirs)).toBe(0);
+      expect(await batchOf(b, theirs)).toEqual({
+        finishedAt: null,
+        canceledAt: null,
+      });
+      expect(await statusesOf(b, theirs)).toEqual(["canceled", "failed"]);
+      const after = await messagesOf(b);
+      expect(after).toEqual(before);
+      expect(after.filter((id) => id.endsWith(`batch-${theirs}`))).toEqual([]);
+    });
+
+    it("the studio's own ended batch is finished, and its conversation says so once", async () => {
+      const before = await messagesOf(a);
+      expect(await generation.cancelBatch(a.maker.id, mine)).toBe(0);
+      const batch = await batchOf(a, mine);
+      expect(batch?.canceledAt).toBeInstanceOf(Date);
+      expect(batch?.finishedAt).toBeInstanceOf(Date);
+      expect(await statusesOf(a, mine)).toEqual(["canceled", "failed"]);
+      const added = (await messagesOf(a)).filter((id) => !before.includes(id));
+      expect(added).toHaveLength(1);
+      expect(added[0].endsWith(`batch-${mine}`)).toBe(true);
+    });
+  });
+
   // What a project's takes are made from, and what it spent: read as the
   // maker, so a project id alone opens nothing.
   describe("a project's output facts, sources and spend are read as its maker", () => {
