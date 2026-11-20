@@ -1110,3 +1110,181 @@ describe("the database client stays in the repositories", () => {
     ).toEqual([]);
   });
 });
+
+// Everything below reads src/server and src/modules as they are.
+describe("every repository function names the maker", () => {
+  // Functions that query a maker's data without being handed the maker, by
+  // design: "<path> <function>" -> why. It can only shrink.
+  const UNSCOPED = new Map([
+    // The worker and its leases: keyed by a claimed job's id and lease token,
+    // or running for every maker.
+    [
+      "src/server/generation-repository.ts claimJobs",
+      "the worker claims queued jobs of every maker",
+    ],
+    [
+      "src/server/generation-repository.ts renewLease",
+      "keyed by a claimed job's id and lease token",
+    ],
+    [
+      "src/server/generation-repository.ts markCallStarted",
+      "keyed by a claimed job's id and lease token",
+    ],
+    [
+      "src/server/generation-repository.ts recordCost",
+      "keyed by a claimed job's id and lease token",
+    ],
+    [
+      "src/server/generation-repository.ts completeJob",
+      "keyed by a claimed job's id and lease token",
+    ],
+    [
+      "src/server/generation-repository.ts failJob",
+      "keyed by a claimed job's id and lease token",
+    ],
+    [
+      "src/server/generation-repository.ts fallBackJob",
+      "keyed by a claimed job's id and lease token",
+    ],
+    [
+      "src/server/generation-repository.ts requeueExpired",
+      "the worker requeues expired leases of every maker",
+    ],
+    [
+      "src/server/generation-repository.ts markDirectCall",
+      "keyed by the direct call the caller just reserved",
+    ],
+    [
+      "src/server/generation-repository.ts closeDirectCall",
+      "keyed by the direct call the caller just reserved",
+    ],
+    [
+      "src/server/generation-repository.ts spend",
+      "the month's spend read inside a transaction that already holds the maker's lock",
+    ],
+    [
+      "src/server/batch-end.ts finishBatch",
+      "the worker closes the batch of the job it just ended",
+    ],
+    [
+      "src/server/qc/project-take.ts takeContext",
+      "the worker reads the project of the job it claimed",
+    ],
+    [
+      "src/server/chat/chat-repository.ts appendChatEvent",
+      "the worker tells a project's chat what its job did",
+    ],
+    // The edge and the account: how the maker comes to be known.
+    [
+      "src/server/access-tokens.ts verifyAccessToken",
+      "the edge working out which maker a token names",
+    ],
+    [
+      "src/server/maker-repository.ts makerOfToken",
+      "the edge working out which maker a token names",
+    ],
+    [
+      "src/server/maker-repository.ts getCurrentMaker",
+      "the instance's own maker, for a script or a test with no request",
+    ],
+    [
+      "src/server/organization.ts claimInstance",
+      "the first account claims the instance's maker",
+    ],
+  ]);
+
+  // Functions scoped by a makerId string (a parameter, input.makerId or a
+  // context that holds the maker), the shape from before MakerRef:
+  // "<path> <function>" -> where the id comes from. It can only shrink.
+  const MAKER_ID_FIRST = new Map([
+    ["src/server/generation-repository.ts budget", "makerId parameter"],
+    ["src/server/generation-repository.ts cancelBatch", "makerId parameter"],
+    ["src/server/generation-repository.ts readUnlisted", "makerId parameter"],
+    [
+      "src/server/generation-repository.ts projectGenerationState",
+      "makerId parameter",
+    ],
+    ["src/server/generation-repository.ts sessionSpend", "makerId parameter"],
+    ["src/server/generation-repository.ts enqueueBatch", "input.makerId"],
+    ["src/server/generation-repository.ts reserveDirectCall", "input.makerId"],
+    ["src/server/generation-repository.ts recordKeyCheck", "input.makerId"],
+    ["src/server/home-repository.ts homeStats", "makerId parameter"],
+    ["src/server/provider-health.ts providerHealth", "makerId parameter"],
+    ["src/server/provider-keys.ts read", "makerId parameter"],
+    ["src/server/provider-keys.ts providerKeyStates", "makerId parameter"],
+    ["src/server/provider-keys.ts saveProviderKey", "makerId parameter"],
+    ["src/server/provider-keys.ts removeProviderKey", "makerId parameter"],
+    ["src/server/shop-connection.ts markNeedsReconnect", "makerId parameter"],
+    ["src/server/shop-ranking.ts projectsByListing", "makerId parameter"],
+    ["src/server/lessons.ts proposeFromTaste", "makerId parameter"],
+    [
+      "src/server/etsy-drafts.ts defaultSettings",
+      "makerId parameter, beside the connected shop",
+    ],
+    ["src/server/tool-calls.ts callAndRecord", "the tool context's maker"],
+  ]);
+
+  const files = [
+    ...sources(join(root, "src", "server")),
+    ...sources(join(root, "src", "modules")),
+  ].map((path) => ({
+    path: posix(relative(root, path)),
+    text: readFileSync(path, "utf8"),
+  }));
+  const reports = (lists: { unscoped: Listed; makerIdFirst: Listed }) =>
+    files.flatMap((f) =>
+      unscoped(f.text, f.path, { models: MODELS, ...lists }),
+    );
+  const found = new Set(
+    files.flatMap((f) =>
+      repositoryFunctions(f.text, f.path, { models: MODELS }).map(
+        (name) => `${f.path} ${name}`,
+      ),
+    ),
+  );
+  // An entry is stale when its function is gone, or passes without it.
+  const stale = (name: string, map: Map<string, string>) =>
+    [...map.keys()].flatMap((key) => {
+      if (!found.has(key)) {
+        return [
+          `${name} lists "${key}", which is not a function that queries a maker's data. Remove the entry.`,
+        ];
+      }
+      const without = { has: (k: string) => k !== key && map.has(k) };
+      const lines = reports({
+        unscoped: map === UNSCOPED ? without : UNSCOPED,
+        makerIdFirst: map === MAKER_ID_FIRST ? without : MAKER_ID_FIRST,
+      });
+      return lines.some((line) => line.startsWith(`${key}:`))
+        ? []
+        : [
+            `${name} lists "${key}", which passes without it. Remove the entry.`,
+          ];
+    });
+
+  it("finds the repository functions", () => {
+    expect(found.size).toBeGreaterThanOrEqual(100);
+  });
+
+  it("each takes the maker first and names it in every query, or follows a read under the maker", () => {
+    expect(
+      reports({ unscoped: UNSCOPED, makerIdFirst: MAKER_ID_FIRST }),
+    ).toEqual([]);
+  });
+
+  it("no query of a maker's data sits where the check cannot see it", () => {
+    expect(
+      files.flatMap((f) => outsideShapes(f.text, f.path, { models: MODELS })),
+    ).toEqual([]);
+  });
+
+  it("the functions listed as working without a maker still exist and still need it", () => {
+    expect(stale("UNSCOPED", UNSCOPED)).toEqual([]);
+    for (const reason of UNSCOPED.values()) expect(reason).not.toBe("");
+  });
+
+  it("the functions listed as scoped by a makerId string still exist and still need it", () => {
+    expect(stale("MAKER_ID_FIRST", MAKER_ID_FIRST)).toEqual([]);
+    for (const reason of MAKER_ID_FIRST.values()) expect(reason).not.toBe("");
+  });
+});
