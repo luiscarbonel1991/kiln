@@ -76,7 +76,7 @@ async function loadFrames(maker: MakerRef, projectId: string) {
     : undefined;
   // What Kiln read in each shown take (null: the job left no check).
   const shown = Object.values(cards).flatMap((c) => c.outputs.slice(0, 1));
-  const facts = await outputFacts(projectId, shown);
+  const facts = await outputFacts(maker, projectId, shown);
   const checks: Record<string, TakeCheck | null> = {};
   for (const [id, card] of Object.entries(cards)) {
     const fact = card.outputs[0] ? facts.get(card.outputs[0]) : undefined;

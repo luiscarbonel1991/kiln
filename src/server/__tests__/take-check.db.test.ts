@@ -151,7 +151,7 @@ describe.skipIf(!enabled)("take check (database)", async () => {
       where: { id: jobId },
     });
     expect(job.takeCheck).toEqual(check);
-    const facts = await outputFacts(projectId, [take]);
+    const facts = await outputFacts(maker, projectId, [take]);
     expect(facts.get(take)?.check).toEqual(check);
     // What get_frames and view_frame read.
     const frames = await projectFrames(maker, projectId);

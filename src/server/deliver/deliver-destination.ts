@@ -59,7 +59,7 @@ export async function destinationDelivery(
   // Exact frames draw the product as the project shows it (its look).
   const shown = projectProduct(loaded.product, fullPlan);
   const plate = plateHref(shown);
-  const sources = await outputSources(projectId, outputs);
+  const sources = await outputSources(maker, projectId, outputs);
   // resvg fetches nothing: the colour sheet's material samples go inline.
   const product = {
     ...shown,
@@ -115,7 +115,7 @@ export async function destinationDelivery(
         ? {
             cost: projectCost(
               fullPlan,
-              (await projectSpend(projectId)).byCard,
+              (await projectSpend(maker, projectId)).byCard,
             ).destinations.find((d) => d.destinationId === destinationId),
           }
         : {}),

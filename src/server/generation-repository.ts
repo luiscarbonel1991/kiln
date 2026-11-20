@@ -979,13 +979,19 @@ export interface OutputFacts {
 // What is known of each of these outputs from the job that finished with it;
 // an output no job made (a studio edit) is absent.
 export async function outputFacts(
+  maker: MakerRef,
   projectId: string,
   outputs: string[],
 ): Promise<Map<string, OutputFacts>> {
   assertDatabaseUrl();
   if (outputs.length === 0) return new Map();
   const jobs = await db.generationJob.findMany({
-    where: { projectId, status: "done", outputUrl: { in: outputs } },
+    where: {
+      projectId,
+      makerId: maker.id,
+      status: "done",
+      outputUrl: { in: outputs },
+    },
     select: { outputUrl: true, productHash: true, takeCheck: true },
   });
   return new Map(
@@ -1009,7 +1015,10 @@ export async function outputFacts(
 // job's measured cost, else its estimate once its paid call went out), with
 // each card's takes (its finished generations). Its direct calls (the
 // listing text) belong to no card.
-export async function projectSpend(projectId: string): Promise<{
+export async function projectSpend(
+  maker: MakerRef,
+  projectId: string,
+): Promise<{
   byCard: Map<string, CardSpend>;
   directMicros: number;
 }> {
@@ -1022,7 +1031,8 @@ export async function projectSpend(projectId: string): Promise<{
         CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)), 0)::float8 AS "spent",
       (COUNT(*) FILTER (WHERE "status" = 'done' AND "outputUrl" IS NOT NULL))::int AS "takes"
     FROM "GenerationJob"
-    WHERE "projectId" = ${projectId} AND "mode" = 'live'
+    WHERE "projectId" = ${projectId} AND "makerId" = ${maker.id}
+      AND "mode" = 'live'
       AND "status" IN ('done', 'failed', 'canceled')
     GROUP BY "cardId"`;
   const byCard = new Map<string, CardSpend>();
@@ -1067,13 +1077,19 @@ export async function sessionSpend(
 // What produced each of these outputs: the queue job that finished with it
 // (its prompt, model and measured cost), for a delivery's manifest.
 export async function outputSources(
+  maker: MakerRef,
   projectId: string,
   outputs: string[],
 ): Promise<Map<string, OutputSource>> {
   assertDatabaseUrl();
   if (outputs.length === 0) return new Map();
   const jobs = await db.generationJob.findMany({
-    where: { projectId, status: "done", outputUrl: { in: outputs } },
+    where: {
+      projectId,
+      makerId: maker.id,
+      status: "done",
+      outputUrl: { in: outputs },
+    },
     select: {
       outputUrl: true,
       request: true,

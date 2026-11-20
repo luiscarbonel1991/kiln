@@ -1152,4 +1152,56 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
       expect(await getRequestMaker()).toBeNull();
     });
   });
+
+  // What a project's takes are made from, and what it spent: read as the
+  // maker, so a project id alone opens nothing.
+  describe("a project's output facts, sources and spend are read as its maker", () => {
+    it("outputFacts answers its own project's takes, and nothing for the other studio's", async () => {
+      const own = await generation.outputFacts(b.maker, b.projectId, [
+        b.output,
+      ]);
+      expect(own.get(b.output)).toEqual({ productHash: "hash-b", check: null });
+      const theirs = await generation.outputFacts(a.maker, b.projectId, [
+        b.output,
+      ]);
+      expect([...theirs]).toEqual([]);
+      expect([
+        ...(await generation.outputFacts(a.maker, missing(), [b.output])),
+      ]).toEqual([]);
+    });
+
+    it("outputSources answers its own project's takes, and nothing for the other studio's", async () => {
+      const own = await generation.outputSources(b.maker, b.projectId, [
+        b.output,
+      ]);
+      expect(own.get(b.output)).toMatchObject({
+        prompt: "a scene for studio b",
+        provider: "openai",
+        model: "gpt-image-2",
+        costMicros: b.costMicros,
+      });
+      const theirs = await generation.outputSources(a.maker, b.projectId, [
+        b.output,
+      ]);
+      expect([...theirs]).toEqual([]);
+      expect([
+        ...(await generation.outputSources(a.maker, missing(), [b.output])),
+      ]).toEqual([]);
+    });
+
+    it("projectSpend answers its own project's spend, and none for the other studio's", async () => {
+      const own = await generation.projectSpend(b.maker, b.projectId);
+      expect(own.byCard.get("etsy.hero")).toEqual({
+        spentMicros: b.costMicros,
+        takes: 1,
+      });
+      expect(own.directMicros).toBe(0);
+      const theirs = await generation.projectSpend(a.maker, b.projectId);
+      expect([...theirs.byCard]).toEqual([]);
+      expect(theirs.directMicros).toBe(0);
+      const none = await generation.projectSpend(a.maker, missing());
+      expect([...none.byCard]).toEqual([]);
+      expect(none.directMicros).toBe(0);
+    });
+  });
 });

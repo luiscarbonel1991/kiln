@@ -198,7 +198,9 @@ describe.skipIf(!enabled)(
       });
       expect(saved.outputs).toEqual(["https://x/done.png"]);
       expect(saved.status).toBe("done");
-      const facts = await repo.outputFacts(projectId, ["https://x/done.png"]);
+      const facts = await repo.outputFacts({ id: makerId }, projectId, [
+        "https://x/done.png",
+      ]);
       expect(facts.get("https://x/done.png")?.check).toEqual(check);
     });
 

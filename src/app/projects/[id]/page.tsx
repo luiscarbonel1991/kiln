@@ -139,7 +139,7 @@ export default makerPage(async function ProjectBoardPage(
   // cards whose current output shows an earlier version.
   const drift = product && version ? productDrift(product, version) : null;
   const shown = board.cards.flatMap((c) => c.outputs.slice(0, 1));
-  const facts = await outputFacts(board.id, shown);
+  const facts = await outputFacts(maker, board.id, shown);
   const earlier = version?.hash
     ? board.cards
         .filter((c) => {
@@ -164,7 +164,7 @@ export default makerPage(async function ProjectBoardPage(
   const { searchColumns } = await getMakerPreferences(maker);
   const health = await providerHealth(maker.id);
   const plan = board.plan;
-  const spend = plan ? await projectSpend(board.id) : null;
+  const spend = plan ? await projectSpend(maker, board.id) : null;
   const cost =
     plan && spend ? projectCost(plan, spend.byCard, spend.directMicros) : null;
   const estimate =
