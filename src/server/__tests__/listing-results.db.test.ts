@@ -25,6 +25,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("a listing's results (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const results = await import("@/server/listing-results");
@@ -49,7 +52,7 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
   // A listing kit for Etsy and Instagram, its Etsy frames delivered on a day
   // (an exact frame needs no approval to be delivered).
   async function delivered(at: string | null) {
-    const [product] = await upsertProducts([
+    const [product] = await upsertProducts(maker, [
       Product.parse({
         id: "pkg:LR",
         sku,
@@ -71,7 +74,7 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
       destinationIds: ["etsy", "instagram"],
       catalog: CATALOG,
     });
-    const id = await repo.createProject({
+    const id = await repo.createProject(maker, {
       type: "launch",
       product,
       plan,
@@ -87,7 +90,7 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
       const exact = plan.destinations[0].slots
         .filter((s) => s.fill === "exact")
         .map((s) => ({ key: s.key }));
-      await repo.setDelivered(id, "etsy", exact, at);
+      await repo.setDelivered(maker, id, "etsy", exact, at);
     }
     return id;
   }
@@ -97,7 +100,7 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
   it("keeps a typed read in its own window, and refuses one before delivery or with bad numbers", async () => {
     const early = await delivered(null);
     await expect(
-      results.saveRead({
+      results.saveRead(maker, {
         projectId: early,
         destinationId: "etsy",
         key: "before",
@@ -107,11 +110,11 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
       }),
     ).rejects.toThrow(/Set the day the photos went up first/);
     // The maker took the photos out another way and says when they went up.
-    await repo.changePlan(early, (plan) =>
+    await repo.changePlan(maker, early, (plan) =>
       withLiveOn(plan, "etsy", "2026-10-20"),
     );
     expect(
-      await results.saveRead({
+      await results.saveRead(maker, {
         projectId: early,
         destinationId: "etsy",
         key: "before",
@@ -123,7 +126,7 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
 
     const id = await delivered("2026-10-27T15:00:00.000Z");
     const liveOn = localDate("2026-10-27T15:00:00.000Z");
-    const saved = await results.saveRead({
+    const saved = await results.saveRead(maker, {
       projectId: id,
       destinationId: "etsy",
       key: "before",
@@ -138,13 +141,13 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
       readOn: today,
       to: (await import("@/domain/listing-results")).addDays(liveOn, -1),
     });
-    const loaded = await repo.loadProjectBoard(id);
+    const loaded = await repo.loadProjectBoard(maker, id);
     expect(loaded?.board.plan?.destinations[0].results?.reads.before).toEqual(
       saved,
     );
 
     await expect(
-      results.saveRead({
+      results.saveRead(maker, {
         projectId: id,
         destinationId: "etsy",
         key: "day14",
@@ -154,7 +157,7 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
       }),
     ).rejects.toThrow("Visits must be a whole number of 0 or more.");
     await expect(
-      results.saveRead({
+      results.saveRead(maker, {
         projectId: id,
         destinationId: "instagram",
         key: "day14",
@@ -168,17 +171,17 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
   it("reads a passed window from the shop once the listing's address is known", async () => {
     const id = await delivered("2026-10-01T15:00:00.000Z");
     await expect(
-      results.readFromShop({
+      results.readFromShop(maker, {
         projectId: id,
         destinationId: "etsy",
         key: "before",
         today,
       }),
     ).rejects.toThrow(/listing's address/);
-    await repo.changePlan(id, (plan) =>
+    await repo.changePlan(maker, id, (plan) =>
       withListingUrl(plan, "etsy", "https://www.etsy.com/listing/4413933723/x"),
     );
-    const before = await results.readFromShop({
+    const before = await results.readFromShop(maker, {
       projectId: id,
       destinationId: "etsy",
       key: "before",
@@ -188,7 +191,7 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
     expect(before.visits).toBeGreaterThan(0);
     // The 30-day window is still running on 10/27.
     await expect(
-      results.readFromShop({
+      results.readFromShop(maker, {
         projectId: id,
         destinationId: "etsy",
         key: "day30",
@@ -196,7 +199,7 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
       }),
     ).rejects.toThrow(/once its days have passed/);
 
-    const listed = (await results.followedListings(today)).find(
+    const listed = (await results.followedListings(maker, today)).find(
       (l) => l.projectId === id,
     );
     expect(listed).toMatchObject({
@@ -211,10 +214,10 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
 
   it("a shop that gives only orders keeps the visits typed for the same window", async () => {
     const id = await delivered("2026-10-01T15:00:00.000Z");
-    await repo.changePlan(id, (plan) =>
+    await repo.changePlan(maker, id, (plan) =>
       withListingUrl(plan, "etsy", "https://www.etsy.com/listing/4413933723/x"),
     );
-    await results.saveRead({
+    await results.saveRead(maker, {
       projectId: id,
       destinationId: "etsy",
       key: "before",
@@ -224,7 +227,7 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
     });
     connector.ordersOnly = true;
     try {
-      const read = await results.readFromShop({
+      const read = await results.readFromShop(maker, {
         projectId: id,
         destinationId: "etsy",
         key: "before",
@@ -243,26 +246,32 @@ describe.skipIf(!enabled)("a listing's results (database)", async () => {
 
   it("takes the before read at delivery when a shop is connected", async () => {
     const id = await delivered(null);
-    await repo.changePlan(id, (plan) =>
+    await repo.changePlan(maker, id, (plan) =>
       withListingUrl(plan, "etsy", "https://www.etsy.com/listing/4413933723/x"),
     );
     const exact = (
-      await repo.loadProjectBoard(id)
+      await repo.loadProjectBoard(maker, id)
     )?.board.plan?.destinations[0].slots
       .filter((s) => s.fill === "exact")
       .map((s) => ({ key: s.key }));
-    await repo.setDelivered(id, "etsy", exact ?? [], new Date().toISOString());
-    await results.readBeforeAtDelivery(id, "etsy");
-    const plan = (await repo.loadProjectBoard(id))?.board.plan;
+    await repo.setDelivered(
+      maker,
+      id,
+      "etsy",
+      exact ?? [],
+      new Date().toISOString(),
+    );
+    await results.readBeforeAtDelivery(maker, id, "etsy");
+    const plan = (await repo.loadProjectBoard(maker, id))?.board.plan;
     expect(plan?.destinations[0].results?.reads.before?.source).toBe(
       "Mock shop",
     );
     // A second delivery keeps the read it has.
     const kept = plan?.destinations[0].results?.reads.before;
-    await results.readBeforeAtDelivery(id, "etsy");
+    await results.readBeforeAtDelivery(maker, id, "etsy");
     expect(
-      (await repo.loadProjectBoard(id))?.board.plan?.destinations[0].results
-        ?.reads.before,
+      (await repo.loadProjectBoard(maker, id))?.board.plan?.destinations[0]
+        .results?.reads.before,
     ).toEqual(kept);
   });
 });

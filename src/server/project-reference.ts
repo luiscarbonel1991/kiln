@@ -6,6 +6,7 @@ import { refreshCards } from "@/lib/project-refresh";
 import { slotCards } from "@/lib/project-start";
 import { getStorageProvider } from "@/providers/registry";
 import { megabytes } from "@/server/http-api";
+import type { MakerRef } from "@/server/maker-repository";
 import { getMakerModels } from "@/server/maker-repository";
 import {
   loadProjectBoard,
@@ -28,6 +29,7 @@ export type ReferenceOutcome =
 // the call, so the server never fetches an address a caller names, and what
 // they are is read from them, not from a declared type.
 export async function addProjectReference(
+  maker: MakerRef,
   projectId: string,
   bytes: Uint8Array,
 ): Promise<ReferenceOutcome> {
@@ -49,7 +51,7 @@ export async function addProjectReference(
       error: "A reference image must be a PNG, JPEG or WebP image.",
     };
   }
-  const loaded = await loadProjectBoard(projectId);
+  const loaded = await loadProjectBoard(maker, projectId);
   if (!loaded) {
     return {
       ok: false,
@@ -79,7 +81,7 @@ export async function addProjectReference(
   const { plan } = loaded.board;
   const { product } = loaded;
   const write = async () =>
-    slotCards(plan, master, product, await getMakerModels());
+    slotCards(plan, master, product, await getMakerModels(maker));
   const first = loaded.board.cards.length === 0;
   // The view from above was drawn beside Kiln's plate: with the maker's own
   // reference it no longer applies, so the scenes Kiln started a little above
@@ -88,6 +90,7 @@ export async function addProjectReference(
     !first &&
     threeQuarterFor(plan.references, loaded.board.master?.assetUrl) !== null;
   await setProjectReference(
+    maker,
     projectId,
     master,
     first ? await write() : [],

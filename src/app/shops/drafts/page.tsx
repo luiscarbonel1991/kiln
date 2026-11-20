@@ -14,6 +14,8 @@ import {
   draftableProjects,
   listDrafts,
 } from "@/server/etsy-drafts";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 
 const HEADING = "font-serif text-xl text-foreground";
@@ -23,17 +25,17 @@ const LEAD =
 // The drafts of the maker's Etsy shop (Luis, 2026-11-02): the ones there now,
 // read from Etsy per request, and the projects a new one can be made from.
 // Nothing here publishes.
-export default async function DraftsPage() {
+export default makerPage(async function DraftsPage(maker: CurrentMaker) {
   await dynamic();
   const setup = etsySetup();
-  const shop = hasDatabase() ? await shopConnection() : null;
+  const shop = hasDatabase() ? await shopConnection(maker) : null;
   const live = shop && !shop.needsReconnect ? shop : null;
   let drafts: DraftSummary[] = [];
   let complete = true;
   let error: string | null = null;
   if (live) {
     try {
-      const listed = await listDrafts();
+      const listed = await listDrafts(maker);
       drafts = listed.drafts;
       complete = listed.complete;
     } catch (e) {
@@ -41,7 +43,7 @@ export default async function DraftsPage() {
         e instanceof DraftRefusal || e instanceof Error ? e.message : String(e);
     }
   }
-  const projects = live ? await draftableProjects() : [];
+  const projects = live ? await draftableProjects(maker) : [];
   const destinationName = (id: string) =>
     CATALOG.destinations.find((d) => d.id === id)?.name ?? id;
 
@@ -225,4 +227,4 @@ export default async function DraftsPage() {
       </main>
     </div>
   );
-}
+});

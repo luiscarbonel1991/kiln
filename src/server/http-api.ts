@@ -29,16 +29,21 @@ export async function authorize(request: Request): Promise<Response | null> {
 
 // The token a request carries, if it is one of the current maker's; otherwise
 // the 401 to send back.
-export async function authorizeToken(
-  request: Request,
-): Promise<
-  { tokenId: string; tokenName: string; canSpend: boolean } | Response
+export async function authorizeToken(request: Request): Promise<
+  | {
+      tokenId: string;
+      maker: { id: string };
+      tokenName: string;
+      canSpend: boolean;
+    }
+  | Response
 > {
   const token = bearerToken(request.headers.get("authorization"));
   const verified = token ? await verifyAccessToken(token) : null;
   if (verified) {
     return {
       tokenId: verified.tokenId,
+      maker: { id: verified.makerId },
       tokenName: verified.name,
       canSpend: verified.canSpend,
     };

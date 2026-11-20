@@ -12,10 +12,11 @@ import type {
   ModelValue,
   ProviderNote,
 } from "@/components/models/model-choice";
+import { monthFitLine, useMonthFit } from "@/components/projects/month-fit";
 import { SlotModel } from "@/components/projects/slot-model";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { toMicros } from "@/domain/generation-cost";
+import { canAfford, toMicros } from "@/domain/generation-cost";
 import { modelLabel } from "@/domain/model-defaults";
 import { type Route, videoTakeEstimate } from "@/domain/model-routing";
 import type { VideoSettings } from "@/domain/plan";
@@ -26,6 +27,7 @@ import {
   type VideoOrientation,
   type VideoSeconds,
 } from "@/domain/video";
+import { cn } from "@/lib/utils";
 
 const money = (usd: number) => `$${usd.toFixed(2)}`;
 
@@ -35,7 +37,8 @@ const SELECT =
 // A video slot's choices and its Generate: the model and its resolution, the
 // start frame among the approved scenes, the motion, the length the model and
 // the destination accept, the orientation. Generating opens one confirmation
-// with the model, its pinned price and the month's budget, then queues this
+// with the model, its pinned price and the month's limit (its amounts for the
+// owner, whether it fits for a member), then queues this
 // card alone (the queue re-derives the request and refuses if its price is
 // higher than the one shown).
 export function VideoControls({
@@ -49,7 +52,7 @@ export function VideoControls({
   scenes,
   busy,
   rendered,
-  budgetLine,
+  month,
   route = null,
   blocked = null,
 }: {
@@ -63,7 +66,18 @@ export function VideoControls({
   scenes: { key: string; label: string }[];
   busy: boolean;
   rendered: boolean;
-  budgetLine: string;
+  // The owner's line of this month's amounts (or mock mode's), or, for a
+  // member, whom to ask: they read only whether the video fits.
+  month:
+    | {
+        line: string;
+        studio?: {
+          spentMicros: number;
+          reservedMicros: number;
+          capMicros: number;
+        };
+      }
+    | { ask: string };
   // The video route's models that may run here: the price is the dearest.
   route?: Route | null;
   // Why the model's provider cannot take a paid call now (providerBlock).
@@ -73,6 +87,19 @@ export function VideoControls({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const usd = videoTakeEstimate(model, settings.seconds, route);
+  const ask = "ask" in month ? month.ask : null;
+  // The owner reads the amounts, so the video's fit is worked out here, as
+  // the Generate panel does; the queue checks again when it is sent.
+  const overCap =
+    "studio" in month &&
+    month.studio !== undefined &&
+    usd !== null &&
+    !canAfford({ ...month.studio, requestMicros: toMicros(usd) });
+  const fit = useMonthFit({
+    projectId,
+    cardIds: [cardId],
+    enabled: confirming && ask !== null && usd !== null,
+  });
   const choose = (choice: VideoChoice) =>
     startTransition(() =>
       setVideoChoiceAction({ projectId, destinationId, slotKey, choice }),
@@ -288,12 +315,32 @@ export function VideoControls({
             second; Kiln records what the clip used)
           </dd>
           <dt className="text-on-surface-mid">This month</dt>
-          <dd className="text-foreground">{budgetLine}</dd>
+          <dd
+            data-testid="video-confirm-month"
+            className={cn(
+              // A member's answer may take two lines at 390 px: the row keeps
+              // them from "checking" on, so the dialog does not move.
+              ask !== null && "min-h-[2lh] sm:min-h-0",
+              ask !== null && fit !== "fits" && fit !== "checking"
+                ? "text-fail"
+                : "text-foreground",
+            )}
+          >
+            {"line" in month ? month.line : monthFitLine(fit, month.ask)}
+          </dd>
         </dl>
         <p className="font-sans text-[0.8rem] leading-snug text-on-surface-mid">
           Kiln animates the approved scene in the background; the product stays
           exactly as photographed. A render that fails is never paid twice.
         </p>
+        {overCap ? (
+          <p
+            className="font-mono text-[0.7rem] text-fail"
+            data-testid="video-confirm-over-cap"
+          >
+            This video would go over the monthly cap.
+          </p>
+        ) : null}
         <div className="flex justify-end gap-2">
           <Button
             variant="ghost"
@@ -307,7 +354,7 @@ export function VideoControls({
           <Button
             size="sm"
             data-testid="video-confirm-generate"
-            disabled={pending}
+            disabled={pending || overCap || (ask !== null && fit !== "fits")}
             onClick={generate}
           >
             {pending ? <Loader2 className="animate-spin" /> : <Film />}

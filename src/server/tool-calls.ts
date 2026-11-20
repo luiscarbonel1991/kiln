@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { assertDatabaseUrl, db } from "@/lib/db";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import {
   callTool,
   type Tool,
@@ -42,12 +42,12 @@ export async function callAndRecord(
   const answer = await callTool(tools, name, args, ctx);
   try {
     assertDatabaseUrl();
-    const maker = await getCurrentMaker();
     await db.toolCall.create({
       data: {
-        makerId: maker.id,
+        makerId: ctx.maker.id,
         tokenId: ctx.tokenId,
         sessionId: ctx.sessionId ?? null,
+        memberId: ctx.maker.member?.id ?? null,
         tokenName: ctx.tokenName,
         tool: name.slice(0, 80),
         args: recordedArgs(args),
@@ -81,9 +81,11 @@ const READ_BACK = 300;
 
 // The current maker's latest tool calls, newest first, a run of the same call
 // (tool, token, outcome) folded into one row with its count.
-export async function recentToolCalls(take = 20): Promise<ToolCallView[]> {
+export async function recentToolCalls(
+  maker: MakerRef,
+  take = 20,
+): Promise<ToolCallView[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = await db.toolCall.findMany({
     where: { makerId: maker.id },
     orderBy: { at: "desc" },

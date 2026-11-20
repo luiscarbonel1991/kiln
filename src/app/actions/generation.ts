@@ -2,9 +2,12 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { enqueueProjectCards } from "@/server/generation-queue";
+import {
+  enqueueProjectCards,
+  fitsProjectCards,
+} from "@/server/generation-queue";
 import { cancelBatch, QueueRefusal } from "@/server/generation-repository";
-import { getCurrentMaker } from "@/server/maker-repository";
+import { makerAction } from "@/server/guarded";
 
 // Queue mutations. Server Functions are POST-reachable: Zod is the trust
 // boundary; the queue re-derives every request and estimate from the saved
@@ -25,25 +28,49 @@ const Enqueue = z.object({
   test: z.boolean().optional(),
 });
 
-export async function enqueueGenerationAction(
-  input: unknown,
-): Promise<{ queued: number } | { error: string }> {
-  const parsed = Enqueue.parse(input);
-  try {
-    const result = await enqueueProjectCards(parsed);
-    refresh();
-    return { queued: result.queued };
-  } catch (error) {
-    if (error instanceof QueueRefusal) return { error: error.message };
-    throw error;
-  }
-}
+export const enqueueGenerationAction = makerAction(
+  async (
+    maker,
+    input: unknown,
+  ): Promise<{ queued: number } | { error: string }> => {
+    const parsed = Enqueue.parse(input);
+    try {
+      const result = await enqueueProjectCards(maker, parsed);
+      refresh();
+      return { queued: result.queued };
+    } catch (error) {
+      if (error instanceof QueueRefusal) return { error: error.message };
+      throw error;
+    }
+  },
+);
+
+const Fit = Enqueue.pick({ projectId: true, cardIds: true });
+
+// Whether these cards would fit this month's limit, for a member, who never
+// reads the amounts: the server prices them from the saved project, so the
+// answer is only ever about work the maker could queue.
+export const monthFitAction = makerAction(
+  async (
+    maker,
+    input: unknown,
+  ): Promise<{ fits: boolean } | { error: string }> => {
+    const parsed = Fit.parse(input);
+    try {
+      return { fits: await fitsProjectCards(maker, parsed) };
+    } catch (error) {
+      if (error instanceof QueueRefusal) return { error: error.message };
+      throw error;
+    }
+  },
+);
 
 const Cancel = z.object({ batchId: z.string().min(1) });
 
-export async function cancelBatchAction(input: unknown): Promise<void> {
-  const { batchId } = Cancel.parse(input);
-  const maker = await getCurrentMaker();
-  await cancelBatch(maker.id, batchId);
-  refresh();
-}
+export const cancelBatchAction = makerAction(
+  async (maker, input: unknown): Promise<void> => {
+    const { batchId } = Cancel.parse(input);
+    await cancelBatch(maker.id, batchId);
+    refresh();
+  },
+);

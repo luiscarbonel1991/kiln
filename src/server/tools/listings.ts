@@ -21,6 +21,7 @@ import {
   saveRead,
 } from "@/server/listing-results";
 import { listingTarget } from "@/server/listing-write";
+import type { MakerRef } from "@/server/maker-repository";
 import { setBrief, setListing } from "@/server/project-repository";
 import {
   findShops,
@@ -56,8 +57,9 @@ export const saveBriefTool = defineTool({
     "Save a destination's market brief, as the board's Market brief does: the searches the listing aims at, the first the one it leads with (term, monthly searches, results, conversion, price band, source, readOn), and notes about page one. It replaces the brief there; an empty one clears it. The listing text and scenes read it.",
   input: z.object({ ...Where, brief: MarketBrief }),
   hints: { idempotent: true },
-  run: async ({ project, destination, brief }) => {
+  run: async ({ project, destination, brief }, { maker }) => {
     await setBrief(
+      maker,
       project,
       destination,
       isEmptyBrief(brief) ? undefined : brief,
@@ -80,10 +82,13 @@ export const listResultsTool = defineTool({
     "Every listing the maker follows (a delivered sale destination): its address, the reads due today and the next one (before, day14, day30, each with its window), the reads kept, before against the latest after in words, and what changed on the listing.",
   input: z.object({}),
   hints: { readOnly: true },
-  run: async () => {
+  run: async (_input, { maker }) => {
     const today = localDate();
     return {
-      data: { today, listings: followedView(await followedListings(today)) },
+      data: {
+        today,
+        listings: followedView(await followedListings(maker, today)),
+      },
     };
   },
 });
@@ -99,8 +104,8 @@ export const saveReadTool = defineTool({
     numbers: ReadInput,
   }),
   hints: { idempotent: true },
-  run: async ({ project, destination, read, numbers }) => {
-    const saved = await saveRead({
+  run: async ({ project, destination, read, numbers }, { maker }) => {
+    const saved = await saveRead(maker, {
       projectId: project,
       destinationId: destination,
       key: read,
@@ -124,8 +129,8 @@ export const bestSellersTool = defineTool({
     by: z.enum(RANK_BY).default("orders"),
   }),
   hints: { readOnly: true, openWorld: true },
-  run: async ({ days, by }) => {
-    const view = await yourBestSellers(days, { by });
+  run: async ({ days, by }, { maker }) => {
+    const view = await yourBestSellers(maker, days, { by });
     if (!view) {
       throw new ToolRefusal(
         "No shop is connected: the maker connects one in Shops.",
@@ -142,8 +147,8 @@ export const watchedShopsTool = defineTool({
     "The shops the maker compares theirs with, theirs among them, ranked by the past year's reviews (recent) or lifetime sales: the numbers Etsy gives about another shop.",
   input: z.object({ by: z.enum(SHOP_RANK_BY).default("recent") }),
   hints: { readOnly: true, openWorld: true },
-  run: async ({ by }) => {
-    const view = await watchedShops({ by });
+  run: async ({ by }, { maker }) => {
+    const view = await watchedShops(maker, { by });
     if (!view)
       throw new ToolRefusal("Kiln has no Etsy key to read shops with.");
     return { data: { ...view } };
@@ -179,8 +184,8 @@ export const shopFavouritesTool = defineTool({
 
 type Target = NonNullable<Awaited<ReturnType<typeof listingTarget>>>;
 
-async function targetOf(project: string, destination: string) {
-  const target = await listingTarget(project, destination);
+async function targetOf(maker: MakerRef, project: string, destination: string) {
+  const target = await listingTarget(maker, project, destination);
   if (!target) {
     throw new ToolRefusal(
       `No project of yours has listing text on "${destination}": it needs a planned project and a sale destination.`,
@@ -204,8 +209,8 @@ export const getListingTool = defineTool({
     "A destination's listing text as the board's Listing panel shows it: the title, description, tags and materials, each with who wrote it (spec: drafted from the product; model: a text model or an agent; maker: the maker), whether it is saved or still the free draft, every problem against the channel's rules and the market brief (errors the channel refuses, warnings), the rules (title length, tag count, length and characters), and tag ideas from the brief's searches. Free.",
   input: z.object(Where),
   hints: { readOnly: true },
-  run: async ({ project, destination }) => {
-    const target = await targetOf(project, destination);
+  run: async ({ project, destination }, { maker }) => {
+    const target = await targetOf(maker, project, destination);
     const listing = target.current;
     return {
       data: {
@@ -260,8 +265,11 @@ export const editListingTool = defineTool({
       .describe("Replace a field the maker wrote; only after they agreed."),
   }),
   hints: { idempotent: true },
-  run: async ({ project, destination, overwriteMakerText, ...fields }) => {
-    const target = await targetOf(project, destination);
+  run: async (
+    { project, destination, overwriteMakerText, ...fields },
+    { maker },
+  ) => {
+    const target = await targetOf(maker, project, destination);
     const given = PROSE.filter(
       (f) => fields[f as keyof typeof fields] !== undefined,
     );
@@ -292,7 +300,7 @@ export const editListingTool = defineTool({
         `Nothing was saved: ${wrong.map((i) => i.message).join(" ")} Fix it and send the edit again.`,
       );
     }
-    await setListing(project, destination, listing).catch(refused);
+    await setListing(maker, project, destination, listing).catch(refused);
     return { data: { project, destination, written: given, issues } };
   },
 });

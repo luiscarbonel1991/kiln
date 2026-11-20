@@ -1,7 +1,8 @@
-import { OpenAddressNotice } from "@/components/open-address-notice";
 import { StudioShell } from "@/components/studio/studio-shell";
 import { enabledModules } from "@/modules/enabled";
 import { ModulesProvider } from "@/modules/modules-context";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 import { getMakerModelSetup } from "@/server/maker-repository";
 import { photoRead } from "@/server/text-calls";
 
@@ -9,23 +10,25 @@ import { photoRead } from "@/server/text-calls";
 // restores the latest studio project; `?open=<id>` opens one (from Home) and
 // `?new=1` (the New project flow's Design tile) opens it empty. Its new cards
 // start on the draft route's first model: the studio explores.
-export default async function StudioPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+export default makerPage(async function StudioPage(
+  maker: CurrentMaker,
+  {
+    searchParams,
+  }: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  },
+) {
   const { new: fresh, open } = await searchParams;
-  const { models, routes } = await getMakerModelSetup();
+  const { models, routes } = await getMakerModelSetup(maker);
   const [draft] = routes?.draft.models ?? [models.image];
   return (
     <ModulesProvider modules={enabledModules()}>
-      <OpenAddressNotice />
       <StudioShell
         fresh={fresh === "1"}
         openId={typeof open === "string" ? open : undefined}
         makerModels={{ ...models, image: draft }}
-        photoRead={await photoRead()}
+        photoRead={await photoRead(maker)}
       />
     </ModulesProvider>
   );
-}
+});

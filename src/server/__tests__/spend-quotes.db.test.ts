@@ -19,9 +19,9 @@ describe.skipIf(!enabled)(
     let other: { id: string };
 
     const quote = (
-      over: Partial<Parameters<typeof quotes.createQuote>[0]> = {},
+      over: Partial<Parameters<typeof quotes.createQuote>[1]> = {},
     ) =>
-      quotes.createQuote({
+      quotes.createQuote(maker, {
         action: "generate",
         input: { project: "p1", cards: ["etsy.hero"] },
         typicalMicros: 70_000,
@@ -49,26 +49,26 @@ describe.skipIf(!enabled)(
 
     it("a quote runs once, with the input and estimate it was made with", async () => {
       const made = await quote();
-      const claimed = await quotes.claimQuote(made.id, "generate");
+      const claimed = await quotes.claimQuote(maker, made.id, "generate");
       expect(claimed).toMatchObject({
         id: made.id,
         action: "generate",
         input: { project: "p1", cards: ["etsy.hero"] },
         maxMicros: 90_000,
       });
-      await expect(quotes.claimQuote(made.id, "generate")).rejects.toThrow(
-        "That quote was used already: quote again.",
-      );
+      await expect(
+        quotes.claimQuote(maker, made.id, "generate"),
+      ).rejects.toThrow("That quote was used already: quote again.");
     });
 
     it("is refused for another action, after it expires, and for another maker", async () => {
       const made = await quote();
-      await expect(quotes.claimQuote(made.id, "write_listing")).rejects.toThrow(
-        "That quote is for generate, not write_listing",
-      );
+      await expect(
+        quotes.claimQuote(maker, made.id, "write_listing"),
+      ).rejects.toThrow("That quote is for generate, not write_listing");
       const later = new Date(made.expiresAt.getTime() + 1000);
       await expect(
-        quotes.claimQuote(made.id, "generate", later),
+        quotes.claimQuote(maker, made.id, "generate", later),
       ).rejects.toThrow(/^That quote expired at/);
       const theirs = await db.spendQuote.create({
         data: {
@@ -81,18 +81,20 @@ describe.skipIf(!enabled)(
           expiresAt: new Date(Date.now() + 60_000),
         },
       });
-      await expect(quotes.claimQuote(theirs.id, "generate")).rejects.toThrow(
-        "No quote of yours has that id: quote first.",
-      );
+      await expect(
+        quotes.claimQuote(maker, theirs.id, "generate"),
+      ).rejects.toThrow("No quote of yours has that id: quote first.");
       // The refused claims left the quote unused.
-      expect((await quotes.claimQuote(made.id, "generate")).id).toBe(made.id);
+      expect((await quotes.claimQuote(maker, made.id, "generate")).id).toBe(
+        made.id,
+      );
     });
 
     it("only one of two calls with the same quote runs it", async () => {
       const made = await quote();
       const results = await Promise.allSettled([
-        quotes.claimQuote(made.id, "generate"),
-        quotes.claimQuote(made.id, "generate"),
+        quotes.claimQuote(maker, made.id, "generate"),
+        quotes.claimQuote(maker, made.id, "generate"),
       ]);
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     });
@@ -107,7 +109,12 @@ describe.skipIf(!enabled)(
         hints: {},
         run: async () => ({ data: { queued: 1 } }),
       });
-      const ctx = { tokenId: "tok-quotes", tokenName: "Agent", canSpend: true };
+      const ctx = {
+        maker,
+        tokenId: "tok-quotes",
+        tokenName: "Agent",
+        canSpend: true,
+      };
       await calls.callAndRecord([tool], "spend_test", { quote: made.id }, ctx);
       await calls.callAndRecord(
         [tool],
@@ -130,13 +137,50 @@ describe.skipIf(!enabled)(
         keys: ["quote", "note"],
       });
       expect(rows[2].error).toMatch(/^spend_test needs:/);
-      const recent = await calls.recentToolCalls();
+      const recent = await calls.recentToolCalls(maker);
       expect(recent.find((c) => c.id === rows[0].id)).toMatchObject({
         tokenName: "Agent",
         tool: "spend_test",
         quotedMaxMicros: 350_000,
         count: 1,
       });
+    });
+
+    // A tool call records the person behind it; a token's (MCP,
+    // the HTTP API, `kiln call`) records no one.
+    it("records a call with the person behind it, and a token's with no one", async () => {
+      const tool = defineTool({
+        name: "member_test",
+        title: "Member test",
+        description: "Answers.",
+        input: z.object({}),
+        hints: { readOnly: true },
+        run: async () => ({ data: {} }),
+      });
+      const token = {
+        maker,
+        tokenId: "tok-quotes",
+        tokenName: "Agent",
+        canSpend: false,
+      };
+      const chat = {
+        ...token,
+        maker: {
+          ...maker,
+          member: { id: "m-tool", userId: "u-tool", role: "member" as const },
+        },
+        tokenName: "Chat",
+      };
+      await calls.callAndRecord([tool], "member_test", {}, token);
+      await calls.callAndRecord([tool], "member_test", {}, chat);
+      const rows = await db.toolCall.findMany({
+        where: { tokenId: "tok-quotes", tool: "member_test" },
+        orderBy: { at: "asc" },
+      });
+      expect(rows.map((r) => [r.tokenName, r.memberId])).toEqual([
+        ["Agent", null],
+        ["Chat", "m-tool"],
+      ]);
     });
 
     it("folds the same call back to back into one row with its count", async () => {
@@ -149,6 +193,7 @@ describe.skipIf(!enabled)(
         run: async () => ({ data: {} }),
       });
       const ctx = {
+        maker,
         tokenId: "tok-quotes",
         tokenName: "Poller",
         canSpend: false,
@@ -156,7 +201,7 @@ describe.skipIf(!enabled)(
       for (let i = 0; i < 3; i++) {
         await calls.callAndRecord([tool], "poll_test", {}, ctx);
       }
-      const [latest] = await calls.recentToolCalls();
+      const [latest] = await calls.recentToolCalls(maker);
       expect(latest).toMatchObject({ tool: "poll_test", count: 3 });
     });
   },

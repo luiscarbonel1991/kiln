@@ -14,11 +14,13 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("test takes (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const { estimateProjectCards } = await import("@/server/generation-queue");
   const { upsertProducts } = await import("@/server/product-repository");
-  const { getCurrentMaker } = await import("@/server/maker-repository");
   const { planProject } = await import("@/domain/plan");
   const { Product } = await import("@/domain/product");
   const { CATALOG } = await import("@/lib/recipes");
@@ -40,7 +42,7 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
     destination = "etsy",
     type: "listing-kit" | "content" = "listing-kit",
   ) => {
-    const [product] = await upsertProducts([
+    const [product] = await upsertProducts(maker, [
       Product.parse({
         id: "pkg:TT",
         sku,
@@ -62,7 +64,7 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
       destinationIds: [destination],
       catalog: CATALOG,
     });
-    const id = await repo.createProject({
+    const id = await repo.createProject(maker, {
       type,
       product,
       plan,
@@ -79,8 +81,10 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
 
   it("prices a scene at its model's low quality, on that model alone", async () => {
     const id = await start();
-    const full = await estimateProjectCards(id, ["etsy.hero"]);
-    const test = await estimateProjectCards(id, ["etsy.hero"], { test: true });
+    const full = await estimateProjectCards(maker, id, ["etsy.hero"]);
+    const test = await estimateProjectCards(maker, id, ["etsy.hero"], {
+      test: true,
+    });
     const [card] = test.cards;
     expect(card.request).toMatchObject({
       kind: "image",
@@ -90,7 +94,7 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
     expect(card.next).toEqual([]);
     expect(card.maxMicros).toBeLessThan(full.cards[0].maxMicros);
     await expect(
-      estimateProjectCards(id, ["etsy.video"], { test: true }),
+      estimateProjectCards(maker, id, ["etsy.video"], { test: true }),
     ).rejects.toThrow();
   });
 
@@ -99,7 +103,7 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
       "@/domain/generation-cost"
     );
     const id = await start();
-    const full = await estimateProjectCards(id, ["etsy.hero"]);
+    const full = await estimateProjectCards(maker, id, ["etsy.hero"]);
     const [hero] = full.cards;
     expect(hero.request.model).toMatchObject({
       provider: "openai",
@@ -122,7 +126,9 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
     );
     expect(full.models[0]).toMatchObject({ resolution: "2K" });
     expect(full.model).toContain("medium 2K");
-    const test = await estimateProjectCards(id, ["etsy.hero"], { test: true });
+    const test = await estimateProjectCards(maker, id, ["etsy.hero"], {
+      test: true,
+    });
     expect(test.cards[0].request.model).toMatchObject({ size: "1k" });
     // A test take, a cheap check of the direction, goes without the look.
     expect(test.cards[0].request).not.toHaveProperty("look");
@@ -133,7 +139,7 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
     const scene = await db.card.findFirstOrThrow({
       where: { projectId: feed, type: "image", cardId: "instagram.hook" },
     });
-    const post = await estimateProjectCards(feed, [scene.cardId]);
+    const post = await estimateProjectCards(maker, feed, [scene.cardId]);
     expect(post.cards[0].request.model).toMatchObject({ size: "1k" });
     expect(post.models[0].resolution).toBeNull();
   });
@@ -151,11 +157,10 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
       },
     });
     await expect(
-      estimateProjectCards(id, ["etsy.hero"], { test: true }),
+      estimateProjectCards(maker, id, ["etsy.hero"], { test: true }),
     ).rejects.toThrow("has no low quality");
 
     // A finished test take on the in-use scene.
-    const maker = await getCurrentMaker();
     const take = "https://stub.local/cards/in-use-test.png";
     await db.generationJob.create({
       data: {
@@ -178,6 +183,7 @@ describe.skipIf(!enabled)("test takes (database)", async () => {
     });
     await expect(
       repo.setSlotApproval(
+        maker,
         id,
         { destinationId: "etsy", slotKey: "in-use" },
         true,

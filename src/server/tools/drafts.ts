@@ -37,9 +37,9 @@ export const listDraftsTool = defineTool({
     "Every draft listing of the maker's connected Etsy shop, newest change first: its id, title, price, quantity, photo count, and the project Kiln made it from. draftsAllowed says whether the maker allowed Kiln to write drafts. Free; read from Etsy's API.",
   input: z.object({}),
   hints: { readOnly: true, openWorld: true },
-  run: () =>
+  run: (_input, { maker }) =>
     asTool(async () => {
-      const listed = await listDrafts();
+      const listed = await listDrafts(maker);
       return {
         data: {
           shop: listed.shopName,
@@ -72,9 +72,9 @@ export const getDraftTool = defineTool({
     "One listing of the maker's shop as Etsy has it now: title, description, tags, materials, category, price, quantity, photos, whether Kiln may change it (a draft; a live listing never) and why not, whether it has variations (its prices then stay Etsy's), and the last writes Kiln sent to it. Free.",
   input: z.object({ listing: Listing }),
   hints: { readOnly: true, openWorld: true },
-  run: ({ listing }) =>
+  run: ({ listing }, { maker }) =>
     asTool(async () => {
-      const d = await draftDetail(listing);
+      const d = await draftDetail(maker, listing);
       return {
         data: {
           listing: d.listingId,
@@ -121,7 +121,10 @@ export const makeDraftTool = defineTool({
     whenMade: WhenMade.optional(),
   }),
   hints: { openWorld: true, makerClick: true },
-  run: ({ project, destination, category, quantity, whoMade, whenMade }) =>
+  run: (
+    { project, destination, category, quantity, whoMade, whenMade },
+    { maker },
+  ) =>
     asTool(async () => {
       const chosen = {
         ...(category ? { taxonomyId: category } : {}),
@@ -129,11 +132,11 @@ export const makeDraftTool = defineTool({
         ...(whoMade ? { whoMade } : {}),
         ...(whenMade ? { whenMade } : {}),
       };
-      const preview = await previewDraft(project, destination, chosen);
+      const preview = await previewDraft(maker, project, destination, chosen);
       if (!preview.fields) {
         throw new ToolRefusal(preview.blockers.join(" "));
       }
-      const made = await createDraftFromProject({
+      const made = await createDraftFromProject(maker, {
         projectId: project,
         destinationId: destination,
         settings: DraftSettings.parse(preview.settings),
@@ -176,9 +179,10 @@ export const editDraftTool = defineTool({
     quantity: z.number().int().min(0).max(999).optional(),
   }),
   hints: { openWorld: true, makerClick: true },
-  run: ({ listing, category, ...change }) =>
+  run: ({ listing, category, ...change }, { maker }) =>
     asTool(async () => {
       const result = await updateDraft(
+        maker,
         listing,
         { ...change, ...(category ? { taxonomyId: category } : {}) },
         "Chat",

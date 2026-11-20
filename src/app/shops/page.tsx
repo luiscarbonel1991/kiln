@@ -16,6 +16,8 @@ import {
 import { hasDatabase } from "@/lib/db";
 import { SHOP_RANK_LABEL, type ShopsQuery, shopsHref } from "@/lib/shops-view";
 import { EtsyError } from "@/providers/shop/etsy";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 import {
   type ConnectProblem,
   etsySetup,
@@ -53,11 +55,14 @@ const said = (error: unknown) =>
 // Shops (Luis, 2026-10-27): the maker's best sellers, read from their connected
 // Etsy shop's orders, and the other shops they compare theirs with, from Etsy's
 // public numbers. Read per request through Etsy's API, never its pages.
-export default async function ShopsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+export default makerPage(async function ShopsPage(
+  maker: CurrentMaker,
+  {
+    searchParams,
+  }: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  },
+) {
   await dynamic();
   const params = await searchParams;
   const query: ShopsQuery = {
@@ -67,26 +72,29 @@ export default async function ShopsPage({
   };
   const fresh = params.fresh === "1";
   const setup = etsySetup();
-  const connected = hasDatabase() ? await shopConnection() : null;
+  const connected = hasDatabase() ? await shopConnection(maker) : null;
 
   let best: BestSellersView | null = null;
   let bestError: string | null = null;
   if (connected && !connected.needsReconnect) {
     try {
-      best = await yourBestSellers(query.window, { by: query.by, fresh });
+      best = await yourBestSellers(maker, query.window, {
+        by: query.by,
+        fresh,
+      });
     } catch (error) {
       bestError =
         error instanceof ShopNeedsReconnect ? error.message : said(error);
     }
   }
   // A failed read may have found the access revoked.
-  const shop = bestError && connected ? await shopConnection() : connected;
+  const shop = bestError && connected ? await shopConnection(maker) : connected;
 
   let others: Awaited<ReturnType<typeof watchedShops>> = null;
   let othersError: string | null = null;
   if (setup.publicReads && hasDatabase()) {
     try {
-      others = await watchedShops({ by: query.shops, fresh });
+      others = await watchedShops(maker, { by: query.shops, fresh });
     } catch (error) {
       othersError = said(error);
     }
@@ -271,4 +279,4 @@ export default async function ShopsPage({
       </main>
     </div>
   );
-}
+});

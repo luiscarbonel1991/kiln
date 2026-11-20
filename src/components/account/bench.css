@@ -1,0 +1,402 @@
+/* The account pages' scene, in three acts on one 16 s clock: a pencil sketch
+   on paper, the product it becomes, and the photo Kiln makes of it. */
+.bench {
+  --pencil: #3b3733;
+  --paper: #efe7d8;
+  --ink: #241f18;
+  background: var(--paper);
+}
+.bench svg * {
+  animation-duration: 16s;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+  /* Open with the pencil already moving, not on blank paper. */
+  animation-delay: -2.5s;
+}
+
+/* The steps, top left: the one being played is dark. */
+.bench-step {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  fill: var(--ink);
+  opacity: 0.28;
+}
+.bench-step-1 {
+  animation-name: bench-step-1;
+}
+.bench-step-2 {
+  animation-name: bench-step-2;
+}
+.bench-step-3 {
+  animation-name: bench-step-3;
+}
+
+/* Act 1: the sketch. Every line is drawn, twice where a hand would go over
+   it, and wobbles through the pencil filter. */
+.bench-sketch {
+  animation-name: bench-sketch;
+}
+.bench-line {
+  fill: none;
+  stroke: var(--pencil);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0.9;
+}
+.bench-line-soft {
+  stroke-width: 1;
+  opacity: 0.5;
+}
+.bench-l1 {
+  animation-name: bench-l1;
+}
+.bench-l2 {
+  animation-name: bench-l2;
+}
+.bench-l3 {
+  animation-name: bench-l3;
+}
+.bench-l4 {
+  animation-name: bench-l4;
+}
+.bench-l5 {
+  animation-name: bench-l5;
+}
+.bench-hand {
+  font-family: var(--font-fraunces), serif;
+  font-style: italic;
+  fill: transparent;
+  stroke: var(--pencil);
+  stroke-width: 0.9;
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
+}
+.bench-hand-name {
+  font-size: 44px;
+  animation-name: bench-hand-name;
+}
+.bench-hand-note {
+  font-size: 17px;
+  stroke-width: 0.7;
+  animation-name: bench-hand-note;
+}
+
+/* Act 2: the product. Clean edges, its material, its lettering engraved. */
+.bench-product {
+  opacity: 0;
+  animation-name: bench-product;
+}
+.bench-product-name {
+  font-family: var(--font-fraunces), serif;
+  font-size: 44px;
+  font-weight: 500;
+  fill: #2a1a10;
+}
+.bench-product-year {
+  font-family: var(--font-fraunces), serif;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  fill: #2a1a10;
+}
+.bench-spec {
+  opacity: 0;
+  animation-name: bench-spec;
+}
+.bench-spec text {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  fill: var(--ink);
+}
+.bench-spec path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+/* Act 3: the scene around it, the camera's frame, the check. */
+.bench-scene {
+  opacity: 0;
+  animation-name: bench-scene;
+}
+.bench-counter {
+  animation-name: bench-counter;
+}
+.bench-shadow {
+  opacity: 0;
+  animation-name: bench-scene;
+}
+.bench-corner {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  opacity: 0;
+  transform-box: fill-box;
+  animation-name: bench-corner;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bench-flash {
+  fill: #fffdf9;
+  opacity: 0;
+  animation-name: bench-flash;
+}
+.bench-chip {
+  opacity: 0;
+  animation-name: bench-chip;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bench-chip rect {
+  fill: #2c6a51;
+}
+.bench-chip text {
+  fill: #fffdf9;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+@keyframes bench-step-1 {
+  0%,
+  34% {
+    opacity: 1;
+  }
+  38%,
+  100% {
+    opacity: 0.28;
+  }
+}
+@keyframes bench-step-2 {
+  0%,
+  34% {
+    opacity: 0.28;
+  }
+  38%,
+  58% {
+    opacity: 1;
+  }
+  62%,
+  100% {
+    opacity: 0.28;
+  }
+}
+@keyframes bench-step-3 {
+  0%,
+  58% {
+    opacity: 0.28;
+  }
+  62%,
+  94% {
+    opacity: 1;
+  }
+  99%,
+  100% {
+    opacity: 0.28;
+  }
+}
+
+@keyframes bench-sketch {
+  0%,
+  34% {
+    opacity: 1;
+  }
+  42%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes bench-l1 {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  10%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bench-l2 {
+  0%,
+  6% {
+    stroke-dashoffset: 1;
+  }
+  15%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bench-l3 {
+  0%,
+  13% {
+    stroke-dashoffset: 1;
+  }
+  18%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bench-l4 {
+  0%,
+  24% {
+    stroke-dashoffset: 1;
+  }
+  29%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bench-l5 {
+  0%,
+  27% {
+    stroke-dashoffset: 1;
+  }
+  32%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bench-hand-name {
+  0%,
+  15% {
+    stroke-dashoffset: 320;
+  }
+  26%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bench-hand-note {
+  0%,
+  28% {
+    stroke-dashoffset: 320;
+  }
+  33%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes bench-product {
+  0%,
+  34% {
+    opacity: 0;
+  }
+  42%,
+  94% {
+    opacity: 1;
+  }
+  99%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes bench-spec {
+  0%,
+  42% {
+    opacity: 0;
+  }
+  46%,
+  56% {
+    opacity: 1;
+  }
+  60%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes bench-scene {
+  0%,
+  58% {
+    opacity: 0;
+  }
+  68%,
+  94% {
+    opacity: 1;
+  }
+  99%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes bench-counter {
+  0%,
+  58% {
+    transform: translateY(26px);
+  }
+  68%,
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes bench-corner {
+  0%,
+  72% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+  77%,
+  94% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  99%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@keyframes bench-flash {
+  0%,
+  79% {
+    opacity: 0;
+  }
+  80.5% {
+    opacity: 0.7;
+  }
+  84%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes bench-chip {
+  0%,
+  84% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  88%,
+  94% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  99%,
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+}
+
+/* Without motion: the last frame, the product in its scene, checked. */
+@media (prefers-reduced-motion: reduce) {
+  .bench svg * {
+    animation-name: none;
+  }
+  .bench-sketch,
+  .bench-spec,
+  .bench-flash {
+    opacity: 0;
+  }
+  .bench-product,
+  .bench-scene,
+  .bench-shadow,
+  .bench-corner,
+  .bench-chip,
+  .bench-step-3 {
+    opacity: 1;
+  }
+}

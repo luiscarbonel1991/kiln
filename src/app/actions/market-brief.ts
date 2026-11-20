@@ -9,6 +9,7 @@ import {
   MarketBrief,
   SearchColumns,
 } from "@/domain/market-brief";
+import { makerAction } from "@/server/guarded";
 import { rememberSearchColumns } from "@/server/maker-repository";
 import { setBrief } from "@/server/project-repository";
 
@@ -59,26 +60,28 @@ function briefError(error: z.ZodError): string {
 
 // Save a destination's market brief (an empty one clears it), and the column
 // mapping a pasted table was read with, for its source.
-export async function saveBriefAction(
-  input: unknown,
-): Promise<{ error: string } | undefined> {
-  const parsed = BriefSave.safeParse(input);
-  if (!parsed.success) return { error: "The brief could not be read." };
-  const { projectId, destinationId, columns } = parsed.data;
-  const brief = MarketBrief.safeParse(parsed.data.brief);
-  if (!brief.success) return { error: briefError(brief.error) };
-  try {
-    await setBrief(
-      projectId,
-      destinationId,
-      isEmptyBrief(brief.data) ? undefined : brief.data,
-    );
-    if (columns) await rememberSearchColumns(columns.source, columns.columns);
-  } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Could not save the brief.",
-    };
-  }
-  refresh();
-}
+export const saveBriefAction = makerAction(
+  async (maker, input: unknown): Promise<{ error: string } | undefined> => {
+    const parsed = BriefSave.safeParse(input);
+    if (!parsed.success) return { error: "The brief could not be read." };
+    const { projectId, destinationId, columns } = parsed.data;
+    const brief = MarketBrief.safeParse(parsed.data.brief);
+    if (!brief.success) return { error: briefError(brief.error) };
+    try {
+      await setBrief(
+        maker,
+        projectId,
+        destinationId,
+        isEmptyBrief(brief.data) ? undefined : brief.data,
+      );
+      if (columns)
+        await rememberSearchColumns(maker, columns.source, columns.columns);
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error ? error.message : "Could not save the brief.",
+      };
+    }
+    refresh();
+  },
+);

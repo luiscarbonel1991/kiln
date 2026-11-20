@@ -17,6 +17,9 @@ const enabled =
 describe.skipIf(!enabled)(
   "the reference each scene edits (database)",
   async () => {
+    const maker = enabled
+      ? await (await import("@/server/maker-repository")).getCurrentMaker()
+      : { id: "" };
     const { db } = await import("@/lib/db");
     const repo = await import("@/server/project-repository");
     const { estimateProjectCards } = await import("@/server/generation-queue");
@@ -39,7 +42,7 @@ describe.skipIf(!enabled)(
     });
 
     it("hero and in-use edit the view from above; the maker's eye level and the macro edit the front", async () => {
-      const [product] = await upsertProducts([
+      const [product] = await upsertProducts(maker, [
         Product.parse({
           id: "pkg:SR",
           sku,
@@ -71,7 +74,7 @@ describe.skipIf(!enabled)(
         }),
         view,
       );
-      const id = await repo.createProject({
+      const id = await repo.createProject(maker, {
         type: "listing-kit",
         product,
         plan,
@@ -86,7 +89,7 @@ describe.skipIf(!enabled)(
       const used = async () =>
         Object.fromEntries(
           (
-            await estimateProjectCards(id, [
+            await estimateProjectCards(maker, id, [
               "etsy.hero",
               "etsy.in-use",
               "etsy.detail",
@@ -101,7 +104,7 @@ describe.skipIf(!enabled)(
         "etsy.in-use": view.assetUrl,
         "etsy.detail": master.assetUrl,
       });
-      await repo.changePlan(id, (p) =>
+      await repo.changePlan(maker, id, (p) =>
         withSlotTuning(
           p,
           { destinationId: "etsy", slotKey: "in-use" },
@@ -113,7 +116,7 @@ describe.skipIf(!enabled)(
       // The maker's own reference: the view no longer applies, and the scene
       // Kiln started a little above is written again from the front.
       const heroText = async () =>
-        (await repo.loadProjectBoard(id))?.board.cards.find(
+        (await repo.loadProjectBoard(maker, id))?.board.cards.find(
           (c) => c.id === "etsy.hero",
         )?.fields.composition.value ?? "";
       expect(await heroText()).toContain("a little above");
@@ -122,10 +125,11 @@ describe.skipIf(!enabled)(
         id: "own-reference",
         assetUrl: "https://stub.local/mine.jpg",
       };
-      const loaded = await repo.loadProjectBoard(id);
+      const loaded = await repo.loadProjectBoard(maker, id);
       const current = loaded?.board.plan;
       if (!loaded || !current) throw new Error("no board");
       await repo.setProjectReference(
+        maker,
         id,
         own,
         [],

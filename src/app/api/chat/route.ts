@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { runTurn, TurnRefusal } from "@/server/chat/run-turn";
 import { SpecialistId } from "@/server/chat/specialists";
+import { sessionRoute } from "@/server/guarded";
 import { apiError, foreignOrigin, readBody } from "@/server/http-api";
 
 // POST /api/chat — one turn of Kiln's chat: the conversation, and what the
@@ -16,7 +17,7 @@ const Body = z.object({
   specialist: SpecialistId.optional(),
 });
 
-export async function POST(request: Request) {
+export const POST = sessionRoute(async (maker, request: Request) => {
   if (foreignOrigin(request)) {
     return apiError(403, "Kiln's chat answers only Kiln's own pages.");
   }
@@ -29,10 +30,10 @@ export async function POST(request: Request) {
     return apiError(400, "Send a conversation and a message.");
   }
   try {
-    return await runTurn(parsed);
+    return await runTurn(maker, parsed);
   } catch (error) {
     if (error instanceof TurnRefusal)
       return apiError(error.status, error.message);
     throw error;
   }
-}
+});

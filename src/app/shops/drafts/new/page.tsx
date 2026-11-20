@@ -10,14 +10,19 @@ import {
   draftChoices,
   previewDraft,
 } from "@/server/etsy-drafts";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 
 // A new Etsy draft from a project's destination: everything it would carry,
 // seen and completed before anything is sent.
-export default async function NewDraftPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+export default makerPage(async function NewDraftPage(
+  maker: CurrentMaker,
+  {
+    searchParams,
+  }: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  },
+) {
   await dynamic();
   const { project, destination } = await searchParams;
   const projectId = typeof project === "string" ? project : "";
@@ -30,8 +35,8 @@ export default async function NewDraftPage({
       throw new DraftRefusal("Pick a project on the Drafts page.");
     }
     [preview, choices] = await Promise.all([
-      previewDraft(projectId, destinationId),
-      draftChoices(),
+      previewDraft(maker, projectId, destinationId),
+      draftChoices(maker),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
@@ -90,4 +95,4 @@ export default async function NewDraftPage({
       </main>
     </div>
   );
-}
+});

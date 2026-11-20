@@ -39,7 +39,12 @@ describe("saveListingAction", () => {
         listing,
       }),
     ).toBeUndefined();
-    expect(setListing).toHaveBeenCalledWith("p", "etsy", listing);
+    expect(setListing).toHaveBeenCalledWith(
+      expect.anything(),
+      "p",
+      "etsy",
+      listing,
+    );
   });
 
   it("refuses what is not a listing, in words", async () => {

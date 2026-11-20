@@ -35,8 +35,8 @@ vi.mock("@/server/maker-repository", async (importOriginal) => {
     await importOriginal<typeof import("@/server/maker-repository")>();
   return {
     ...real,
-    getMakerModelSetup: async () => ({
-      ...(await real.getMakerModelSetup()),
+    getMakerModelSetup: async (maker: { id: string }) => ({
+      ...(await real.getMakerModelSetup(maker)),
       routes: null,
       agents: setup.agents,
     }),
@@ -120,7 +120,7 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
   let maker: { id: string };
   const made: string[] = [];
   const session = async (projectId?: string) => {
-    const created = await repo.createChatSession(projectId);
+    const created = await repo.createChatSession(maker, projectId);
     made.push(created.id);
     return created;
   };
@@ -133,16 +133,20 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
 
   // Run a turn to its end: the whole stream read, the session let go.
   async function turn(sessionId: string, message: unknown) {
-    const response = await runTurn({ sessionId, message });
+    const response = await runTurn(maker, { sessionId, message });
     const body = await response.text();
-    for (let i = 0; i < 50 && (await repo.getChat(sessionId))?.running; i++) {
+    for (
+      let i = 0;
+      i < 50 && (await repo.getChat(maker, sessionId))?.running;
+      i++
+    ) {
       await new Promise((r) => setTimeout(r, 20));
     }
     return body;
   }
 
   const lastReply = async (sessionId: string) =>
-    (await repo.getChat(sessionId))?.messages.at(-1) as KilnMessage;
+    (await repo.getChat(maker, sessionId))?.messages.at(-1) as KilnMessage;
 
   const toolPart = (message: KilnMessage, name: string) =>
     message.parts.find((p) => p.type === `tool-${name}`) as
@@ -168,7 +172,7 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
     const { id } = await session();
     replies.push(call("c1", "peek", {}), say("I see 3."));
     await turn(id, user("u1", "What do you see?"));
-    const chat = await repo.getChat(id);
+    const chat = await repo.getChat(maker, id);
     expect(chat?.running).toBe(false);
     expect(chat?.title).toBe("What do you see?");
     const reply = chat?.messages.at(-1) as KilnMessage;
@@ -187,6 +191,29 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
     const recorded = await db.toolCall.findMany({ where: { sessionId: id } });
     expect(recorded).toEqual([
       expect.objectContaining({ tool: "peek", tokenName: "Chat", ok: true }),
+    ]);
+  });
+
+  // A turn's tool calls are recorded in the name of the person who
+  // sent it (the session's maker carries its member down).
+  it("records each tool call of a turn with the person who sent it", async () => {
+    const { id } = await session();
+    const person = {
+      ...maker,
+      member: { id: "m-chat", userId: "u-chat", role: "member" as const },
+    };
+    replies.push(call("c9", "peek", {}), say("I see 3."));
+    const response = await runTurn(person, {
+      sessionId: id,
+      message: user("u1", "What do you see?"),
+    });
+    await response.text();
+    for (let i = 0; i < 50 && (await repo.getChat(maker, id))?.running; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const recorded = await db.toolCall.findMany({ where: { sessionId: id } });
+    expect(recorded.map((r) => [r.tool, r.memberId])).toEqual([
+      ["peek", "m-chat"],
     ]);
   });
 
@@ -250,11 +277,11 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
 
   it("refuses a turn while another holds the session", async () => {
     const { id } = await session();
-    await repo.lockChat(id);
+    await repo.lockChat(maker, id);
     await expect(
-      runTurn({ sessionId: id, message: user("u1", "hi") }),
+      runTurn(maker, { sessionId: id, message: user("u1", "hi") }),
     ).rejects.toThrow(TurnRefusal);
-    await repo.unlockChat(id);
+    await repo.unlockChat(maker, id);
   });
 
   it("a notice from Kiln reaches the model with the maker's next message", async () => {
@@ -288,13 +315,13 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
     const { id } = await session();
     offered.length = 0;
     replies.push(say("Tuned."));
-    const response = await runTurn({
+    const response = await runTurn(maker, {
       sessionId: id,
       message: user("u1", "lower the camera"),
       specialist: "scenes",
     });
     await response.text();
-    for (let i = 0; i < 50 && (await repo.getChat(id))?.running; i++) {
+    for (let i = 0; i < 50 && (await repo.getChat(maker, id))?.running; i++) {
       await new Promise((r) => setTimeout(r, 20));
     }
     expect(offered[0]).toEqual(["generate"]);
@@ -322,14 +349,14 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
       [2, true, "etsy"],
       [3, false, "kiln"],
     ] as const) {
-      const response = await runTurn({
+      const response = await runTurn(maker, {
         sessionId: id,
         message: user(`u${n}`, "the title"),
         specialist,
         plan,
       });
       await response.text();
-      for (let i = 0; i < 50 && (await repo.getChat(id))?.running; i++) {
+      for (let i = 0; i < 50 && (await repo.getChat(maker, id))?.running; i++) {
         await new Promise((r) => setTimeout(r, 20));
       }
     }
@@ -338,7 +365,7 @@ describe.skipIf(!enabled)("a chat turn (database)", async () => {
       { id: "gpt-6-astra", effort: "max" },
       { id: "gpt-6.1-sol", effort: "low" },
     ]);
-    const replies_ = (await repo.getChat(id))?.messages.filter(
+    const replies_ = (await repo.getChat(maker, id))?.messages.filter(
       (m) => m.role === "assistant",
     ) as KilnMessage[];
     expect(replies_.map((m) => m.metadata)).toMatchObject([

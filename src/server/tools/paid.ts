@@ -13,7 +13,8 @@ import {
 } from "@/server/generation-queue";
 import { budget, QueueRefusal } from "@/server/generation-repository";
 import { listingTarget, writeProjectListing } from "@/server/listing-write";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
+import { readsStudioAmounts, whomToAsk } from "@/server/month-limit";
 import { findProduct, getProduct } from "@/server/product-repository";
 import { waitingProjectFrames } from "@/server/project-frames";
 import {
@@ -77,11 +78,12 @@ interface Priced {
 }
 
 async function priceGenerate(
+  maker: MakerRef,
   project: string,
   frames?: string[],
   test?: boolean,
 ): Promise<Priced> {
-  const state = await waitingProjectFrames(project);
+  const state = await waitingProjectFrames(maker, project);
   if (!state) {
     throw new ToolRefusal("No project of yours with frames has that id.");
   }
@@ -97,6 +99,7 @@ async function priceGenerate(
     );
   }
   const { cards, look } = await estimateProjectCards(
+    maker,
     project,
     [...new Set(asked)],
     { test },
@@ -126,8 +129,12 @@ async function priceGenerate(
 
 // A design's drawings: each card's line art, on the card's own model, from
 // the design's image.
-async function priceDraw(project: string, cards?: string[]): Promise<Priced> {
-  const design = await designView(project);
+async function priceDraw(
+  maker: MakerRef,
+  project: string,
+  cards?: string[],
+): Promise<Priced> {
+  const design = await designView(maker, project);
   if (!design) throw new ToolRefusal("No design of yours has that id.");
   const byCard = new Map(design.drawings.map((d) => [d.card, d]));
   for (const card of cards ?? []) {
@@ -151,7 +158,7 @@ async function priceDraw(project: string, cards?: string[]): Promise<Priced> {
       "Every drawing has its line art or is being drawn: name cards to draw again.",
     );
   }
-  const { cards: priced } = await estimateProjectCards(project, [
+  const { cards: priced } = await estimateProjectCards(maker, project, [
     ...new Set(asked),
   ]).catch((error) => {
     throw asRefusal(error);
@@ -172,11 +179,12 @@ async function priceDraw(project: string, cards?: string[]): Promise<Priced> {
 }
 
 async function priceText(
+  maker: MakerRef,
   kind: "listingCopy" | "productReview",
   task: string,
   input: Record<string, unknown>,
 ): Promise<Priced> {
-  const route = await textRoute(kind);
+  const route = await textRoute(maker, kind);
   if (route.max === null || route.typical === null) {
     throw new ToolRefusal(
       `No pinned price for the ${task}'s model: pick a priced one in Settings → Models.`,
@@ -250,52 +258,68 @@ function needs<T>(value: T | undefined, action: QuoteAction, field: string): T {
   return value;
 }
 
-async function priceOf(input: z.output<typeof QuoteInput>): Promise<Priced> {
+async function priceOf(
+  maker: MakerRef,
+  input: z.output<typeof QuoteInput>,
+): Promise<Priced> {
   const { action } = input;
   if (action === "generate") {
     return priceGenerate(
+      maker,
       needs(input.project, action, "project"),
       input.frames,
       input.test,
     );
   }
   if (action === "draw") {
-    return priceDraw(needs(input.project, action, "project"), input.cards);
+    return priceDraw(
+      maker,
+      needs(input.project, action, "project"),
+      input.cards,
+    );
   }
   if (action === "write_listing") {
     const project = needs(input.project, action, "project");
     const destination = needs(input.destination, action, "destination");
-    if (!(await listingTarget(project, destination))) {
+    if (!(await listingTarget(maker, project, destination))) {
       throw new ToolRefusal(
         "That destination of that project takes no listing text.",
       );
     }
-    return priceText("listingCopy", "listing text", { project, destination });
+    return priceText(maker, "listingCopy", "listing text", {
+      project,
+      destination,
+    });
   }
-  const found = await findProduct(needs(input.product, action, "product"));
+  const found = await findProduct(
+    maker,
+    needs(input.product, action, "product"),
+  );
   if (!found) {
     throw new ToolRefusal("No product of yours has that id or SKU.");
   }
-  return priceText("productReview", "product review", { product: found.id });
+  return priceText(maker, "productReview", "product review", {
+    product: found.id,
+  });
 }
 
 export const quote = defineTool({
   name: "quote",
   title: "Quote a paid task",
-  description: `Price a paid task before it runs, for free: the models it runs on (and may fall back to), what it typically costs and the most it can cost, and what is left of the month's cap. Answers a quote id that generate, draw, write_listing or review_product take; it runs exactly what was quoted, once, within ${QUOTE_MINUTES} minutes, and only for a token the maker lets spend (canSpend says whether this one may).`,
+  description: `Price a paid task before it runs, for free: the models it runs on (and may fall back to), what it typically costs and the most it can cost, and whether it fits the month's cap (fitsCap): the owner and access tokens also read what is left (capLeftUsd), a member of the studio reads instead whom to ask (ask) about the cap. Answers a quote id that generate, draw, write_listing or review_product take; it runs exactly what was quoted, once, within ${QUOTE_MINUTES} minutes, and only for a token the maker lets spend (canSpend says whether this one may).`,
   input: QuoteInput,
   // It stores the quote and nothing the maker sees: free, and safe to ask.
   hints: { readOnly: true },
   run: async (input, ctx) => {
+    const { maker } = ctx;
     const { action } = input;
-    const priced = await priceOf(input);
+    const priced = await priceOf(maker, input);
     const mock = providerMode() === "mock";
-    const maker = await getCurrentMaker();
     const month = mock ? null : await budget(maker.id);
     const left = month
       ? Math.max(month.capMicros - month.spentMicros - month.reservedMicros, 0)
       : null;
-    const made = await createQuote({
+    const made = await createQuote(maker, {
       action,
       input: priced.input as Prisma.InputJsonValue,
       typicalMicros: priced.typicalMicros,
@@ -310,7 +334,10 @@ export const quote = defineTool({
         typicalUsd: usd(priced.typicalMicros),
         atMostUsd: usd(priced.maxMicros),
         lines: priced.lines,
-        capLeftUsd: left === null ? null : usd(left),
+        // A member never reads the studio's amounts (Luis, 2026-11-17).
+        ...(readsStudioAmounts(maker)
+          ? { capLeftUsd: left === null ? null : usd(left) }
+          : { ask: await whomToAsk(maker) }),
         fitsCap: left === null || priced.maxMicros <= left,
         expiresAt: made.expiresAt.toISOString(),
         canSpend: ctx.canSpend,
@@ -334,9 +361,10 @@ export const generate = defineTool({
   input: QuoteId,
   hints: {},
   run: async ({ quote: id }, ctx) => {
-    const quoted = await takeQuote(ctx, id, "generate");
+    const { maker } = ctx;
+    const quoted = await takeQuote(maker, ctx, id, "generate");
     const { project, frames, test } = GenerateQuote.parse(quoted.input);
-    const queued = await enqueueProjectCards({
+    const queued = await enqueueProjectCards(maker, {
       projectId: project,
       cardIds: frames,
       shownMaxMicros: quoted.maxMicros,
@@ -366,9 +394,10 @@ export const draw = defineTool({
   input: QuoteId,
   hints: {},
   run: async ({ quote: id }, ctx) => {
-    const quoted = await takeQuote(ctx, id, "draw");
+    const { maker } = ctx;
+    const quoted = await takeQuote(maker, ctx, id, "draw");
     const { project, cards } = DrawQuote.parse(quoted.input);
-    const queued = await enqueueProjectCards({
+    const queued = await enqueueProjectCards(maker, {
       projectId: project,
       cardIds: cards,
       shownMaxMicros: quoted.maxMicros,
@@ -391,10 +420,11 @@ export const draw = defineTool({
 
 // A text task re-priced before it runs: refused if it would cost more now.
 async function stillPriced(
+  maker: MakerRef,
   kind: "listingCopy" | "productReview",
   maxMicros: number,
 ): Promise<void> {
-  const now = (await textRoute(kind)).max;
+  const now = (await textRoute(maker, kind)).max;
   if (now === null || toMicros(now) > maxMicros) {
     throw new ToolRefusal(ESTIMATE_ROSE);
   }
@@ -408,10 +438,12 @@ export const writeListingTool = defineTool({
   input: QuoteId,
   hints: {},
   run: async ({ quote: id }, ctx) => {
-    const quoted = await takeQuote(ctx, id, "write_listing");
+    const { maker } = ctx;
+    const quoted = await takeQuote(maker, ctx, id, "write_listing");
     const { project, destination } = ListingQuote.parse(quoted.input);
-    await stillPriced("listingCopy", quoted.maxMicros);
+    await stillPriced(maker, "listingCopy", quoted.maxMicros);
     const result = await writeProjectListing(
+      maker,
       project,
       destination,
       undefined,
@@ -445,10 +477,11 @@ export const reviewProductTool = defineTool({
   input: QuoteId,
   hints: {},
   run: async ({ quote: id }, ctx) => {
-    const quoted = await takeQuote(ctx, id, "review_product");
+    const { maker } = ctx;
+    const quoted = await takeQuote(maker, ctx, id, "review_product");
     const { product: productId } = ReviewQuote.parse(quoted.input);
-    await stillPriced("productReview", quoted.maxMicros);
-    const product = await getProduct(productId);
+    await stillPriced(maker, "productReview", quoted.maxMicros);
+    const product = await getProduct(maker, productId);
     if (!product) throw new ToolRefusal("That product no longer exists.");
     const form = ReviewForm.safeParse(formFromProduct(product));
     if (!form.success) {
@@ -457,7 +490,7 @@ export const reviewProductTool = defineTool({
       );
     }
     const fields = reviewFields(form.data, editLimits(product));
-    const result = await reviewProduct(fields, undefined, spentIn(ctx));
+    const result = await reviewProduct(maker, fields, undefined, spentIn(ctx));
     if (!result.review) {
       throw new ToolRefusal(
         result.degraded

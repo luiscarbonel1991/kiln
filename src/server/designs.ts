@@ -3,7 +3,7 @@ import { isActiveJob } from "@/domain/queue";
 import { db } from "@/lib/db";
 import { findRecipe } from "@/lib/recipes";
 import { projectGenerationState } from "@/server/generation-repository";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 
 // A maker's design projects as the tools read them: a design starts in the
 // studio from an image, has no plan and no frames, and each of its drawings is
@@ -58,8 +58,10 @@ const takeOf = (outputs: unknown): string | undefined =>
 export const makeProductHref = (vectorUrl: string) =>
   `/projects/new?design=${encodeURIComponent(vectorUrl)}`;
 
-export async function isDesign(projectId: string): Promise<boolean> {
-  const maker = await getCurrentMaker();
+export async function isDesign(
+  maker: MakerRef,
+  projectId: string,
+): Promise<boolean> {
   const row = await db.project.findFirst({
     where: { id: projectId, makerId: maker.id, ...DESIGN },
     select: { id: true },
@@ -67,8 +69,7 @@ export async function isDesign(projectId: string): Promise<boolean> {
   return row !== null;
 }
 
-export async function listDesigns(): Promise<DesignSummary[]> {
-  const maker = await getCurrentMaker();
+export async function listDesigns(maker: MakerRef): Promise<DesignSummary[]> {
   const rows = await db.project.findMany({
     where: { makerId: maker.id, ...DESIGN },
     orderBy: { updatedAt: "desc" },
@@ -96,9 +97,9 @@ export async function listDesigns(): Promise<DesignSummary[]> {
 // One design with each drawing's state: in the queue, drawn, traced, or
 // failed (its last drawing's error, until a take lands).
 export async function designView(
+  maker: MakerRef,
   projectId: string,
 ): Promise<DesignView | null> {
-  const maker = await getCurrentMaker();
   const row = await db.project.findFirst({
     where: { id: projectId, makerId: maker.id, ...DESIGN },
     select: {

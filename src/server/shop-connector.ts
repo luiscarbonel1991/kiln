@@ -3,6 +3,7 @@ import { bestSellers } from "@/domain/shop-ranking";
 import { providerMode } from "@/providers/mode";
 import { mockShop, type ShopConnector } from "@/providers/shop";
 import { allPages, type EtsyReceipt } from "@/providers/shop/etsy";
+import type { MakerRef } from "@/server/maker-repository";
 import { connectedEtsy, shopConnection } from "@/server/shop-connection";
 
 // The shop connector the results loop reads from: the mock shop in a mock run;
@@ -15,9 +16,11 @@ const MAX_RECEIPT_PAGES = 50;
 
 export const ETSY_CONNECTOR_LABEL = "Etsy";
 
-export async function resultsConnector(): Promise<ShopConnector | null> {
+export async function resultsConnector(
+  maker: MakerRef,
+): Promise<ShopConnector | null> {
   if (providerMode() === "mock") return mockShop;
-  const connection = await shopConnection();
+  const connection = await shopConnection(maker);
   if (!connection || connection.needsReconnect) return null;
   return {
     label: ETSY_CONNECTOR_LABEL,
@@ -26,7 +29,7 @@ export async function resultsConnector(): Promise<ShopConnector | null> {
       if (!listingId) {
         throw new Error("Not an Etsy listing address: Etsy cannot read it.");
       }
-      const etsy = await connectedEtsy();
+      const etsy = await connectedEtsy(maker);
       if (!etsy) throw new Error("No Etsy shop is connected.");
       // The window's days, whole, in UTC.
       const minCreated = Date.parse(`${window.from}T00:00:00Z`) / 1000;

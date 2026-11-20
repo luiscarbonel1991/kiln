@@ -73,7 +73,7 @@ describe.skipIf(!enabled)("projectSpend (database)", async () => {
     });
     await closeDirectCall(direct, { usage: null, actualMicros: 3_000 });
 
-    const spend = await projectSpend(project.id);
+    const spend = await projectSpend(maker, project.id);
     expect(spend.byCard.get("etsy.hero")).toEqual({
       spentMicros: 61_000 + 59_000 + 70_000,
       takes: 2,

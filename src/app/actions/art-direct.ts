@@ -7,6 +7,7 @@ import { SEED_BRAND } from "@/domain/seed";
 import { BaseUnderstanding } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
 import { findRecipe, SEED_RECIPES } from "@/lib/recipes";
+import { makerAction } from "@/server/guarded";
 import { type Degraded, directScenes } from "@/server/text-calls";
 
 const ProposeInput = z.object({
@@ -22,20 +23,26 @@ const ProposeInput = z.object({
 // variant per recipe slot — on the deep route unless a model is named.
 // A failure comes back as the recipe's own directions with why, so the maker
 // chooses between them and the other provider. Zod is the trust boundary.
-export async function proposeVariants(input: unknown): Promise<{
-  variants: VariantDirection[];
-  degraded?: Degraded;
-  ranOn?: RanOn;
-}> {
-  const { understanding, recipeId, model } = ProposeInput.parse(input);
-  const recipe = findRecipe(recipeId) ?? SEED_RECIPES[0];
-  return directScenes(
-    {
-      understanding,
-      recipe,
-      brand: SEED_BRAND,
-      n: recipe.directions.length,
-    },
-    model,
-  );
-}
+export const proposeVariants = makerAction(
+  async (
+    maker,
+    input: unknown,
+  ): Promise<{
+    variants: VariantDirection[];
+    degraded?: Degraded;
+    ranOn?: RanOn;
+  }> => {
+    const { understanding, recipeId, model } = ProposeInput.parse(input);
+    const recipe = findRecipe(recipeId) ?? SEED_RECIPES[0];
+    return directScenes(
+      maker,
+      {
+        understanding,
+        recipe,
+        brand: SEED_BRAND,
+        n: recipe.directions.length,
+      },
+      model,
+    );
+  },
+);

@@ -6,7 +6,7 @@ import { assertDatabaseUrl, db } from "@/lib/db";
 import { CATALOG } from "@/lib/recipes";
 import { localDate, type ResultsView, resultsView } from "@/lib/results-view";
 import { noteRead } from "@/server/lessons";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import { changePlan, loadProjectBoard } from "@/server/project-repository";
 import { resultsConnector } from "@/server/shop-connector";
 
@@ -71,18 +71,21 @@ export function readError(error: z.ZodError): string {
 // Save one read of a delivered sale destination; its window defaults to the
 // read's own (the 30 days before the photos went up, or the first 14 or 30
 // after).
-export async function saveRead(input: {
-  projectId: string;
-  destinationId: string;
-  key: ReadKey;
-  read: ReadInput;
-  source: string;
-  today?: string;
-}): Promise<ListingRead> {
+export async function saveRead(
+  maker: MakerRef,
+  input: {
+    projectId: string;
+    destinationId: string;
+    key: ReadKey;
+    read: ReadInput;
+    source: string;
+    today?: string;
+  },
+): Promise<ListingRead> {
   saleDestination(input.destinationId);
   const today = input.today ?? localDate();
   let saved: ListingRead | undefined;
-  await changePlan(input.projectId, (plan) => {
+  await changePlan(maker, input.projectId, (plan) => {
     const destination = plan.destinations.find(
       (d) => d.destinationId === input.destinationId,
     );
@@ -112,7 +115,7 @@ export async function saveRead(input: {
   if (!saved) throw new Error("the read was not saved");
   // An after-read may say which frames moved the numbers: a lesson.
   if (input.key !== "before") {
-    await noteRead(input.projectId, input.destinationId);
+    await noteRead(maker, input.projectId, input.destinationId);
   }
   return saved;
 }
@@ -120,21 +123,24 @@ export async function saveRead(input: {
 // Read one window from the shop connector and keep it. Refused without a
 // connector or a listing address; nothing is paid. Numbers the shop does not
 // give (Etsy's API has no visits) stay as typed for the same window.
-export async function readFromShop(input: {
-  projectId: string;
-  destinationId: string;
-  key: ReadKey;
-  today?: string;
-}): Promise<ListingRead> {
+export async function readFromShop(
+  maker: MakerRef,
+  input: {
+    projectId: string;
+    destinationId: string;
+    key: ReadKey;
+    today?: string;
+  },
+): Promise<ListingRead> {
   saleDestination(input.destinationId);
-  const shop = await resultsConnector();
+  const shop = await resultsConnector(maker);
   if (!shop) {
     throw new ResultsRefusal(
       "No shop is connected: type the numbers from your shop's stats.",
     );
   }
   const today = input.today ?? localDate();
-  const loaded = await loadProjectBoard(input.projectId);
+  const loaded = await loadProjectBoard(maker, input.projectId);
   const destination = loaded?.board.plan?.destinations.find(
     (d) => d.destinationId === input.destinationId,
   );
@@ -179,7 +185,7 @@ export async function readFromShop(input: {
       )
     : {};
   const merged = Object.keys(kept).length > 0;
-  return saveRead({
+  return saveRead(maker, {
     projectId: input.projectId,
     destinationId: input.destinationId,
     key: input.key,
@@ -202,10 +208,10 @@ export interface FollowedListing {
 // Every delivered sale destination of the maker's projects, followed or not,
 // newest project first.
 export async function followedListings(
+  maker: MakerRef,
   today = localDate(),
 ): Promise<FollowedListing[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = await db.project.findMany({
     where: { makerId: maker.id, plan: { not: Prisma.DbNull } },
     select: {
@@ -252,18 +258,19 @@ export async function followedListings(
 // the listing's address is known and no before read was taken. It never
 // fails the delivery: the board asks for the numbers instead.
 export async function readBeforeAtDelivery(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
 ): Promise<void> {
   const destination = CATALOG.destinations.find((d) => d.id === destinationId);
-  if (destination?.kind !== "sale" || !(await resultsConnector())) return;
+  if (destination?.kind !== "sale" || !(await resultsConnector(maker))) return;
   try {
-    const loaded = await loadProjectBoard(projectId);
+    const loaded = await loadProjectBoard(maker, projectId);
     const plan = loaded?.board.plan?.destinations.find(
       (d) => d.destinationId === destinationId,
     );
     if (!plan?.listingUrl || plan.results?.reads.before) return;
-    await readFromShop({ projectId, destinationId, key: "before" });
+    await readFromShop(maker, { projectId, destinationId, key: "before" });
   } catch (error) {
     console.warn("[kiln results] no before read at delivery", error);
   }

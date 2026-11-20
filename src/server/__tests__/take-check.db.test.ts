@@ -22,6 +22,9 @@ const png = (fill: string) =>
   ).toString("base64")}`;
 
 describe.skipIf(!enabled)("take check (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const { upsertProducts } = await import("@/server/product-repository");
   const { getCurrentMaker } = await import("@/server/maker-repository");
@@ -52,7 +55,7 @@ describe.skipIf(!enabled)("take check (database)", async () => {
 
   beforeAll(async () => {
     const maker = await getCurrentMaker();
-    const [saved] = await upsertProducts([product]);
+    const [saved] = await upsertProducts(maker, [product]);
     const project = await db.project.create({
       data: {
         makerId: maker.id,
@@ -135,7 +138,7 @@ describe.skipIf(!enabled)("take check (database)", async () => {
   });
 
   it("checks the shown take again and writes it on the job that made it", async () => {
-    const check = await recheckTake(projectId, {
+    const check = await recheckTake(maker, projectId, {
       destinationId: "etsy",
       slotKey: "hero",
     });
@@ -148,10 +151,10 @@ describe.skipIf(!enabled)("take check (database)", async () => {
       where: { id: jobId },
     });
     expect(job.takeCheck).toEqual(check);
-    const facts = await outputFacts(projectId, [take]);
+    const facts = await outputFacts(maker, projectId, [take]);
     expect(facts.get(take)?.check).toEqual(check);
     // What get_frames and view_frame read.
-    const frames = await projectFrames(projectId);
+    const frames = await projectFrames(maker, projectId);
     const hero = frames?.frames.find((f) => f.frame === "etsy.hero");
     expect(hero?.check).toEqual({
       status: "unchecked",
@@ -164,10 +167,13 @@ describe.skipIf(!enabled)("take check (database)", async () => {
 
   it("refuses a frame with no take, and a take no job of Kiln's made", async () => {
     await expect(
-      recheckTake(projectId, { destinationId: "etsy", slotKey: "in-use" }),
+      recheckTake(maker, projectId, {
+        destinationId: "etsy",
+        slotKey: "in-use",
+      }),
     ).rejects.toThrow("That frame has no take to check.");
     await expect(
-      recheckTake(projectId, { destinationId: "etsy", slotKey: "gift" }),
+      recheckTake(maker, projectId, { destinationId: "etsy", slotKey: "gift" }),
     ).rejects.toThrow(/no record of how this take was made/);
   });
 });

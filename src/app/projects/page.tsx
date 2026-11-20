@@ -9,13 +9,16 @@ import { buyerSizeLabel, type Product } from "@/domain/product";
 import { hasDatabase } from "@/lib/db";
 import { hasProviderKey } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
-import { budget } from "@/server/generation-repository";
-import { homeStats, type ProjectStats } from "@/server/home-repository";
+import { makerPage } from "@/server/guarded";
+import {
+  homeStats,
+  monthSpent,
+  type ProjectStats,
+} from "@/server/home-repository";
 import { followedListings } from "@/server/listing-results";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { CurrentMaker } from "@/server/maker-repository";
 import { listProducts } from "@/server/product-repository";
 import { listProjects } from "@/server/project-repository";
-import { ensureProviderKeys } from "@/server/provider-keys";
 
 const money = (micros: number) => `$${fromMicros(micros).toFixed(2)}`;
 
@@ -36,7 +39,7 @@ function projectDetail(stats: ProjectStats): string {
 // The maker's work: where they left off, their projects and their products.
 // What Kiln does is told on the public page (/); this is where a maker lands
 // from it. Nothing here calls a model or a shop. Rendered per request.
-export default async function ProjectsPage() {
+export default makerPage(async function ProjectsPage(maker: CurrentMaker) {
   await connection();
   if (!hasDatabase()) {
     return (
@@ -56,17 +59,15 @@ export default async function ProjectsPage() {
       </div>
     );
   }
-  const maker = await getCurrentMaker();
   const [projects, products, stats, spend, listings] = await Promise.all([
-    listProjects(),
-    listProducts(),
+    listProjects(maker),
+    listProducts(maker),
     homeStats(maker.id),
-    budget(maker.id),
-    followedListings(),
+    monthSpent(maker),
+    followedListings(maker),
   ]);
   const followed = listings.filter((l) => l.view.following);
   const mock = providerMode() === "mock";
-  await ensureProviderKeys().catch(() => undefined);
   const keyless =
     !mock && !hasProviderKey("openai") && !hasProviderKey("google");
   const details = Object.fromEntries(
@@ -92,7 +93,9 @@ export default async function ProjectsPage() {
       value: mock ? "mock mode" : money(spend.spentMicros),
       note: mock
         ? "nothing is paid or counted"
-        : `of ${money(spend.capMicros)} (calendar month, UTC)`,
+        : spend.whose === "studio"
+          ? `of ${money(spend.capMicros)} (calendar month, UTC)`
+          : "what your work cost (calendar month, UTC)",
     },
     {
       label: "Approved this month",
@@ -102,10 +105,13 @@ export default async function ProjectsPage() {
     {
       label: "Per approved output",
       value:
-        !mock && stats.monthApproved > 0
+        !mock && spend.whose === "studio" && stats.monthApproved > 0
           ? money(spend.spentMicros / stats.monthApproved)
           : "—",
-      note: "this month's spend over what was kept",
+      note:
+        spend.whose === "studio"
+          ? "this month's spend over what was kept"
+          : "the studio's, shown to its owner",
     },
   ];
 
@@ -211,7 +217,7 @@ export default async function ProjectsPage() {
       </main>
     </div>
   );
-}
+});
 
 const MAIN =
   "mx-auto flex w-full max-w-[1120px] flex-col gap-14 px-6 py-10 sm:gap-16 sm:px-8";

@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { PersistedProject } from "@/domain/persisted-project";
+import { makerAction } from "@/server/guarded";
 import {
   deleteProject,
   listProjects,
@@ -14,36 +15,36 @@ import {
 // Server Functions are POST-reachable: Zod is the trust boundary. These are the
 // only path from the client into the database (mirrors @/app/actions/* for
 // @/providers). Inputs are validated here before reaching the repository.
-export async function saveProjectAction(
-  input: unknown,
-  id?: string,
-): Promise<{ id: string }> {
-  const parsed = PersistedProject.parse(input);
-  const savedId = await saveProject(parsed, id);
-  return { id: savedId };
-}
+export const saveProjectAction = makerAction(
+  async (maker, input: unknown, id?: string): Promise<{ id: string }> => {
+    const parsed = PersistedProject.parse(input);
+    const savedId = await saveProject(maker, parsed, id);
+    return { id: savedId };
+  },
+);
 
-export async function loadProjectAction(id: string) {
-  return loadProject(id);
-}
+export const loadProjectAction = makerAction(async (maker, id: string) => {
+  return loadProject(maker, id);
+});
 
-export async function listProjectsAction() {
-  return listProjects();
-}
+export const listProjectsAction = makerAction(async (maker) => {
+  return listProjects(maker);
+});
 
-export async function deleteProjectAction(id: unknown): Promise<void> {
-  const parsed = z.string().min(1).parse(id);
-  await deleteProject(parsed);
-}
+export const deleteProjectAction = makerAction(
+  async (maker, id: unknown): Promise<void> => {
+    const parsed = z.string().min(1).parse(id);
+    await deleteProject(maker, parsed);
+  },
+);
 
-export async function renameProjectAction(
-  id: unknown,
-  name: unknown,
-): Promise<void> {
-  const parsedId = z.string().min(1).parse(id);
-  const parsedName = z.string().trim().min(1).max(80).parse(name);
-  await renameProject(parsedId, parsedName);
-}
+export const renameProjectAction = makerAction(
+  async (maker, id: unknown, name: unknown): Promise<void> => {
+    const parsedId = z.string().min(1).parse(id);
+    const parsedName = z.string().trim().min(1).max(80).parse(name);
+    await renameProject(maker, parsedId, parsedName);
+  },
+);
 
 const CardOutput = z.object({
   projectId: z.string().min(1),
@@ -51,7 +52,9 @@ const CardOutput = z.object({
   url: z.string().min(1),
 });
 
-export async function saveCardOutputAction(input: unknown): Promise<void> {
-  const { projectId, cardId, url } = CardOutput.parse(input);
-  await saveCardOutput(projectId, cardId, url);
-}
+export const saveCardOutputAction = makerAction(
+  async (maker, input: unknown): Promise<void> => {
+    const { projectId, cardId, url } = CardOutput.parse(input);
+    await saveCardOutput(maker, projectId, cardId, url);
+  },
+);

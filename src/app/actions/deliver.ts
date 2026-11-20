@@ -6,6 +6,7 @@ import {
   type DeliverResult,
   deliverDestination,
 } from "@/server/deliver/deliver-destination";
+import { makerAction } from "@/server/guarded";
 
 // Deliver one destination of a planned project from the board
 // (src/server/deliver/deliver-destination.ts): the zip's link, which the
@@ -17,9 +18,11 @@ const Input = z.object({
   destinationId: z.string().min(1),
 });
 
-export async function deliverAction(input: unknown): Promise<DeliverResult> {
-  const { projectId, destinationId } = Input.parse(input);
-  const result = await deliverDestination(projectId, destinationId);
-  if ("url" in result) refresh();
-  return result;
-}
+export const deliverAction = makerAction(
+  async (maker, input: unknown): Promise<DeliverResult> => {
+    const { projectId, destinationId } = Input.parse(input);
+    const result = await deliverDestination(maker, projectId, destinationId);
+    if ("url" in result) refresh();
+    return result;
+  },
+);

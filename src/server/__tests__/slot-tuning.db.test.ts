@@ -9,6 +9,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const { upsertProducts } = await import("@/server/product-repository");
@@ -65,7 +68,7 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
   });
 
   async function start(product: typeof photo, strip = false) {
-    const [saved] = await upsertProducts([product]);
+    const [saved] = await upsertProducts(maker, [product]);
     const planned = planProject({
       product: saved,
       type: "listing-kit",
@@ -86,7 +89,7 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
       plan,
       master: photoReference(saved),
     });
-    const id = await repo.createProject({
+    const id = await repo.createProject(maker, {
       type: "listing-kit",
       product: saved,
       plan,
@@ -178,11 +181,11 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
       where: cardKey(id),
       data: { outputs: ["https://stub.local/take-1.png"], status: "done" },
     });
-    await repo.setSlotApproval(id, inUse, true);
+    await repo.setSlotApproval(maker, id, inUse, true);
     expect(await tune(id, { knob: "camera", stop: "eye" })).toEqual({
       error: "Undo the approval to tune this scene.",
     });
-    await repo.setSlotApproval(id, inUse, false);
+    await repo.setSlotApproval(maker, id, inUse, false);
     expect(await tune(id, { knob: "camera", stop: "eye" })).toBeUndefined();
   });
 
@@ -192,7 +195,7 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
     expect(
       await tune(id, { knob: "camera", stop: "overhead" }),
     ).toBeUndefined();
-    const loaded = await repo.loadProjectBoard(id);
+    const loaded = await repo.loadProjectBoard(maker, id);
     const plan = loaded?.board.plan;
     if (!plan) throw new Error("no plan");
     const master = {
@@ -202,7 +205,12 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
       assetUrl: "https://stub.local/plate-reference.png",
       mime: "image/png",
     };
-    await repo.setProjectReference(id, master, slotCards(plan, master, saved));
+    await repo.setProjectReference(
+      maker,
+      id,
+      master,
+      slotCards(plan, master, saved),
+    );
     expect(await composition(id)).toMatch(/^the camera high above/);
   });
 
@@ -221,9 +229,9 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
               choice: { knob: "setting", stop },
             }),
           ).toBeUndefined();
-          expect((await getMakerPreferences()).heroSetting["etsy:desk"]).toBe(
-            stop,
-          );
+          expect(
+            (await getMakerPreferences(maker)).heroSetting["etsy:desk"],
+          ).toBe(stop);
         }
       }
     } finally {
@@ -270,7 +278,7 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
       expect(await scene("etsy.hero")).toContain(
         "in its place (an oak bookshelf)",
       );
-      expect((await getMakerPreferences()).heroSetting["etsy:desk"]).toBe(
+      expect((await getMakerPreferences(maker)).heroSetting["etsy:desk"]).toBe(
         "place",
       );
       expect(
@@ -288,7 +296,7 @@ describe.skipIf(!enabled)("a scene's knobs (database)", async () => {
 
   it("follows the product version the project has; Update the project keeps the knobs", async () => {
     const { id, saved } = await start(photo);
-    await upsertProducts([
+    await upsertProducts(maker, [
       { ...saved, dimensions: { ...saved.dimensions, w: 11 } },
     ]);
     expect(await tune(id, { knob: "props", stop: "none" })).toBeUndefined();

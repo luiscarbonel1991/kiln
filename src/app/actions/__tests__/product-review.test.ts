@@ -4,6 +4,7 @@ import type { ProductReview, ReviewField } from "@/providers/text-prompts";
 
 const reviewProduct = vi.fn(
   async (
+    _maker: unknown,
     _fields: ReviewField[],
     _model?: { provider: string; model: string },
   ): Promise<{
@@ -22,7 +23,9 @@ const reviewProduct = vi.fn(
     },
   }),
 );
-const getProduct = vi.fn(async (_id: string): Promise<Product | null> => null);
+const getProduct = vi.fn(
+  async (_maker: unknown, _id: string): Promise<Product | null> => null,
+);
 
 vi.mock("@/server/text-calls", () => ({
   reviewProduct,
@@ -59,7 +62,7 @@ describe("reviewProductAction", () => {
         model: "GPT-6 Luna",
       },
     });
-    const [fields, model] = reviewProduct.mock.calls[0];
+    const [, fields, model] = reviewProduct.mock.calls[0];
     // No model named: the route decides (text-calls).
     expect(model).toBeUndefined();
     expect(fields.find((f) => f.field === "wording.0.label")?.value).toBe(
@@ -88,7 +91,7 @@ describe("reviewProductAction", () => {
       form,
       model: { provider: "google", model: "gemini-3.8-flash" },
     });
-    expect(reviewProduct.mock.calls[0][1]).toEqual({
+    expect(reviewProduct.mock.calls[0][2]).toEqual({
       provider: "google",
       model: "gemini-3.8-flash",
     });
@@ -105,8 +108,8 @@ describe("reviewProductAction", () => {
       description: undefined,
     } as unknown as Product);
     await reviewProductAction({ form, productId: "p1" });
-    expect(getProduct).toHaveBeenCalledWith("p1");
-    const [fields] = reviewProduct.mock.calls[0];
+    expect(getProduct).toHaveBeenCalledWith(expect.anything(), "p1");
+    const [, fields] = reviewProduct.mock.calls[0];
     expect(fields.find((f) => f.field === "name")?.maxChars).toBe(120);
   });
 

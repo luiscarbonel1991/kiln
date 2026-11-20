@@ -31,6 +31,9 @@ vi.mock("@/lib/env", async (original) => {
 });
 
 describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const shops = await import("@/server/shop-connection");
   const ranking = await import("@/server/shop-ranking");
@@ -51,14 +54,14 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
   });
 
   beforeEach(async () => {
-    await shops.disconnectShop();
+    await shops.disconnectShop(maker);
     ranking.forgetShopReads();
   });
   afterEach(() => vi.unstubAllGlobals());
   afterAll(async () => {
-    await shops.disconnectShop();
-    await unwatchShop("60011");
-    await unwatchShop("60013");
+    await shops.disconnectShop(maker);
+    await unwatchShop(maker, "60011");
+    await unwatchShop(maker, "60013");
   });
 
   // Connect through the real handshake: the URL Etsy is sent, the cookie,
@@ -71,7 +74,7 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
     vi.stubGlobal("fetch", etsy.fetch);
     const { url, cookie } = shops.beginConnect(NOW.getTime());
     const state = new URL(url).searchParams.get("state");
-    const view = await shops.finishConnect({
+    const view = await shops.finishConnect(maker, {
       code: "the-code",
       state,
       cookie,
@@ -115,20 +118,20 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
     expect(row.refreshToken).not.toContain("refresh-1");
     expect(unseal(row.accessToken, "etsy-access")).toBe("90001.access-1");
     expect(row.scopes).toBe("shops_r listings_r transactions_r listings_w");
-    expect(await shops.shopConnection()).toEqual(view);
+    expect(await shops.shopConnection(maker)).toEqual(view);
   });
 
   it("refuses an answer that is not the connection Kiln started", async () => {
     const { url, cookie } = shops.beginConnect();
     const state = new URL(url).searchParams.get("state");
     await expect(
-      shops.finishConnect({ code: "c", state: "forged", cookie }),
+      shops.finishConnect(maker, { code: "c", state: "forged", cookie }),
     ).rejects.toMatchObject({ problem: "state" });
     await expect(
-      shops.finishConnect({ code: "c", state, cookie: undefined }),
+      shops.finishConnect(maker, { code: "c", state, cookie: undefined }),
     ).rejects.toMatchObject({ problem: "expired" });
     await expect(
-      shops.finishConnect({
+      shops.finishConnect(maker, {
         code: "c",
         state,
         cookie,
@@ -136,14 +139,14 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
       }),
     ).rejects.toMatchObject({ problem: "expired" });
     await expect(
-      shops.finishConnect({
+      shops.finishConnect(maker, {
         code: null,
         state,
         cookie,
         error: "access_denied",
       }),
     ).rejects.toMatchObject({ problem: "denied" });
-    expect(await shops.shopConnection()).toBeNull();
+    expect(await shops.shopConnection(maker)).toBeNull();
   });
 
   it("refreshes an access token about to expire, once for requests that come together", async () => {
@@ -154,8 +157,8 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
       [tokenAnswer(2)],
     );
     const [a, b] = await Promise.all([
-      shops.connectedEtsy({ now: later, fetch: etsy.fetch }),
-      shops.connectedEtsy({ now: later, fetch: etsy.fetch }),
+      shops.connectedEtsy(maker, { now: later, fetch: etsy.fetch }),
+      shops.connectedEtsy(maker, { now: later, fetch: etsy.fetch }),
     ]);
     const refreshes = etsy.calls.filter(
       (c) => c.url.pathname === "/v3/public/oauth/token",
@@ -185,22 +188,23 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
       [{ status: 400, body: { error: "invalid_grant" } }],
     );
     await expect(
-      shops.connectedEtsy({ now: later, fetch: etsy.fetch }),
+      shops.connectedEtsy(maker, { now: later, fetch: etsy.fetch }),
     ).rejects.toThrow("connect it again");
-    expect(await shops.shopConnection()).toMatchObject({
+    expect(await shops.shopConnection(maker)).toMatchObject({
       needsReconnect: true,
     });
     // Connecting again clears it.
     await connect([tokenAnswer(3)]);
-    expect(await shops.shopConnection()).toMatchObject({
+    expect(await shops.shopConnection(maker)).toMatchObject({
       needsReconnect: false,
     });
   });
 
   it("best sellers: the shop's listings by orders in the window, each with its photo and Kiln project; one-offs set aside", async () => {
+    const maker = await getCurrentMaker();
     await connect();
     vi.stubGlobal("fetch", etsyFetch(mockEtsy(() => NOW)).fetch);
-    const view = await ranking.yourBestSellers(90, { now: NOW });
+    const view = await ranking.yourBestSellers(maker, 90, { now: NOW });
     expect(view).toMatchObject({
       shopName: "MockMakerStudio",
       window: 90,
@@ -234,14 +238,13 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
     const ranked = [...rows, ...aside].reduce((n, r) => n + r.units, 0);
     expect(ranked).toBe(view?.totals.units);
     // Ranked by units on request.
-    const byUnits = await ranking.yourBestSellers(90, {
+    const byUnits = await ranking.yourBestSellers(maker, 90, {
       by: "units",
       now: NOW,
     });
     const units = byUnits?.rows.map((r) => r.units) ?? [];
     expect(units).toEqual([...units].sort((a, b) => b - a));
     // A listing a Kiln project refreshes names that project.
-    const maker = await getCurrentMaker();
     const project = await db.project.create({
       data: {
         makerId: maker.id,
@@ -263,7 +266,7 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
       },
     });
     try {
-      const linked = await ranking.yourBestSellers(90, { now: NOW });
+      const linked = await ranking.yourBestSellers(maker, 90, { now: NOW });
       expect(linked?.rows[1].project).toEqual({
         id: project.id,
         name: "Best seller refresh",
@@ -273,20 +276,20 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
       await db.project.delete({ where: { id: project.id } });
     }
     // A year sells at least what 90 days do.
-    const year = await ranking.yourBestSellers(365, { now: NOW });
+    const year = await ranking.yourBestSellers(maker, 365, { now: NOW });
     expect(year?.totals.orders).toBeGreaterThan(view?.totals.orders ?? 0);
   });
 
   it("a listing the maker leaves out moves to the set-aside ones, and back", async () => {
     await connect();
     vi.stubGlobal("fetch", etsyFetch(mockEtsy(() => NOW)).fetch);
-    const before = await ranking.yourBestSellers(30, { now: NOW });
+    const before = await ranking.yourBestSellers(maker, 30, { now: NOW });
     const first = before?.rows[0];
     if (!first) throw new Error("no best seller");
     try {
-      expect(await leaveOutListing(first.listingId, true)).toBe(true);
-      expect(await leaveOutListing(first.listingId, true)).toBe(false);
-      const after = await ranking.yourBestSellers(30, { now: NOW });
+      expect(await leaveOutListing(maker, first.listingId, true)).toBe(true);
+      expect(await leaveOutListing(maker, first.listingId, true)).toBe(false);
+      const after = await ranking.yourBestSellers(maker, 30, { now: NOW });
       expect(after?.rows.map((r) => r.listingId)).not.toContain(
         first.listingId,
       );
@@ -294,14 +297,14 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
         after?.setAside.find((r) => r.listingId === first.listingId),
       ).toMatchObject({ leftOut: true, now: "live" });
     } finally {
-      await leaveOutListing(first.listingId, false);
+      await leaveOutListing(maker, first.listingId, false);
     }
-    const back = await ranking.yourBestSellers(30, { now: NOW });
+    const back = await ranking.yourBestSellers(maker, 30, { now: NOW });
     expect(back?.rows[0].listingId).toBe(first.listingId);
   });
 
   it("the results loop reads a listing's orders and revenue in a window from the connected shop", async () => {
-    expect(await resultsConnector()).toBeNull();
+    expect(await resultsConnector(maker)).toBeNull();
     await connect();
     // Read at the real time, past the token's hour: it is refreshed first.
     vi.stubGlobal(
@@ -311,9 +314,9 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
         [tokenAnswer(5)],
       ).fetch,
     );
-    const view = await ranking.yourBestSellers(30, { now: NOW });
+    const view = await ranking.yourBestSellers(maker, 30, { now: NOW });
     const top = view?.rows[0];
-    const shop = await resultsConnector();
+    const shop = await resultsConnector(maker);
     expect(shop?.label).toBe("Etsy");
     const window = { from: view?.from ?? "", to: "2026-10-27" };
     const numbers = await shop?.readListing(
@@ -328,7 +331,7 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
   });
 
   it("no shop connected, no best sellers", async () => {
-    expect(await ranking.yourBestSellers(30, { now: NOW })).toBeNull();
+    expect(await ranking.yourBestSellers(maker, 30, { now: NOW })).toBeNull();
   });
 
   it("other shops: found by name, ranked by lifetime sales, their listings by favourites", async () => {
@@ -338,12 +341,12 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
       "NorthPineGoods",
       "PineAndPaperStudio",
     ]);
-    await watchShop({ shopId: "60013", name: "HarborLinenHouse" });
-    await watchShop({ shopId: "60011", name: "NorthPineGoods" });
-    expect(await watchShop({ shopId: "60011", name: "NorthPineGoods" })).toBe(
-      false,
-    );
-    const watched = await ranking.watchedShops();
+    await watchShop(maker, { shopId: "60013", name: "HarborLinenHouse" });
+    await watchShop(maker, { shopId: "60011", name: "NorthPineGoods" });
+    expect(
+      await watchShop(maker, { shopId: "60011", name: "NorthPineGoods" }),
+    ).toBe(false);
+    const watched = await ranking.watchedShops(maker);
     expect(watched?.failed).toEqual([]);
     expect(watched?.yourShopId).toBeNull();
     const reviews = watched?.standings.map((s) => s.reviews?.count ?? 0) ?? [];
@@ -352,7 +355,7 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
       "60011",
       "60013",
     ]);
-    const lifetime = await ranking.watchedShops({ by: "lifetime" });
+    const lifetime = await ranking.watchedShops(maker, { by: "lifetime" });
     const sold = lifetime?.standings.map((s) => s.sold) ?? [];
     expect(sold).toEqual([...sold].sort((x, y) => y - x));
     const top = await ranking.shopFavourites("60011");
@@ -365,7 +368,7 @@ describe.skipIf(!enabled)("Etsy connection and Shops (database)", async () => {
     // With a shop connected, the maker's own stands among the others.
     await connect();
     vi.stubGlobal("fetch", etsyFetch(mockEtsy(() => NOW)).fetch);
-    const withYours = await ranking.watchedShops();
+    const withYours = await ranking.watchedShops(maker);
     expect(withYours?.yourShopId).toBe(String(MOCK_SHOP_ID));
     expect(withYours?.standings.map((s) => s.shopId)).toContain(
       String(MOCK_SHOP_ID),

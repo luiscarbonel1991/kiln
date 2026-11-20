@@ -2,6 +2,8 @@ import { connection } from "next/server";
 import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { etsyListingId, ListingUrl } from "@/domain/live-listing";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 import {
   getMakerBrand,
   getMakerModels,
@@ -18,11 +20,14 @@ import { textWorstCase } from "@/server/text-calls";
 // opens with it. `?product=` (Home) picks a product. `?listing=` (Shops) starts
 // a Listing kit from that live listing, with `?title=` its title, to ask which
 // product it is.
-export default async function NewProjectPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+export default makerPage(async function NewProjectPage(
+  maker: CurrentMaker,
+  {
+    searchParams,
+  }: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  },
+) {
   await connection();
   const { design, product, listing, title } = await searchParams;
   const listingUrl =
@@ -38,14 +43,14 @@ export default async function NewProjectPage({
       : null;
   const initialDesign =
     typeof design === "string" ? await describeStoredSvg(design) : null;
-  const products = await listProducts();
-  const brand = await getMakerBrand();
-  const models = await getMakerModels();
-  const { heroSetting } = await getMakerPreferences();
+  const products = await listProducts(maker);
+  const brand = await getMakerBrand(maker);
+  const models = await getMakerModels(maker);
+  const { heroSetting } = await getMakerPreferences(maker);
   // Priced at the dearest model of each call's route (deep, fast).
-  const draft = await textWorstCase("productDraft");
-  const review = await textWorstCase("productReview");
-  const look = await sceneLookPlan();
+  const draft = await textWorstCase(maker, "productDraft");
+  const review = await textWorstCase(maker, "productReview");
+  const look = await sceneLookPlan(maker);
   return (
     <div className="flex min-h-full flex-col">
       <ProjectsHeader />
@@ -68,4 +73,4 @@ export default async function NewProjectPage({
       />
     </div>
   );
-}
+});

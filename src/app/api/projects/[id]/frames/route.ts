@@ -1,4 +1,5 @@
-import { apiError, apiJson, authorize } from "@/server/http-api";
+import { tokenRoute } from "@/server/guarded";
+import { apiError, apiJson } from "@/server/http-api";
 import { projectFrames } from "@/server/project-frames";
 
 type Context = { params: Promise<{ id: string }> };
@@ -8,12 +9,12 @@ type Context = { params: Promise<{ id: string }> };
 // failed, error?, output, approvedOutput, approvable, versionOf? }] }.
 // `output` is the take an approval approves. 404 for a project of another
 // maker, or one with no frames (a studio project).
-export async function GET(request: Request, { params }: Context) {
-  const denied = await authorize(request);
-  if (denied) return denied;
-  const { id } = await params;
-  const frames = await projectFrames(id);
-  if (!frames)
-    return apiError(404, "No project of yours with frames has that id.");
-  return apiJson(frames);
-}
+export const GET = tokenRoute(
+  async ({ maker }, _request: Request, { params }: Context) => {
+    const { id } = await params;
+    const frames = await projectFrames(maker, id);
+    if (!frames)
+      return apiError(404, "No project of yours with frames has that id.");
+    return apiJson(frames);
+  },
+);

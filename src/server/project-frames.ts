@@ -13,7 +13,7 @@ import {
   outputFacts,
   projectGenerationState,
 } from "@/server/generation-repository";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
 
 // A project's frames as an agent reads them (README "HTTP API"): what the
@@ -29,9 +29,8 @@ const CardState = Card.pick({ status: true, outputs: true });
 // A project's plan, cards and jobs, as its frames are read from them. Null
 // for a project the current maker does not have, or one with no plan (a
 // studio project: it has no frames).
-async function loadFrames(projectId: string) {
+async function loadFrames(maker: MakerRef, projectId: string) {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const project = await db.project.findFirst({
     where: { id: projectId, makerId: maker.id },
     select: {
@@ -77,7 +76,7 @@ async function loadFrames(projectId: string) {
     : undefined;
   // What Kiln read in each shown take (null: the job left no check).
   const shown = Object.values(cards).flatMap((c) => c.outputs.slice(0, 1));
-  const facts = await outputFacts(projectId, shown);
+  const facts = await outputFacts(maker, projectId, shown);
   const checks: Record<string, TakeCheck | null> = {};
   for (const [id, card] of Object.entries(cards)) {
     const fact = card.outputs[0] ? facts.get(card.outputs[0]) : undefined;
@@ -95,9 +94,10 @@ async function loadFrames(projectId: string) {
 }
 
 export async function projectFrames(
+  maker: MakerRef,
   projectId: string,
 ): Promise<ProjectFrames | null> {
-  const loaded = await loadFrames(projectId);
+  const loaded = await loadFrames(maker, projectId);
   if (!loaded) return null;
   const { project, plan, cards, jobs, product, checks } = loaded;
   return { project, frames: frameViews(plan, cards, jobs, product, checks) };
@@ -107,9 +107,10 @@ export async function projectFrames(
 // them, and whether the project has its reference image (no scene has a card
 // to generate from without it); null as projectFrames.
 export async function waitingProjectFrames(
+  maker: MakerRef,
   projectId: string,
 ): Promise<{ waiting: string[]; reference: boolean } | null> {
-  const loaded = await loadFrames(projectId);
+  const loaded = await loadFrames(maker, projectId);
   if (!loaded) return null;
   return {
     waiting: waitingFrames(frameSlots(loaded.plan, loaded.cards, loaded.jobs)),
@@ -119,11 +120,10 @@ export async function waitingProjectFrames(
 
 // The current maker's projects that have frames (started from New project),
 // newest first: what `kiln projects` lists.
-export async function framedProjects(): Promise<
-  (ProjectFrames["project"] & { updatedAt: string })[]
-> {
+export async function framedProjects(
+  maker: MakerRef,
+): Promise<(ProjectFrames["project"] & { updatedAt: string })[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = await db.project.findMany({
     where: { makerId: maker.id },
     select: {

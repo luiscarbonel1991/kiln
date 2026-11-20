@@ -16,7 +16,11 @@ const s = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/listing-write", () => ({
-  listingTarget: async (project: string, destination: string) =>
+  listingTarget: async (
+    _maker: unknown,
+    project: string,
+    destination: string,
+  ) =>
     project === "p1" && destination === "etsy" && s.listing
       ? {
           product: CUTTING_BOARD,
@@ -41,6 +45,7 @@ vi.mock("@/server/listing-write", () => ({
 vi.mock("@/server/project-repository", () => ({
   setBrief: async () => {},
   setListing: async (
+    _maker: unknown,
     project: string,
     destination: string,
     listing: unknown,
@@ -51,7 +56,12 @@ vi.mock("@/server/project-repository", () => ({
 
 const { TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
-const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
+const CTX = {
+  maker: { id: "test" },
+  tokenId: "t1",
+  tokenName: "agent",
+  canSpend: false,
+};
 const call = (name: string, args: unknown) => callTool(TOOLS, name, args, CTX);
 
 const draft = () => listingDraft(CUTTING_BOARD, rules);

@@ -13,18 +13,21 @@ describe.skipIf(!enabled)("laser pricing settings (database)", async () => {
   const { DEFAULT_SHOP } = await import("@/modules/laser-pricing/presets");
 
   it("saves and reads the calculator defaults in the module's own row", async () => {
+    const maker = await getCurrentMaker();
     const data = {
       machineName: "CO2 40W",
       materialName: "MDF 3mm",
       shop: DEFAULT_SHOP,
     };
-    await repo.saveMakerPricing(data);
-    await repo.saveMakerPricing({ ...data, materialName: "Birch ply 3mm" });
-    expect(await repo.getMakerPricing()).toEqual({
+    await repo.saveMakerPricing(maker, data);
+    await repo.saveMakerPricing(maker, {
       ...data,
       materialName: "Birch ply 3mm",
     });
-    const maker = await getCurrentMaker();
+    expect(await repo.getMakerPricing(maker)).toEqual({
+      ...data,
+      materialName: "Birch ply 3mm",
+    });
     const rows = await db.moduleSettings.findMany({
       where: { makerId: maker.id },
     });
@@ -39,7 +42,7 @@ describe.skipIf(!enabled)("laser pricing settings (database)", async () => {
       },
       data: { settings: { machineName: 42 } },
     });
-    expect(await repo.getMakerPricing()).toBeNull();
+    expect(await repo.getMakerPricing(maker)).toBeNull();
     await db.moduleSettings.delete({
       where: {
         makerId_module: { makerId: maker.id, module: "laser-pricing" },

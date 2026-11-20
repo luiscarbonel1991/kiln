@@ -9,7 +9,7 @@ const enabled =
 describe.skipIf(!enabled)("home stats (database)", async () => {
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
-  const { homeStats } = await import("@/server/home-repository");
+  const { homeStats, monthSpent } = await import("@/server/home-repository");
   const { upsertProducts } = await import("@/server/product-repository");
   const { getCurrentMaker } = await import("@/server/maker-repository");
   const { Product } = await import("@/domain/product");
@@ -78,8 +78,9 @@ describe.skipIf(!enabled)("home stats (database)", async () => {
   });
 
   it("counts what each project spent and kept, and this month's approved outputs", async () => {
-    const [saved] = await upsertProducts([product]);
-    const id = await repo.createProject({
+    const maker = await getCurrentMaker();
+    const [saved] = await upsertProducts(maker, [product]);
+    const id = await repo.createProject(maker, {
       type: "launch",
       product: saved,
       plan,
@@ -94,7 +95,6 @@ describe.skipIf(!enabled)("home stats (database)", async () => {
       },
     });
     created.push(id);
-    const maker = await getCurrentMaker();
     const job = (cardId: string, outputUrl: string, actualMicros: number) => ({
       makerId: maker.id,
       projectId: id,
@@ -125,5 +125,56 @@ describe.skipIf(!enabled)("home stats (database)", async () => {
       approved: 1,
     });
     expect(before.monthApproved).toBeGreaterThanOrEqual(1);
+  });
+
+  it("this month: the owner reads the studio's spend and cap, a member only their own", async () => {
+    const solo = await db.maker.create({
+      data: {
+        slug: `home-month-${Date.now()}`,
+        name: "Home month test",
+        monthlyCapCents: 2_000,
+      },
+    });
+    const spent = (memberId: string | null, micros: number) => ({
+      makerId: solo.id,
+      memberId,
+      cardId: "direct",
+      mode: "live",
+      status: "done",
+      maxAttempts: 1,
+      estimateMicros: micros,
+      actualMicros: micros,
+      finishedAt: new Date(),
+    });
+    const as = (role: "owner" | "member", id: string) => ({
+      id: solo.id,
+      slug: "",
+      name: "",
+      member: { id, userId: `u-${id}`, role },
+    });
+    try {
+      await db.generationJob.createMany({
+        data: [spent("m1", 3_000), spent("m2", 5_000), spent(null, 700)],
+      });
+      const studio = { whose: "studio", spentMicros: 8_700 };
+      expect(await monthSpent(as("owner", "m2"))).toMatchObject(studio);
+      // A token or a script has no person: the studio's line, as before.
+      expect(await monthSpent({ id: solo.id, slug: "", name: "" })).toEqual({
+        ...studio,
+        capMicros: 20_000_000,
+      });
+      // A member never receives the studio's total or its cap.
+      expect(await monthSpent(as("member", "m1"))).toEqual({
+        whose: "yours",
+        spentMicros: 3_000,
+      });
+      expect(await monthSpent(as("member", "m9"))).toEqual({
+        whose: "yours",
+        spentMicros: 0,
+      });
+    } finally {
+      await db.generationJob.deleteMany({ where: { makerId: solo.id } });
+      await db.maker.delete({ where: { id: solo.id } });
+    }
   });
 });

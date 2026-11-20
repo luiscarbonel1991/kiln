@@ -22,6 +22,9 @@ const PNG = Buffer.from(
 );
 
 describe.skipIf(!enabled)("HTTP API (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const tokens = await import("@/server/access-tokens");
   const { findProduct } = await import("@/server/product-repository");
@@ -34,7 +37,7 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
   let token = "";
   let tokenId = "";
   beforeAll(async () => {
-    const made = await tokens.createAccessToken("API test");
+    const made = await tokens.createAccessToken(maker, "API test");
     token = made.token;
     tokenId = made.created.id;
   });
@@ -84,7 +87,7 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
 
   afterAll(async () => {
     await db.product.deleteMany({ where: { sku } });
-    await tokens.revokeAccessToken(tokenId);
+    await tokens.revokeAccessToken(maker, tokenId);
   });
 
   it("imports a package and answers with each product's id and colour keys", async () => {
@@ -105,7 +108,7 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
         ],
       },
     ]);
-    expect((await findProduct(sku))?.id).toBe(body.imported[0].id);
+    expect((await findProduct(maker, sku))?.id).toBe(body.imported[0].id);
   });
 
   it("a material photo by sku: stored by its bytes, the swatch hex kept; the same photo again changes nothing", async () => {
@@ -125,7 +128,7 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
       changed: ["colours (Oak changed)"],
       behind: [],
     });
-    const stored = await findProduct(sku);
+    const stored = await findProduct(maker, sku);
     expect(stored?.colours[0]).toMatchObject({
       face: "#C8A165",
       swatchUrl: body.colour.swatchUrl,
@@ -140,7 +143,7 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
     expect(body.warnings).toEqual([
       `"${sku}" API test coaster: kept the material photo of Oak (the package gives none).`,
     ]);
-    expect((await findProduct(sku))?.colours[0].swatchUrl).toMatch(
+    expect((await findProduct(maker, sku))?.colours[0].swatchUrl).toMatch(
       /storage\.test/,
     );
   });
@@ -169,7 +172,9 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
       status: "updated",
       colour: { key: "oak", swatchUrl: null },
     });
-    expect((await findProduct(sku))?.colours[0].swatchUrl).toBeUndefined();
+    expect(
+      (await findProduct(maker, sku))?.colours[0].swatchUrl,
+    ).toBeUndefined();
   });
 
   it("tints a photo to the swatch on ?match=swatch, and refuses a coloured white spot (422) without storing it", async () => {
@@ -180,18 +185,18 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
       "xc:#B48A5C",
       "png:-",
     ]);
-    const before = (await findProduct(sku))?.colours[1].swatchUrl;
+    const before = (await findProduct(maker, sku))?.colours[1].swatchUrl;
     const refused = await photo("maple", warm, sku, "?white=0.5,0.5");
     expect(refused.status).toBe(422);
     expect((await refused.json()).error).toMatch(/has colour/);
-    expect((await findProduct(sku))?.colours[1].swatchUrl).toBe(before);
+    expect((await findProduct(maker, sku))?.colours[1].swatchUrl).toBe(before);
 
     const res = await photo("maple", warm, sku, "?match=swatch");
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.colour.face).toBe("#E3C99A");
     expect(colourDifference(body.photoColour.hex, "#E3C99A")).toBeLessThan(3);
-    expect((await findProduct(sku))?.colours[1].swatchUrl).toBe(
+    expect((await findProduct(maker, sku))?.colours[1].swatchUrl).toBe(
       body.colour.swatchUrl,
     );
   });
@@ -212,7 +217,7 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
       maple: (await maple.json()).colour.swatchUrl,
     };
     expect(urls.oak).not.toBe(urls.maple);
-    const stored = await findProduct(sku);
+    const stored = await findProduct(maker, sku);
     expect(stored?.colours.map((c) => c.swatchUrl)).toEqual([
       urls.oak,
       urls.maple,
@@ -220,8 +225,8 @@ describe.skipIf(!enabled)("HTTP API (database)", async () => {
   });
 
   it("a revoked token is refused", async () => {
-    const other = await tokens.createAccessToken("Revoked API test");
-    await tokens.revokeAccessToken(other.created.id);
+    const other = await tokens.createAccessToken(maker, "Revoked API test");
+    await tokens.revokeAccessToken(maker, other.created.id);
     const res = await importPost(
       new Request("http://kiln.test/api/import", {
         method: "POST",

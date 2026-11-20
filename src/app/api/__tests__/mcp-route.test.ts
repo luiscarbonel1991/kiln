@@ -40,7 +40,7 @@ vi.mock("@/server/project-frames", () => ({
       updatedAt: "2026-10-29T12:00:00.000Z",
     },
   ],
-  projectFrames: async (id: string) =>
+  projectFrames: async (_maker: unknown, id: string) =>
     id === "p1"
       ? {
           project: { id, name: "Planter", type: "listing-kit", phase: "x" },
@@ -134,7 +134,12 @@ describe("/api/mcp", () => {
     expect(result.isError).toBeFalsy();
     expect(recorded.at(-1)).toEqual({
       name: "get_frames",
-      ctx: { tokenId: "t1", tokenName: "agent", canSpend: false },
+      ctx: {
+        tokenId: "t1",
+        maker: { id: "m1" },
+        tokenName: "agent",
+        canSpend: false,
+      },
       ok: true,
     });
     expect(result.structuredContent).toMatchObject({

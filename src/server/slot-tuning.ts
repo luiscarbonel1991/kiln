@@ -11,6 +11,7 @@ import {
 import { Product } from "@/domain/product";
 import { resolveLook } from "@/domain/product-look";
 import { slotCards } from "@/lib/project-start";
+import type { MakerRef } from "@/server/maker-repository";
 import { drawLook } from "@/server/product-reference";
 import { loadProjectBoard, setSlotTuning } from "@/server/project-repository";
 
@@ -41,11 +42,12 @@ const derivedCard =
 // is written again from it, on its own destination only. The board's Tune
 // and the reject_frame tool both tune through here.
 export function retuneSlot(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
   tune: (plan: ProjectPlan) => ProjectPlan,
 ) {
-  return setSlotTuning(projectId, ref, tune, derivedCard(ref));
+  return setSlotTuning(maker, projectId, ref, tune, derivedCard(ref));
 }
 
 // A frame's own colour and style, free: a colour or style given, null to follow
@@ -54,11 +56,12 @@ export function retuneSlot(
 // product's words and material sample; the maker's own fields stay). Nothing is
 // generated. Refused, with why, for a look the product cannot show.
 export async function relookSlot(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
   asked: { colour?: string | null; style?: string | null },
 ) {
-  const loaded = await loadProjectBoard(projectId);
+  const loaded = await loadProjectBoard(maker, projectId);
   const plan = loaded?.board.plan;
   if (!plan || !loaded?.product) {
     throw new Error("Only a planned project with a product takes a look.");
@@ -81,6 +84,7 @@ export async function relookSlot(
       : null;
   if (drawn && "refused" in drawn) throw new Error(drawn.refused);
   return setSlotTuning(
+    maker,
     projectId,
     ref,
     // The looks no frame shows any more are dropped.

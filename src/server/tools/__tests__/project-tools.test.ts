@@ -12,8 +12,9 @@ const product = parsed.products[0];
 
 const s = vi.hoisted(() => ({ started: [] as unknown[] }));
 vi.mock("@/server/product-repository", () => ({
-  getProduct: async (id: string) => (id === product.id ? product : null),
-  findProduct: async (ref: string) =>
+  getProduct: async (_maker: unknown, id: string) =>
+    id === product.id ? product : null,
+  findProduct: async (_maker: unknown, ref: string) =>
     ref === product.id || ref === product.sku ? product : null,
   listProducts: async () => [product],
 }));
@@ -25,7 +26,7 @@ vi.mock("@/server/maker-repository", () => ({
 }));
 vi.mock("@/server/project-repository", () => ({
   latestBriefs: async () => ({}),
-  createProject: async (input: unknown) => {
+  createProject: async (_maker: unknown, input: unknown) => {
     s.started.push(input);
     return "p9";
   },
@@ -36,14 +37,14 @@ vi.mock("@/server/product-reference", () => ({
 }));
 vi.mock("@/server/project-frames", () => ({
   framedProjects: async () => [],
-  projectFrames: async (id: string) => ({
+  projectFrames: async (_maker: unknown, id: string) => ({
     project: { id, name: "Kit", type: "listing-kit", phase: "plan" },
     frames: [],
   }),
   waitingProjectFrames: async () => ({ waiting: [], reference: false }),
 }));
 vi.mock("@/server/deliver/deliver-destination", () => ({
-  deliverDestination: async (project: string) =>
+  deliverDestination: async (_maker: unknown, project: string) =>
     project === "p1"
       ? { url: "https://stub.local/kit.zip", filename: "kit.zip", count: 7 }
       : { error: "Approve the hero first." },
@@ -51,7 +52,12 @@ vi.mock("@/server/deliver/deliver-destination", () => ({
 
 const { TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
-const CTX = { tokenId: "t1", tokenName: "agent", canSpend: false };
+const CTX = {
+  maker: { id: "test" },
+  tokenId: "t1",
+  tokenName: "agent",
+  canSpend: false,
+};
 const call = (name: string, args: unknown) => callTool(TOOLS, name, args, CTX);
 
 afterEach(() => {

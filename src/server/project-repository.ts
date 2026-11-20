@@ -36,7 +36,7 @@ import { BaseUnderstanding } from "@/domain/understanding";
 import type { VideoChoice } from "@/domain/video";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { freshFields, retuneFields } from "@/lib/project-refresh";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
 import { productHash } from "@/server/product-version";
 import {
@@ -150,11 +150,11 @@ function keepServerResults(
 // the card still shows the outputs the editor saw, so a stale tab cannot put
 // back a vector the worker cleared with a new output.
 export async function saveProject(
+  maker: MakerRef,
   input: PersistedProject,
   id?: string,
 ): Promise<string> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = projectToRows(input);
 
   return db.$transaction(async (tx) => {
@@ -240,14 +240,16 @@ export async function saveProject(
 // fixed here, with the editor state (understanding, cards, master) the start
 // produced, and the product as it was (its version: a later change shows on
 // the board). One transaction.
-export async function createProject(input: {
-  type: ProjectType;
-  product: Product;
-  plan: ProjectPlan;
-  editor: PersistedProject;
-}): Promise<string> {
+export async function createProject(
+  maker: MakerRef,
+  input: {
+    type: ProjectType;
+    product: Product;
+    plan: ProjectPlan;
+    editor: PersistedProject;
+  },
+): Promise<string> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = projectToRows(input.editor);
   return db.$transaction(async (tx) => {
     const project = await tx.project.create({
@@ -280,10 +282,10 @@ export async function createProject(input: {
 }
 
 export async function loadProject(
+  maker: MakerRef,
   id: string,
 ): Promise<PersistedProjectRecord | null> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const record = await db.project.findFirst({
     where: { id, makerId: maker.id },
     include: { master: true, cards: { orderBy: { sortOrder: "asc" } } },
@@ -339,9 +341,8 @@ export async function loadProject(
 // Gallery list: every project of the current maker as a lightweight summary
 // (thumbnail + type + phase + card count), newest first. One query via a nested
 // select + relation _count.
-export async function listProjects(): Promise<ProjectSummary[]> {
+export async function listProjects(maker: MakerRef): Promise<ProjectSummary[]> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = await db.project.findMany({
     where: { makerId: maker.id },
     select: {
@@ -365,9 +366,11 @@ export async function listProjects(): Promise<ProjectSummary[]> {
 // the worker never pays for scenes nobody can see; a job already in its paid
 // call finishes, keeps its cost, and its output is dropped. The jobs' rows stay
 // (projectId set null) so the month's spend is kept.
-export async function deleteProject(id: string): Promise<void> {
+export async function deleteProject(
+  maker: MakerRef,
+  id: string,
+): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     // The project row first (enqueueBatch locks it too): a concurrent enqueue
     // waits, then finds the project gone, so no job is queued for it after
@@ -390,9 +393,12 @@ export async function deleteProject(id: string): Promise<void> {
 
 // Rename a project. The only writer of `name` after create — autosave leaves it
 // alone (see saveProject), so the new name persists.
-export async function renameProject(id: string, name: string): Promise<void> {
+export async function renameProject(
+  maker: MakerRef,
+  id: string,
+  name: string,
+): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.project.update({ where: { id, makerId: maker.id }, data: { name } });
 }
 
@@ -403,12 +409,12 @@ export async function renameProject(id: string, name: string): Promise<void> {
 // concurrent autosave is replacing the card rows; that autosave then carries the
 // result from the store.
 export async function saveCardOutput(
+  maker: MakerRef,
   projectId: string,
   cardId: string,
   url: string,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.card.updateMany({
     where: {
       projectId,
@@ -423,12 +429,12 @@ export async function saveCardOutput(
 // (free, no queue job): its take, to review and approve like any other.
 // Refused while the card has a job in the queue.
 export async function setStillsVideo(
+  maker: MakerRef,
   projectId: string,
   cardId: string,
   url: string,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -452,13 +458,13 @@ export async function setStillsVideo(
 // only while the card still shows that take (a newer take clears the vector,
 // so a late trace never lands on it). False when nothing was written.
 export async function setCardVector(
+  maker: MakerRef,
   projectId: string,
   cardId: string,
   take: string,
   vectorUrl: string,
 ): Promise<boolean> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const written = await db.card.updateMany({
     where: {
       projectId,
@@ -500,13 +506,15 @@ export interface ProjectProductVersion {
 }
 
 // The board's read: project + plan + product + anchor + cards, or null.
-export async function loadProjectBoard(id: string): Promise<{
+export async function loadProjectBoard(
+  maker: MakerRef,
+  id: string,
+): Promise<{
   board: ProjectBoard;
   product: Product | null;
   version: ProjectProductVersion | null;
 } | null> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const record = await db.project.findFirst({
     where: { id, makerId: maker.id },
     select: {
@@ -570,13 +578,13 @@ const CardState = Card.pick({ status: true, outputs: true });
 // agent after its QC): a newer take landed since is refused, not approved
 // unseen.
 export async function setSlotApproval(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
   approved: boolean,
   checked?: string,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -642,12 +650,12 @@ export async function setSlotApproval(
 // Save a destination's listing text in the plan. Locked like approvals, so a
 // save never drops an approval landing at the same time.
 export async function setListing(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
   listing: ListingText,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -674,12 +682,12 @@ export async function setListing(
 
 // Save one destination's market brief (none: the brief is cleared).
 export async function setBrief(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
   brief: MarketBrief | undefined,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -708,11 +716,11 @@ export async function setBrief(
 // address, the day it went live): the change sees the plan as stored, so an
 // agent's read and the maker's click do not undo each other.
 export async function changePlan(
+  maker: MakerRef,
   projectId: string,
   change: (plan: ProjectPlan) => ProjectPlan,
 ): Promise<ProjectPlan> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   return db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -736,10 +744,10 @@ export async function changePlan(
 // The last market brief kept for a product on each destination, with the
 // project it is in: a new project of the product starts from it.
 export async function latestBriefs(
+  maker: MakerRef,
   productId: string,
 ): Promise<Record<string, { brief: MarketBrief; projectName: string }>> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const rows = await db.project.findMany({
     where: { makerId: maker.id, products: { some: { productId } } },
     select: { name: true, plan: true },
@@ -760,12 +768,12 @@ export async function latestBriefs(
 }
 
 export async function setSlotOff(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
   off: boolean,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -807,6 +815,7 @@ export async function setSlotOff(
 // approved: its words must keep describing the approved picture, which the
 // video starts from. Locked like approvals; one transaction.
 export async function setSlotTuning(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
   tune: (plan: ProjectPlan) => ProjectPlan,
@@ -821,7 +830,6 @@ export async function setSlotTuning(
   rewrite: "direction" | "card" = "direction",
 ): Promise<{ product: Product | null; plan: ProjectPlan }> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   return db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -928,12 +936,12 @@ export async function setSlotTuning(
 // Change a video slot's choices (start frame, motion, length, orientation).
 // Locked like approvals.
 export async function setVideoChoice(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
   choice: VideoChoice,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -963,6 +971,7 @@ export async function setVideoChoice(
 // and what prices it change (quality, resolution); its aspect and tuning stay.
 // A job already queued keeps the request it snapshotted.
 export async function setCardModel(
+  maker: MakerRef,
   projectId: string,
   cardId: string,
   model: {
@@ -973,7 +982,6 @@ export async function setCardModel(
   },
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -1018,6 +1026,7 @@ export async function setCardModel(
 // card (built by `makeCard` from the project's reference and understanding).
 // Locked like approvals; refused without a reference image.
 export async function addVideoToPlan(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
   shotLists: ShotList[],
@@ -1029,7 +1038,6 @@ export async function addVideoToPlan(
   ) => Card,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -1074,12 +1082,12 @@ export async function addVideoToPlan(
 
 // Reorder a destination's slots (the photo order). Locked like approvals.
 export async function setSlotOrder(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
   move: SlotMove,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -1103,13 +1111,13 @@ export async function setSlotOrder(
 // Stamp the slots a delivery exported (withDelivered: a scene only if the
 // output it exported is still the approved one). Locked like approvals.
 export async function setDelivered(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
   delivered: { key: string; approvedOutput?: string }[],
   at: string,
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -1141,6 +1149,7 @@ export async function setDelivered(
 // the material sample), each saved listing's spec fields, and the version the
 // project now follows. Locked like approvals; one transaction.
 export async function refreshProjectProduct(
+  maker: MakerRef,
   projectId: string,
   input: {
     product: Product;
@@ -1155,7 +1164,6 @@ export async function refreshProjectProduct(
   },
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"
@@ -1226,13 +1234,13 @@ export async function refreshProjectProduct(
 // their fields and references, as refreshCards leaves them). Locked like
 // approvals.
 export async function setProjectReference(
+  maker: MakerRef,
   projectId: string,
   master: MasterAsset,
   firstCards: Card[],
   rewritten: Card[] = [],
 ): Promise<void> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Project"

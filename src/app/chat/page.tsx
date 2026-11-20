@@ -5,6 +5,8 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { cn } from "@/lib/utils";
 import { listChatSessions } from "@/server/chat/chat-repository";
 import { chatPanelData } from "@/server/chat/chat-view";
+import { makerPage } from "@/server/guarded";
+import type { CurrentMaker } from "@/server/maker-repository";
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", {
@@ -17,15 +19,18 @@ const when = (iso: string) =>
 // Chat: the maker's conversations with Kiln's agent, their own and each
 // project's, newest first; one open beside them. `?session=` opens one; none
 // opens a new conversation of the maker's own.
-export default async function ChatPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ session?: string }>;
-}) {
+export default makerPage(async function ChatPage(
+  maker: CurrentMaker,
+  {
+    searchParams,
+  }: {
+    searchParams: Promise<{ session?: string }>;
+  },
+) {
   const { session } = await searchParams;
-  const sessions = await listChatSessions();
+  const sessions = await listChatSessions(maker);
   const open = sessions.find((s) => s.id === session) ?? null;
-  const data = await chatPanelData(open ? { sessionId: open.id } : {});
+  const data = await chatPanelData(maker, open ? { sessionId: open.id } : {});
   const title = open
     ? open.projectName
       ? `${open.projectName} · ${open.title}`
@@ -88,4 +93,4 @@ export default async function ChatPage({
       </main>
     </div>
   );
-}
+});

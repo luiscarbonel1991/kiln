@@ -66,8 +66,11 @@ import {
   type UnlistedModels,
 } from "@/server/generation-repository";
 import { createWorker, type Worker } from "@/server/generation-worker";
-import { getCurrentMaker, getMakerRoutes } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
+import { getMakerRoutes } from "@/server/maker-repository";
+import { fitsThisMonth, inMembersWords } from "@/server/month-limit";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
+import { withMakerKeys } from "@/server/provider-keys";
 import { checkProjectTake } from "@/server/qc/project-take";
 import { sceneLookPlan } from "@/server/scene-look";
 
@@ -192,13 +195,14 @@ function assertRunnable(
 // reference, built exactly as the queue builds a request. A version is built
 // at queue time from its source's approval, so it has none here.
 export async function scenePrompts(
+  maker: MakerRef,
   projectId: string,
 ): Promise<
   Record<string, { prompt: string; negative: string; images: number }>
 > {
-  const project = await loadProject(projectId);
+  const project = await loadProject(maker, projectId);
   if (!project?.master || !project.understanding) return {};
-  const board = await loadProjectBoard(projectId);
+  const board = await loadProjectBoard(maker, projectId);
   const plan = board?.board.plan;
   const prompts: Record<
     string,
@@ -233,6 +237,7 @@ export async function scenePrompts(
 // Build the exact request each card would pay for, from the saved project
 // (the client flushes its autosave first), with its estimate.
 export async function estimateProjectCards(
+  maker: MakerRef,
   projectId: string,
   cardIds: string[],
   // Test takes: each scene at its model's low quality, on that model alone.
@@ -249,12 +254,12 @@ export async function estimateProjectCards(
   // scenes it looks at; null when none is looked at.
   look: { label: string; count: number } | null;
 }> {
-  const project = await loadProject(projectId);
-  const routes = await getMakerRoutes();
+  const project = await loadProject(maker, projectId);
+  const routes = await getMakerRoutes(maker);
   // What the providers' latest key checks found they no longer list.
   const unlisted =
     providerMode() === "live" && hasDatabase()
-      ? await readUnlisted((await getCurrentMaker()).id)
+      ? await readUnlisted(maker.id)
       : NONE_UNLISTED;
   if (!project?.master || !project.understanding) {
     throw new Error("The project needs a reference image first.");
@@ -262,13 +267,13 @@ export async function estimateProjectCards(
   const { master, understanding } = project;
   // The look at each scene once it lands, priced with it; a test take, a
   // cheap check of the direction, goes without.
-  const look = options.test ? null : await sceneLookPlan();
+  const look = options.test ? null : await sceneLookPlan(maker);
   const byId = new Map(project.cards.map((c) => [c.id, c]));
   // A video is built from the board (its plan slot, the approved scene it
   // starts from) and the product's spec.
   let board: Awaited<ReturnType<typeof loadProjectBoard>> | undefined;
   const videoEstimate = async (card: Card): Promise<CardEstimate> => {
-    board ??= await loadProjectBoard(projectId);
+    board ??= await loadProjectBoard(maker, projectId);
     const ref = parseSlotCardId(card.id);
     const destination = board?.board.plan?.destinations.find(
       (d) => d.destinationId === ref?.destinationId,
@@ -336,7 +341,7 @@ export async function estimateProjectCards(
     }
     assertRunnable(card.model, "image", card.id, unlisted);
     // A scene looking down edits Kiln's view from above, when there is one.
-    board ??= await loadProjectBoard(projectId);
+    board ??= await loadProjectBoard(maker, projectId);
     const plan = board?.board.plan;
     const ref = parseSlotCardId(card.id);
     const slot = plan?.destinations
@@ -474,19 +479,41 @@ export async function estimateProjectCards(
   };
 }
 
+// Whether a batch of these cards would fit this month's limit, priced as
+// enqueueProjectCards prices it (each card's dearest model): a member's yes
+// or no before the click, from the cards' saved state, never an amount the
+// browser sends. Only live work counts against the limit.
+export async function fitsProjectCards(
+  maker: MakerRef,
+  input: { projectId: string; cardIds: string[] },
+): Promise<boolean> {
+  if (providerMode() !== "live") return true;
+  const { cards } = await estimateProjectCards(
+    maker,
+    input.projectId,
+    input.cardIds,
+  );
+  return fitsThisMonth(
+    maker,
+    cards.reduce((total, c) => total + c.maxMicros, 0),
+  );
+}
+
 // Queue a planned project's cards, or a design's drawings (an agent's draw:
 // the studio shows the job and saves around its result), as one batch and
 // wake the worker.
-export async function enqueueProjectCards(input: {
-  projectId: string;
-  cardIds: string[];
-  shownMaxMicros?: number;
-  // The chat conversation whose paid tool queues them.
-  sessionId?: string;
-  // Test takes (estimateProjectCards).
-  test?: boolean;
-}) {
-  const maker = await getCurrentMaker();
+export async function enqueueProjectCards(
+  maker: MakerRef,
+  input: {
+    projectId: string;
+    cardIds: string[];
+    shownMaxMicros?: number;
+    // The chat conversation whose paid tool queues them.
+    sessionId?: string;
+    // Test takes (estimateProjectCards).
+    test?: boolean;
+  },
+) {
   const planned = await db.project.findFirst({
     where: { id: input.projectId, makerId: maker.id },
     select: { plan: true, type: true },
@@ -497,6 +524,7 @@ export async function enqueueProjectCards(input: {
     );
   }
   const { cards, model } = await estimateProjectCards(
+    maker,
     input.projectId,
     input.cardIds,
     { test: input.test },
@@ -514,6 +542,9 @@ export async function enqueueProjectCards(input: {
     })),
     shownMaxMicros: input.shownMaxMicros,
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+    memberId: maker.member?.id ?? null,
+  }).catch(async (error) => {
+    throw await inMembersWords(maker, error);
   });
   ensureGenerationWorker()?.wake();
   return result;
@@ -547,6 +578,7 @@ export function ensureGenerationWorker(): Worker | null {
   if (!globalForWorker.kilnGenerationWorker) {
     const worker = createWorker({
       mode: providerMode(),
+      asMaker: withMakerKeys,
       concurrency: env.KILN_GENERATION_CONCURRENCY,
       leaseSec: 120,
       renewMs: 30_000,

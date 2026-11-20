@@ -1,5 +1,6 @@
 import { sceneLookEstimate } from "@/domain/generation-cost";
 import { modelLabel, type ProviderId } from "@/domain/model-defaults";
+import type { MakerRef } from "@/server/maker-repository";
 import {
   getMakerModelSetup,
   getMakerPreferences,
@@ -27,10 +28,10 @@ export interface SceneLookSetup {
   plan: SceneLookPlan | null;
 }
 
-export async function sceneLookSetup(): Promise<SceneLookSetup> {
+export async function sceneLookSetup(maker: MakerRef): Promise<SceneLookSetup> {
   const [prefs, setup] = await Promise.all([
-    getMakerPreferences(),
-    getMakerModelSetup(),
+    getMakerPreferences(maker),
+    getMakerModelSetup(maker),
   ]);
   const { candidates } = roleCandidates(setup, "sceneLook");
   const entry = candidates.find(textRunnable("sceneLook"));
@@ -48,6 +49,8 @@ export async function sceneLookSetup(): Promise<SceneLookSetup> {
 
 // What a queued scene carries: null when the maker turned the look off or
 // nothing can run it.
-export async function sceneLookPlan(): Promise<SceneLookPlan | null> {
-  return (await sceneLookSetup()).plan;
+export async function sceneLookPlan(
+  maker: MakerRef,
+): Promise<SceneLookPlan | null> {
+  return (await sceneLookSetup(maker)).plan;
 }

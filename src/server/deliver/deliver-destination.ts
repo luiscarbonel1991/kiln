@@ -16,6 +16,7 @@ import {
 } from "@/server/deliver/delivery";
 import { outputSources, projectSpend } from "@/server/generation-repository";
 import { readBeforeAtDelivery } from "@/server/listing-results";
+import type { MakerRef } from "@/server/maker-repository";
 import { getMakerBrand } from "@/server/maker-repository";
 import { loadProjectBoard, setDelivered } from "@/server/project-repository";
 
@@ -39,11 +40,12 @@ async function dataUrl(url: string): Promise<string> {
 // (or deliveredFiles): the product as the project shows it, its frames and
 // their sources. Null when the destination is not part of a planned project.
 export async function destinationDelivery(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
   now = new Date(),
 ): Promise<{ input: DeliveryInput; product: Product } | null> {
-  const loaded = await loadProjectBoard(projectId);
+  const loaded = await loadProjectBoard(maker, projectId);
   const plan = loaded?.board.plan?.destinations.find(
     (d) => d.destinationId === destinationId,
   );
@@ -57,7 +59,7 @@ export async function destinationDelivery(
   // Exact frames draw the product as the project shows it (its look).
   const shown = projectProduct(loaded.product, fullPlan);
   const plate = plateHref(shown);
-  const sources = await outputSources(projectId, outputs);
+  const sources = await outputSources(maker, projectId, outputs);
   // resvg fetches nothing: the colour sheet's material samples go inline.
   const product = {
     ...shown,
@@ -73,7 +75,7 @@ export async function destinationDelivery(
     input: {
       projectName: loaded.board.name,
       product,
-      brand: await getMakerBrand(),
+      brand: await getMakerBrand(maker),
       destination,
       plan,
       cardOf: (key) => cards.get(slotCardId(destinationId, key)),
@@ -113,7 +115,7 @@ export async function destinationDelivery(
         ? {
             cost: projectCost(
               fullPlan,
-              (await projectSpend(projectId)).byCard,
+              (await projectSpend(maker, projectId)).byCard,
             ).destinations.find((d) => d.destinationId === destinationId),
           }
         : {}),
@@ -126,24 +128,31 @@ export async function destinationDelivery(
 }
 
 export async function deliverDestination(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
 ): Promise<DeliverResult> {
   try {
     const now = new Date();
-    const delivery = await destinationDelivery(projectId, destinationId, now);
+    const delivery = await destinationDelivery(
+      maker,
+      projectId,
+      destinationId,
+      now,
+    );
     if (!delivery) {
       return { error: "This destination is not part of a planned project." };
     }
     const result = await buildDelivery(delivery.input);
     const url = await storeAsset(result.zip, "application/zip", "deliveries");
     await setDelivered(
+      maker,
       projectId,
       destinationId,
       result.delivered,
       now.toISOString(),
     );
-    await readBeforeAtDelivery(projectId, destinationId);
+    await readBeforeAtDelivery(maker, projectId, destinationId);
     return { url, filename: result.filename, count: result.files.length };
   } catch (error) {
     if (error instanceof DeliveryRefusal) return { error: error.message };

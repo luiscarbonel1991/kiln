@@ -7,6 +7,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("product repository (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const { deleteProduct, importCatalog, productProjects, updateProduct } =
     await import("@/server/product-repository");
@@ -44,18 +47,18 @@ describe.skipIf(!enabled)("product repository (database)", async () => {
   });
 
   it("says whether each product is new, updated (and what changed) or unchanged", async () => {
-    const [first] = await importCatalog([product]);
+    const [first] = await importCatalog(maker, [product]);
     expect(first).toMatchObject({ status: "new", changed: [] });
     const row = await db.product.findFirstOrThrow({ where: { sku } });
 
-    const [same] = await importCatalog([{ ...product, id: "other" }]);
+    const [same] = await importCatalog(maker, [{ ...product, id: "other" }]);
     expect(same).toMatchObject({ status: "unchanged", changed: [] });
     expect(same.product.id).toBe(first.product.id);
     // Nothing was written: updatedAt still means the last real change.
     const untouched = await db.product.findFirstOrThrow({ where: { sku } });
     expect(untouched.updatedAt).toEqual(row.updatedAt);
 
-    const [updated] = await importCatalog([
+    const [updated] = await importCatalog(maker, [
       { ...product, material: "solid oak" },
     ]);
     expect(updated).toMatchObject({ status: "updated", changed: ["material"] });
@@ -63,17 +66,19 @@ describe.skipIf(!enabled)("product repository (database)", async () => {
   });
 
   it("saves an edit over its own row, keeping its sku, or writes nothing", async () => {
-    const [created] = await importCatalog([{ ...product, sku: `${sku}-E` }]);
+    const [created] = await importCatalog(maker, [
+      { ...product, sku: `${sku}-E` },
+    ]);
     const id = created.product.id;
     const row = await db.product.findFirstOrThrow({ where: { id } });
 
-    const same = await updateProduct(id, created.product);
+    const same = await updateProduct(maker, id, created.product);
     expect(same).toMatchObject({ status: "unchanged", changed: [] });
     expect(
       (await db.product.findFirstOrThrow({ where: { id } })).updatedAt,
     ).toEqual(row.updatedAt);
 
-    const edited = await updateProduct(id, {
+    const edited = await updateProduct(maker, id, {
       ...created.product,
       name: "Renamed board",
       sku: "something-else",
@@ -85,7 +90,7 @@ describe.skipIf(!enabled)("product repository (database)", async () => {
   });
 
   it("deletes a product no project uses, and names the projects that do", async () => {
-    const [created] = await importCatalog([
+    const [created] = await importCatalog(maker, [
       { ...product, sku: `${sku}-E`, name: "Delete test board" },
     ]);
     const id = created.product.id;
@@ -95,7 +100,7 @@ describe.skipIf(!enabled)("product repository (database)", async () => {
       destinationIds: ["etsy"],
       catalog: CATALOG,
     });
-    const projectId = await repo.createProject({
+    const projectId = await repo.createProject(maker, {
       type: "listing-kit",
       product: created.product,
       plan,
@@ -107,13 +112,13 @@ describe.skipIf(!enabled)("product repository (database)", async () => {
       }),
     });
     projects.push(projectId);
-    const uses = await productProjects(id);
+    const uses = await productProjects(maker, id);
     expect(uses.map((u) => u.projectId)).toEqual([projectId]);
-    expect(await deleteProduct(id)).toMatchObject({
+    expect(await deleteProduct(maker, id)).toMatchObject({
       usedBy: [{ projectId }],
     });
     await db.project.delete({ where: { id: projectId } });
-    expect(await deleteProduct(id)).toEqual({ deleted: true });
+    expect(await deleteProduct(maker, id)).toEqual({ deleted: true });
     expect(await db.product.findFirst({ where: { id } })).toBeNull();
   });
 });

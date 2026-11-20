@@ -11,6 +11,9 @@ const enabled =
 describe.skipIf(!enabled)(
   "a project from a live listing (database)",
   async () => {
+    const maker = enabled
+      ? await (await import("@/server/maker-repository")).getCurrentMaker()
+      : { id: "" };
     const { db } = await import("@/lib/db");
     const repo = await import("@/server/project-repository");
     const { upsertProducts } = await import("@/server/product-repository");
@@ -29,7 +32,7 @@ describe.skipIf(!enabled)(
     });
 
     it("keeps the listing's address, its kept photos and what each frame replaces", async () => {
-      const [product] = await upsertProducts([
+      const [product] = await upsertProducts(maker, [
         Product.parse({
           id: "pkg:LL",
           sku,
@@ -66,7 +69,7 @@ describe.skipIf(!enabled)(
         plan,
         master: photoReference(product),
       });
-      const id = await repo.createProject({
+      const id = await repo.createProject(maker, {
         type: "listing-kit",
         product,
         plan,
@@ -74,7 +77,7 @@ describe.skipIf(!enabled)(
       });
       created.push(id);
 
-      const loaded = await repo.loadProjectBoard(id);
+      const loaded = await repo.loadProjectBoard(maker, id);
       const etsy = loaded?.board.plan?.destinations[0];
       expect(etsy?.listingUrl).toBe(listingUrl);
       expect(etsy?.slots.map((s) => s.key)).toEqual(["hero", "live-2"]);

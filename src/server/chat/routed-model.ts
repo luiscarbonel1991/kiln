@@ -24,6 +24,7 @@ import {
   openDirectCall,
   textCall,
 } from "@/server/direct-spend";
+import type { MakerRef } from "@/server/maker-repository";
 import { textRunnable } from "@/server/text-calls";
 
 // The chat's model: a route behind one language model, every model at the
@@ -114,6 +115,7 @@ function metered(
 }
 
 export function routedChatModel(
+  maker: MakerRef,
   kind: ChatKind,
   options: {
     candidates: RouteEntry[];
@@ -137,7 +139,7 @@ export function routedChatModel(
     let move: { from: RouteEntry; reason: string } | undefined;
     for (;;) {
       const entry = current;
-      const direct = await openDirectCall({
+      const direct = await openDirectCall(maker, {
         ...textCall<undefined>(entry, kind, effort),
         ...(projectId ? { projectId } : {}),
         ...(move

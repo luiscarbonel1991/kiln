@@ -13,9 +13,9 @@ export const listProductsTool = defineTool({
     "The maker's products, by name: id, sku, name, family, description, its colours and default colour, its styles (other designs), and its wording lines. A project or a scene can show any colour and style.",
   input: z.object({}),
   hints: { readOnly: true },
-  run: async () => ({
+  run: async (_input, { maker }) => ({
     data: {
-      products: (await listProducts()).map((p) => ({
+      products: (await listProducts(maker)).map((p) => ({
         id: p.id,
         sku: p.sku,
         name: p.name,
@@ -57,8 +57,8 @@ export const importProductsTool = defineTool({
       .describe("The product package itself: { version, products: [...] }."),
   }),
   hints: { idempotent: true },
-  run: async ({ package: pkg }) => {
-    const result = await importPackage(pkg);
+  run: async ({ package: pkg }, { maker }) => {
+    const result = await importPackage(maker, pkg);
     if ("error" in result) throw new ToolRefusal(result.error);
     return { data: { ...importSummary(result) } };
   },

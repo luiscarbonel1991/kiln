@@ -26,7 +26,7 @@ describe.skipIf(!enabled)("a batch that ends (database)", async () => {
         phase: "generation",
       },
     });
-    session = await chats.createChatSession(project.id);
+    session = await chats.createChatSession(maker, project.id);
   });
 
   afterAll(async () => {
@@ -70,7 +70,7 @@ describe.skipIf(!enabled)("a batch that ends (database)", async () => {
   }
 
   const notices = async () =>
-    ((await chats.getChat(session.id))?.messages ?? []).filter((m) =>
+    ((await chats.getChat(maker, session.id))?.messages ?? []).filter((m) =>
       m.id.startsWith("event-"),
     );
 

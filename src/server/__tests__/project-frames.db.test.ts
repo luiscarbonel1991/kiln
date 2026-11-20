@@ -7,6 +7,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("project frames (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const { framedProjects, projectFrames, waitingProjectFrames } = await import(
@@ -28,7 +31,7 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
   });
 
   it("lists the frames, approves only the take that was checked, and withdraws", async () => {
-    const [product] = await upsertProducts([
+    const [product] = await upsertProducts(maker, [
       Product.parse({
         id: "pkg:FR",
         sku,
@@ -52,7 +55,7 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
       destinationIds: ["etsy"],
       catalog: CATALOG,
     });
-    const id = await repo.createProject({
+    const id = await repo.createProject(maker, {
       type: "listing-kit",
       product,
       plan,
@@ -63,7 +66,7 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
 
     // Nothing generated yet: every scene with a card waits for a batch, and
     // the hero takes no approval.
-    const state = await waitingProjectFrames(id);
+    const state = await waitingProjectFrames(maker, id);
     expect(state?.reference).toBe(true);
     const waiting = state?.waiting;
     expect(waiting).toContain("etsy.hero");
@@ -77,14 +80,16 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
         ),
       ),
     ).toBe(true);
-    let frames = await projectFrames(id);
+    let frames = await projectFrames(maker, id);
     expect(frames?.project).toMatchObject({ id, type: "listing-kit" });
     expect(frames?.frames.find((f) => f.frame === "etsy.hero")).toMatchObject({
       state: "queued",
       output: null,
       approvable: false,
     });
-    await expect(repo.setSlotApproval(id, hero, true)).rejects.toMatchObject({
+    await expect(
+      repo.setSlotApproval(maker, id, hero, true),
+    ).rejects.toMatchObject({
       kind: "refused",
     });
 
@@ -94,7 +99,7 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
       where: { projectId_cardId: { projectId: id, cardId: "etsy.hero" } },
       data: { outputs: [second, first], status: "done" },
     });
-    frames = await projectFrames(id);
+    frames = await projectFrames(maker, id);
     expect(frames?.frames.find((f) => f.frame === "etsy.hero")).toMatchObject({
       state: "to-review",
       output: second,
@@ -102,19 +107,19 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
     });
 
     // The caller checked the first take; the second landed since.
-    const stale = repo.setSlotApproval(id, hero, true, first);
+    const stale = repo.setSlotApproval(maker, id, hero, true, first);
     await expect(stale).rejects.toBeInstanceOf(SlotRefusal);
     await expect(stale).rejects.toMatchObject({ kind: "stale" });
 
-    await repo.setSlotApproval(id, hero, true, second);
-    frames = await projectFrames(id);
+    await repo.setSlotApproval(maker, id, hero, true, second);
+    frames = await projectFrames(maker, id);
     expect(frames?.frames.find((f) => f.frame === "etsy.hero")).toMatchObject({
       state: "approved",
       approvedOutput: second,
     });
 
-    await repo.setSlotApproval(id, hero, false);
-    frames = await projectFrames(id);
+    await repo.setSlotApproval(maker, id, hero, false);
+    frames = await projectFrames(maker, id);
     expect(frames?.frames.find((f) => f.frame === "etsy.hero")).toMatchObject({
       state: "to-review",
       approvedOutput: null,
@@ -122,13 +127,14 @@ describe.skipIf(!enabled)("project frames (database)", async () => {
 
     await expect(
       repo.setSlotApproval(
+        maker,
         id,
         { destinationId: "etsy", slotKey: "nope" },
         true,
       ),
     ).rejects.toMatchObject({ kind: "missing" });
-    expect((await framedProjects()).map((p) => p.id)).toContain(id);
-    expect(await projectFrames("no-such-project")).toBeNull();
-    expect(await waitingProjectFrames("no-such-project")).toBeNull();
+    expect((await framedProjects(maker)).map((p) => p.id)).toContain(id);
+    expect(await projectFrames(maker, "no-such-project")).toBeNull();
+    expect(await waitingProjectFrames(maker, "no-such-project")).toBeNull();
   });
 });

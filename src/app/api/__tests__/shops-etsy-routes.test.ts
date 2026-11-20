@@ -35,7 +35,7 @@ vi.mock("@/server/shop-connection", async (original) => {
             cookie: "v1.a.b.c",
           };
     },
-    finishConnect: async (input: unknown) => {
+    finishConnect: async (_maker: unknown, input: unknown) => {
       state.finished.push(input);
       if (state.refuse) {
         throw new real.ConnectRefusal(

@@ -15,10 +15,13 @@ export type {
 } from "@/providers/interfaces";
 export { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 export {
+  currentProviderKeys,
+  hasEnvironmentKey,
   hasProviderKey,
+  type ProviderKeys,
   providerKey,
   providerKeySource,
-  setProviderKey,
+  withProviderKeys,
 } from "@/providers/keys";
 export { mockArtDirector } from "@/providers/mock/art-director";
 export { type MockReply, mockReply } from "@/providers/mock/chat-model";

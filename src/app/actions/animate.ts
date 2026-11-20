@@ -5,6 +5,7 @@ import { snapSeconds, videoSecondsFor } from "@/domain/video";
 import { getVideoProvider } from "@/providers/registry";
 import { AnimateInput, GenerationResult } from "@/providers/types";
 import { videoCall, withDirectSpend } from "@/server/direct-spend";
+import { makerAction } from "@/server/guarded";
 
 // Server Function: the only client path into @/providers for video. The
 // provider is the card's own; a retired or unknown model (Sora) is refused with
@@ -12,27 +13,28 @@ import { videoCall, withDirectSpend } from "@/server/direct-spend";
 // video reserves its pinned max against the monthly cap and records what it
 // cost, like the image calls. The card's length snaps to the nearest one its
 // model renders (Gemini Omni: 3 to 10 s), so the price and the call agree.
-export async function animateVideo(
-  input: AnimateInput,
-): Promise<GenerationResult> {
-  const raw = AnimateInput.parse(input);
-  assertModel(raw.model, "video");
-  const parsed = {
-    ...raw,
-    durationSec: snapSeconds(
-      raw.durationSec,
-      videoSecondsFor(undefined, raw.model),
-    ),
-  };
-  const provider = getVideoProvider(parsed.model.provider);
-  if (!provider) {
-    throw new Error(
-      `${PROVIDER_LABELS[parsed.model.provider]} has no video model.`,
+export const animateVideo = makerAction(
+  async (maker, input: AnimateInput): Promise<GenerationResult> => {
+    const raw = AnimateInput.parse(input);
+    assertModel(raw.model, "video");
+    const parsed = {
+      ...raw,
+      durationSec: snapSeconds(
+        raw.durationSec,
+        videoSecondsFor(undefined, raw.model),
+      ),
+    };
+    const provider = getVideoProvider(parsed.model.provider);
+    if (!provider) {
+      throw new Error(
+        `${PROVIDER_LABELS[parsed.model.provider]} has no video model.`,
+      );
+    }
+    return withDirectSpend(
+      maker,
+      videoCall(parsed.model, parsed.durationSec),
+      async (beforeCall) =>
+        GenerationResult.parse(await provider.animate(parsed, { beforeCall })),
     );
-  }
-  return withDirectSpend(
-    videoCall(parsed.model, parsed.durationSec),
-    async (beforeCall) =>
-      GenerationResult.parse(await provider.animate(parsed, { beforeCall })),
-  );
-}
+  },
+);

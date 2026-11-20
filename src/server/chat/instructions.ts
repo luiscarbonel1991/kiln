@@ -1,6 +1,7 @@
 import type { Specialist } from "@/server/chat/specialists";
 import { designView } from "@/server/designs";
 import { keptLessons } from "@/server/lessons";
+import type { MakerRef } from "@/server/maker-repository";
 import { projectFrames } from "@/server/project-frames";
 import { loadProjectBoard } from "@/server/project-repository";
 
@@ -24,10 +25,12 @@ Rules:
 // The kept lessons the agent is told: a project's family's (and every
 // family's), on its mode's topics; at most twenty, newest first.
 async function lessonLines(
+  maker: MakerRef,
   family: string | null,
   specialist: Pick<Specialist, "topics">,
 ): Promise<string[]> {
   const lessons = await keptLessons(
+    maker,
     family,
     specialist.topics ? [...specialist.topics] : null,
   ).catch(() => []);
@@ -40,6 +43,7 @@ async function lessonLines(
 }
 
 export async function chatInstructions(
+  maker: MakerRef,
   projectId: string | null,
   specialist: Pick<Specialist, "instructions" | "topics">,
   now = new Date(),
@@ -54,13 +58,13 @@ export async function chatInstructions(
   if (!projectId) {
     lines.push(
       "This conversation is the maker's own, on no project: list_projects and list_products find what they mean; list_lessons reads a family's lessons.",
-      ...(await lessonLines(null, specialist)),
+      ...(await lessonLines(maker, null, specialist)),
     );
     return lines.join("\n");
   }
-  const frames = await projectFrames(projectId).catch(() => null);
+  const frames = await projectFrames(maker, projectId).catch(() => null);
   if (!frames) {
-    const design = await designView(projectId).catch(() => null);
+    const design = await designView(maker, projectId).catch(() => null);
     if (design) {
       const counts = new Map<string, number>();
       for (const d of design.drawings) {
@@ -71,7 +75,7 @@ export async function chatInstructions(
         .join(", ");
       lines.push(
         `This conversation is on the design "${design.project.name}" (Project id: ${projectId}; a design, with no frames). Its ${design.drawings.length} drawings: ${states || "none yet"}. get_design reads them.`,
-        ...(await lessonLines(null, specialist)),
+        ...(await lessonLines(maker, null, specialist)),
       );
       return lines.join("\n");
     }
@@ -84,11 +88,11 @@ export async function chatInstructions(
   }
   const states = [...counts].map(([state, n]) => `${n} ${state}`).join(", ");
   const family =
-    (await loadProjectBoard(projectId).catch(() => null))?.product?.family ??
-    null;
+    (await loadProjectBoard(maker, projectId).catch(() => null))?.product
+      ?.family ?? null;
   lines.push(
     `This conversation is on the project "${frames.project.name}" (Project id: ${projectId}; a ${frames.project.type}, phase ${frames.project.phase}${family ? `, a ${family} product` : ""}). Its ${frames.frames.length} frames: ${states || "none yet"}. get_frames reads them.`,
-    ...(await lessonLines(family, specialist)),
+    ...(await lessonLines(maker, family, specialist)),
   );
   return lines.join("\n");
 }

@@ -16,11 +16,11 @@ vi.mock("@/server/maker-repository", () => ({
     watchedShops: kept.watched,
     leftOutListings: kept.leftOut,
   }),
-  leaveOutListing: async (listingId: string, out: boolean) => {
+  leaveOutListing: async (_maker: unknown, listingId: string, out: boolean) => {
     kept.changes.push([listingId, out]);
     return true;
   },
-  watchShop: async (shop: unknown) => {
+  watchShop: async (_maker: unknown, shop: unknown) => {
     kept.added.push(shop);
     return true;
   },

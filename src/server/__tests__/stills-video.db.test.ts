@@ -31,6 +31,9 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("stills in motion (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const { upsertProducts } = await import("@/server/product-repository");
@@ -50,7 +53,7 @@ describe.skipIf(!enabled)("stills in motion (database)", async () => {
   });
 
   it("makes the video from the approved scenes, free, as the video card's take", async () => {
-    const [product] = await upsertProducts([
+    const [product] = await upsertProducts(maker, [
       Product.parse({
         id: "pkg:SV",
         sku,
@@ -72,7 +75,7 @@ describe.skipIf(!enabled)("stills in motion (database)", async () => {
       destinationIds: ["etsy"],
       catalog: CATALOG,
     });
-    const id = await repo.createProject({
+    const id = await repo.createProject(maker, {
       type: "listing-kit",
       product,
       plan: planned,
@@ -86,7 +89,7 @@ describe.skipIf(!enabled)("stills in motion (database)", async () => {
     created.push(id);
     const ref = { destinationId: "etsy", slotKey: "video" };
 
-    expect(await makeStillsVideo(id, ref)).toEqual({
+    expect(await makeStillsVideo(maker, id, ref)).toEqual({
       error: "Choose stills in motion for this video first.",
     });
 
@@ -105,7 +108,7 @@ describe.skipIf(!enabled)("stills in motion (database)", async () => {
       })),
     };
     await db.project.update({ where: { id }, data: { plan: approved } });
-    const made = await makeStillsVideo(id, ref);
+    const made = await makeStillsVideo(maker, id, ref);
     if ("error" in made) throw new Error(made.error);
     expect(made.url).toMatch(/\/stills\/\d+\.mp4$/);
     const card = await db.card.findUniqueOrThrow({

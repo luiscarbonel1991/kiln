@@ -28,6 +28,7 @@ import {
 } from "@/domain/queue";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { noteBatchEnd } from "@/server/batch-end";
+import type { MakerRef } from "@/server/maker-repository";
 
 // Persistence for the background generation queue. Every closing write on a
 // job is guarded by its lease token, so a worker that lost its lease (another
@@ -76,6 +77,8 @@ export interface ClaimedJob {
   request: unknown;
   route: unknown;
   estimateMicros: number;
+  // Who queued it; the worker still runs it as its maker.
+  memberId: string | null;
 }
 
 export interface Budget {
@@ -97,23 +100,28 @@ const STOPPED = Prisma.sql`(
 
 type Tx = Prisma.TransactionClient;
 
+// What one job spent this calendar month (UTC), the cap's own rule: a
+// finished job counts its measured cost; without one, its estimate if its
+// paid call went out (the outcome is unknown), else nothing. Queued and
+// running work is not spent. Every read of the month's spend sums this, so
+// none can drift from the cap.
+const SPENT_THIS_MONTH = Prisma.sql`CASE
+  WHEN "status" IN ('done', 'failed', 'canceled')
+    AND "finishedAt" >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+  THEN COALESCE("actualMicros", CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)
+  ELSE 0 END`;
+
 // What this calendar month (UTC) has spent on live generations, and what live
 // jobs in the queue have reserved (their recorded cost, else their estimate);
 // a queued job whose project is gone reserves nothing (it is never claimed).
-// A finished job counts its measured cost; without one, its estimate if its
-// paid call went out (the outcome is unknown), else nothing. One statement, so
-// a job moving to done mid-read is counted exactly once.
+// One statement, so a job moving to done mid-read is counted exactly once.
 async function spend(
   tx: Tx | typeof db,
   makerId: string,
 ): Promise<{ spentMicros: number; reservedMicros: number }> {
   const [row] = await tx.$queryRaw<{ spent: number; reserved: number }[]>`
     SELECT
-      COALESCE(SUM(CASE
-        WHEN "status" IN ('done', 'failed', 'canceled')
-          AND "finishedAt" >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
-        THEN COALESCE("actualMicros", CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)
-        ELSE 0 END), 0)::float8 AS "spent",
+      COALESCE(SUM(${SPENT_THIS_MONTH}), 0)::float8 AS "spent",
       COALESCE(SUM(CASE
         WHEN "status" = 'running'
           OR ("status" = 'queued' AND "projectId" IS NOT NULL)
@@ -122,6 +130,33 @@ async function spend(
     FROM "GenerationJob"
     WHERE "makerId" = ${makerId} AND "mode" = 'live'`;
   return { spentMicros: row.spent, reservedMicros: row.reserved };
+}
+
+export interface MemberSpend {
+  // Who started the work; null for a token, a script, work Kiln did on its
+  // own, or work from before Kiln recorded it.
+  memberId: string | null;
+  spentMicros: number;
+}
+
+// This calendar month's live spend per person, highest first, by the cap's
+// own rule (its rows add up to budget's spentMicros); a person with nothing
+// spent has no row. With `only`, the one person's sum alone: a member never
+// reads the others'.
+export async function spendByMember(
+  maker: MakerRef,
+  only?: { memberId: string },
+): Promise<MemberSpend[]> {
+  assertDatabaseUrl();
+  const rows = await db.$queryRaw<{ memberId: string | null; spent: number }[]>`
+    SELECT "memberId", COALESCE(SUM(${SPENT_THIS_MONTH}), 0)::float8 AS "spent"
+    FROM "GenerationJob"
+    WHERE "makerId" = ${maker.id} AND "mode" = 'live'
+      ${only ? Prisma.sql`AND "memberId" = ${only.memberId}` : Prisma.empty}
+    GROUP BY "memberId"
+    HAVING COALESCE(SUM(${SPENT_THIS_MONTH}), 0) > 0
+    ORDER BY "spent" DESC, "memberId" NULLS LAST`;
+  return rows.map((r) => ({ memberId: r.memberId, spentMicros: r.spent }));
 }
 
 export async function budget(makerId: string): Promise<Budget> {
@@ -151,6 +186,8 @@ export async function enqueueBatch(input: {
   shownMaxMicros?: number;
   // The chat conversation whose paid tool queued it.
   sessionId?: string;
+  // The person who queued it; none for a token, a script or the worker.
+  memberId?: string | null;
 }): Promise<{ batchId: string; queued: number; skipped: string[] }> {
   assertDatabaseUrl();
   const { makerId, projectId, mode } = input;
@@ -273,6 +310,7 @@ export async function enqueueBatch(input: {
         estimateMicros: j.estimateMicros,
         productHash: link?.productHash ?? null,
         sessionId: input.sessionId ?? null,
+        memberId: input.memberId ?? null,
       })),
     });
     return { batchId: batch.id, queued: fresh.length, skipped: [...busy] };
@@ -329,6 +367,7 @@ export async function claimJobs(
     request: j.request,
     route: j.route,
     estimateMicros: j.estimateMicros,
+    memberId: j.memberId,
   }));
 }
 
@@ -603,18 +642,19 @@ export async function cancelBatch(
   batchId: string,
 ): Promise<number> {
   assertDatabaseUrl();
-  const canceled = await db.$transaction(async (tx) => {
+  const { canceled, own } = await db.$transaction(async (tx) => {
     const jobs = await tx.generationJob.updateMany({
       where: { batchId, makerId, status: "queued" },
       data: { status: "canceled", finishedAt: new Date() },
     });
-    await tx.generationBatch.updateMany({
+    const batch = await tx.generationBatch.updateMany({
       where: { id: batchId, makerId },
       data: { canceledAt: new Date() },
     });
-    return jobs.count;
+    return { canceled: jobs.count, own: batch.count === 1 };
   });
-  await noteBatchEnd(batchId);
+  // Only the maker's own batch is ended: the id comes from the client.
+  if (own) await noteBatchEnd(batchId);
   return canceled;
 }
 
@@ -636,6 +676,8 @@ export async function reserveDirectCall(input: {
   route?: JobRoute;
   // The chat conversation whose paid tool made it.
   sessionId?: string;
+  // The person who made it; none for a token or a script.
+  memberId?: string | null;
 }): Promise<string> {
   assertDatabaseUrl();
   return db.$transaction(async (tx) => {
@@ -659,6 +701,7 @@ export async function reserveDirectCall(input: {
         makerId: input.makerId,
         projectId: input.projectId ?? null,
         sessionId: input.sessionId ?? null,
+        memberId: input.memberId ?? null,
         cardId: "direct",
         mode: "live",
         status: "running",
@@ -689,12 +732,15 @@ export async function recordKeyCheck(input: {
   error: string | null;
   // The offered models the provider no longer lists (domain unlistedModels).
   unlisted?: string[];
+  // The person who ran the check.
+  memberId?: string | null;
 }): Promise<void> {
   assertDatabaseUrl();
   const now = new Date();
   await db.generationJob.create({
     data: {
       makerId: input.makerId,
+      memberId: input.memberId ?? null,
       cardId: "key-check",
       mode: "live",
       status: input.error === null ? "done" : "failed",
@@ -804,12 +850,12 @@ export interface GenerationState {
     { status: string; outputs: string[]; vectorUrl: string | null }
   >;
   batch: BatchProgress | null;
-  budget: Budget;
 }
 
 // What the board and the slot editor poll: each card's latest job, the cards'
-// generation state, the running batch's progress and the month's budget, plus
-// a version that changes whenever any of it does.
+// generation state and the running batch's progress, plus a version that
+// changes whenever any of it does. No amount of this month's: a member polls
+// it too (the owner's amounts are monthLimit's).
 const withRanOn = (route: unknown) => {
   const ran = ranOn(readJobRoute(route));
   return ran ? { ranOn: ran } : {};
@@ -890,7 +936,6 @@ export async function projectGenerationState(
       ]),
     ),
     batch,
-    budget: await budget(makerId),
   };
   const version = createHash("sha1")
     .update(JSON.stringify([state.jobs, state.cards, state.batch]))
@@ -935,13 +980,19 @@ export interface OutputFacts {
 // What is known of each of these outputs from the job that finished with it;
 // an output no job made (a studio edit) is absent.
 export async function outputFacts(
+  maker: MakerRef,
   projectId: string,
   outputs: string[],
 ): Promise<Map<string, OutputFacts>> {
   assertDatabaseUrl();
   if (outputs.length === 0) return new Map();
   const jobs = await db.generationJob.findMany({
-    where: { projectId, status: "done", outputUrl: { in: outputs } },
+    where: {
+      projectId,
+      makerId: maker.id,
+      status: "done",
+      outputUrl: { in: outputs },
+    },
     select: { outputUrl: true, productHash: true, takeCheck: true },
   });
   return new Map(
@@ -965,7 +1016,10 @@ export async function outputFacts(
 // job's measured cost, else its estimate once its paid call went out), with
 // each card's takes (its finished generations). Its direct calls (the
 // listing text) belong to no card.
-export async function projectSpend(projectId: string): Promise<{
+export async function projectSpend(
+  maker: MakerRef,
+  projectId: string,
+): Promise<{
   byCard: Map<string, CardSpend>;
   directMicros: number;
 }> {
@@ -978,7 +1032,8 @@ export async function projectSpend(projectId: string): Promise<{
         CASE WHEN "callStartedAt" IS NOT NULL THEN "estimateMicros" ELSE 0 END)), 0)::float8 AS "spent",
       (COUNT(*) FILTER (WHERE "status" = 'done' AND "outputUrl" IS NOT NULL))::int AS "takes"
     FROM "GenerationJob"
-    WHERE "projectId" = ${projectId} AND "mode" = 'live'
+    WHERE "projectId" = ${projectId} AND "makerId" = ${maker.id}
+      AND "mode" = 'live'
       AND "status" IN ('done', 'failed', 'canceled')
     GROUP BY "cardId"`;
   const byCard = new Map<string, CardSpend>();
@@ -1023,13 +1078,19 @@ export async function sessionSpend(
 // What produced each of these outputs: the queue job that finished with it
 // (its prompt, model and measured cost), for a delivery's manifest.
 export async function outputSources(
+  maker: MakerRef,
   projectId: string,
   outputs: string[],
 ): Promise<Map<string, OutputSource>> {
   assertDatabaseUrl();
   if (outputs.length === 0) return new Map();
   const jobs = await db.generationJob.findMany({
-    where: { projectId, status: "done", outputUrl: { in: outputs } },
+    where: {
+      projectId,
+      makerId: maker.id,
+      status: "done",
+      outputUrl: { in: outputs },
+    },
     select: {
       outputUrl: true,
       request: true,

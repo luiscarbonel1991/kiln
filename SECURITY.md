@@ -15,15 +15,20 @@ to disclose it, and you are credited unless you prefer not to be.
 
 ## How Kiln is meant to run
 
-Kiln serves one maker, on their own machine or a private network:
+Kiln serves one organization (a maker's company and its people) per instance:
 
-- **The web app has no login.** Anyone who can reach it can use it, and can spend
-  the maker's provider credit up to the monthly cap. Do not expose it to the
-  internet unless your own authentication sits in front of it. Opened on any
-  address but this machine's, every page says so, until `KILN_ACCESS_GUARDED=1`
-  tells Kiln your login is in front.
+- **The web app asks people to sign in** (email and password; sessions are
+  cookies, signed with a key derived from `KILN_SECRET_KEY`). The first account
+  made on an instance owns it, so make yours before the address is reachable by
+  anyone else. Every page and action reads its data through the session's
+  organization. On any address but this machine's, set `KILN_URL` and serve Kiln
+  over HTTPS.
 - **The HTTP API and the MCP endpoint** require an access token (Settings → Access
   tokens), stored only as a hash.
+- **Stored images are read by address, without a session.** Kiln sets anonymous
+  read on its storage bucket so pages can show them: whoever has a file's address
+  can open it. Keep the bucket off the internet, or behind your own rules, when a
+  file must stay private.
 - **Provider keys** come from Settings → Providers or from the environment
   (`.env`). A key saved in Settings is sealed in the database with AES-256-GCM
   under `KILN_SECRET_KEY`, as a connected shop's OAuth tokens are, and is never

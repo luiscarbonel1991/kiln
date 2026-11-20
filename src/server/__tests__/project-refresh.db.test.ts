@@ -2,7 +2,10 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ refresh: () => {} }));
 // The queue refuses a live job whose provider has no key; tests run key-free.
-vi.mock("@/providers/keys", () => ({ hasProviderKey: () => true }));
+vi.mock("@/providers/keys", async (original) => ({
+  ...(await original<typeof import("@/providers/keys")>()),
+  hasProviderKey: () => true,
+}));
 
 // Integration test against the throwaway Postgres (see
 // project-repository.db.test.ts for the setup).
@@ -13,6 +16,9 @@ const enabled =
 describe.skipIf(!enabled)(
   "product changed — update the project (database)",
   async () => {
+    const maker = enabled
+      ? await (await import("@/server/maker-repository")).getCurrentMaker()
+      : { id: "" };
     const { db } = await import("@/lib/db");
     const repo = await import("@/server/project-repository");
     const { upsertProducts } = await import("@/server/product-repository");
@@ -49,7 +55,7 @@ describe.skipIf(!enabled)(
     });
 
     it("brings the project to the product's current version, keeping the maker's own edits", async () => {
-      const [saved] = await upsertProducts([product]);
+      const [saved] = await upsertProducts(maker, [product]);
       const plan = planProject({
         product: saved,
         type: "launch",
@@ -62,7 +68,7 @@ describe.skipIf(!enabled)(
         plan,
         master: photoReference(saved),
       });
-      const id = await repo.createProject({
+      const id = await repo.createProject(maker, {
         type: "launch",
         product: saved,
         plan,
@@ -74,7 +80,7 @@ describe.skipIf(!enabled)(
       const { listingDraft } = await import("@/domain/listing");
       const { SEED_DESTINATIONS } = await import("@/domain/seed");
       const etsyText = SEED_DESTINATIONS.find((d) => d.id === "etsy")?.text;
-      await repo.setListing(id, "etsy", {
+      await repo.setListing(maker, id, "etsy", {
         ...listingDraft(saved, etsyText),
         title: { value: "My coaster title", source: "maker" },
       });
@@ -90,7 +96,7 @@ describe.skipIf(!enabled)(
 
       const sample = "https://stub.local/birch-sample.jpg";
       const view = "https://stub.local/birch-top.png";
-      const [changed] = await upsertProducts([
+      const [changed] = await upsertProducts(maker, [
         {
           ...saved,
           material: "solid oak",
@@ -98,7 +104,7 @@ describe.skipIf(!enabled)(
           views: [{ label: "top", url: view }],
         },
       ]);
-      const before = await repo.loadProjectBoard(id);
+      const before = await repo.loadProjectBoard(maker, id);
       if (!before?.version || !before.product) throw new Error("no version");
       expect(productDrift(before.product, before.version)).toEqual({
         stale: true,
@@ -107,7 +113,7 @@ describe.skipIf(!enabled)(
       const { estimateProjectCards } = await import(
         "@/server/generation-queue"
       );
-      const [old] = (await estimateProjectCards(id, [first.id])).cards;
+      const [old] = (await estimateProjectCards(maker, id, [first.id])).cards;
       expect(old.request.kind === "image" && old.request.imageInputs).toEqual(
         [],
       );
@@ -116,7 +122,7 @@ describe.skipIf(!enabled)(
         await updateProjectProductAction({ projectId: id }),
       ).toBeUndefined();
 
-      const after = await repo.loadProjectBoard(id);
+      const after = await repo.loadProjectBoard(maker, id);
       if (!after?.version) throw new Error("no version");
       expect(productDrift(changed, after.version).stale).toBe(false);
       const card = after.board.cards.find((c) => c.id === first.id);
@@ -128,7 +134,7 @@ describe.skipIf(!enabled)(
       expect(card?.fields.subject.value).toContain("solid oak");
       // The material sample now travels with the reference, and is priced.
       expect(card?.references).toEqual([sample, view]);
-      const [now] = (await estimateProjectCards(id, [first.id])).cards;
+      const [now] = (await estimateProjectCards(maker, id, [first.id])).cards;
       expect(now.request.kind === "image" && now.request.imageInputs).toEqual([
         sample,
         view,
@@ -155,7 +161,7 @@ describe.skipIf(!enabled)(
         id: "pkg:PR-02",
         sku: `${sku}-B`,
       });
-      const [saved] = await upsertProducts([one]);
+      const [saved] = await upsertProducts(maker, [one]);
       const plan = planProject({
         product: saved,
         type: "launch",
@@ -180,7 +186,7 @@ describe.skipIf(!enabled)(
           },
         ],
       };
-      const id = await repo.createProject({
+      const id = await repo.createProject(maker, {
         type: "launch",
         product: saved,
         plan: approved,
@@ -193,7 +199,7 @@ describe.skipIf(!enabled)(
       });
       created.push(id);
 
-      const [two] = await upsertProducts([
+      const [two] = await upsertProducts(maker, [
         {
           ...saved,
           colours: [
@@ -202,7 +208,7 @@ describe.skipIf(!enabled)(
           ],
         },
       ]);
-      const before = await repo.loadProjectBoard(id);
+      const before = await repo.loadProjectBoard(maker, id);
       if (!before?.board.plan) throw new Error("no plan");
       // The banner's preview is what the update then does.
       const preview = replan(before.board.plan, two, CATALOG.shotLists);
@@ -218,7 +224,7 @@ describe.skipIf(!enabled)(
       expect(
         await updateProjectProductAction({ projectId: id }),
       ).toBeUndefined();
-      const after = await repo.loadProjectBoard(id);
+      const after = await repo.loadProjectBoard(maker, id);
       expect(keys(after?.board.plan)).toEqual(keys(preview.plan));
       expect(keys(after?.board.plan)).toContain("colours");
       expect(
@@ -231,7 +237,7 @@ describe.skipIf(!enabled)(
       expect(
         await updateProjectProductAction({ projectId: id }),
       ).toBeUndefined();
-      const again = await repo.loadProjectBoard(id);
+      const again = await repo.loadProjectBoard(maker, id);
       expect(keys(again?.board.plan)).toEqual(keys(after?.board.plan));
     });
   },

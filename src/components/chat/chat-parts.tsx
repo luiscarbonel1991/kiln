@@ -24,6 +24,7 @@ import {
   MessageFooter,
 } from "@/components/ui/message";
 import { draftApprovalLines } from "@/lib/drafts-view";
+import { memberOverLimit, overLimitLine } from "@/lib/month-limit-words";
 import type { KilnMessage } from "@/server/chat/messages";
 import type { SpecialistId } from "@/server/chat/specialists";
 
@@ -48,6 +49,8 @@ export interface QuoteView {
   typicalUsd: number;
   atMostUsd: number;
   fitsCap?: boolean;
+  // For a member: whom to ask about the cap (they read no amount).
+  ask?: string;
   lines?: { model?: string; fallbacks?: string[] }[];
 }
 
@@ -171,13 +174,15 @@ function ApprovalCard({
       ) : null}
       {quote?.fitsCap === false ? (
         <p className="font-sans text-[0.75rem] text-fail">
-          It may not fit what is left of this month's cap.
+          {quote.ask
+            ? `${overLimitLine(quote.ask)}.`
+            : "It may not fit what is left of this month's cap."}
         </p>
       ) : null}
       <div className="flex items-center gap-2">
         <Button
           size="sm"
-          disabled={disabled}
+          disabled={disabled || memberOverLimit(quote)}
           data-testid={`chat-approve-${name}`}
           onClick={() => onAnswer(true)}
         >

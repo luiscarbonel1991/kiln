@@ -24,7 +24,7 @@ import {
   pkcePair,
   refreshTokens,
 } from "@/providers/shop/etsy-oauth";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import { seal, unseal } from "@/server/secret-box";
 
 // The maker's Etsy shop, connected to Kiln (Luis, 2026-10-27: approve Kiln on
@@ -176,13 +176,16 @@ export interface ShopConnectionView {
 
 // Etsy sent the maker back: check the handshake, trade the code for the
 // shop's tokens, read which shop they open, and keep them sealed.
-export async function finishConnect(input: {
-  code: string | null;
-  state: string | null;
-  error?: string | null;
-  cookie: string | undefined;
-  now?: number;
-}): Promise<ShopConnectionView> {
+export async function finishConnect(
+  maker: MakerRef,
+  input: {
+    code: string | null;
+    state: string | null;
+    error?: string | null;
+    cookie: string | undefined;
+    now?: number;
+  },
+): Promise<ShopConnectionView> {
   if (input.error) {
     throw new ConnectRefusal(
       "denied",
@@ -239,7 +242,7 @@ export async function finishConnect(input: {
     }
     const me = await reader.me();
     const shop = await reader.shop(me.shop_id);
-    return await keepConnection({
+    return await keepConnection(maker, {
       tokens,
       shopId: String(shop.shop_id),
       shopName: shop.shop_name,
@@ -281,14 +284,16 @@ const VIEW = {
   scopes: true,
 } as const;
 
-async function keepConnection(input: {
-  tokens: EtsyTokens;
-  shopId: string;
-  shopName: string;
-  shopUrl: string;
-}): Promise<ShopConnectionView> {
+async function keepConnection(
+  maker: MakerRef,
+  input: {
+    tokens: EtsyTokens;
+    shopId: string;
+    shopName: string;
+    shopUrl: string;
+  },
+): Promise<ShopConnectionView> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const sealed = {
     shopId: input.shopId,
     shopName: input.shopName,
@@ -312,9 +317,10 @@ async function keepConnection(input: {
 }
 
 // The maker's connected shop, without its tokens; null when none.
-export async function shopConnection(): Promise<ShopConnectionView | null> {
+export async function shopConnection(
+  maker: MakerRef,
+): Promise<ShopConnectionView | null> {
   if (!hasDatabase()) return null;
-  const maker = await getCurrentMaker();
   const row = await db.shopConnection.findUnique({
     where: { makerId_platform: { makerId: maker.id, platform: PLATFORM } },
     select: VIEW,
@@ -324,9 +330,8 @@ export async function shopConnection(): Promise<ShopConnectionView | null> {
 
 // Forget the shop: Kiln drops its tokens. The maker can also remove Kiln from
 // their Etsy account's apps.
-export async function disconnectShop(): Promise<boolean> {
+export async function disconnectShop(maker: MakerRef): Promise<boolean> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const { count } = await db.shopConnection.deleteMany({
     where: { makerId: maker.id, platform: PLATFORM },
   });
@@ -358,10 +363,10 @@ export interface ConnectedEtsy {
 // spend the same refresh token). Null when no shop is connected; throws
 // ShopNeedsReconnect when Etsy no longer takes the refresh.
 export async function connectedEtsy(
+  maker: MakerRef,
   options: { now?: Date; fetch?: typeof fetch } = {},
 ): Promise<ConnectedEtsy | null> {
   if (!hasDatabase()) return null;
-  const maker = await getCurrentMaker();
   const where = {
     makerId_platform: { makerId: maker.id, platform: PLATFORM },
   };

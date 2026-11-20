@@ -1,3 +1,4 @@
+import { signedInRoute } from "@/server/guarded";
 import {
   CONNECT_COOKIE,
   CONNECT_PATH,
@@ -11,7 +12,7 @@ import {
 // approve Kiln (ETSY_REDIRECT_URI, registered on the app exactly): the code
 // is traded for the shop's tokens, the handshake cookie is cleared either
 // way, and the maker lands on Shops.
-export async function GET(request: Request) {
+export const GET = signedInRoute(async (maker, request: Request) => {
   const here = new URL(request.url);
   const clear = `${CONNECT_COOKIE}=; Path=${CONNECT_PATH}; Max-Age=0; HttpOnly; SameSite=Lax`;
   const land = (to: string, note?: string) => {
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
     return new Response(null, { status: 302, headers });
   };
   try {
-    await finishConnect({
+    await finishConnect(maker, {
       code: here.searchParams.get("code"),
       state: here.searchParams.get("state"),
       error: here.searchParams.get("error"),
@@ -46,4 +47,4 @@ export async function GET(request: Request) {
     }
     throw error;
   }
-}
+});

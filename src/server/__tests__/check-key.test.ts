@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { catalogFor } from "@/domain/model-defaults";
 
 // Checking a key compares the models the provider lists with the catalog.
@@ -10,7 +10,13 @@ vi.mock("@/providers/key-check", () => ({
     models: listed.models,
   }),
 }));
-vi.mock("@/lib/db", () => ({ db: {}, hasDatabase: () => false }));
+const store = vi.hoisted(() => ({ on: false }));
+vi.mock("@/lib/db", () => ({ db: {}, hasDatabase: () => store.on }));
+const recordKeyCheck = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@/server/generation-repository", async (original) => ({
+  ...(await original<typeof import("@/server/generation-repository")>()),
+  recordKeyCheck,
+}));
 
 const { checkKey } = await import("@/server/provider-health");
 
@@ -25,11 +31,37 @@ describe("checkKey", () => {
     listed.models = offered("google").filter(
       (id) => id !== "gemini-omni-1.1-flash",
     );
-    expect(await checkKey("google")).toMatchObject({
+    expect(await checkKey({ id: "test" }, "google")).toMatchObject({
       ok: true,
       unlisted: ["gemini-omni-1.1-flash"],
     });
     listed.models = offered("google");
-    expect(await checkKey("google")).toMatchObject({ unlisted: [] });
+    expect(await checkKey({ id: "test" }, "google")).toMatchObject({
+      unlisted: [],
+    });
+  });
+
+  // The check is recorded in the name of the person who ran it,
+  // or no one's.
+  it("records the check with the person who ran it, or none", async () => {
+    store.on = true;
+    onTestFinished(() => {
+      store.on = false;
+    });
+    listed.models = offered("google");
+    await checkKey(
+      {
+        id: "test",
+        member: { id: "m1", userId: "u1", role: "owner" as const },
+      },
+      "google",
+    );
+    expect(recordKeyCheck).toHaveBeenLastCalledWith(
+      expect.objectContaining({ makerId: "test", memberId: "m1" }),
+    );
+    await checkKey({ id: "test" }, "google");
+    expect(recordKeyCheck).toHaveBeenLastCalledWith(
+      expect.objectContaining({ makerId: "test", memberId: null }),
+    );
   });
 });

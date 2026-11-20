@@ -27,7 +27,7 @@ import {
   DeliveryRefusal,
   deliveredFiles,
 } from "@/server/deliver/delivery";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import {
   type ConnectedEtsy,
   connectedEtsy,
@@ -57,10 +57,10 @@ const MAX_DRAFT_PAGES = 5;
 export const etsyEditorUrl = (listingId: number | string) =>
   `https://www.etsy.com/your/shops/me/listing-editor/edit/${listingId}`;
 
-async function shopOrRefuse(): Promise<ConnectedEtsy> {
+async function shopOrRefuse(maker: MakerRef): Promise<ConnectedEtsy> {
   let etsy: ConnectedEtsy | null;
   try {
-    etsy = await connectedEtsy();
+    etsy = await connectedEtsy(maker);
   } catch (error) {
     if (error instanceof ShopNeedsReconnect) {
       throw new DraftRefusal(error.message);
@@ -73,8 +73,8 @@ async function shopOrRefuse(): Promise<ConnectedEtsy> {
   return etsy;
 }
 
-async function writableShop(): Promise<ConnectedEtsy> {
-  const etsy = await shopOrRefuse();
+async function writableShop(maker: MakerRef): Promise<ConnectedEtsy> {
+  const etsy = await shopOrRefuse(maker);
   if (!etsy.draftsAllowed) {
     throw new DraftRefusal(
       `Kiln may not write drafts to ${etsy.shopName} yet: connect the shop again to allow it.`,
@@ -146,8 +146,9 @@ export interface ShopWriteView {
   sent: Record<string, unknown>;
 }
 
-async function logWrite(data: {
-  makerId: string;
+// A write is logged for the maker ref it ran for, and its person when it
+// has one (a session); a token or a script records none.
+type ShopWriteData = {
   shopId: number;
   listingId?: number;
   action: WriteAction;
@@ -159,10 +160,14 @@ async function logWrite(data: {
   projectId?: string;
   destinationId?: string;
   productId?: string;
-}) {
+};
+
+async function logWrite(maker: MakerRef, data: ShopWriteData) {
   return db.shopWrite.create({
     data: {
       ...data,
+      makerId: maker.id,
+      memberId: maker.member?.id ?? null,
       platform: PLATFORM,
       shopId: String(data.shopId),
       listingId: data.listingId === undefined ? null : String(data.listingId),
@@ -175,7 +180,7 @@ async function logWrite(data: {
 // or unanswered (it may have). A failure reaches the maker in words.
 async function loggedWrite(
   etsy: ConnectedEtsy,
-  makerId: string,
+  maker: MakerRef,
   listingId: number,
   write: {
     action: WriteAction;
@@ -184,18 +189,18 @@ async function loggedWrite(
   },
   run: () => Promise<unknown>,
 ): Promise<void> {
-  const row = { makerId, shopId: etsy.shopId, listingId, ...write };
+  const row = { shopId: etsy.shopId, listingId, ...write };
   try {
     await run();
   } catch (error) {
-    await logWrite({
+    await logWrite(maker, {
       ...row,
       status: refusedByEtsy(error) ? "failed" : "unanswered",
       error: said(error),
     });
     throw new DraftRefusal(said(error));
   }
-  await logWrite({ ...row, status: "done" });
+  await logWrite(maker, { ...row, status: "done" });
 }
 
 const viewOf = (row: {
@@ -216,9 +221,11 @@ const viewOf = (row: {
   sent: (row.sent ?? {}) as Record<string, unknown>,
 });
 
-export async function draftLog(listingId: number): Promise<ShopWriteView[]> {
+export async function draftLog(
+  maker: MakerRef,
+  listingId: number,
+): Promise<ShopWriteView[]> {
   if (!hasDatabase()) return [];
-  const maker = await getCurrentMaker();
   // Writes in the same millisecond keep their order by id (a cuid runs in
   // sequence within the process).
   const rows = await db.shopWrite.findMany({
@@ -231,10 +238,10 @@ export async function draftLog(listingId: number): Promise<ShopWriteView[]> {
 
 // The drafts Kiln made from a project's destinations, newest first.
 export async function projectDrafts(
+  maker: MakerRef,
   projectId: string,
 ): Promise<{ destinationId: string; listingId: number; at: string }[]> {
   if (!hasDatabase()) return [];
-  const maker = await getCurrentMaker();
   const rows = await db.shopWrite.findMany({
     where: {
       makerId: maker.id,
@@ -283,18 +290,17 @@ const summaryOf = (l: EtsyDraftListing): DraftSummary => ({
   editorUrl: etsyEditorUrl(l.listing_id),
 });
 
-export async function listDrafts(): Promise<{
+export async function listDrafts(maker: MakerRef): Promise<{
   shopName: string;
   draftsAllowed: boolean;
   drafts: DraftSummary[];
   complete: boolean;
 }> {
-  const etsy = await shopOrRefuse();
+  const etsy = await shopOrRefuse(maker);
   const { items, complete } = await allPages(
     (page) => etsy.drafts.drafts(etsy.shopId, page),
     MAX_DRAFT_PAGES,
   );
-  const maker = await getCurrentMaker();
   const made = await db.shopWrite.findMany({
     where: {
       makerId: maker.id,
@@ -349,8 +355,11 @@ export interface DraftDetail extends DraftSummary {
   log: ShopWriteView[];
 }
 
-export async function draftDetail(listingId: number): Promise<DraftDetail> {
-  const etsy = await shopOrRefuse();
+export async function draftDetail(
+  maker: MakerRef,
+  listingId: number,
+): Promise<DraftDetail> {
+  const etsy = await shopOrRefuse(maker);
   let listing: EtsyDraftListing;
   try {
     listing = await etsy.drafts.listing(listingId);
@@ -405,17 +414,17 @@ export async function draftDetail(listingId: number): Promise<DraftDetail> {
     editable: isDraft && etsy.draftsAllowed,
     ...(why ? { why } : {}),
     variations,
-    log: await draftLog(listingId),
+    log: await draftLog(maker, listingId),
   };
 }
 
 // The categories and the shop's profiles a draft's form offers.
-export async function draftChoices(): Promise<{
+export async function draftChoices(maker: MakerRef): Promise<{
   categories: TaxonomyChoice[];
   shipping: { id: number; label: string; calculated?: boolean }[];
   processing: { id: number; label: string }[];
 }> {
-  const etsy = await shopOrRefuse();
+  const etsy = await shopOrRefuse(maker);
   const [categories, shipping, processing] = await Promise.all([
     etsy.drafts.taxonomy(),
     etsy.drafts.shippingProfiles(etsy.shopId).catch(() => []),
@@ -557,19 +566,19 @@ export interface DraftPreview {
 }
 
 export async function previewDraft(
+  maker: MakerRef,
   projectId: string,
   destinationId: string,
   chosen?: Partial<DraftSettings>,
 ): Promise<DraftPreview> {
-  const etsy = await shopOrRefuse();
-  const delivery = await destinationDelivery(projectId, destinationId);
+  const etsy = await shopOrRefuse(maker);
+  const delivery = await destinationDelivery(maker, projectId, destinationId);
   const listing = delivery?.input.listing;
   const rules = delivery?.input.destination.text;
   if (!delivery || !listing || !rules) {
     throw new DraftRefusal("This destination has no listing to draft.");
   }
-  const maker = await getCurrentMaker();
-  const choices = await draftChoices();
+  const choices = await draftChoices(maker);
   const guessed = await defaultSettings(
     etsy,
     maker.id,
@@ -600,7 +609,7 @@ export async function previewDraft(
     ...proposal.blockers,
   ];
   const shop = await etsy.reader.shop(etsy.shopId).catch(() => null);
-  const made = (await projectDrafts(projectId))
+  const made = (await projectDrafts(maker, projectId))
     .filter((d) => d.destinationId === destinationId)
     .map(({ listingId, at }) => ({ listingId, at }));
   return {
@@ -676,16 +685,19 @@ const MIME: Record<string, string> = {
   png: "image/png",
 };
 
-export async function createDraftFromProject(input: {
-  projectId: string;
-  destinationId: string;
-  settings: DraftSettings;
-  requestKey: string;
-  by: DraftWriter;
-}): Promise<DraftMade> {
-  const etsy = await writableShop();
-  const maker = await getCurrentMaker();
+export async function createDraftFromProject(
+  maker: MakerRef,
+  input: {
+    projectId: string;
+    destinationId: string;
+    settings: DraftSettings;
+    requestKey: string;
+    by: DraftWriter;
+  },
+): Promise<DraftMade> {
+  const etsy = await writableShop(maker);
   const delivery = await destinationDelivery(
+    maker,
     input.projectId,
     input.destinationId,
   );
@@ -716,8 +728,7 @@ export async function createDraftFromProject(input: {
   // The key is claimed before Etsy is called: the same preview makes one
   // draft, however often it is sent. A send Etsy refused (or that never
   // reached it) made nothing, so its key may be sent again.
-  const row = await claimKey({
-    makerId: maker.id,
+  const row = await claimKey(maker, {
     shopId: etsy.shopId,
     action: "create",
     by: input.by,
@@ -729,7 +740,10 @@ export async function createDraftFromProject(input: {
     productId: delivery.product.id,
   });
   const settle = (status: ShopWriteView["status"], extra: object = {}) =>
-    db.shopWrite.update({ where: { id: row.id }, data: { status, ...extra } });
+    db.shopWrite.update({
+      where: { id: row.id, makerId: maker.id },
+      data: { status, ...extra },
+    });
   let files: Awaited<ReturnType<typeof deliveredFiles>>;
   try {
     files = await deliveredFiles(delivered);
@@ -756,8 +770,7 @@ export async function createDraftFromProject(input: {
     .filter((f) => f.meta.kind !== "video" && f.meta.photo !== null)
     .slice(0, ETSY_MAX_PHOTOS);
   const missing = await uploadPhotos(etsy, made.listing_id, photos, 1);
-  await logWrite({
-    makerId: maker.id,
+  await logWrite(maker, {
     shopId: etsy.shopId,
     listingId: made.listing_id,
     action: "photos",
@@ -787,10 +800,11 @@ export async function createDraftFromProject(input: {
 }
 
 async function claimKey(
-  write: Parameters<typeof logWrite>[0] & { requestKey: string },
+  maker: MakerRef,
+  write: ShopWriteData & { requestKey: string },
 ): Promise<{ id: string }> {
   try {
-    return await logWrite(write);
+    return await logWrite(maker, write);
   } catch (error) {
     if (
       !(error instanceof Prisma.PrismaClientKnownRequestError) ||
@@ -801,19 +815,21 @@ async function claimKey(
   }
   const retried = await db.shopWrite.updateMany({
     where: {
-      makerId: write.makerId,
+      makerId: maker.id,
       requestKey: write.requestKey,
       status: "failed",
     },
+    // Like `sent` and `at`, the person describes the attempt that runs.
     data: {
       status: "pending",
       error: null,
       at: new Date(),
       sent: write.sent as Prisma.InputJsonValue,
+      memberId: maker.member?.id ?? null,
     },
   });
   const row = await db.shopWrite.findFirst({
-    where: { makerId: write.makerId, requestKey: write.requestKey },
+    where: { makerId: maker.id, requestKey: write.requestKey },
     select: { id: true },
   });
   if (retried.count === 0 || !row) {
@@ -854,11 +870,11 @@ async function uploadPhotos(
 // The photos a draft made from a project did not get, sent again after the
 // ones it has.
 export async function sendMissingPhotos(
+  maker: MakerRef,
   listingId: number,
   by: DraftWriter,
 ): Promise<{ sent: number; missing: string[] }> {
-  const etsy = await writableShop();
-  const maker = await getCurrentMaker();
+  const etsy = await writableShop(maker);
   const last = await db.shopWrite.findFirst({
     where: {
       makerId: maker.id,
@@ -874,6 +890,7 @@ export async function sendMissingPhotos(
   }
   const listing = await editableDraft(etsy, listingId);
   const delivery = await destinationDelivery(
+    maker,
     last.projectId,
     last.destinationId,
   );
@@ -886,8 +903,7 @@ export async function sendMissingPhotos(
     photos,
     (listing.images?.length ?? 0) + 1,
   );
-  await logWrite({
-    makerId: maker.id,
+  await logWrite(maker, {
     shopId: etsy.shopId,
     listingId,
     action: "photos",
@@ -923,12 +939,12 @@ const TEXT_FIELDS = [
 ] as const;
 
 export async function updateDraft(
+  maker: MakerRef,
   listingId: number,
   change: DraftChange,
   by: DraftWriter,
 ): Promise<{ changes: FieldChange[]; readBack: ReadBack[] }> {
-  const etsy = await writableShop();
-  const maker = await getCurrentMaker();
+  const etsy = await writableShop(maker);
   const listing = await editableDraft(etsy, listingId);
   const text: DraftChange = Object.fromEntries(
     TEXT_FIELDS.flatMap((f) =>
@@ -969,7 +985,7 @@ export async function updateDraft(
     action: WriteAction,
     sent: Record<string, unknown>,
     run: () => Promise<unknown>,
-  ) => loggedWrite(etsy, maker.id, listingId, { action, by, sent }, run);
+  ) => loggedWrite(etsy, maker, listingId, { action, by, sent }, run);
   // Only what differs is sent.
   const changed: DraftChange = Object.fromEntries(
     Object.entries(text).filter(([f]) => changes.some((c) => c.field === f)),
@@ -1006,12 +1022,12 @@ export async function updateDraft(
 }
 
 export async function addDraftPhoto(
+  maker: MakerRef,
   listingId: number,
   photo: { bytes: Uint8Array; mime: string; filename: string },
   by: DraftWriter,
 ): Promise<void> {
-  const etsy = await writableShop();
-  const maker = await getCurrentMaker();
+  const etsy = await writableShop(maker);
   const listing = await editableDraft(etsy, listingId);
   const count = listing.images?.length ?? 0;
   if (count >= ETSY_MAX_PHOTOS) {
@@ -1019,7 +1035,7 @@ export async function addDraftPhoto(
   }
   await loggedWrite(
     etsy,
-    maker.id,
+    maker,
     listingId,
     {
       action: "photo-add",
@@ -1035,19 +1051,19 @@ export async function addDraftPhoto(
 }
 
 export async function removeDraftPhoto(
+  maker: MakerRef,
   listingId: number,
   imageId: number,
   by: DraftWriter,
 ): Promise<void> {
-  const etsy = await writableShop();
-  const maker = await getCurrentMaker();
+  const etsy = await writableShop(maker);
   const listing = await editableDraft(etsy, listingId);
   if (!listing.images?.some((i) => i.listing_image_id === imageId)) {
     throw new DraftRefusal("That photo is not on this draft.");
   }
   await loggedWrite(
     etsy,
-    maker.id,
+    maker,
     listingId,
     { action: "photo-remove", by, sent: { imageId } },
     () => etsy.drafts.removePhoto(etsy.shopId, listingId, imageId),
@@ -1056,7 +1072,7 @@ export async function removeDraftPhoto(
 
 // The projects a draft can be made from: those with a destination that takes
 // a listing through Etsy's draft API, newest first.
-export async function draftableProjects(): Promise<
+export async function draftableProjects(maker: MakerRef): Promise<
   {
     projectId: string;
     name: string;
@@ -1065,7 +1081,6 @@ export async function draftableProjects(): Promise<
   }[]
 > {
   if (!hasDatabase()) return [];
-  const maker = await getCurrentMaker();
   const rows = await db.project.findMany({
     where: { makerId: maker.id, plan: { not: Prisma.DbNull } },
     select: { id: true, name: true, plan: true, updatedAt: true },

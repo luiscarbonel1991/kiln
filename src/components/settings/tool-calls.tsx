@@ -1,4 +1,4 @@
-import { fromMicros } from "@/domain/generation-cost";
+import { microsMoney as money } from "@/lib/micros-money";
 import type { ToolCallView } from "@/server/tool-calls";
 
 const when = (iso: string) =>
@@ -8,10 +8,6 @@ const when = (iso: string) =>
     hour: "numeric",
     minute: "2-digit",
   });
-
-// Cents, or a tenth of a cent under one (a text call is $0.004).
-const money = (micros: number) =>
-  `$${fromMicros(micros).toFixed(micros > 0 && micros < 10_000 ? 3 : 2)}`;
 
 // Settings → Access tokens: the latest tool calls agents made with the
 // maker's tokens (MCP, `kiln call`), newest first, each with how it ended and,

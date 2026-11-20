@@ -18,6 +18,7 @@ const swatch = vi.hoisted(() => ({
 }));
 vi.mock("@/server/product-swatch", () => ({
   setColourSwatch: async (
+    _maker: unknown,
     ref: string,
     key: string,
     photo: Uint8Array | null,

@@ -26,9 +26,9 @@ export const listLessonsTool = defineTool({
     })
     .strict(),
   hints: { readOnly: true },
-  run: async ({ family, topic, status }) => ({
+  run: async ({ family, topic, status }, { maker }) => ({
     data: {
-      lessons: await listLessons({
+      lessons: await listLessons(maker, {
         status: [status],
         ...(family ? { family } : {}),
         topics: topic ? [topic] : null,
@@ -56,8 +56,8 @@ export const proposeLessonTool = defineTool({
     })
     .strict(),
   hints: {},
-  run: async (input) => {
-    const lesson = await proposeLesson(input);
+  run: async (input, { maker }) => {
+    const lesson = await proposeLesson(maker, input);
     return {
       data: {
         lesson,

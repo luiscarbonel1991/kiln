@@ -17,7 +17,7 @@ import { readTakeCheck, type TakeCheck, withLook } from "@/domain/qc";
 import { sizeCueIn } from "@/domain/scene-direction";
 import { assertDatabaseUrl, db } from "@/lib/db";
 import { fetchAsset } from "@/providers/asset-bytes";
-import { getCurrentMaker } from "@/server/maker-repository";
+import type { MakerRef } from "@/server/maker-repository";
 import { rowToProduct } from "@/server/product-mapper";
 import { checkTake, type Reading } from "@/server/qc/check-take";
 import { ocrEngine } from "@/server/qc/ocr";
@@ -149,11 +149,11 @@ export async function checkProjectTake(
 // A frame's shown take, checked again (free): one from before the check, or
 // one left unchecked. The check is written on the job that made the take.
 export async function recheckTake(
+  maker: MakerRef,
   projectId: string,
   ref: SlotRef,
 ): Promise<TakeCheck> {
   assertDatabaseUrl();
-  const maker = await getCurrentMaker();
   const cardId = slotCardId(ref.destinationId, ref.slotKey);
   const card = await db.card.findFirst({
     where: { projectId, cardId, project: { makerId: maker.id } },

@@ -1,4 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  lineArtDrawing as drawing,
+  lineArtDesign,
+} from "@/server/__tests__/fixtures/line-art-design";
 
 // A design project against the throwaway Postgres (see
 // project-repository.db.test.ts for the setup): the tools' read of its
@@ -12,70 +16,18 @@ const enabled =
   (process.env.DATABASE_URL ?? "").includes("kiln_test");
 
 describe.skipIf(!enabled)("a design (database)", async () => {
+  const maker = enabled
+    ? await (await import("@/server/maker-repository")).getCurrentMaker()
+    : { id: "" };
   const { db } = await import("@/lib/db");
   const repo = await import("@/server/project-repository");
   const designs = await import("@/server/designs");
-  const { getCurrentMaker } = await import("@/server/maker-repository");
 
-  const field = { value: "x", source: "recipe" as const, locked: false };
-  const fields = {
-    subject: field,
-    materials: field,
-    scene: field,
-    composition: field,
-    lighting: field,
-    mood: field,
-    palette: field,
-  };
-  const drawing = (i: number, direction: string, outputs: string[]) => ({
-    id: `recipe-line-art-${i}`,
-    parentId: null,
-    masterAssetId: "m-1",
-    recipeId: "recipe-line-art",
-    type: "image" as const,
-    direction,
-    fields,
-    references: [],
-    model: {
-      provider: "openai" as const,
-      model: "gpt-image-2",
-      aspect: "1:1",
-      guidance: 7.5,
-      strength: 0.65,
-    },
-    outputs,
-    status: outputs.length ? ("done" as const) : ("draft" as const),
-  });
-  const editor = {
-    name: "DB test design",
-    phase: "generation" as const,
-    master: {
-      id: "m-1",
-      origin: "upload" as const,
-      sourcePrompt: null,
-      assetUrl: "https://stub.local/fern.png",
-      mime: "image/png",
-    },
-    understanding: {
-      subject: "a fern leaf",
-      productType: "",
-      useContext: "",
-      sceneProps: "",
-      avoid: "",
-      materials: "ink",
-      lighting: "flat",
-      composition: "centered",
-      mood: "calm",
-      palette: ["#000000"],
-    },
-    recipeId: "recipe-line-art",
-    planning: null,
-    cards: [
-      drawing(0, "Outline", ["https://stub.local/outline.png"]),
-      drawing(1, "Detail", []),
-      drawing(2, "Badge", []),
-    ],
-  };
+  const editor = lineArtDesign("DB test design", [
+    drawing(0, "Outline", ["https://stub.local/outline.png"]),
+    drawing(1, "Detail"),
+    drawing(2, "Badge"),
+  ]);
   let id: string;
   let other: string;
   const card = (cardId: string) =>
@@ -84,8 +36,8 @@ describe.skipIf(!enabled)("a design (database)", async () => {
     });
 
   beforeAll(async () => {
-    id = await repo.saveProject(editor);
-    other = await repo.saveProject({
+    id = await repo.saveProject(maker, editor);
+    other = await repo.saveProject(maker, {
       ...editor,
       name: "DB test studio",
       recipeId: "recipe-etsy-hero",
@@ -103,11 +55,11 @@ describe.skipIf(!enabled)("a design (database)", async () => {
   });
 
   it("is listed and read as a design, with each drawing's state", async () => {
-    expect(await designs.isDesign(id)).toBe(true);
-    expect(await designs.isDesign(other)).toBe(false);
-    const listed = (await designs.listDesigns()).find((d) => d.id === id);
+    expect(await designs.isDesign(maker, id)).toBe(true);
+    expect(await designs.isDesign(maker, other)).toBe(false);
+    const listed = (await designs.listDesigns(maker)).find((d) => d.id === id);
     expect(listed).toMatchObject({ drawings: 3, drawn: 1, vectorized: 0 });
-    const view = await designs.designView(id);
+    const view = await designs.designView(maker, id);
     expect(view).toMatchObject({
       master: "https://stub.local/fern.png",
       subject: "a fern leaf",
@@ -122,12 +74,13 @@ describe.skipIf(!enabled)("a design (database)", async () => {
         { label: "Badge", state: "to-draw" },
       ],
     });
-    expect(await designs.designView(other)).toBeNull();
+    expect(await designs.designView(maker, other)).toBeNull();
   });
 
   it("keeps a vector traced on the server only for the take it traced", async () => {
     expect(
       await repo.setCardVector(
+        maker,
         id,
         "recipe-line-art-0",
         "https://stub.local/older.png",
@@ -136,6 +89,7 @@ describe.skipIf(!enabled)("a design (database)", async () => {
     ).toBe(false);
     expect(
       await repo.setCardVector(
+        maker,
         id,
         "recipe-line-art-0",
         "https://stub.local/outline.png",
@@ -145,7 +99,7 @@ describe.skipIf(!enabled)("a design (database)", async () => {
     expect((await card("recipe-line-art-0")).vectorUrl).toBe(
       "https://stub.local/outline.svg",
     );
-    const view = await designs.designView(id);
+    const view = await designs.designView(maker, id);
     expect(view?.drawings[0]).toMatchObject({
       state: "vectorized",
       makeProduct: `/projects/new?design=${encodeURIComponent("https://stub.local/outline.svg")}`,
@@ -167,6 +121,7 @@ describe.skipIf(!enabled)("a design (database)", async () => {
     // The stale tab: Outline without the server's vector, Detail without
     // its take, a prompt of its own on Badge.
     await repo.saveProject(
+      maker,
       {
         ...editor,
         cards: [
@@ -191,11 +146,13 @@ describe.skipIf(!enabled)("a design (database)", async () => {
     // An editor that drew Outline again itself: its take wins, the old
     // vector goes with the old take.
     await repo.saveCardOutput(
+      maker,
       id,
       "recipe-line-art-0",
       "https://stub.local/outline-2.png",
     );
     await repo.saveProject(
+      maker,
       {
         ...editor,
         cards: [
@@ -224,12 +181,14 @@ describe.skipIf(!enabled)("a design (database)", async () => {
     const { enqueueBatch } = await import("@/server/generation-repository");
     // Refused before any worker starts.
     await expect(
-      enqueueProjectCards({ projectId: other, cardIds: ["recipe-line-art-0"] }),
+      enqueueProjectCards(maker, {
+        projectId: other,
+        cardIds: ["recipe-line-art-0"],
+      }),
     ).rejects.toThrow("Only a planned project or a design");
     // The queue's own steps, in a mode no worker claims (enqueueProjectCards
     // would start this process's worker, which takes other tests' rows).
-    const maker = await getCurrentMaker();
-    const { cards, model } = await estimateProjectCards(id, [
+    const { cards, model } = await estimateProjectCards(maker, id, [
       "recipe-line-art-1",
     ]);
     const queued = await enqueueBatch({
@@ -260,7 +219,9 @@ describe.skipIf(!enabled)("a design (database)", async () => {
       kind: "image",
       masterAssetUrl: "https://stub.local/fern.png",
     });
-    expect((await designs.designView(id))?.drawings[1].state).toBe("drawing");
+    expect((await designs.designView(maker, id))?.drawings[1].state).toBe(
+      "drawing",
+    );
     // Nothing runs it here: cancel it, as the maker's Stop does.
     await db.generationJob.updateMany({
       where: { projectId: id, status: { in: ["queued", "running"] } },
@@ -284,7 +245,6 @@ describe.skipIf(!enabled)("a design (database)", async () => {
     expect(batchWords({ ...ended, done: 1, failed: 1 })).toBe(
       "1 of 2 drawings of the last batch landed, 1 failed.",
     );
-    const maker = await getCurrentMaker();
     const batch = await db.generationBatch.create({
       data: {
         makerId: maker.id,

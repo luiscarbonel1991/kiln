@@ -15,6 +15,7 @@ import {
   type Specialist,
   SpecialistId,
 } from "@/server/chat/specialists";
+import type { MakerRef } from "@/server/maker-repository";
 import { getMakerModelSetup } from "@/server/maker-repository";
 import { roleCandidates } from "@/server/text-calls";
 import { TOOLS } from "@/server/tools";
@@ -51,10 +52,11 @@ export function agentRouteIn(
 }
 
 export async function agentRoute(
+  maker: MakerRef,
   id: SpecialistId,
   kind: ChatKind,
 ): Promise<AgentRoute> {
-  return agentRouteIn(await getMakerModelSetup(), id, kind);
+  return agentRouteIn(await getMakerModelSetup(maker), id, kind);
 }
 
 // Whether an agent looks at images (one of its tools shows them), so every

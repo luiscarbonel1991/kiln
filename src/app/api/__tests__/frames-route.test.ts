@@ -19,7 +19,7 @@ vi.mock("@/server/project-frames", () => ({
       updatedAt: "2026-10-29T12:00:00.000Z",
     },
   ],
-  projectFrames: async (id: string) =>
+  projectFrames: async (_maker: unknown, id: string) =>
     id === "p1"
       ? {
           project: { id, name: "Coaster", type: "listing-kit", phase: "x" },
@@ -40,6 +40,7 @@ vi.mock("@/server/project-repository", async () => {
   const { SlotRefusal } = await import("@/domain/plan");
   return {
     setSlotApproval: async (
+      _maker: unknown,
       projectId: string,
       ref: { destinationId: string; slotKey: string },
       approved: boolean,

@@ -33,6 +33,7 @@ vi.mock("@/server/etsy-drafts", async (original) => {
       ],
     }),
     previewDraft: async (
+      _maker: unknown,
       _project: string,
       _destination: string,
       chosen: object,
@@ -48,7 +49,7 @@ vi.mock("@/server/etsy-drafts", async (original) => {
       notSent: ["The video: upload it in Etsy's editor."],
       requestKey: "6f1c1d56-31a8-4a52-9d34-7a3c6f4b2f10",
     }),
-    createDraftFromProject: async (input: unknown) => {
+    createDraftFromProject: async (_maker: unknown, input: unknown) => {
       s.created.push(input);
       return {
         listingId: 1601,
@@ -59,7 +60,12 @@ vi.mock("@/server/etsy-drafts", async (original) => {
         readBack: [],
       };
     },
-    updateDraft: async (listingId: number, change: unknown, by: string) => {
+    updateDraft: async (
+      _maker: unknown,
+      listingId: number,
+      change: unknown,
+      by: string,
+    ) => {
       if (listingId === 2) {
         throw new real.DraftRefusal(
           "Listing 2 is active on Etsy: Kiln changes drafts only.",
@@ -77,7 +83,12 @@ vi.mock("@/server/etsy-drafts", async (original) => {
 const { TOOLS, MCP_TOOLS } = await import("@/server/tools");
 const { callTool } = await import("@/server/tools/registry");
 const { NEEDS_CLICK } = await import("@/server/chat/chat-tools");
-const CTX = { tokenId: null, tokenName: "Chat", canSpend: true };
+const CTX = {
+  maker: { id: "test" },
+  tokenId: null,
+  tokenName: "Chat",
+  canSpend: true,
+};
 const call = (name: string, args: unknown) => callTool(TOOLS, name, args, CTX);
 
 afterEach(() => {
@@ -93,6 +104,7 @@ describe("the draft tools", () => {
       "list_drafts",
       {},
       {
+        maker: { id: "test" },
         tokenId: "t1",
         tokenName: "agent",
         canSpend: false,

@@ -1,6 +1,7 @@
 import { rasterType } from "@/domain/image-type";
 import { colourName } from "@/lib/product-form";
 import { storeAsset } from "@/providers/asset-bytes";
+import type { MakerRef } from "@/server/maker-repository";
 import { balanceWhite, matchSwatch, type Spot } from "@/server/material-photo";
 import { photoColours } from "@/server/product-files";
 import {
@@ -41,12 +42,13 @@ export type SwatchOutcome =
   | { ok: false; status: 404 | 409 | 415 | 422; error: string };
 
 export async function setColourSwatch(
+  maker: MakerRef,
   ref: string,
   key: string,
   photo: Uint8Array | null,
   fix?: SwatchFix,
 ): Promise<SwatchOutcome> {
-  const product = await findProduct(ref);
+  const product = await findProduct(maker, ref);
   if (!product) {
     return {
       ok: false,
@@ -102,7 +104,7 @@ export async function setColourSwatch(
 
   // Under the product's row lock: another colour's photo sent at the same
   // moment is kept.
-  const saved = await setSwatchUrl(product.id, key, swatchUrl);
+  const saved = await setSwatchUrl(maker, product.id, key, swatchUrl);
   if (!saved) {
     return {
       ok: false,
@@ -111,7 +113,7 @@ export async function setColourSwatch(
     };
   }
   const now = productHash(saved.product);
-  const behind = (await productProjects(product.id))
+  const behind = (await productProjects(maker, product.id))
     .filter((use) => use.hash !== now)
     .map(({ projectId, name }) => ({ projectId, name }));
   return {

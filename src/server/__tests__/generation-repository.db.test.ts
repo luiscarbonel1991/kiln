@@ -34,6 +34,7 @@ describe.skipIf(!enabled)(
     const KEYS = [
       ...["a", "b", "c", "d", "e", "f", "dup", "cx", "cy", "sx", "sy"],
       ...["ra", "rb", "rc", "sa", "sb", "sc"],
+      ...["ma", "mb", "mn", "mr"],
     ];
     const plan = {
       destinations: [
@@ -197,7 +198,9 @@ describe.skipIf(!enabled)(
       });
       expect(saved.outputs).toEqual(["https://x/done.png"]);
       expect(saved.status).toBe("done");
-      const facts = await repo.outputFacts(projectId, ["https://x/done.png"]);
+      const facts = await repo.outputFacts({ id: makerId }, projectId, [
+        "https://x/done.png",
+      ]);
       expect(facts.get("https://x/done.png")?.check).toEqual(check);
     });
 
@@ -354,11 +357,15 @@ describe.skipIf(!enabled)(
       ]);
     });
 
-    it("the polled state carries each card's latest job, the budget and a changing version", async () => {
+    it("the polled state carries each card's latest job and a changing version, and no amount", async () => {
       const before = await repo.projectGenerationState(makerId, projectId);
       expect(before.jobs["q.f"].status).toBe("canceled");
       expect(before.cards["q.f"].status).toBe("draft");
-      expect(before.budget.capMicros).toBe(1_000_000);
+      // A member polls it too: this month's amounts are read for the owner
+      // alone (monthLimit), never sent with the poll.
+      expect(JSON.stringify(before)).not.toMatch(
+        /capMicros|spentMicros|reservedMicros/,
+      );
       await repo.enqueueBatch({ ...base(), jobs: [job("f", 10_000)] });
       const after = await repo.projectGenerationState(makerId, projectId);
       expect(after.jobs["q.f"].status).toBe("queued");
@@ -667,6 +674,226 @@ describe.skipIf(!enabled)(
         where: { batchId: mock.batchId },
         data: { status: "canceled", finishedAt: new Date() },
       });
+    });
+
+    // A batch records the person who queued it; work with no
+    // person (a token, a script, the worker) records none and still queues.
+    it("a batch queued by a person stores them on every job; one with no person stores null", async () => {
+      // A mode no worker claims, so the rows stay as queued.
+      const mode = "member-batch" as never;
+      const byPerson = await repo.enqueueBatch({
+        ...base(),
+        mode,
+        memberId: "m1",
+        jobs: [job("ma", 1), job("mb", 1)],
+      });
+      const theirs = await db.generationJob.findMany({
+        where: { batchId: byPerson.batchId },
+      });
+      expect(theirs.map((j) => j.memberId)).toEqual(["m1", "m1"]);
+
+      const byNoOne = await repo.enqueueBatch({
+        ...base(),
+        mode,
+        jobs: [job("mn", 1)],
+      });
+      expect(byNoOne.queued).toBe(1);
+      const unnamed = await db.generationJob.findFirstOrThrow({
+        where: { batchId: byNoOne.batchId },
+      });
+      expect(unnamed.memberId).toBeNull();
+      await db.generationJob.updateMany({
+        where: { batchId: { in: [byPerson.batchId, byNoOne.batchId] } },
+        data: { status: "canceled", finishedAt: new Date() },
+      });
+    });
+
+    // The worker knows whose job it runs, across a retry and a route move.
+    it("a claimed job carries who queued it, kept across a retry and a move down its route", async () => {
+      const mode = "member-claim" as never;
+      const { batchId } = await repo.enqueueBatch({
+        ...base(),
+        mode,
+        memberId: "m1",
+        jobs: [job("mr", 1)],
+      });
+      const [first] = await repo.claimJobs(mode, 1, 60);
+      expect(first).toMatchObject({ cardId: "q.mr", memberId: "m1" });
+
+      expect(
+        await repo.failJob(first.id, first.leaseToken, "503", {
+          retry: true,
+          mayBeCharged: false,
+        }),
+      ).toBe(true);
+      // Skip the retry's backoff.
+      await db.generationJob.update({
+        where: { id: first.id },
+        data: { availableAt: new Date(Date.now() - 1000) },
+      });
+      const [retried] = await repo.claimJobs(mode, 1, 60);
+      expect(retried).toMatchObject({
+        id: first.id,
+        attempt: 2,
+        memberId: "m1",
+      });
+
+      const flash = {
+        provider: "google" as const,
+        model: "gemini-3.1-flash-image",
+      };
+      expect(
+        await repo.fallBackJob(
+          { id: retried.id, leaseToken: retried.leaseToken },
+          { to: flash, rest: [], reason: "OpenAI answered 503" },
+          () => true,
+        ),
+      ).toBe(true);
+      const [moved] = await repo.claimJobs(mode, 1, 60);
+      expect(moved).toMatchObject({ id: first.id, memberId: "m1" });
+      await db.generationJob.updateMany({
+        where: { batchId },
+        data: { status: "canceled", finishedAt: new Date() },
+      });
+    });
+
+    // A direct call and a key check record the person who made
+    // them, or no one.
+    it("a direct call and a key check store who made them, or null", async () => {
+      const solo = await db.maker.create({
+        data: {
+          slug: `${slug}-direct-member`,
+          name: "Direct member test",
+          monthlyCapCents: 100,
+        },
+      });
+      try {
+        const reserve = (memberId?: string) =>
+          repo.reserveDirectCall({
+            makerId: solo.id,
+            provider: "openai",
+            model: "gpt-image-2",
+            estimateMicros: 1_000,
+            ...(memberId ? { memberId } : {}),
+          });
+        const theirs = await reserve("m1");
+        const nobody = await reserve();
+        await repo.recordKeyCheck({
+          makerId: solo.id,
+          provider: "google",
+          error: null,
+          memberId: "m1",
+        });
+        await repo.recordKeyCheck({
+          makerId: solo.id,
+          provider: "openai",
+          error: null,
+        });
+        const rows = await db.generationJob.findMany({
+          where: { makerId: solo.id },
+        });
+        const byId = new Map(rows.map((r) => [r.id, r.memberId]));
+        expect(byId.get(theirs)).toBe("m1");
+        expect(byId.get(nobody)).toBeNull();
+        const checks = rows.filter((r) => r.cardId === "key-check");
+        expect(
+          checks
+            .map((r) => [
+              (r.request as { provider: string }).provider,
+              r.memberId,
+            ])
+            .sort(),
+        ).toEqual([
+          ["google", "m1"],
+          ["openai", null],
+        ]);
+      } finally {
+        await db.generationJob.deleteMany({ where: { makerId: solo.id } });
+        await db.maker.delete({ where: { id: solo.id } });
+      }
+    });
+
+    // The month's spend per person, by the cap's own rule; its rows
+    // add up to what the budget counts as spent.
+    it("the month's spend per person adds up to the budget's spent, by the cap's rule", async () => {
+      const solo = await db.maker.create({
+        data: {
+          slug: `${slug}-by-member`,
+          name: "Spend by member test",
+          monthlyCapCents: 100_000,
+        },
+      });
+      const now = new Date();
+      const lastMonth = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 15),
+      );
+      const row = (
+        memberId: string | null,
+        data: { status: string } & Record<string, unknown>,
+      ) => ({
+        makerId: solo.id,
+        memberId,
+        cardId: "direct",
+        mode: "live",
+        maxAttempts: 1,
+        estimateMicros: 5_000,
+        ...data,
+      });
+      try {
+        await db.generationJob.createMany({
+          data: [
+            // m1: a measured cost, and a call with no answer at its estimate.
+            row("m1", { status: "done", actualMicros: 7_000, finishedAt: now }),
+            row("m1", {
+              status: "failed",
+              callStartedAt: now,
+              finishedAt: now,
+            }),
+            // Not spent: a failure before the call, queued and running work,
+            // a mock run, last month.
+            row("m1", { status: "failed", finishedAt: now }),
+            row("m1", { status: "running", startedAt: now }),
+            row("m2", { status: "queued" }),
+            row("m1", {
+              status: "done",
+              mode: "mock",
+              actualMicros: 99_000,
+              finishedAt: now,
+            }),
+            row("m2", {
+              status: "done",
+              actualMicros: 50_000,
+              finishedAt: lastMonth,
+            }),
+            row("m2", { status: "done", actualMicros: 3_000, finishedAt: now }),
+            row(null, { status: "done", actualMicros: 800, finishedAt: now }),
+            // A free key check: a person with nothing spent has no row.
+            row("m3", { status: "done", actualMicros: 0, finishedAt: now }),
+          ],
+        });
+        const maker = { id: solo.id };
+        const [rows, budget] = await Promise.all([
+          repo.spendByMember(maker),
+          repo.budget(solo.id),
+        ]);
+        expect(rows).toEqual([
+          { memberId: "m1", spentMicros: 12_000 },
+          { memberId: "m2", spentMicros: 3_000 },
+          { memberId: null, spentMicros: 800 },
+        ]);
+        expect(rows.reduce((sum, r) => sum + r.spentMicros, 0)).toBe(
+          budget.spentMicros,
+        );
+        // A member's read is filtered in SQL to their own sum.
+        expect(await repo.spendByMember(maker, { memberId: "m2" })).toEqual([
+          { memberId: "m2", spentMicros: 3_000 },
+        ]);
+        // Another maker reads none of it.
+        expect(await repo.spendByMember({ id: "someone-else" })).toEqual([]);
+      } finally {
+        await db.generationJob.deleteMany({ where: { makerId: solo.id } });
+        await db.maker.delete({ where: { id: solo.id } });
+      }
     });
 
     it("deleting the project keeps the month's spend", async () => {

@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { ProjectPlan } from "@/domain/plan";
 import { assertDatabaseUrl, db } from "@/lib/db";
+import { budget, spendByMember } from "@/server/generation-repository";
+import type { CurrentMaker } from "@/server/maker-repository";
+import { readsStudioAmounts } from "@/server/month-limit";
 
 // What a maker cares about on Home: what each project has spent and kept, and
 // this month's cost per approved output — not per output made. Spend follows
@@ -22,6 +25,25 @@ export interface HomeStats {
 
 const monthStart = (now = new Date()) =>
   new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+// Home's "This month": the studio's spend against its cap, or, for a member,
+// what their own work cost.
+export type MonthSpent =
+  | { whose: "studio"; spentMicros: number; capMicros: number }
+  | { whose: "yours"; spentMicros: number };
+
+// The owner, or a maker with no person behind it, reads the studio's budget;
+// a member reads only their own sum, so the studio's total and its cap never
+// reach their page.
+export async function monthSpent(maker: CurrentMaker): Promise<MonthSpent> {
+  const member = maker.member;
+  if (member && !readsStudioAmounts(maker)) {
+    const [own] = await spendByMember(maker, { memberId: member.id });
+    return { whose: "yours", spentMicros: own?.spentMicros ?? 0 };
+  }
+  const { spentMicros, capMicros } = await budget(maker.id);
+  return { whose: "studio", spentMicros, capMicros };
+}
 
 export async function homeStats(makerId: string): Promise<HomeStats> {
   assertDatabaseUrl();

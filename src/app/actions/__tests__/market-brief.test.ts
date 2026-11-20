@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const setBrief = vi.fn(
-  async (_projectId: string, _destinationId: string, _brief: unknown) => {},
+  async (
+    _maker: unknown,
+    _projectId: string,
+    _destinationId: string,
+    _brief: unknown,
+  ) => {},
 );
 const rememberSearchColumns = vi.fn(
-  async (_source: string, _columns: unknown) => {},
+  async (_maker: unknown, _source: string, _columns: unknown) => {},
 );
 vi.mock("next/cache", () => ({ refresh: () => {} }));
 vi.mock("@/server/project-repository", () => ({ setBrief }));
@@ -32,16 +37,25 @@ describe("saveBriefAction", () => {
         { columns: { source: "EverBee", columns } },
       ),
     ).toBeUndefined();
-    expect(setBrief).toHaveBeenCalledWith("p", "etsy", {
+    expect(setBrief).toHaveBeenCalledWith(expect.anything(), "p", "etsy", {
       searches: [search("cutting board", { searches: 27900 })],
       notes: [],
     });
-    expect(rememberSearchColumns).toHaveBeenCalledWith("EverBee", columns);
+    expect(rememberSearchColumns).toHaveBeenCalledWith(
+      expect.anything(),
+      "EverBee",
+      columns,
+    );
   });
 
   it("an empty brief clears it", async () => {
     await save({ searches: [], notes: [], carriedFrom: "An older project" });
-    expect(setBrief).toHaveBeenCalledWith("p", "etsy", undefined);
+    expect(setBrief).toHaveBeenCalledWith(
+      expect.anything(),
+      "p",
+      "etsy",
+      undefined,
+    );
     expect(rememberSearchColumns).not.toHaveBeenCalled();
   });
 
