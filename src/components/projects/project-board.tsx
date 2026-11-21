@@ -322,6 +322,8 @@ export function ProjectBoard({
   // the plate it was drawn beside.
   const above = threeQuarterFor(board.plan.references, board.master?.assetUrl);
   const waiting = waitingCardIds(rows);
+  // Whom a member asks about a key; null for the owner.
+  const ask = limit.whose === "member" ? limit.ask : null;
   // The product as the project shows it (its colour and style): exact
   // frames draw it, and scenes are made in it. Nothing real backs a look
   // without a material photo or a supplier page.
@@ -550,7 +552,7 @@ export function ProjectBoard({
                                   notes,
                                   card.model.provider,
                                   mode,
-                                  limit.whose === "member" ? limit.ask : null,
+                                  ask,
                                 )
                               : null,
                             prompt: prompts[cardId] ?? null,
@@ -566,7 +568,7 @@ export function ProjectBoard({
                                   notes,
                                   card.model.provider,
                                   mode,
-                                  limit.whose === "member" ? limit.ask : null,
+                                  ask,
                                 )
                               : null
                           }

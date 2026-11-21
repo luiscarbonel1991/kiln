@@ -15,6 +15,7 @@ import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
 import { projectCost } from "@/domain/project-cost";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerBlock } from "@/lib/provider-block";
+import { healthForReader } from "@/lib/provider-key-words";
 import { providerMode } from "@/providers/mode";
 import { chatPanelData } from "@/server/chat/chat-view";
 import { projectDrafts } from "@/server/etsy-drafts";
@@ -45,6 +46,7 @@ async function batchEstimate(
   projectId: string,
   cardIds: string[],
   plan: ProjectPlan,
+  // The providers' health, already in its reader's words (healthForReader).
   health: ProviderHealth[],
   // Whom a member asks about a key; null for the owner.
   ask: string | null,
@@ -164,7 +166,10 @@ export default makerPage(async function ProjectBoardPage(
   const limit = await monthLimit(maker);
   const brand = await getMakerBrand(maker);
   const { searchColumns } = await getMakerPreferences(maker);
-  const health = await providerHealth(maker.id);
+  // Whom a member asks about a key (null for the owner), and the providers'
+  // health as that reader may read it: it goes to the browser.
+  const ask = limit.whose === "member" ? limit.ask : null;
+  const health = healthForReader(await providerHealth(maker.id), ask);
   const plan = board.plan;
   const spend = plan ? await projectSpend(maker, board.id) : null;
   const cost =
@@ -177,7 +182,7 @@ export default makerPage(async function ProjectBoardPage(
           waitingCardIds(boardRows({ ...board, plan }, generation.jobs)),
           plan,
           health,
-          limit.whose === "member" ? limit.ask : null,
+          ask,
         )
       : null;
   const chat = chatOpen
