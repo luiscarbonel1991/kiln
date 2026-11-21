@@ -42,8 +42,8 @@ export const saveMakerRoutesAction = makerAction(
 );
 
 // Settings → Providers: a key checked for free, the answer kept as the
-// provider's latest call.
-export const checkProviderKeyAction = makerAction(
+// provider's latest call. The keys are the owner's to manage, the check too.
+export const checkProviderKeyAction = ownerAction(
   async (maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
     const parsed = ProviderId.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Which provider?" };
