@@ -101,6 +101,41 @@ describe("provider keys", () => {
     expect(inside.provider).toBe("openai");
   });
 
+  // The app refuses a person in their own words under the same error, so
+  // what reads its class or its name treats it as any missing key.
+  it("a missing key given a message reads that message, in and out of a scope", () => {
+    const words = "You have no access to an OpenAI key; ask Ana.";
+    const outside = new ProviderKeyMissing("openai", words);
+    const inside = withProviderKeys(
+      {},
+      () =>
+        new ProviderKeyMissing(
+          "google",
+          "You have no access to a Google key; ask Ana.",
+        ),
+    );
+    expect(outside.message).toBe(words);
+    expect(inside.message).toBe("You have no access to a Google key; ask Ana.");
+    for (const error of [outside, inside]) {
+      expect(error.name).toBe("ProviderKeyMissing");
+      expect(error).toBeInstanceOf(ProviderKeyMissing);
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).not.toMatch(/API_KEY|\.env|Settings/);
+    }
+    expect(outside.provider).toBe("openai");
+    expect(inside.provider).toBe("google");
+  });
+
+  it("a missing key given no message keeps the one for where it runs", () => {
+    expect(new ProviderKeyMissing("openai", undefined).message).toBe(
+      "OpenAI has no API key: set OPENAI_API_KEY.",
+    );
+    expect(
+      withProviderKeys({}, () => new ProviderKeyMissing("google", undefined))
+        .message,
+    ).toBe("Google has no API key: add one in Settings → Providers.");
+  });
+
   it("a different key builds a new client; the same key keeps its client", () => {
     withProviderKeys({ openai: "sk-one-1234567890" }, () => {
       const first = getOpenAI();
