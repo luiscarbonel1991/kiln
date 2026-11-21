@@ -12,7 +12,7 @@ describe.skipIf(!enabled)(
   "this month's limit by caller (database)",
   async () => {
     const { db } = await import("@/lib/db");
-    const { fitsThisMonth, monthLimit, whomToAsk } = await import(
+    const { fitsThisMonth, memberAsk, monthLimit, whomToAsk } = await import(
       "@/server/month-limit"
     );
 
@@ -165,6 +165,16 @@ describe.skipIf(!enabled)(
 
     it("a studio with no team names no one", async () => {
       expect(await whomToAsk(member(loneId))).toBe("the studio's owner");
+    });
+
+    // Who reads decides the words about a key: a member gets whom to ask,
+    // the owner and work with no person (a token, a script, the worker) get
+    // null, which reads as the owner.
+    it("a member is told whom to ask; the owner and work with no person are not", async () => {
+      expect(await memberAsk(member())).toBe("Ana");
+      expect(await memberAsk(member(loneId))).toBe("the studio's owner");
+      expect(await memberAsk(owner())).toBeNull();
+      expect(await memberAsk({ id: makerId })).toBeNull();
     });
 
     it("work fits while spent, queued and its cost stay within the cap", async () => {
