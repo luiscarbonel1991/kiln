@@ -246,6 +246,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
             saved={setup.routes !== null}
             notes={health}
             mock={mode === "mock"}
+            ask={ask}
           />
         </section>
 

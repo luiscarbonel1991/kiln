@@ -39,6 +39,7 @@ import {
   type RouteEntry,
   sameModel,
 } from "@/domain/model-routing";
+import { routeKeyLine } from "@/lib/provider-key-words";
 import { cn } from "@/lib/utils";
 
 const ROLES: { role: ModelRole; label: string; what: string; off: string }[] = [
@@ -97,6 +98,7 @@ export function RoutesForm({
   saved,
   notes,
   mock,
+  ask,
 }: {
   initial: MakerRoutes;
   initialAgents: AgentRoutes;
@@ -104,6 +106,8 @@ export function RoutesForm({
   saved: boolean;
   notes: ProviderNote[];
   mock: boolean;
+  // Whom a member asks about a key; null for the owner.
+  ask: string | null;
 }) {
   const [routes, setRoutes] = useState<MakerRoutes>(initial);
   const [agents, setAgents] = useState<AgentRoutes>(initialAgents);
@@ -135,7 +139,7 @@ export function RoutesForm({
         result.error ? { ok: false, error: result.error } : { ok: true },
       );
     });
-  const editor = { notes, keyed, pending };
+  const editor = { notes, keyed, pending, ask };
   return (
     <div className="flex flex-col gap-4">
       {saved ? null : (
@@ -318,6 +322,7 @@ function RouteEditor({
   notes,
   keyed,
   pending,
+  ask,
   onChange,
 }: {
   kind: ModelKind;
@@ -328,6 +333,7 @@ function RouteEditor({
   notes: ProviderNote[];
   keyed: (provider: RouteEntry["provider"]) => boolean;
   pending: boolean;
+  ask: string | null;
   onChange: (next: Partial<Route>) => void;
 }) {
   const spare = catalogFor(kind).find(
@@ -407,8 +413,7 @@ function RouteEditor({
               </div>
               {keyed(entry.provider) ? null : (
                 <span className="pl-10 font-mono text-[0.6rem] text-fail">
-                  {PROVIDER_LABELS[entry.provider]} has no API key (add one
-                  under Providers): this model cannot run.
+                  {routeKeyLine(PROVIDER_LABELS[entry.provider], ask)}
                 </span>
               )}
             </li>
