@@ -287,27 +287,26 @@ function Opening({
           {returning ? "New project" : "Add a product"}
         </Link>
       </div>
-      {keyless && ask !== null ? (
+      {keyless ? (
         <p
           data-testid="home-keys"
           className="max-w-[520px] font-sans text-[0.875rem] leading-relaxed text-on-surface-mid"
         >
-          {homeKeysLine(ask)}
-        </p>
-      ) : keyless ? (
-        <p
-          data-testid="home-keys"
-          className="max-w-[520px] font-sans text-[0.875rem] leading-relaxed text-on-surface-mid"
-        >
-          Exact frames, vectors and the plan need no key. Scenes, video and
-          written text run on your own OpenAI or Google key:{" "}
-          <Link
-            href="/settings#providers"
-            className="font-semibold text-foreground underline underline-offset-2"
-          >
-            add one in Settings
-          </Link>
-          .
+          {ask !== null ? (
+            homeKeysLine(ask)
+          ) : (
+            <>
+              Exact frames, vectors and the plan need no key. Scenes, video and
+              written text run on your own OpenAI or Google key:{" "}
+              <Link
+                href="/settings#providers"
+                className="font-semibold text-foreground underline underline-offset-2"
+              >
+                add one in Settings
+              </Link>
+              .
+            </>
+          )}
         </p>
       ) : null}
     </section>
