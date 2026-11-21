@@ -19,7 +19,10 @@ import {
 import type { JobRoute } from "@/domain/model-routing";
 import { describeProviderError, hadResponse } from "@/domain/queue";
 import { hasDatabase } from "@/lib/db";
+import { directNoKeyLine } from "@/lib/provider-key-words";
+import { ProviderKeyMissing } from "@/providers/errors";
 import type { TextResult } from "@/providers/interfaces";
+import { hasProviderKey } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
 import type { GenerationResult } from "@/providers/types";
 import {
@@ -29,7 +32,7 @@ import {
   reserveDirectCall,
 } from "@/server/generation-repository";
 import type { MakerRef } from "@/server/maker-repository";
-import { inMembersWords } from "@/server/month-limit";
+import { inMembersWords, memberAsk } from "@/server/month-limit";
 
 // The monthly cap covers every paid call made from Kiln, not only the queue.
 // Mock runs neither reserve nor count. Without a database (tests) both are
@@ -137,7 +140,9 @@ const UNCOUNTED: DirectCall<never> = {
 // An error the provider answered counts nothing, a call with no answer counts
 // at its estimate, and a call never made (a stub) records nothing. A model its
 // provider's last key check no longer lists is refused before anything, as a
-// model that cannot run (a route moves past it).
+// model that cannot run (a route moves past it). So is a call whose provider
+// has no key in reach, first of all: nothing is read or reserved for it, and
+// a member is told whom to ask.
 export async function openDirectCall<T extends { usage?: unknown }>(
   maker: MakerRef,
   priced: PricedCall<T>,
@@ -150,6 +155,18 @@ export async function openDirectCall<T extends { usage?: unknown }>(
   }
   const provider = ProviderId.safeParse(priced.provider);
   if (provider.success) {
+    if (!hasProviderKey(provider.data)) {
+      const ask = await memberAsk(maker);
+      // The engine's own error for the owner and for work with no person;
+      // a member's carries their words under the same name, which is all a
+      // route reads to move on.
+      throw ask === null
+        ? new ProviderKeyMissing(provider.data)
+        : Object.assign(
+            new Error(directNoKeyLine(PROVIDER_LABELS[provider.data], ask)),
+            { name: "ProviderKeyMissing", provider: provider.data },
+          );
+    }
     const gone = (await readUnlisted(maker.id))[provider.data];
     if (gone?.models.includes(priced.model)) {
       const model = { provider: provider.data, model: priced.model };

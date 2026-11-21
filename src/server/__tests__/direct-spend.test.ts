@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { TextResult } from "@/providers/interfaces";
 import type { GenerationResult } from "@/providers/types";
 
 const reserveDirectCall = vi.fn(async (): Promise<string> => "row-1");
@@ -7,6 +8,7 @@ const closeDirectCall = vi.fn(async () => {});
 const unlisted = vi.hoisted(() => ({
   found: {} as Record<string, { models: string[]; at: string }>,
 }));
+const readUnlisted = vi.fn(async (_makerId: string) => unlisted.found);
 
 vi.mock("@/lib/db", () => ({
   hasDatabase: () => true,
@@ -17,7 +19,14 @@ vi.mock("@/lib/db", () => ({
     },
   },
 }));
-vi.mock("@/providers/mode", () => ({ providerMode: () => "live" }));
+const mode = vi.hoisted(() => ({ current: "live" as "live" | "mock" }));
+vi.mock("@/providers/mode", () => ({ providerMode: () => mode.current }));
+// Fixture keys: which providers have a key in reach. Nothing here can pay.
+const keys = vi.hoisted(() => ({ openai: true, google: true }));
+vi.mock("@/providers/keys", async (original) => ({
+  ...(await original<typeof import("@/providers/keys")>()),
+  hasProviderKey: (provider: "openai" | "google") => keys[provider],
+}));
 const { QueueRefusal } = vi.hoisted(() => ({
   QueueRefusal: class QueueRefusal extends Error {
     constructor(
@@ -33,11 +42,13 @@ vi.mock("@/server/generation-repository", () => ({
   reserveDirectCall,
   markDirectCall,
   closeDirectCall,
-  readUnlisted: async () => unlisted.found,
+  readUnlisted,
 }));
 
 const { imageCall, openDirectCall, textCall, videoCall, withDirectSpend } =
   await import("@/server/direct-spend");
+const { withProviderKeys } = await import("@/providers/keys");
+const { fallbackAfter } = await import("@/domain/model-routing");
 
 const OMNI = {
   provider: "google" as const,
@@ -50,7 +61,12 @@ const video: GenerationResult = {
   model: OMNI.model,
 };
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  keys.openai = true;
+  keys.google = true;
+  mode.current = "live";
+});
 
 describe("direct spend", () => {
   it("a video reserves its pinned max and records the seconds it generated", async () => {
@@ -261,5 +277,150 @@ describe("direct spend", () => {
       error: "Bad Request",
       mayBeCharged: false,
     });
+  });
+});
+
+// A provider with no key in reach cannot take the call: it is refused first,
+// in the reader's words, before the unlisted models are read and before
+// anything is reserved. The app runs every entry point inside its maker's
+// keys, so the cases that read the owner's words run inside a scope.
+describe("a direct call with no key in reach", () => {
+  const LUNA = { provider: "openai" as const, model: "gpt-6-luna" };
+  const member = {
+    id: "maker-1",
+    member: { id: "m1", userId: "u1", role: "member" as const },
+  };
+  const owner = {
+    id: "maker-1",
+    member: { id: "o1", userId: "u0", role: "owner" as const },
+  };
+  const OWNERS = "OpenAI has no API key: add one in Settings → Providers.";
+  const nothingHappened = (call?: { mock: { calls: unknown[] } }) => {
+    expect(readUnlisted).not.toHaveBeenCalled();
+    expect(reserveDirectCall).not.toHaveBeenCalled();
+    expect(markDirectCall).not.toHaveBeenCalled();
+    expect(closeDirectCall).not.toHaveBeenCalled();
+    if (call) expect(call.mock.calls).toEqual([]);
+  };
+
+  it("a member is refused before anything is read or reserved, and told whom to ask", async () => {
+    keys.openai = false;
+    const call = vi.fn(
+      async (): Promise<TextResult<string>> => ({
+        value: "",
+        model: LUNA.model,
+      }),
+    );
+    await expect(
+      withProviderKeys({}, () =>
+        withDirectSpend(member, textCall<string>(LUNA, "chatTurn"), call),
+      ),
+    ).rejects.toMatchObject({
+      name: "ProviderKeyMissing",
+      provider: "openai",
+      message: "You have no access to an OpenAI key; ask Ana.",
+    });
+    nothingHappened(call);
+    await expect(
+      withProviderKeys({}, () =>
+        openDirectCall(member, textCall<string>(LUNA, "chatTurn")),
+      ),
+    ).rejects.toMatchObject({
+      name: "ProviderKeyMissing",
+      message: "You have no access to an OpenAI key; ask Ana.",
+    });
+    nothingHappened();
+  });
+
+  it("a member's video on a provider with no key names that provider", async () => {
+    keys.google = false;
+    const call = vi.fn(async () => video);
+    await expect(
+      withProviderKeys({}, () =>
+        withDirectSpend(member, videoCall(OMNI, 8), call),
+      ),
+    ).rejects.toMatchObject({
+      name: "ProviderKeyMissing",
+      provider: "google",
+      message: "You have no access to a Google key; ask Ana.",
+    });
+    nothingHappened(call);
+  });
+
+  it("the owner and work with no person read where to add the key, with no .env in it", async () => {
+    keys.openai = false;
+    for (const reader of [owner, { id: "maker-1" }]) {
+      const call = vi.fn(async () => video);
+      const refused = withProviderKeys({}, () =>
+        withDirectSpend(
+          reader,
+          imageCall({ provider: "openai", model: "gpt-image-2" }, "1:1"),
+          call,
+        ),
+      );
+      await expect(refused).rejects.toMatchObject({
+        name: "ProviderKeyMissing",
+        provider: "openai",
+        message: OWNERS,
+      });
+      nothingHappened(call);
+    }
+  });
+
+  it("a script outside any maker's keys is told which variable to set", async () => {
+    keys.openai = false;
+    await expect(
+      openDirectCall({ id: "maker-1" }, textCall<string>(LUNA, "chatTurn")),
+    ).rejects.toMatchObject({
+      name: "ProviderKeyMissing",
+      message: "OpenAI has no API key: set OPENAI_API_KEY.",
+    });
+    nothingHappened();
+  });
+
+  it("the refusal is one a saved route moves past, to another provider's model", async () => {
+    keys.openai = false;
+    for (const reader of [member, owner]) {
+      const error = await withProviderKeys({}, () =>
+        openDirectCall(reader, textCall<string>(LUNA, "chatTurn")),
+      ).catch((e: unknown) => e);
+      expect(fallbackAfter("openai", error, { callStarted: false })).toEqual({
+        move: "provider",
+        reason: "OpenAI has no API key",
+      });
+    }
+  });
+
+  it("the other provider's call still runs and reserves", async () => {
+    keys.openai = false;
+    await withDirectSpend(member, videoCall(OMNI, 8), async (beforeCall) => {
+      await beforeCall();
+      return video;
+    });
+    expect(reserveDirectCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("a model with no pinned price is still refused for its price first", async () => {
+    keys.openai = false;
+    await expect(
+      withDirectSpend(
+        member,
+        imageCall({ provider: "openai", model: "gpt-image-0" }, "1:1"),
+        vi.fn(),
+      ),
+    ).rejects.toThrow("No pinned price for gpt-image-0");
+    nothingHappened();
+  });
+
+  it("a mock run checks no key and reserves nothing", async () => {
+    keys.google = false;
+    mode.current = "mock";
+    const result = await withDirectSpend(
+      member,
+      videoCall(OMNI, 8),
+      async () => video,
+    );
+    expect(result).toBe(video);
+    nothingHappened();
   });
 });
