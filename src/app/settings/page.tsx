@@ -15,6 +15,11 @@ import { fromMicros } from "@/domain/generation-cost";
 import { modelLabel } from "@/domain/model-defaults";
 import { proposeRoutes } from "@/domain/model-routing";
 import { hasDatabase } from "@/lib/db";
+import {
+  healthErrorLine,
+  keyLine,
+  providersIntro,
+} from "@/lib/provider-key-words";
 import { providerMode } from "@/providers/mode";
 import { listAccessTokens } from "@/server/access-tokens";
 import { SPECIALIST_CHOICES } from "@/server/chat/specialists";
@@ -23,11 +28,9 @@ import { makerPage } from "@/server/guarded";
 import { listLessons } from "@/server/lessons";
 import type { CurrentMaker } from "@/server/maker-repository";
 import { getMakerModelSetup } from "@/server/maker-repository";
+import { memberAsk } from "@/server/month-limit";
 import { providerHealth } from "@/server/provider-health";
-import {
-  type ProviderKeyState,
-  providerKeyStates,
-} from "@/server/provider-keys";
+import { providerKeyStates } from "@/server/provider-keys";
 import { sceneLookSetup } from "@/server/scene-look";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
 import { listTeam, monthSpend } from "@/server/team";
@@ -44,24 +47,11 @@ const when = (iso: string) =>
     minute: "2-digit",
   });
 
-const ENV_NAME = { openai: "OPENAI_API_KEY", google: "GOOGLE_API_KEY" };
-
-function keyLine(state: ProviderKeyState | undefined, owner: boolean): string {
-  if (!state) return "No API key yet";
-  if (state.unreadable) {
-    return `A saved key (ends in ${state.hint}) cannot be read: KILN_SECRET_KEY is missing or changed. Paste the key again.`;
-  }
-  if (state.source === "saved") return `API key saved, ends in ${state.hint}`;
-  if (state.inEnvironment && owner) {
-    return `No API key yet. ${ENV_NAME[state.provider]} is in .env, but the app uses only keys saved here: paste it below.`;
-  }
-  return "No API key yet";
-}
-
 // Settings (per request: it reads the maker's routes and the providers'
 // health). Models: a route per role, Kiln's proposal until saved. Providers: each key and its last
 // calls, read for free, and a free key check on a click (the provider lists
-// its models; no paid call). The month's cap, read only: the owner sees the
+// its models; no paid call); a member reads only whether each provider is in
+// reach and whom to ask, never a key or a control. The month's cap, read only: the owner sees the
 // studio's total and each person's spend, a member only their own.
 // Lessons: what Kiln proposes it learned of the maker's taste, and what they
 // kept. Shops: the Etsy connection. Access tokens: for the HTTP API (README
@@ -82,6 +72,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
     calls,
     lessons,
     team,
+    ask,
   ] = await Promise.all([
     getMakerModelSetup(current),
     providerHealth(maker?.id ?? null),
@@ -95,6 +86,8 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
       ? listLessons(maker, { status: ["proposed", "kept"] })
       : Promise.resolve(null),
     maker && owner ? listTeam(maker) : Promise.resolve(null),
+    // Whom a member asks about a key; null for the owner.
+    maker ? memberAsk(maker) : Promise.resolve(null),
   ]);
   const mode = providerMode();
   const look = maker ? await sceneLookSetup(maker) : null;
@@ -128,7 +121,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
           <p className="mt-1 mb-5 font-sans text-[0.8125rem] leading-relaxed text-on-surface-mid">
             {mode === "mock"
               ? "Mock mode: nothing is called or paid."
-              : "Kiln runs on your own keys: paste one and it is kept sealed on this machine, then checked for free (the provider lists its models, nothing is generated). One provider is enough to start. The rest is read from the last calls Kiln made."}
+              : providersIntro(ask)}
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {health.map((h) => (
@@ -139,21 +132,31 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
                 <div className="font-sans text-sm font-semibold text-foreground">
                   {h.label}
                 </div>
-                <div
-                  className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
-                  data-testid={`provider-${h.provider}-key`}
-                >
-                  <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
-                  {keyLine(
-                    keyStates.find((k) => k.provider === h.provider),
-                    owner,
-                  )}
-                </div>
+                {ask !== null && mode === "mock" ? null : (
+                  <div
+                    className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
+                    data-testid={`provider-${h.provider}-key`}
+                  >
+                    <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
+                    {keyLine({
+                      state: keyStates.find((k) => k.provider === h.provider),
+                      owner,
+                      keyInReach: h.keyPresent,
+                      ask,
+                      label: h.label,
+                    })}
+                  </div>
+                )}
                 {h.lastError ? (
                   <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
                     <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
                     <span className="min-w-0 [overflow-wrap:anywhere]">
-                      {h.lastError.message}{" "}
+                      {healthErrorLine({
+                        message: h.lastError.message,
+                        keyRejected: h.keyRejected,
+                        label: h.label,
+                        ask,
+                      })}{" "}
                       <span className="font-mono text-[0.65rem] text-on-surface-dim">
                         {when(h.lastError.at)}
                       </span>
@@ -187,13 +190,8 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
                     </span>
                   </div>
                 ) : null}
-                {h.keyPresent && mode !== "mock" ? (
+                {h.keyPresent && mode !== "mock" && owner ? (
                   <KeyCheck provider={h.provider} label={h.label} />
-                ) : null}
-                {maker && mode !== "mock" && !owner ? (
-                  <p className="font-sans text-[0.75rem] text-on-surface-dim">
-                    The studio&apos;s owner manages its keys.
-                  </p>
                 ) : null}
                 {maker && mode !== "mock" && owner ? (
                   <ProviderKey
