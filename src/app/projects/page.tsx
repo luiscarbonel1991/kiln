@@ -7,6 +7,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { fromMicros } from "@/domain/generation-cost";
 import { buyerSizeLabel, type Product } from "@/domain/product";
 import { hasDatabase } from "@/lib/db";
+import { homeKeysLine } from "@/lib/provider-key-words";
 import { hasProviderKey } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
 import { makerPage } from "@/server/guarded";
@@ -17,6 +18,7 @@ import {
 } from "@/server/home-repository";
 import { followedListings } from "@/server/listing-results";
 import type { CurrentMaker } from "@/server/maker-repository";
+import { memberAsk } from "@/server/month-limit";
 import { listProducts } from "@/server/product-repository";
 import { listProjects } from "@/server/project-repository";
 
@@ -70,6 +72,8 @@ export default makerPage(async function ProjectsPage(maker: CurrentMaker) {
   const mock = providerMode() === "mock";
   const keyless =
     !mock && !hasProviderKey("openai") && !hasProviderKey("google");
+  // Whom a member asks for a key; the owner is sent to Settings instead.
+  const ask = keyless ? await memberAsk(maker) : null;
   const details = Object.fromEntries(
     projects.flatMap((p) => {
       const s = stats.projects.get(p.id);
@@ -124,6 +128,7 @@ export default makerPage(async function ProjectsPage(maker: CurrentMaker) {
           next={next}
           returning={returning}
           keyless={keyless}
+          ask={ask}
         />
 
         {returning ? (
@@ -233,11 +238,13 @@ function Opening({
   next,
   returning,
   keyless,
+  ask,
 }: {
   maker: string;
   next: { href: string; label: string } | null;
   returning: boolean;
   keyless: boolean;
+  ask: string | null;
 }) {
   return (
     <section className="flex flex-col gap-5 pt-4">
@@ -280,7 +287,14 @@ function Opening({
           {returning ? "New project" : "Add a product"}
         </Link>
       </div>
-      {keyless ? (
+      {keyless && ask !== null ? (
+        <p
+          data-testid="home-keys"
+          className="max-w-[520px] font-sans text-[0.875rem] leading-relaxed text-on-surface-mid"
+        >
+          {homeKeysLine(ask)}
+        </p>
+      ) : keyless ? (
         <p
           data-testid="home-keys"
           className="max-w-[520px] font-sans text-[0.875rem] leading-relaxed text-on-surface-mid"
