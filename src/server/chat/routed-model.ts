@@ -31,8 +31,10 @@ import { textRunnable } from "@/server/text-calls";
 // route's effort. Each step of a turn is one direct call under the monthly
 // cap, its estimate (the step's budget at that effort) reserved first and its
 // measured cost recorded when its stream ends. A step the
-// provider refused (an HTTP error, before anything streamed) moves down the
-// route the maker saved, as fallbackAfter allows; a step with no answer (a
+// provider refused (an HTTP error, before anything streamed), or one refused
+// when its call is opened (no key in reach, a model no longer listed), moves
+// down the route the maker saved, as fallbackAfter allows; the cap's refusal
+// never moves; a step with no answer (a
 // timeout, a dropped connection) or one that failed midway ends the turn,
 // never retried. The turn's ledger says which models answered, the moves,
 // and what the steps cost.
@@ -139,27 +141,31 @@ export function routedChatModel(
     let move: { from: RouteEntry; reason: string } | undefined;
     for (;;) {
       const entry = current;
-      const direct = await openDirectCall(maker, {
-        ...textCall<undefined>(entry, kind, effort),
-        ...(projectId ? { projectId } : {}),
-        ...(move
-          ? {
-              route: {
-                next: [],
-                switched: [
-                  {
-                    from: move.from,
-                    to: entry,
-                    reason: move.reason,
-                    at: new Date().toISOString(),
-                  },
-                ],
-              },
-            }
-          : {}),
-      });
+      // Opened inside the try: a call refused at opening (no key in reach, a
+      // model its provider no longer lists) was never made, so it moves along
+      // the route like a refused request and there is nothing to close.
+      let direct: DirectCall<{ usage?: GenerationUsage }> | undefined;
       let callStarted = false;
       try {
+        direct = await openDirectCall(maker, {
+          ...textCall<undefined>(entry, kind, effort),
+          ...(projectId ? { projectId } : {}),
+          ...(move
+            ? {
+                route: {
+                  next: [],
+                  switched: [
+                    {
+                      from: move.from,
+                      to: entry,
+                      reason: move.reason,
+                      at: new Date().toISOString(),
+                    },
+                  ],
+                },
+              }
+            : {}),
+        });
         const model = getChatModels(entry.provider).model(entry.model, effort);
         await direct.beforeCall();
         callStarted = true;
@@ -168,7 +174,7 @@ export function routedChatModel(
         if (!ledger.models.includes(label)) ledger.models.push(label);
         return await settle(result, entry, direct);
       } catch (error) {
-        await direct.failed(error);
+        await direct?.failed(error);
         const failure = fallbackAfter(entry.provider, error, { callStarted });
         const picked = pickNext(rest, entry, failure, textRunnable(kind));
         if (!picked) throw inWords(entry.provider, error);
