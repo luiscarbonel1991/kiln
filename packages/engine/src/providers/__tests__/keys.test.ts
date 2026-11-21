@@ -15,6 +15,7 @@ const {
   withProviderKeys,
 } = await import("@/providers/keys");
 const { getOpenAI, hasOpenAIKey } = await import("@/providers/openai/client");
+const { ProviderKeyMissing } = await import("@/providers/errors");
 
 describe("provider keys", () => {
   it("inside a maker's scope only its own keys count; outside, the environment's", () => {
@@ -56,6 +57,48 @@ describe("provider keys", () => {
     expect(providerKeySource("openai")).toBeNull();
     expect(hasOpenAIKey()).toBe(false);
     expect(() => getOpenAI()).toThrow(/OpenAI has no API key/);
+  });
+
+  // A script or the CLI sets its key in the environment; the app never
+  // reads it, so inside a maker's scope the message names no variable.
+  it("outside a maker's scope a missing key names the environment variable", () => {
+    expect(new ProviderKeyMissing("openai").message).toBe(
+      "OpenAI has no API key: set OPENAI_API_KEY.",
+    );
+    expect(new ProviderKeyMissing("google").message).toBe(
+      "Google has no API key: set GOOGLE_API_KEY.",
+    );
+  });
+
+  it("inside a maker's scope a missing key never names the environment", () => {
+    withProviderKeys({}, () => {
+      const openai = new ProviderKeyMissing("openai");
+      expect(openai.message).toBe(
+        "OpenAI has no API key: add one in Settings → Providers.",
+      );
+      const google = new ProviderKeyMissing("google");
+      expect(google.message).toBe(
+        "Google has no API key: add one in Settings → Providers.",
+      );
+      for (const error of [openai, google]) {
+        expect(error.message).not.toMatch(/API_KEY|\.env/);
+      }
+      expect(() => getOpenAI()).toThrow(
+        "OpenAI has no API key: add one in Settings → Providers.",
+      );
+    });
+  });
+
+  it("a missing key keeps its name, its provider and its class in and out of a scope", () => {
+    const outside = new ProviderKeyMissing("google");
+    const inside = withProviderKeys({}, () => new ProviderKeyMissing("openai"));
+    for (const error of [outside, inside]) {
+      expect(error.name).toBe("ProviderKeyMissing");
+      expect(error).toBeInstanceOf(ProviderKeyMissing);
+      expect(error).toBeInstanceOf(Error);
+    }
+    expect(outside.provider).toBe("google");
+    expect(inside.provider).toBe("openai");
   });
 
   it("a different key builds a new client; the same key keeps its client", () => {

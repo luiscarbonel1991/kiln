@@ -48,6 +48,12 @@ export function providerKeySource(
   return fromEnv(provider) ? "env" : null;
 }
 
+// Whether this runs inside a maker's keys (the app) or outside any (a script,
+// the CLI): only outside does the environment's key count.
+export function inProviderKeyScope(): boolean {
+  return scope().getStore() !== undefined;
+}
+
 // Whether the environment holds a key the app will not use, so Settings can
 // say where it has to go.
 export function hasEnvironmentKey(provider: ProviderId): boolean {
