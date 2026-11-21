@@ -49,6 +49,7 @@ const { imageCall, openDirectCall, textCall, videoCall, withDirectSpend } =
   await import("@/server/direct-spend");
 const { withProviderKeys } = await import("@/providers/keys");
 const { fallbackAfter } = await import("@/domain/model-routing");
+const { ProviderKeyMissing } = await import("@/providers/errors");
 
 const OMNI = {
   provider: "google" as const,
@@ -345,6 +346,52 @@ describe("a direct call with no key in reach", () => {
       message: "You have no access to a Google key; ask Ana.",
     });
     nothingHappened(call);
+  });
+
+  // The refusal is the engine's own error, not a look-alike: whatever reads
+  // its class (a route, a tool's refusal) treats a member's as the owner's.
+  it("a member's refusal is the engine's missing-key error, carrying their words", async () => {
+    for (const [provider, priced, message] of [
+      [
+        "openai",
+        textCall<string>(LUNA, "chatTurn"),
+        "You have no access to an OpenAI key; ask Ana.",
+      ],
+      [
+        "google",
+        videoCall(OMNI, 8),
+        "You have no access to a Google key; ask Ana.",
+      ],
+    ] as const) {
+      keys[provider] = false;
+      const error = await withProviderKeys({}, () =>
+        openDirectCall<{ usage?: unknown }>(member, priced),
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ProviderKeyMissing);
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toMatchObject({
+        name: "ProviderKeyMissing",
+        provider,
+        message,
+      });
+      expect(Object.getPrototypeOf(error)).toBe(ProviderKeyMissing.prototype);
+    }
+    nothingHappened();
+  });
+
+  it("the owner's refusal is the same error with its own message, unchanged", async () => {
+    keys.openai = false;
+    for (const reader of [owner, { id: "maker-1" }]) {
+      const error = await withProviderKeys({}, () =>
+        openDirectCall(reader, textCall<string>(LUNA, "chatTurn")),
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ProviderKeyMissing);
+      expect(error).toMatchObject({
+        name: "ProviderKeyMissing",
+        provider: "openai",
+        message: OWNERS,
+      });
+    }
   });
 
   it("the owner and work with no person read where to add the key, with no .env in it", async () => {

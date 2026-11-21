@@ -156,16 +156,15 @@ export async function openDirectCall<T extends { usage?: unknown }>(
   const provider = ProviderId.safeParse(priced.provider);
   if (provider.success) {
     if (!hasProviderKey(provider.data)) {
-      const ask = await memberAsk(maker);
-      // The engine's own error for the owner and for work with no person;
-      // a member's carries their words under the same name, which is all a
-      // route reads to move on.
-      throw ask === null
-        ? new ProviderKeyMissing(provider.data)
-        : Object.assign(
-            new Error(directNoKeyLine(PROVIDER_LABELS[provider.data], ask)),
-            { name: "ProviderKeyMissing", provider: provider.data },
-          );
+      // The engine's own error for everyone; a member's carries their
+      // words. If whom to ask cannot be read, the refusal still stands.
+      const ask = await memberAsk(maker).catch(() => null);
+      throw new ProviderKeyMissing(
+        provider.data,
+        ask === null
+          ? undefined
+          : directNoKeyLine(PROVIDER_LABELS[provider.data], ask),
+      );
     }
     const gone = (await readUnlisted(maker.id))[provider.data];
     if (gone?.models.includes(priced.model)) {

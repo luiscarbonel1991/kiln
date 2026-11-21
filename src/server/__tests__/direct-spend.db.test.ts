@@ -21,6 +21,7 @@ describe.skipIf(!enabled)(
     const { db } = await import("@/lib/db");
     const { withProviderKeys } = await import("@/providers/keys");
     const { textCall, withDirectSpend } = await import("@/server/direct-spend");
+    const { ProviderKeyMissing } = await import("@/providers/errors");
 
     const stamp = randomUUID().slice(0, 8);
     const organizationId = randomUUID();
@@ -99,6 +100,24 @@ describe.skipIf(!enabled)(
         message: "You have no access to an OpenAI key; ask Ana.",
       });
       expect(call).not.toHaveBeenCalled();
+      expect(await rows()).toEqual(before);
+    });
+
+    it("a member's refusal is the engine's missing-key error, and leaves no row", async () => {
+      const before = await rows();
+      const error = await withProviderKeys({}, () =>
+        withDirectSpend(
+          member(),
+          textCall<string>(LUNA, "chatTurn"),
+          async () => answer,
+        ),
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ProviderKeyMissing);
+      expect(error).toMatchObject({
+        name: "ProviderKeyMissing",
+        provider: "openai",
+        message: "You have no access to an OpenAI key; ask Ana.",
+      });
       expect(await rows()).toEqual(before);
     });
 
