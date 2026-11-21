@@ -4,6 +4,8 @@
 // which reads as the owner. A member never reads key material, an owner's
 // control or where a key is set.
 
+import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
+
 type KeyState = {
   provider: "openai" | "google";
   source: "saved" | "env" | null;
@@ -22,25 +24,30 @@ const noAccess = (label: string) =>
 export const noAccessLine = (label: string, ask: string) =>
   `${noAccess(label)}; ask ${ask}.`;
 
+const rejected = (label: string, ask: string) =>
+  `${label} rejected the studio's key on its last call; ask ${ask}`;
+
 export const providersIntro = (ask: string | null) =>
   ask === null
     ? "Kiln runs on your own keys: paste one and it is kept sealed on this machine, then checked for free (the provider lists its models, nothing is generated). One provider is enough to start. The rest is read from the last calls Kiln made."
     : `Kiln runs on the studio's keys, which ${ask} manages.`;
 
 // Settings → Providers, a provider's key line. A key in reach is one the
-// reader's calls would run on; a saved key that cannot be read is not.
+// reader's calls would run on; a saved key that cannot be read is not. A
+// member reads one thing about the key: a rejected one cannot generate.
 export function keyLine(input: {
   state: KeyState | undefined;
   owner: boolean;
   keyInReach: boolean;
+  keyRejected?: boolean;
   ask: string | null;
   label: string;
 }): string {
-  const { state, owner, keyInReach, ask, label } = input;
+  const { state, owner, keyInReach, keyRejected, ask, label } = input;
   if (ask !== null) {
-    return keyInReach
-      ? `You can generate with ${label}.`
-      : noAccessLine(label, ask);
+    if (!keyInReach) return noAccessLine(label, ask);
+    if (keyRejected) return `${rejected(label, ask)}.`;
+    return `You can generate with ${label}.`;
   }
   if (!state) return "No API key yet";
   if (state.unreadable) {
@@ -53,17 +60,43 @@ export function keyLine(input: {
   return "No API key yet";
 }
 
-// A provider's last error in Settings. Only a rejected key reads differently
-// for a member: replacing it is the owner's to do.
+// A provider's last error in Settings, under the key line. A member's key
+// line already says a rejected key, so there is no second line (null).
 export const healthErrorLine = (input: {
   message: string;
   keyRejected: boolean;
   label: string;
   ask: string | null;
-}): string =>
-  input.keyRejected && input.ask !== null
-    ? `${input.label} rejected the studio's key on its last call; ask ${input.ask}.`
-    : input.message;
+}): string | null =>
+  input.keyRejected && input.ask !== null ? null : input.message;
+
+// What a stored failure tells its reader to do about the key or the
+// provider's account: the owner's to do, not a member's.
+const OWNERS_TO_DO =
+  /replace the key|Settings|\.env|_API_KEY|billing|spend cap|AI Studio|ai\.studio|platform\.openai\.com/i;
+
+// A provider's health in its reader's words, for a page and for what it hands
+// the browser: a member reads whom to ask where the stored failure says what
+// only the owner can do. The owner (null) gets the health as it was given.
+export function healthForReader<
+  T extends {
+    provider: ProviderId;
+    lastError: { message: string } | null;
+    keyRejected?: boolean;
+  },
+>(health: T[], ask: string | null): T[] {
+  if (ask === null) return health;
+  return health.map((h) => {
+    if (!h.lastError) return h;
+    const label = PROVIDER_LABELS[h.provider];
+    const message = h.keyRejected
+      ? `${rejected(label, ask)}.`
+      : OWNERS_TO_DO.test(h.lastError.message)
+        ? `${label}'s last call failed; ask ${ask}.`
+        : h.lastError.message;
+    return { ...h, lastError: { ...h.lastError, message } };
+  });
+}
 
 // Home, for a member with no key in reach (the owner's line has a link to
 // Settings and stays in the page).
@@ -76,12 +109,22 @@ export const routeKeyLine = (label: string, ask: string | null) =>
     ? `${label} has no API key (add one under Providers): this model cannot run.`
     : `${noAccess(label)}: this model cannot run.`;
 
-// The board's block on a card, before anyone clicks.
-export const blockNoKeyLine = (label: string, other: string, ask: string) =>
-  `${noAccess(label)}; ask ${ask}, or pick ${other} model.`;
+// The board's block on a card, before anyone clicks. The other provider is
+// a way out only when it can run (`other` is its label, or null).
+export const orPickLine = (other: string | null) =>
+  other === null ? "." : `, or pick ${article(other)} ${other} model.`;
 
-export const blockRejectedLine = (label: string, other: string, ask: string) =>
-  `${label} rejected the studio's key on its last call; ask ${ask}, or pick ${other} model.`;
+export const blockNoKeyLine = (
+  label: string,
+  other: string | null,
+  ask: string,
+) => `${noAccess(label)}; ask ${ask}${orPickLine(other)}`;
+
+export const blockRejectedLine = (
+  label: string,
+  other: string | null,
+  ask: string,
+) => `${rejected(label, ask)}${orPickLine(other)}`;
 
 // The queue's refusal of a card whose provider has no key in reach.
 export const queueNoKeyLine = (

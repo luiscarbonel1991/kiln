@@ -17,6 +17,7 @@ import { proposeRoutes } from "@/domain/model-routing";
 import { hasDatabase } from "@/lib/db";
 import {
   healthErrorLine,
+  healthForReader,
   keyLine,
   providersIntro,
 } from "@/lib/provider-key-words";
@@ -48,11 +49,12 @@ const when = (iso: string) =>
   });
 
 // Settings (per request: it reads the maker's routes and the providers'
-// health). Models: a route per role, Kiln's proposal until saved. Providers: each key and its last
-// calls, read for free, and a free key check on a click (the provider lists
-// its models; no paid call); a member reads only whether each provider is in
-// reach and whom to ask, never a key or a control. The month's cap, read only: the owner sees the
-// studio's total and each person's spend, a member only their own.
+// health). Models: a route per role, Kiln's proposal until saved. Providers:
+// each key and its last calls, read for free, and a free key check on a click
+// (the provider lists its models; no paid call); a member reads only whether
+// each provider is in reach and whom to ask, never a key or a control, and
+// their request unseals no key. The month's cap, read only: the owner sees
+// the studio's total and each person's spend, a member only their own.
 // Lessons: what Kiln proposes it learned of the maker's taste, and what they
 // kept. Shops: the Etsy connection. Access tokens: for the HTTP API (README
 // "HTTP API").
@@ -63,7 +65,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
   const owner = current.member?.role === "owner";
   const [
     setup,
-    health,
+    stored,
     keyStates,
     month,
     spenders,
@@ -76,7 +78,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
   ] = await Promise.all([
     getMakerModelSetup(current),
     providerHealth(maker?.id ?? null),
-    maker ? providerKeyStates(maker.id) : Promise.resolve([]),
+    maker && owner ? providerKeyStates(maker.id) : Promise.resolve([]),
     maker && owner ? budget(maker.id) : Promise.resolve(null),
     maker ? monthSpend(maker) : Promise.resolve([]),
     maker && owner ? listAccessTokens(maker) : Promise.resolve(null),
@@ -89,6 +91,18 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
     // Whom a member asks about a key; null for the owner.
     maker ? memberAsk(maker) : Promise.resolve(null),
   ]);
+  // The health as this reader may read it: a member gets no owner's to-do.
+  const health = healthForReader(stored, ask);
+  // A member's key row already says a rejected key: no second line (null).
+  const errorLine = (h: (typeof health)[number]) =>
+    h.lastError
+      ? healthErrorLine({
+          message: h.lastError.message,
+          keyRejected: h.keyRejected,
+          label: h.label,
+          ask,
+        })
+      : null;
   const mode = providerMode();
   const look = maker ? await sceneLookSetup(maker) : null;
   // A mock run calls nothing, so every provider counts as keyed.
@@ -142,33 +156,35 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
                       state: keyStates.find((k) => k.provider === h.provider),
                       owner,
                       keyInReach: h.keyPresent,
+                      keyRejected: h.keyRejected,
                       ask,
                       label: h.label,
                     })}
                   </div>
                 )}
-                {h.lastError ? (
-                  <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
+                {h.lastError && errorLine(h) !== null ? (
+                  <div
+                    className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
+                    data-testid={`provider-${h.provider}-error`}
+                  >
                     <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
                     <span className="min-w-0 [overflow-wrap:anywhere]">
-                      {healthErrorLine({
-                        message: h.lastError.message,
-                        keyRejected: h.keyRejected,
-                        label: h.label,
-                        ask,
-                      })}{" "}
+                      {errorLine(h)}{" "}
                       <span className="font-mono text-[0.65rem] text-on-surface-dim">
                         {when(h.lastError.at)}
                       </span>
                     </span>
                   </div>
                 ) : null}
-                <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
-                  <CircleCheck className="size-3.5 text-prov-recipe" />
-                  {h.lastOkAt
-                    ? `Last call that worked: ${when(h.lastOkAt)}`
-                    : "No call that worked yet"}
-                </div>
+                {/* A member with no key in reach has made no call to speak of. */}
+                {h.lastOkAt || ask === null || h.keyPresent ? (
+                  <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
+                    <CircleCheck className="size-3.5 text-prov-recipe" />
+                    {h.lastOkAt
+                      ? `Last call that worked: ${when(h.lastOkAt)}`
+                      : "No call that worked yet"}
+                  </div>
+                ) : null}
                 {h.unlisted ? (
                   <div
                     className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
