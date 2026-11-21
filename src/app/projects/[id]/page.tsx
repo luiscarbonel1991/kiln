@@ -46,6 +46,8 @@ async function batchEstimate(
   cardIds: string[],
   plan: ProjectPlan,
   health: ProviderHealth[],
+  // Whom a member asks about a key; null for the owner.
+  ask: string | null,
 ): Promise<BatchEstimate | { refusal: string } | null> {
   if (cardIds.length === 0) return null;
   try {
@@ -67,7 +69,7 @@ async function batchEstimate(
     const blocked = [
       ...new Set(cards.map((c) => c.request.model.provider)),
     ].flatMap((provider) => {
-      const why = providerBlock(health, provider, providerMode());
+      const why = providerBlock(health, provider, providerMode(), ask);
       return why ? [why] : [];
     });
     if (blocked.length > 0) return { refusal: blocked.join(" ") };
@@ -175,6 +177,7 @@ export default makerPage(async function ProjectBoardPage(
           waitingCardIds(boardRows({ ...board, plan }, generation.jobs)),
           plan,
           health,
+          limit.whose === "member" ? limit.ask : null,
         )
       : null;
   const chat = chatOpen

@@ -546,7 +546,12 @@ export function ProjectBoard({
                             sceneLook: takeRoutes.look,
                             look: tuneLook(product, board.plan, slot),
                             blocked: card
-                              ? providerBlock(notes, card.model.provider, mode)
+                              ? providerBlock(
+                                  notes,
+                                  card.model.provider,
+                                  mode,
+                                  limit.whose === "member" ? limit.ask : null,
+                                )
                               : null,
                             prompt: prompts[cardId] ?? null,
                             check: checks[cardId] ?? null,
@@ -557,7 +562,12 @@ export function ProjectBoard({
                           check={checks[cardId]}
                           blocked={
                             card
-                              ? providerBlock(notes, card.model.provider, mode)
+                              ? providerBlock(
+                                  notes,
+                                  card.model.provider,
+                                  mode,
+                                  limit.whose === "member" ? limit.ask : null,
+                                )
                               : null
                           }
                           model={card ? (card.model as ModelValue) : null}
