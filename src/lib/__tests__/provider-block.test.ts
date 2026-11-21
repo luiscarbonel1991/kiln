@@ -8,9 +8,33 @@ const note = (over = {}) => ({
   ...over,
 });
 
+// The other provider is offered as a way out only when it can run: its note
+// is there, with a key in reach that was not rejected on its last call.
+const key = (provider: "openai" | "google", over = {}) =>
+  note({ provider, ...over });
+const NO_KEY = { keyPresent: false };
+const REJECTED = {
+  lastError: { message: "rejected the API key" },
+  keyRejected: true,
+};
+const OTHER = { openai: "google", google: "openai" } as const;
+// The other provider when it cannot run: with no key, with a rejected key,
+// or not among the notes at all.
+const unusable = (provider: "openai" | "google") => [
+  [key(provider, NO_KEY)],
+  [key(provider, REJECTED)],
+  [],
+];
+
 describe("providerBlock", () => {
   it("blocks a live call to a provider with no key, or one that rejected its key", () => {
-    expect(providerBlock([note({ keyPresent: false })], "google", "live")).toBe(
+    expect(
+      providerBlock(
+        [note({ keyPresent: false }), key("openai")],
+        "google",
+        "live",
+      ),
+    ).toBe(
       "Google has no API key: add one in Settings → Providers, or pick an OpenAI model.",
     );
     expect(
@@ -25,6 +49,175 @@ describe("providerBlock", () => {
         "live",
       ),
     ).toContain("Google rejected the API key on its last call");
+  });
+
+  const rejected = note({
+    provider: "openai" as const,
+    lastError: { message: "OpenAI rejected the API key" },
+    keyRejected: true,
+  });
+  const missing = note({ provider: "openai" as const, keyPresent: false });
+  const google = key("google");
+
+  it("the owner, a token and a script read where to add or replace the key, as before", () => {
+    const owner =
+      "OpenAI has no API key: add one in Settings → Providers, or pick a Google model.";
+    expect(providerBlock([missing, google], "openai", "live")).toBe(owner);
+    expect(providerBlock([missing, google], "openai", "live", null)).toBe(
+      owner,
+    );
+    const replace =
+      "OpenAI rejected the API key on its last call: replace it in Settings → Providers, or pick a Google model.";
+    expect(providerBlock([rejected, google], "openai", "live")).toBe(replace);
+    expect(providerBlock([rejected, google], "openai", "live", null)).toBe(
+      replace,
+    );
+    expect(
+      providerBlock([key("google", NO_KEY), key("openai")], "google", "live"),
+    ).toBe(
+      "Google has no API key: add one in Settings → Providers, or pick an OpenAI model.",
+    );
+    expect(
+      providerBlock(
+        [key("google", REJECTED), key("openai")],
+        "google",
+        "live",
+        null,
+      ),
+    ).toBe(
+      "Google rejected the API key on its last call: replace it in Settings → Providers, or pick an OpenAI model.",
+    );
+  });
+
+  it("the owner is not sent to the other provider when it cannot run either", () => {
+    for (const others of unusable("google")) {
+      expect(providerBlock([missing, ...others], "openai", "live")).toBe(
+        "OpenAI has no API key: add one in Settings → Providers.",
+      );
+      expect(providerBlock([rejected, ...others], "openai", "live", null)).toBe(
+        "OpenAI rejected the API key on its last call: replace it in Settings → Providers.",
+      );
+    }
+    for (const others of unusable("openai")) {
+      expect(
+        providerBlock([key("google", NO_KEY), ...others], "google", "live"),
+      ).toBe("Google has no API key: add one in Settings → Providers.");
+      expect(
+        providerBlock([key("google", REJECTED), ...others], "google", "live"),
+      ).toBe(
+        "Google rejected the API key on its last call: replace it in Settings → Providers.",
+      );
+    }
+  });
+
+  it("a member with no key in reach is told whom to ask, or to pick the other provider", () => {
+    expect(providerBlock([missing, google], "openai", "live", "Ana")).toBe(
+      "You have no access to an OpenAI key; ask Ana, or pick a Google model.",
+    );
+    expect(
+      providerBlock(
+        [key("google", NO_KEY), key("openai")],
+        "google",
+        "live",
+        "Ana",
+      ),
+    ).toBe(
+      "You have no access to a Google key; ask Ana, or pick an OpenAI model.",
+    );
+  });
+
+  it("a member reads a rejected key as the studio's, with whom to ask", () => {
+    expect(providerBlock([rejected, google], "openai", "live", "Ana")).toBe(
+      "OpenAI rejected the studio's key on its last call; ask Ana, or pick a Google model.",
+    );
+    expect(
+      providerBlock(
+        [key("google", REJECTED), key("openai")],
+        "google",
+        "live",
+        "Ana",
+      ),
+    ).toBe(
+      "Google rejected the studio's key on its last call; ask Ana, or pick an OpenAI model.",
+    );
+  });
+
+  it("a member is not sent to the other provider when it cannot run either", () => {
+    for (const others of unusable("google")) {
+      expect(providerBlock([missing, ...others], "openai", "live", "Ana")).toBe(
+        "You have no access to an OpenAI key; ask Ana.",
+      );
+      expect(
+        providerBlock([rejected, ...others], "openai", "live", "Ana"),
+      ).toBe("OpenAI rejected the studio's key on its last call; ask Ana.");
+    }
+    for (const others of unusable("openai")) {
+      expect(
+        providerBlock(
+          [key("google", NO_KEY), ...others],
+          "google",
+          "live",
+          "Ana",
+        ),
+      ).toBe("You have no access to a Google key; ask Ana.");
+      expect(
+        providerBlock(
+          [key("google", REJECTED), ...others],
+          "google",
+          "live",
+          "Ana",
+        ),
+      ).toBe("Google rejected the studio's key on its last call; ask Ana.");
+    }
+  });
+
+  // A failure that is not about the key leaves the other provider able to
+  // run, and the order of the notes changes nothing.
+  it("the other provider is offered when its last call failed for another reason, wherever its note is", () => {
+    const failed = { lastError: { message: "answered 503" } };
+    for (const ask of [null, "Ana"]) {
+      for (const provider of ["openai", "google"] as const) {
+        const other = key(OTHER[provider], failed);
+        const model = provider === "openai" ? "a Google" : "an OpenAI";
+        for (const blocked of [
+          key(provider, NO_KEY),
+          key(provider, REJECTED),
+        ]) {
+          for (const notes of [
+            [blocked, other],
+            [other, blocked],
+          ]) {
+            expect(providerBlock(notes, provider, "live", ask)).toMatch(
+              new RegExp(`, or pick ${model} model\\.$`),
+            );
+          }
+        }
+      }
+    }
+  });
+
+  it("no member line sends them to Settings or tells them to replace a key", () => {
+    for (const blocked of [missing, rejected]) {
+      for (const others of [[google], ...unusable("google")]) {
+        const line = providerBlock(
+          [blocked, ...others],
+          "openai",
+          "live",
+          "Ana",
+        );
+        expect(line).not.toBeNull();
+        expect(line).not.toMatch(
+          /Settings|replace|add one|\.env|API_KEY|paste/i,
+        );
+      }
+    }
+  });
+
+  it("a mock run and a healthy provider block no one, whoever reads", () => {
+    expect(providerBlock([missing], "openai", "mock", "Ana")).toBeNull();
+    expect(providerBlock([rejected], "openai", "mock", "Ana")).toBeNull();
+    expect(providerBlock([missing, google], "openai", "mock")).toBeNull();
+    expect(providerBlock([note()], "google", "live", "Ana")).toBeNull();
   });
 
   it("lets a transient failure, a healthy provider and every mock run through", () => {

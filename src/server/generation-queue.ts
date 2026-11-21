@@ -41,6 +41,7 @@ import { SEED_BRAND } from "@/domain/seed";
 import { cardReference } from "@/lib/card-reference";
 import { db, hasDatabase } from "@/lib/db";
 import { env } from "@/lib/env";
+import { queueNoKeyLine } from "@/lib/provider-key-words";
 import { CATALOG, findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { storeAsset } from "@/providers/asset-bytes";
 import { hasProviderKey } from "@/providers/keys";
@@ -68,7 +69,7 @@ import {
 import { createWorker, type Worker } from "@/server/generation-worker";
 import type { MakerRef } from "@/server/maker-repository";
 import { getMakerRoutes } from "@/server/maker-repository";
-import { fitsThisMonth, inMembersWords } from "@/server/month-limit";
+import { fitsThisMonth, inMembersWords, memberAsk } from "@/server/month-limit";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
 import { withMakerKeys } from "@/server/provider-keys";
 import { checkProjectTake } from "@/server/qc/project-take";
@@ -165,12 +166,13 @@ const batchLabel = (m: BatchModel) =>
 // A card's model must be one Kiln offers for its kind, still listed by its
 // provider when the key was last checked, and in a live run its provider
 // needs a key: refused with the reason, never swapped for another.
-function assertRunnable(
+async function assertRunnable(
+  maker: MakerRef,
   model: { provider: ProviderId; model: string },
   kind: ModelKind,
   cardId: string,
   unlisted: UnlistedModels,
-): void {
+): Promise<void> {
   const check = checkModel(model, kind);
   if (!check.ok) {
     throw new QueueRefusal("model", `${cardId}: ${check.message}`);
@@ -185,7 +187,12 @@ function assertRunnable(
   if (providerMode() === "live" && !hasProviderKey(model.provider)) {
     throw new QueueRefusal(
       "provider",
-      `${cardId} uses ${check.entry.label}, but ${PROVIDER_LABELS[model.provider]} has no API key: add one in Settings → Providers.`,
+      queueNoKeyLine(
+        cardId,
+        check.entry.label,
+        PROVIDER_LABELS[model.provider],
+        await memberAsk(maker),
+      ),
     );
   }
 }
@@ -282,7 +289,7 @@ export async function estimateProjectCards(
     if (!board?.product || !destination || slot?.fill !== "video") {
       throw new Error(`"${card.id}" is not a video slot of this project.`);
     }
-    assertRunnable(card.model, "video", card.id, unlisted);
+    await assertRunnable(maker, card.model, "video", card.id, unlisted);
     const settings = videoSettings(
       destination,
       slot,
@@ -339,7 +346,7 @@ export async function estimateProjectCards(
     if (card?.type !== "image") {
       throw new Error(`"${id}" is not an image card of this project.`);
     }
-    assertRunnable(card.model, "image", card.id, unlisted);
+    await assertRunnable(maker, card.model, "image", card.id, unlisted);
     // A scene looking down edits Kiln's view from above, when there is one.
     board ??= await loadProjectBoard(maker, projectId);
     const plan = board?.board.plan;

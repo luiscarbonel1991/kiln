@@ -367,8 +367,8 @@ describe("draftProductAction", () => {
       degraded: {
         provider: "openai",
         model: "gpt-6.1-sol",
-        message:
-          "OpenAI has no API key: add one in Settings → Providers, or set OPENAI_API_KEY.",
+        // Inside the app the line never names the environment.
+        message: "OpenAI has no API key: add one in Settings → Providers.",
         alternative: {
           provider: "google",
           model: "gemini-3.8-flash",

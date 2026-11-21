@@ -254,6 +254,137 @@ describe("the chat's routed model", () => {
     expect(doStream).not.toHaveBeenCalled();
   });
 
+  // A call refused when it is opened was never made: no row, no request.
+  // It moves along the route the maker saved exactly as a refused request
+  // does, and nothing is closed or marked failed for it.
+  const noKey = (message: string) =>
+    Object.assign(new Error(message), {
+      name: "ProviderKeyMissing",
+      provider: "openai",
+    });
+  const OWNERS_NO_KEY =
+    "OpenAI has no API key: add one in Settings → Providers.";
+  const MEMBERS_NO_KEY = "You have no access to an OpenAI key; ask Ana.";
+  const UNLISTED =
+    "OpenAI no longer offers GPT-6 Luna (its model list, checked 2026-10-31) — pick another model.";
+
+  it("a step whose provider has no key in reach runs on the route's next model, said so", async () => {
+    openDirectCall.mockRejectedValueOnce(noKey(MEMBERS_NO_KEY));
+    const refused = vi.fn();
+    models.set(LUNA.model, new MockLanguageModelV4({ doStream: refused }));
+    models.set(FLASH.model, streaming(answer("Hola.")));
+    const ledger = newLedger();
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
+      ...ROUTE,
+      ledger,
+    });
+    await read((await model.doStream(CALL)).stream);
+    expect(refused).not.toHaveBeenCalled();
+    expect(openDirectCall).toHaveBeenCalledTimes(2);
+    expect(openDirectCall.mock.calls[0][1]).toMatchObject({
+      model: LUNA.model,
+    });
+    expect(openDirectCall.mock.calls[1][1]).toMatchObject({
+      model: FLASH.model,
+      route: {
+        switched: [{ from: LUNA, to: FLASH, reason: "OpenAI has no API key" }],
+      },
+    });
+    // Only the call that was opened is settled.
+    expect(opened.map((o) => o.model)).toEqual([FLASH.model]);
+    expect(opened[0].failed).not.toHaveBeenCalled();
+    expect(opened[0].done).toHaveBeenCalledTimes(1);
+    expect(ledger.models).toEqual(["Gemini 3.8 Flash · low"]);
+    expect(ledger.moves).toEqual([
+      {
+        from: "GPT-6 Luna",
+        to: "Gemini 3.8 Flash",
+        reason: "OpenAI has no API key",
+      },
+    ]);
+  });
+
+  it("a step on a model its provider no longer offers runs on the route's next model, said so", async () => {
+    openDirectCall.mockRejectedValueOnce(
+      Object.assign(new Error(UNLISTED), { name: "CapabilityError" }),
+    );
+    models.set(FLASH.model, streaming(answer("Hola.")));
+    const ledger = newLedger();
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
+      ...ROUTE,
+      ledger,
+    });
+    await read((await model.doStream(CALL)).stream);
+    expect(opened.map((o) => o.model)).toEqual([FLASH.model]);
+    expect(opened[0].failed).not.toHaveBeenCalled();
+    expect(openDirectCall.mock.calls[1][1]).toMatchObject({
+      route: { switched: [{ from: LUNA, to: FLASH }] },
+    });
+    expect(ledger.moves).toEqual([
+      {
+        from: "GPT-6 Luna",
+        to: "Gemini 3.8 Flash",
+        reason: "OpenAI cannot run this request",
+      },
+    ]);
+  });
+
+  it("with no saved route a step refused at opening is refused as it is, in the reader's words", async () => {
+    for (const refusal of [
+      noKey(OWNERS_NO_KEY),
+      noKey(MEMBERS_NO_KEY),
+      Object.assign(new Error(UNLISTED), { name: "CapabilityError" }),
+    ]) {
+      openDirectCall.mockRejectedValueOnce(refusal);
+      const doStream = vi.fn();
+      models.set(LUNA.model, new MockLanguageModelV4({ doStream }));
+      const ledger = newLedger();
+      const model = routedChatModel({ id: "test" }, "chatTurn", {
+        candidates: [LUNA],
+        effort: "low",
+        ledger,
+      });
+      await expect(model.doStream(CALL)).rejects.toBe(refusal);
+      expect(doStream).not.toHaveBeenCalled();
+      expect(opened).toHaveLength(0);
+      expect(ledger.moves).toEqual([]);
+      expect(openDirectCall).toHaveBeenCalledTimes(1);
+      openDirectCall.mockClear();
+    }
+  });
+
+  it("a provider with no key in reach is not tried again on its other models", async () => {
+    const SOL = { provider: "openai" as const, model: "gpt-6.1-sol" };
+    const refusal = noKey(OWNERS_NO_KEY);
+    openDirectCall.mockRejectedValueOnce(refusal);
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
+      candidates: [LUNA, SOL],
+      effort: "low",
+      ledger: newLedger(),
+    });
+    await expect(model.doStream(CALL)).rejects.toBe(refusal);
+    expect(openDirectCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("the cap's refusal at opening is thrown as it is and never moves along the route", async () => {
+    const over = Object.assign(new Error("Over this month's limit: ask Ana."), {
+      reason: "cap",
+    });
+    openDirectCall.mockRejectedValueOnce(over);
+    const doStream = vi.fn();
+    models.set(LUNA.model, new MockLanguageModelV4({ doStream }));
+    models.set(FLASH.model, new MockLanguageModelV4({ doStream }));
+    const ledger = newLedger();
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
+      ...ROUTE,
+      ledger,
+    });
+    await expect(model.doStream(CALL)).rejects.toBe(over);
+    expect(openDirectCall).toHaveBeenCalledTimes(1);
+    expect(doStream).not.toHaveBeenCalled();
+    expect(ledger.moves).toEqual([]);
+  });
+
   it("a stream stopped midway closes its call as one that may be charged", async () => {
     models.set(
       LUNA.model,

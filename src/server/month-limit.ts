@@ -36,6 +36,12 @@ export async function whomToAsk(maker: MakerRef): Promise<string> {
   return first || "the studio's owner";
 }
 
+// Whom a member asks, or null for the owner and for work with no person
+// behind it: who reads decides the words (provider-key-words.ts).
+export async function memberAsk(maker: MakerRef): Promise<string | null> {
+  return readsStudioAmounts(maker) ? null : await whomToAsk(maker);
+}
+
 export async function monthLimit(maker: MakerRef): Promise<MonthLimit> {
   if (!readsStudioAmounts(maker)) {
     return { whose: "member", ask: await whomToAsk(maker) };

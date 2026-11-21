@@ -1,6 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { editImage } from "@/app/actions/edit";
 import type { ImageEditInput } from "@/providers/types";
+
+// A direct call is refused when its provider has no key in reach, so the
+// studio counts as keyed here. Only that answer is a fixture: the adapters
+// still find no key and take their stubs, so nothing is asked or paid.
+vi.mock("@/providers/keys", async (original) => ({
+  ...(await original<typeof import("@/providers/keys")>()),
+  hasProviderKey: () => true,
+}));
 
 const MODEL = { google: "gemini-3.1-flash-image", openai: "gpt-image-2" };
 
