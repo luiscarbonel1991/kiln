@@ -8,7 +8,11 @@ import {
 // project-repository.db.test.ts): the maker ref the session hands down
 // carries the person working, and every job the batch queues records them.
 // Its own maker, a mode no worker claims, and no worker started.
-vi.mock("@/providers/keys", () => ({ hasProviderKey: () => true }));
+const keys = vi.hoisted(() => ({ present: true }));
+vi.mock("@/providers/keys", async (original) => ({
+  ...(await original<typeof import("@/providers/keys")>()),
+  hasProviderKey: () => keys.present,
+}));
 // Live while the database client is made (a mock process uses another
 // database), then a mode no worker claims.
 const mode = vi.hoisted(() => ({ current: "live" }));
@@ -146,6 +150,58 @@ describe.skipIf(!enabled)("a batch queued by a person (database)", async () => {
     }
     // Work that is not live counts nothing against the limit.
     expect(await fitsProjectCards(member, ask)).toBe(true);
+  });
+
+  // A live batch whose card's provider has no key in reach is refused
+  // before anything is queued: a member is told whom to ask (this studio has
+  // no team, so no name); the owner, a token and a script read where to add
+  // the key, as before.
+  it("a batch with no key in reach is refused in the reader's words, and nothing is queued", async () => {
+    const card = "recipe-line-art-2";
+    const member = {
+      id: makerId,
+      member: { id: "m1", userId: "u1", role: "member" as const },
+    };
+    const owner = {
+      id: makerId,
+      member: { id: "o1", userId: "u0", role: "owner" as const },
+    };
+    const membersWords = {
+      reason: "provider",
+      message: `${card} uses GPT Image 2, but you have no access to an OpenAI key; ask the studio's owner.`,
+    };
+    const ownersWords = {
+      reason: "provider",
+      message: `${card} uses GPT Image 2, but OpenAI has no API key: add one in Settings → Providers.`,
+    };
+    const made = () =>
+      Promise.all([
+        db.generationJob.count({ where: { makerId, projectId, cardId: card } }),
+        db.generationBatch.count({ where: { makerId, projectId } }),
+      ]);
+    const before = await made();
+    mode.current = "live";
+    keys.present = false;
+    try {
+      await expect(
+        estimateProjectCards(member, projectId, [card]),
+      ).rejects.toMatchObject(membersWords);
+      await expect(
+        enqueueProjectCards(member, { projectId, cardIds: [card] }),
+      ).rejects.toMatchObject(membersWords);
+      for (const reader of [owner, { id: makerId }]) {
+        await expect(
+          estimateProjectCards(reader, projectId, [card]),
+        ).rejects.toMatchObject(ownersWords);
+        await expect(
+          enqueueProjectCards(reader, { projectId, cardIds: [card] }),
+        ).rejects.toMatchObject(ownersWords);
+      }
+    } finally {
+      keys.present = true;
+      mode.current = "queue-member";
+    }
+    expect(await made()).toEqual(before);
   });
 
   // A token, a script or the worker hands down { id } alone.
