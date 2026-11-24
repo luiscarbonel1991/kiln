@@ -77,7 +77,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
     ask,
   ] = await Promise.all([
     getMakerModelSetup(current),
-    providerHealth(maker?.id ?? null),
+    providerHealth(current),
     maker && owner ? providerKeyStates(maker) : Promise.resolve([]),
     maker && owner ? budget(maker.id) : Promise.resolve(null),
     maker ? monthSpend(maker) : Promise.resolve([]),

@@ -169,7 +169,7 @@ export default makerPage(async function ProjectBoardPage(
   // Whom a member asks about a key (null for the owner), and the providers'
   // health as that reader may read it: it goes to the browser.
   const ask = limit.whose === "member" ? limit.ask : null;
-  const health = healthForReader(await providerHealth(maker.id), ask);
+  const health = healthForReader(await providerHealth(maker), ask);
   const plan = board.plan;
   const spend = plan ? await projectSpend(maker, board.id) : null;
   const cost =

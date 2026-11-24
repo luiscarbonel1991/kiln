@@ -1209,7 +1209,6 @@ describe("every repository function names the maker", () => {
     ["src/server/generation-repository.ts reserveDirectCall", "input.makerId"],
     ["src/server/generation-repository.ts recordKeyCheck", "input.makerId"],
     ["src/server/home-repository.ts homeStats", "makerId parameter"],
-    ["src/server/provider-health.ts providerHealth", "makerId parameter"],
     ["src/server/shop-connection.ts markNeedsReconnect", "makerId parameter"],
     ["src/server/shop-ranking.ts projectsByListing", "makerId parameter"],
     ["src/server/lessons.ts proposeFromTaste", "makerId parameter"],
