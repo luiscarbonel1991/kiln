@@ -9,6 +9,7 @@ import {
   type ImageGenerationRequest,
   type VideoGenerationRequest,
 } from "@/domain/generation-request";
+import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import {
   fallbackAfter,
   pickNext,
@@ -27,6 +28,7 @@ import {
   hadResponse,
   retryDecision,
 } from "@/domain/queue";
+import { ProviderKeyMissing } from "@/providers/errors";
 import type { ImageProvider, VideoProvider } from "@/providers/interfaces";
 import type { GenerationUsage } from "@/providers/types";
 import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
@@ -97,6 +99,9 @@ export interface WorkerDeps {
   // Whether a model of the route may run this request now (key, price,
   // capability).
   runnable(entry: RouteEntry, request: GenerationRequest): boolean;
+  // Whether the job's starter (or, with none, the team) has a key of this
+  // provider they can use now, in the scope asMaker set. Live mode only.
+  keyInReach?(provider: ProviderId): boolean;
   overCap(makerId: string): Promise<boolean>;
   provider(id: "google" | "openai"): ImageProvider;
   videoProvider(id: "google" | "openai"): VideoProvider | undefined;
@@ -235,12 +240,20 @@ async function lookLanding(
 
 // The job lost its lease, its project was deleted or its batch canceled
 // before the paid call: nothing was spent, and there is nothing to retry.
-// Failures that are Kiln's, not a provider's (provider health skips them).
+// Failures that are Kiln's, not a provider's (provider health skips them,
+// and every "Not run: " sentence).
 export const CAP_REACHED = "This month's spending cap was reached.";
 export const NOT_STARTED =
   "The job was canceled, or lost its lease or its project, before the paid call; nothing was spent.";
-export const STARTER_LEFT =
-  "Not run: the person who queued it is no longer on the team, so nothing was spent.";
+export const NOT_RUN = "Not run: ";
+export const STARTER_LEFT = `${NOT_RUN}the person who queued it is no longer on the team, so nothing was spent.`;
+
+// A job refused before its call for want of a key its starter (or, with no
+// starter, the team) can use: words that name no one and no key.
+const noKeyInReach = (provider: ProviderId, person: boolean) =>
+  person
+    ? `${NOT_RUN}the person who queued it has no ${PROVIDER_LABELS[provider]} key they can use now, so nothing was spent.`
+    : `${NOT_RUN}the studio has no ${PROVIDER_LABELS[provider]} key for the whole team it can use now, so nothing was spent.`;
 
 class CallNotStarted extends Error {
   constructor() {
@@ -404,6 +417,7 @@ export async function runJob(
   }
   let callStarted = false;
   let paid = false;
+  let keyless = false;
   let provider: "google" | "openai" | undefined;
   let request: GenerationRequest | undefined;
   const renew = setInterval(() => {
@@ -420,6 +434,12 @@ export async function runJob(
     const parsed = GenerationRequest.parse(job.request);
     request = parsed;
     provider = parsed.model.provider;
+    // No key in reach: refused before the call, as the adapter would, so a
+    // saved route moves it as it moves any missing key.
+    if (deps.mode === "live" && deps.keyInReach && !deps.keyInReach(provider)) {
+      keyless = true;
+      throw new ProviderKeyMissing(provider);
+    }
     const beforeCall = async () => {
       if (!(await deps.markCallStarted(job.id, job.leaseToken))) {
         throw new CallNotStarted();
@@ -468,6 +488,7 @@ export async function runJob(
     }
     const retry =
       !mayBeCharged &&
+      !keyless &&
       !(error instanceof CallNotStarted) &&
       retryDecision(job.attempt, error, job.maxAttempts).retry;
     // The provider's failure in words the maker can act on (Google's spend
@@ -475,9 +496,12 @@ export async function runJob(
     const said = provider
       ? describeProviderError(provider, error)
       : errorMessage(error);
-    const message = unanswered
-      ? `The call got no answer (${said}); it may have been charged, so it was not retried.`
-      : said;
+    const message =
+      keyless && provider
+        ? noKeyInReach(provider, job.memberId !== null)
+        : unanswered
+          ? `The call got no answer (${said}); it may have been charged, so it was not retried.`
+          : said;
     deps.log(`generation job ${job.id} failed (retry: ${retry})`, error);
     await deps
       .failJob(job.id, job.leaseToken, message, { retry, mayBeCharged })

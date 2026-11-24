@@ -586,6 +586,7 @@ export function ensureGenerationWorker(): Worker | null {
     const worker = createWorker({
       mode: providerMode(),
       asMaker: withStarterKeys,
+      keyInReach: hasProviderKey,
       concurrency: env.KILN_GENERATION_CONCURRENCY,
       leaseSec: 120,
       renewMs: 30_000,

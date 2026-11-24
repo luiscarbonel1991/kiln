@@ -250,5 +250,14 @@ describe.skipIf(!enabled)(
       expect(openai.lastError).toBeNull();
       expect(openai.keyRejected).toBe(false);
     });
+
+    it("a job refused for want of a key it could use is not the provider's error", async () => {
+      const makerId = await studioWith([
+        "Not run: the person who queued it has no OpenAI key they can use now, so nothing was spent.",
+        "Not run: the studio has no OpenAI key for the whole team it can use now, so nothing was spent.",
+      ]);
+      const [openai] = await providerHealth(makerId);
+      expect(openai.lastError).toBeNull();
+    });
   },
 );

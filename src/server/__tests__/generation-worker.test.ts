@@ -948,3 +948,96 @@ describe("a job whose starter is no longer on the team", () => {
     });
   }
 });
+
+// A job whose starter has no key they can use for its provider when it runs
+// is refused before the call: a saved route moves it as any missing key
+// does; with nowhere to go it ends unstarted, in words that name no one.
+describe("a job with no key in reach when it runs", () => {
+  const flash = {
+    provider: "google" as const,
+    model: "gemini-3.1-flash-image",
+  };
+  const PERSON_OPENAI =
+    "Not run: the person who queued it has no OpenAI key they can use now, so nothing was spent.";
+  const PERSON_GOOGLE =
+    "Not run: the person who queued it has no Google key they can use now, so nothing was spent.";
+  const NO_PERSON =
+    "Not run: the studio has no OpenAI key for the whole team it can use now, so nothing was spent.";
+
+  const withKeys = (inReach: ("openai" | "google")[]) =>
+    vi.fn((provider: "openai" | "google") => inReach.includes(provider));
+
+  const failedWith = (d: WorkerDeps) =>
+    vi.mocked(d.failJob).mock.calls.map((c) => c.slice(0, 4));
+
+  it("with no saved route the provider is not called and the job ends, unretried, saying so", async () => {
+    const keyInReach = withKeys([]);
+    const { d, editBytes } = deps({ keyInReach } as Partial<WorkerDeps>);
+    await runJob(d, { ...claimed("a", 1), memberId: "m-bob" });
+    expect(keyInReach).toHaveBeenCalledWith("openai");
+    expect(editBytes).not.toHaveBeenCalled();
+    expect(d.markCallStarted).not.toHaveBeenCalled();
+    expect(failedWith(d)).toEqual([
+      ["a", "t-a", PERSON_OPENAI, { retry: false, mayBeCharged: false }],
+    ]);
+  });
+
+  it("a Google job says Google", async () => {
+    const { d } = deps({
+      keyInReach: withKeys(["openai"]),
+    } as Partial<WorkerDeps>);
+    await runJob(d, {
+      ...claimed("g", 1),
+      memberId: "m-bob",
+      request: {
+        ...request,
+        model: { ...request.model, provider: "google", model: flash.model },
+      },
+    });
+    expect(failedWith(d)).toEqual([
+      ["g", "t-g", PERSON_GOOGLE, { retry: false, mayBeCharged: false }],
+    ]);
+  });
+
+  it("a saved route to a model whose provider has a key moves the job, with today's reason", async () => {
+    const { d, editBytes } = deps({
+      keyInReach: withKeys(["google"]),
+      runnable: (entry) => entry.provider === "google",
+    } as Partial<WorkerDeps>);
+    await runJob(d, {
+      ...claimed("a", 1, { next: [flash], switched: [] }),
+      memberId: "m-bob",
+    });
+    expect(editBytes).not.toHaveBeenCalled();
+    expect(d.fallBack).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(d.fallBack).mock.calls[0][1]).toEqual({
+      to: flash,
+      rest: [],
+      reason: "OpenAI has no API key",
+    });
+    expect(d.failJob).not.toHaveBeenCalled();
+  });
+
+  it("a job no person queued (a token's) says the studio has no key for the whole team", async () => {
+    const { d, editBytes } = deps({
+      keyInReach: withKeys([]),
+    } as Partial<WorkerDeps>);
+    await runJob(d, { ...claimed("a", 1), memberId: null });
+    expect(editBytes).not.toHaveBeenCalled();
+    expect(failedWith(d)).toEqual([
+      ["a", "t-a", NO_PERSON, { retry: false, mayBeCharged: false }],
+    ]);
+  });
+
+  it("in mock mode nothing checks a key, and the job runs", async () => {
+    const keyInReach = withKeys([]);
+    const { d, editBytes } = deps({
+      mode: "mock",
+      keyInReach,
+    } as Partial<WorkerDeps>);
+    await runJob(d, { ...claimed("a", 1), memberId: "m-bob" });
+    expect(keyInReach).not.toHaveBeenCalled();
+    expect(editBytes).toHaveBeenCalledTimes(1);
+    expect(d.completeJob).toHaveBeenCalledTimes(1);
+  });
+});
