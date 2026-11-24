@@ -192,6 +192,23 @@ export async function withStarterKeys<T>(
   );
 }
 
+// Run `work` with one key of the studio's and no other, whoever it is given
+// to: the owner checks a key that is not the one their own calls run on. The
+// key is read under the studio (an id of another studio's reads as gone).
+export async function withKey<T>(
+  maker: MakerRef,
+  keyId: string,
+  work: (provider: ProviderId) => Promise<T>,
+): Promise<T> {
+  const key = (await studioKeys(maker)).keys.find((k) => k.id === keyId);
+  if (!key) throw new KeyRefusal(KEY_GONE);
+  return withProviderKeys(
+    key.secret === null ? {} : { [key.provider]: key.secret },
+    () => work(key.provider),
+    { [key.provider]: key.id },
+  );
+}
+
 // Whether each provider has a key this caller can use, and whose it is: no
 // id, name or last four, so it may reach any reader's words.
 export async function providerReach(

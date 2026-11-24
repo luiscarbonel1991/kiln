@@ -14,7 +14,7 @@ import {
 } from "@/server/generation-repository";
 import { CAP_REACHED, NOT_RUN, NOT_STARTED } from "@/server/generation-worker";
 import type { MakerRef } from "@/server/maker-repository";
-import { providerReach } from "@/server/provider-keys";
+import { providerReach, withKey } from "@/server/provider-keys";
 
 // Each provider's health, free to read (no ping, no paid call): whether the
 // reader has a key, and what the last live calls on it did — the queue's jobs and the
@@ -176,9 +176,9 @@ export async function keyHealth(maker: MakerRef): Promise<KeyHealth[]> {
   });
 }
 
-// Check a provider's key now, for free, and keep the answer as the provider's
-// latest call: a key replaced in .env clears the error it left, and a key the
-// provider rejects says so before any paid call. The models it lists are
+// Check a provider's key now, for free, and keep the answer as the latest
+// call of the key in use (the scope's): a replaced key clears the error it
+// left, and a key the provider rejects says so before any paid call. The models it lists are
 // compared with the catalog: an offered model it no longer names is kept with
 // the answer, so Settings names it and the queue refuses it before paying.
 export async function checkKey(
@@ -194,7 +194,18 @@ export async function checkKey(
       error: result.ok ? null : result.message,
       ...(result.ok ? { unlisted } : {}),
       memberId: maker.member?.id ?? null,
+      providerKeyId: providerKeyId(provider),
     });
   }
   return result.ok ? { ...result, unlisted } : result;
+}
+
+// Check one key of the studio's, for free, whoever it is given to, and keep
+// the answer on that key. A key of another studio is refused before any
+// request.
+export async function checkKeyById(
+  maker: MakerRef,
+  keyId: string,
+): Promise<KeyCheck & { unlisted?: string[] }> {
+  return withKey(maker, keyId, (provider) => checkKey(maker, provider));
 }

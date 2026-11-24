@@ -757,6 +757,8 @@ export async function recordKeyCheck(input: {
   unlisted?: string[];
   // The person who ran the check.
   memberId?: string | null;
+  // The key it checked.
+  providerKeyId?: string | null;
 }): Promise<void> {
   assertDatabaseUrl();
   const now = new Date();
@@ -764,6 +766,7 @@ export async function recordKeyCheck(input: {
     data: {
       makerId: input.makerId,
       memberId: input.memberId ?? null,
+      providerKeyId: input.providerKeyId ?? null,
       cardId: "key-check",
       mode: "live",
       status: input.error === null ? "done" : "failed",

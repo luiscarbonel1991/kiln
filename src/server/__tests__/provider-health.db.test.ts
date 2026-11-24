@@ -1,6 +1,22 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+// The free key check, as the provider would answer it: it rejects the one
+// fixture key named below and accepts any other. No request goes out.
 const REJECTED_SECRET = "sk-fixture-health-bob-rejected-01";
+vi.mock("@/providers/key-check", async () => {
+  const { providerKey } = await import("@/providers/keys");
+  return {
+    checkProviderKey: async (provider: "openai" | "google") =>
+      providerKey(provider) === REJECTED_SECRET
+        ? {
+            ok: false,
+            called: true,
+            message:
+              "OpenAI rejected the API key (401) — replace the key or use Google.",
+          }
+        : { ok: true, called: true, models: [] },
+  };
+});
 
 // Against a migrated throwaway Postgres (see project-repository.db.test.ts).
 const enabled =
@@ -273,7 +289,9 @@ describe.skipIf(!enabled)(
   "provider health by the reader's key (database)",
   async () => {
     const { db } = await import("@/lib/db");
-    const { providerHealth } = await import("@/server/provider-health");
+    const { providerHealth, checkKeyById } = await import(
+      "@/server/provider-health"
+    );
     const { withMakerKeys } = await import("@/server/provider-keys");
     const { providerBlock } = await import("@/lib/provider-block");
     const { recordKeyCheck } = await import("@/server/generation-repository");
@@ -456,6 +474,27 @@ describe.skipIf(!enabled)(
       ];
       expect(bob.unlisted?.models).toEqual(["gemini-3.1-flash-lite-image"]);
       expect(carla.unlisted).toEqual(bob.unlisted);
+    });
+
+    it("checking Bob's key, which the provider rejects, is kept on Bob's key and leaves the team key clean", async () => {
+      // Bob's key is checked by the owner, and answers rejected.
+      const before = await healthOf(s.as(s.carla));
+      const checked = await checkKeyById(s.as(s.ana), ids.bob);
+      expect(checked).toMatchObject({ ok: false });
+      const recorded = await db.generationJob.findFirstOrThrow({
+        where: {
+          makerId: s.makerId,
+          cardId: "key-check",
+          providerKeyId: ids.bob,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(recorded.status).toBe("failed");
+      expect(await healthOf(s.as(s.carla))).toMatchObject({
+        keyRejected: false,
+        lastError: before.lastError,
+      });
+      expect((await healthOf(s.as(s.bob))).keyRejected).toBe(true);
     });
   },
 );
