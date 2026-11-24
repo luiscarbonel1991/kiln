@@ -1,7 +1,14 @@
 import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
 import {
+  type AccessRow,
+  type KeyRow,
+  type PickedKey,
+  pickProviderKeys,
+} from "@/lib/provider-key-pick";
+import {
   hasEnvironmentKey,
+  type ProviderKeyIds,
   type ProviderKeys,
   providerKeySource,
   withProviderKeys,
@@ -30,55 +37,131 @@ export interface ProviderKeyState {
   inEnvironment: boolean;
 }
 
-// Each maker's keys, read once and unsealed in memory; saving or removing a
-// key drops that maker's entry, and a failed read is tried again.
+// A studio's keys as the lookup reads them: every key row unsealed (null when
+// it cannot be read), who each key is given to, and which of those people
+// are on the studio's team.
+interface StudioKeys {
+  keys: KeyRow[];
+  access: AccessRow[];
+  people: string[];
+}
+
+// Each studio's keys, read once and unsealed in memory, keyed by the maker's
+// id only; the key a caller runs on is picked per call from that one entry
+// (pickProviderKeys), so the cache never hands one person's key to another.
+// Every write of a studio's keys drops its entry, and a failed read is tried
+// again. The cache is per server process: Kiln runs one (the worker lives in
+// it); a second process would keep its own entry until its next read after a
+// write of its own.
 const cache = globalThis as typeof globalThis & {
-  __kilnMakerKeys?: Map<string, Promise<ProviderKeys>>;
+  __kilnStudioKeys?: Map<string, Promise<StudioKeys>>;
 };
 const loaded = () => {
-  cache.__kilnMakerKeys ??= new Map();
-  return cache.__kilnMakerKeys;
+  cache.__kilnStudioKeys ??= new Map();
+  return cache.__kilnStudioKeys;
 };
 
-async function read(maker: MakerRef): Promise<ProviderKeys> {
+async function read(maker: MakerRef): Promise<StudioKeys> {
   const rows = await db.providerKey.findMany({
-    where: { makerId: maker.id, forTeam: true },
+    where: { makerId: maker.id },
   });
-  const keys: ProviderKeys = {};
+  const access = await db.providerKeyAccess.findMany({
+    where: { makerId: maker.id },
+  });
+  // An access row counts only for someone on this studio's team.
+  const named = [...new Set(access.map((a) => a.memberId))];
+  const people =
+    named.length === 0
+      ? []
+      : await db.member.findMany({
+          where: {
+            id: { in: named },
+            organization: { maker: { is: { id: maker.id } } },
+          },
+          select: { id: true },
+        });
+  const keys: KeyRow[] = [];
   for (const row of rows) {
     const provider = row.provider as ProviderId;
     if (!PROVIDERS.includes(provider)) continue;
+    let secret: string | null = null;
     try {
-      keys[provider] = unseal(row.sealed, purpose(provider));
+      secret = unseal(row.sealed, purpose(provider));
     } catch {
       // KILN_SECRET_KEY is missing or changed: the key reads as unreadable.
     }
+    keys.push({ id: row.id, provider, forTeam: row.forTeam, secret });
   }
-  return keys;
+  return {
+    keys,
+    access: access.flatMap((a) =>
+      PROVIDERS.includes(a.provider as ProviderId)
+        ? [
+            {
+              keyId: a.keyId,
+              memberId: a.memberId,
+              provider: a.provider as ProviderId,
+            },
+          ]
+        : [],
+    ),
+    people: people.map((p) => p.id),
+  };
 }
 
-export function makerProviderKeys(makerId: string): Promise<ProviderKeys> {
-  if (!hasDatabase()) return Promise.resolve({});
-  const keys = loaded();
-  let pending = keys.get(makerId);
+const NO_KEYS: StudioKeys = { keys: [], access: [], people: [] };
+
+function studioKeys(maker: MakerRef): Promise<StudioKeys> {
+  if (!hasDatabase()) return Promise.resolve(NO_KEYS);
+  const entries = loaded();
+  let pending = entries.get(maker.id);
   if (!pending) {
-    pending = read({ id: makerId }).catch((error) => {
-      keys.delete(makerId);
+    pending = read(maker).catch((error) => {
+      entries.delete(maker.id);
       throw error;
     });
-    keys.set(makerId, pending);
+    entries.set(maker.id, pending);
   }
   return pending;
 }
 
 const forget = (makerId: string) => loaded().delete(makerId);
 
-// Run `work` with this maker's saved keys, and no other maker's.
+// The key each provider gives this caller: the person's own, else the
+// team's (a token, with no person, the team's only).
+async function picked(maker: MakerRef) {
+  return pickProviderKeys({
+    ...(await studioKeys(maker)),
+    memberId: maker.member?.id ?? null,
+  });
+}
+
+// Run `work` with this caller's keys, and no one else's: the person's own or
+// the team's, per provider, with the id of each key in use.
 export async function withMakerKeys<T>(
-  makerId: string,
+  maker: MakerRef,
   work: () => Promise<T>,
 ): Promise<T> {
-  return withProviderKeys(await makerProviderKeys(makerId), work);
+  const keys: ProviderKeys = {};
+  const ids: ProviderKeyIds = {};
+  for (const [provider, pick] of Object.entries(await picked(maker))) {
+    if (!pick.key) continue;
+    keys[provider as ProviderId] = pick.key.secret;
+    ids[provider as ProviderId] = pick.key.id;
+  }
+  return withProviderKeys(keys, work, ids);
+}
+
+// Whether each provider has a key this caller can use, and whose it is: no
+// id, name or last four, so it may reach any reader's words.
+export async function providerReach(
+  maker: MakerRef,
+): Promise<Record<ProviderId, Pick<PickedKey, "reach" | "whose">>> {
+  const picks = await picked(maker);
+  return {
+    openai: { reach: picks.openai.reach, whose: picks.openai.whose },
+    google: { reach: picks.google.reach, whose: picks.google.whose },
+  };
 }
 
 export async function providerKeyStates(
@@ -89,7 +172,13 @@ export async function providerKeyStates(
         where: { makerId: maker.id, forTeam: true },
       })
     : [];
-  const keys = await makerProviderKeys(maker.id);
+  // Today's form manages each provider's team key: the one a token runs on.
+  const team = await picked({ id: maker.id });
+  const keys: ProviderKeys = {};
+  for (const provider of PROVIDERS) {
+    const key = team[provider].key;
+    if (key) keys[provider] = key.secret;
+  }
   return withProviderKeys(keys, () =>
     PROVIDERS.map((provider) => {
       const row = rows.find((r) => r.provider === provider);

@@ -585,7 +585,7 @@ export function ensureGenerationWorker(): Worker | null {
   if (!globalForWorker.kilnGenerationWorker) {
     const worker = createWorker({
       mode: providerMode(),
-      asMaker: withMakerKeys,
+      asMaker: (makerId, work) => withMakerKeys({ id: makerId }, work),
       concurrency: env.KILN_GENERATION_CONCURRENCY,
       leaseSec: 120,
       renewMs: 30_000,
