@@ -60,7 +60,7 @@ async function loadFrames(maker: MakerRef, projectId: string) {
   });
   const plan = project ? ProjectPlan.safeParse(project.plan) : null;
   if (!project || !plan?.success) return null;
-  const state = await projectGenerationState(maker.id, projectId);
+  const state = await projectGenerationState(maker, projectId);
   const cards: Record<string, CardLike> = {};
   for (const [id, card] of Object.entries(state.cards)) {
     const parsed = CardState.safeParse(card);

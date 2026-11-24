@@ -385,7 +385,7 @@ describe.skipIf(!enabled)("project repository (database)", async () => {
       where: { projectId_cardId: { projectId: id, cardId: "etsy.in-use" } },
     });
     expect(card.outputs).toEqual(["https://stub.local/queued.png"]);
-    const state = await queueRepo.projectGenerationState(maker.id, id);
+    const state = await queueRepo.projectGenerationState(maker, id);
     expect(state.jobs["etsy.in-use"].status).toBe("done");
   });
 

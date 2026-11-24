@@ -275,7 +275,7 @@ describe.skipIf(!enabled)(
     it("the state a reader polls carries no key id", async () => {
       for (const reader of [a.as(a.ana), a.as(a.bob), a.as(a.carla), a.as()]) {
         const text = JSON.stringify(
-          await projectGenerationState(reader.id, projectA),
+          await projectGenerationState(reader, projectA),
         );
         expect(text).toContain("a.bob-2");
         for (const id of Object.values(ids)) expect(text).not.toContain(id);

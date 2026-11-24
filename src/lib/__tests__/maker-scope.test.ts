@@ -1200,10 +1200,6 @@ describe("every repository function names the maker", () => {
     ["src/server/generation-repository.ts budget", "makerId parameter"],
     ["src/server/generation-repository.ts cancelBatch", "makerId parameter"],
     ["src/server/generation-repository.ts readUnlisted", "makerId parameter"],
-    [
-      "src/server/generation-repository.ts projectGenerationState",
-      "makerId parameter",
-    ],
     ["src/server/generation-repository.ts sessionSpend", "makerId parameter"],
     ["src/server/generation-repository.ts enqueueBatch", "input.makerId"],
     ["src/server/generation-repository.ts reserveDirectCall", "input.makerId"],

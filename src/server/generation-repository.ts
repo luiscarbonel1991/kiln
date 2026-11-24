@@ -2,11 +2,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import { GenerationRequest } from "@/domain/generation-request";
-import {
-  modelEntry,
-  modelLabel,
-  type ProviderId,
-} from "@/domain/model-defaults";
+import { modelEntry, modelLabel, ProviderId } from "@/domain/model-defaults";
 import {
   type JobRoute,
   type RouteEntry,
@@ -27,9 +23,11 @@ import {
   readableFailure,
 } from "@/domain/queue";
 import { assertDatabaseUrl, db } from "@/lib/db";
+import { failureForReader } from "@/lib/provider-key-words";
 import { currentProviderKeyIds, inProviderKeyScope } from "@/providers/keys";
 import { noteBatchEnd } from "@/server/batch-end";
 import type { MakerRef } from "@/server/maker-repository";
+import { memberAsk } from "@/server/studio-owner";
 
 // Persistence for the background generation queue. Every closing write on a
 // job is guarded by its lease token, so a worker that lost its lease (another
@@ -887,7 +885,7 @@ const withRanOn = (route: unknown) => {
 };
 
 export async function projectGenerationState(
-  makerId: string,
+  maker: MakerRef,
   projectId: string,
 ): Promise<GenerationState> {
   assertDatabaseUrl();
@@ -897,22 +895,37 @@ export async function projectGenerationState(
       status: JobStatus;
       attempt: number;
       error: string | null;
+      provider: string | null;
       route: unknown;
       test: boolean | null;
     }[]
   >`
     SELECT DISTINCT ON ("cardId") "cardId", "status", "attempt", "error", "route",
+           "request" #>> '{model,provider}' AS "provider",
            ("request" ->> 'test') = 'true' AS "test"
     FROM "GenerationJob"
-    WHERE "projectId" = ${projectId} AND "makerId" = ${makerId}
+    WHERE "projectId" = ${projectId} AND "makerId" = ${maker.id}
       AND "batchId" IS NOT NULL
     ORDER BY "cardId", "createdAt" DESC`;
+  // A member reads a failure in their words; the owner and a token as stored.
+  const ask = await memberAsk(maker);
+  const failure = (error: string, provider: string | null) => {
+    const readable = readableFailure(error);
+    const known = ProviderId.safeParse(provider);
+    return known.success
+      ? failureForReader(readable, known.data, ask)
+      : readable;
+  };
   const cards = await db.card.findMany({
-    where: { projectId, project: { makerId } },
+    where: { projectId, project: { makerId: maker.id } },
     select: { cardId: true, status: true, outputs: true, vectorUrl: true },
   });
   const active = await db.generationJob.findFirst({
-    where: { projectId, makerId, status: { in: ACTIVE_JOB_STATUSES } },
+    where: {
+      projectId,
+      makerId: maker.id,
+      status: { in: ACTIVE_JOB_STATUSES },
+    },
     orderBy: { createdAt: "desc" },
     select: { batchId: true },
   });
@@ -941,7 +954,7 @@ export async function projectGenerationState(
         {
           status: j.status,
           attempt: j.attempt,
-          ...(j.error ? { error: readableFailure(j.error) } : {}),
+          ...(j.error ? { error: failure(j.error, j.provider) } : {}),
           ...withRanOn(j.route),
           // Its take is a test take (low quality, never approved).
           ...(j.test && j.status === "done" ? { test: true } : {}),

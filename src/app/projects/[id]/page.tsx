@@ -161,7 +161,7 @@ export default makerPage(async function ProjectBoardPage(
   );
   const writeUsd = await textWorstCase(maker, "listingCopy");
   const listingPrice = writeUsd === null ? null : `≈ $${writeUsd.toFixed(2)}`;
-  const generation = await projectGenerationState(maker.id, board.id);
+  const generation = await projectGenerationState(maker, board.id);
   // This month's limit as this person may know it: a member reads no amount.
   const limit = await monthLimit(maker);
   const brand = await getMakerBrand(maker);

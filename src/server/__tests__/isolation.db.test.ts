@@ -755,7 +755,7 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
         await asUnknown((id) => designs.designView(a.maker, id), b.designId),
       ).toEqual({ answered: null });
       const state = await asUnknown(
-        (id) => generation.projectGenerationState(a.maker.id, id),
+        (id) => generation.projectGenerationState(a.maker, id),
         b.projectId,
       );
       expect(state.answered).toMatchObject({
@@ -770,10 +770,7 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
       expect((await designs.designView(a.maker, a.designId))?.project.id).toBe(
         a.designId,
       );
-      const own = await generation.projectGenerationState(
-        a.maker.id,
-        a.projectId,
-      );
+      const own = await generation.projectGenerationState(a.maker, a.projectId);
       expect(own.jobs["etsy.hero"]).toMatchObject({ status: "done" });
       expect(own.batch?.batchId).toBe(a.batchId);
     });

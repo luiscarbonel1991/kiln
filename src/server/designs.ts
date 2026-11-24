@@ -123,7 +123,7 @@ export async function designView(
     },
   });
   if (!row) return null;
-  const { jobs } = await projectGenerationState(maker.id, row.id);
+  const { jobs } = await projectGenerationState(maker, row.id);
   const subject = (row.understanding as { subject?: unknown } | null)?.subject;
   return {
     project: {
