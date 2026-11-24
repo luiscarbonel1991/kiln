@@ -176,7 +176,7 @@ describe("a provider's key, as the owner", () => {
       }),
     ).toEqual({ ok: true, message: "Saved. OpenAI accepts the key." });
     expect(saveProviderKey).toHaveBeenCalledWith(
-      "test",
+      expect.objectContaining({ id: "test" }),
       "openai",
       "sk-fixture-0000",
     );
@@ -188,6 +188,9 @@ describe("a provider's key, as the owner", () => {
       ok: true,
       message: "Removed.",
     });
-    expect(removeProviderKey).toHaveBeenCalledWith("test", "google");
+    expect(removeProviderKey).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "test" }),
+      "google",
+    );
   });
 });

@@ -81,7 +81,7 @@ export const saveProviderKeyAction = ownerAction(
       };
     }
     try {
-      await saveProviderKey(maker.id, parsed.data.provider, parsed.data.key);
+      await saveProviderKey(maker, parsed.data.provider, parsed.data.key);
     } catch (error) {
       return {
         ok: false,
@@ -101,7 +101,7 @@ export const removeProviderKeyAction = ownerAction(
     const parsed = ProviderId.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Which provider?" };
     try {
-      await removeProviderKey(maker.id, parsed.data);
+      await removeProviderKey(maker, parsed.data);
     } catch (error) {
       return {
         ok: false,

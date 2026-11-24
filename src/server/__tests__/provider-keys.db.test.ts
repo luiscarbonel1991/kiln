@@ -29,7 +29,7 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
   });
 
   it("keeps a key sealed, hands it to its maker's work, and names only its last four", async () => {
-    await saveProviderKey(a.id, "openai", "  sk-test-abcdefghijklmnop1234  ");
+    await saveProviderKey(a, "openai", "  sk-test-abcdefghijklmnop1234  ");
     const row = await db.providerKey.findFirstOrThrow({
       where: { makerId: a.id, provider: "openai" },
     });
@@ -39,7 +39,7 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
     expect(await withMakerKeys(a.id, async () => providerKey("openai"))).toBe(
       "sk-test-abcdefghijklmnop1234",
     );
-    const states = await providerKeyStates(a.id);
+    const states = await providerKeyStates(a);
     expect(states.find((s) => s.provider === "openai")).toEqual({
       provider: "openai",
       source: "saved",
@@ -62,20 +62,20 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
   });
 
   it("another maker on the same instance never sees that key", async () => {
-    await saveProviderKey(b.id, "openai", "sk-test-bbbbbbbbbbbbbbbb5678");
+    await saveProviderKey(b, "openai", "sk-test-bbbbbbbbbbbbbbbb5678");
     const [seenByA, seenByB] = await Promise.all([
       withMakerKeys(a.id, async () => providerKey("openai")),
       withMakerKeys(b.id, async () => providerKey("openai")),
     ]);
     expect(seenByA).toBe("sk-test-abcdefghijklmnop1234");
     expect(seenByB).toBe("sk-test-bbbbbbbbbbbbbbbb5678");
-    const statesB = await providerKeyStates(b.id);
+    const statesB = await providerKeyStates(b);
     expect(statesB.find((s) => s.provider === "openai")?.hint).toBe("5678");
   });
 
   it("a replaced key is used from the next piece of work", async () => {
     await withMakerKeys(a.id, async () => providerKey("openai"));
-    await saveProviderKey(a.id, "openai", "sk-test-replacedreplaced9999");
+    await saveProviderKey(a, "openai", "sk-test-replacedreplaced9999");
     expect(await withMakerKeys(a.id, async () => providerKey("openai"))).toBe(
       "sk-test-replacedreplaced9999",
     );
@@ -86,7 +86,7 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
       where: { makerId: a.id, provider: "openai" },
     });
     expect(before).toHaveLength(1);
-    await saveProviderKey(a.id, "openai", "sk-test-againagainagain7777");
+    await saveProviderKey(a, "openai", "sk-test-againagainagain7777");
     const after = await db.providerKey.findMany({
       where: { makerId: a.id, provider: "openai" },
     });
@@ -100,13 +100,13 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
   });
 
   it("refuses what cannot be a key, and removing one leaves no row", async () => {
-    await expect(saveProviderKey(a.id, "google", "short")).rejects.toThrow(
+    await expect(saveProviderKey(a, "google", "short")).rejects.toThrow(
       /too short/,
     );
     await expect(
-      saveProviderKey(a.id, "google", "two words that are long enough"),
+      saveProviderKey(a, "google", "two words that are long enough"),
     ).rejects.toThrow(/no spaces/);
-    await removeProviderKey(a.id, "openai");
+    await removeProviderKey(a, "openai");
     expect(
       await withMakerKeys(a.id, async () => providerKey("openai")),
     ).toBeUndefined();
