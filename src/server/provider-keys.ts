@@ -55,9 +55,15 @@ interface StudioKeys {
 // id only; the key a caller runs on is picked per call from that one entry
 // (pickProviderKeys), so the cache never hands one person's key to another.
 // Every write of a studio's keys drops its entry, and a failed read is tried
-// again. The cache is per server process: Kiln runs one (the worker lives in
-// it); a second process would keep its own entry until its next read after a
-// write of its own.
+// again. A person leaving the team is not such a write: their access rows go
+// by the database's cascade and the entry still lists them, as of its read,
+// until the next write. That is safe because nothing can present them: the
+// edge reads each session's membership afresh (makerOfMember) and refuses
+// theirs, and the worker reads a job's starter uncached (withStarterKeys)
+// before any pick; everyone else's pick is unchanged by their rows. The cache
+// is per server process: Kiln runs one (the worker lives in it); a second
+// process would keep its own entry until its next read after a write of its
+// own.
 const cache = globalThis as typeof globalThis & {
   __kilnStudioKeys?: Map<string, Promise<StudioKeys>>;
 };
