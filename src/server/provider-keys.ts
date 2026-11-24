@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
 import {
@@ -6,6 +7,7 @@ import {
   type PickedKey,
   pickProviderKeys,
 } from "@/lib/provider-key-pick";
+import { article } from "@/lib/provider-key-words";
 import {
   hasEnvironmentKey,
   type ProviderKeyIds,
@@ -62,6 +64,15 @@ const loaded = () => {
   return cache.__kilnStudioKeys;
 };
 
+// The key, or null when KILN_SECRET_KEY is missing or changed.
+function unsealed(sealed: string, provider: ProviderId): string | null {
+  try {
+    return unseal(sealed, purpose(provider));
+  } catch {
+    return null;
+  }
+}
+
 async function read(maker: MakerRef): Promise<StudioKeys> {
   const rows = await db.providerKey.findMany({
     where: { makerId: maker.id },
@@ -85,12 +96,7 @@ async function read(maker: MakerRef): Promise<StudioKeys> {
   for (const row of rows) {
     const provider = row.provider as ProviderId;
     if (!PROVIDERS.includes(provider)) continue;
-    let secret: string | null = null;
-    try {
-      secret = unseal(row.sealed, purpose(provider));
-    } catch {
-      // KILN_SECRET_KEY is missing or changed: the key reads as unreadable.
-    }
+    const secret = unsealed(row.sealed, provider);
     keys.push({ id: row.id, provider, forTeam: row.forTeam, secret });
   }
   return {
@@ -238,21 +244,40 @@ export function keyProblem(key: string): string | null {
   return null;
 }
 
+// A refusal of a write of the studio's keys, in the owner's words; `field`
+// is the form's field it belongs under, if one.
+export class KeyRefusal extends Error {
+  constructor(
+    message: string,
+    readonly field?: "name" | "memberIds" | "key",
+  ) {
+    super(message);
+    this.name = "KeyRefusal";
+  }
+}
+
+const KEY_GONE = "That key was removed already.";
+
+// A pasted key, sealed under its provider's purpose, with its last four.
+function sealedKey(provider: ProviderId, raw: string) {
+  const key = raw.trim();
+  const problem = keyProblem(key);
+  if (problem) throw new KeyRefusal(problem, "key");
+  if (!hasSecretKey()) {
+    throw new Error(
+      `Kiln has no KILN_SECRET_KEY to keep the ${PROVIDER_LABELS[provider]} key sealed: add one to .env (openssl rand -base64 32) and restart Kiln.`,
+    );
+  }
+  return { sealed: seal(key, purpose(provider)), hint: key.slice(-4) };
+}
+
 export async function saveProviderKey(
   maker: MakerRef,
   provider: ProviderId,
   raw: string,
 ): Promise<void> {
   assertDatabaseUrl();
-  const key = raw.trim();
-  const problem = keyProblem(key);
-  if (problem) throw new Error(problem);
-  if (!hasSecretKey()) {
-    throw new Error(
-      `Kiln has no KILN_SECRET_KEY to keep the ${PROVIDER_LABELS[provider]} key sealed: add one to .env (openssl rand -base64 32) and restart Kiln.`,
-    );
-  }
-  const data = { sealed: seal(key, purpose(provider)), hint: key.slice(-4) };
+  const data = sealedKey(provider, raw);
   // The form writes the provider's team key: replaced in place, or made.
   await db.$transaction(async (tx) => {
     const team = await tx.providerKey.findFirst({
@@ -285,4 +310,271 @@ export async function removeProviderKey(
     where: { makerId: maker.id, provider, forTeam: true },
   });
   forget(maker.id);
+}
+
+// Who uses a key: the whole team, or the people chosen (member ids from the
+// client, checked against the studio's team before anything is written).
+export interface KeyAudience {
+  name: string;
+  who: "team" | "people";
+  memberIds: string[];
+}
+
+type Tx = Prisma.TransactionClient;
+
+// The people chosen, each on this studio's team; anyone who is not (gone
+// meanwhile, or of another studio) refuses the whole write.
+async function chosenPeople(
+  maker: MakerRef,
+  tx: Tx,
+  audience: KeyAudience,
+): Promise<string[]> {
+  if (audience.who === "team") return [];
+  const ids = [...new Set(audience.memberIds)];
+  if (ids.length === 0) {
+    throw new KeyRefusal("Choose at least one person.", "memberIds");
+  }
+  const found = await tx.member.findMany({
+    where: {
+      id: { in: ids },
+      organization: { maker: { is: { id: maker.id } } },
+    },
+    select: { id: true },
+  });
+  if (found.length !== ids.length) {
+    throw new KeyRefusal(
+      "Someone you chose is no longer on the team.",
+      "memberIds",
+    );
+  }
+  return ids;
+}
+
+// The name, and the team's place, are free among the provider's other keys.
+async function refuseTaken(
+  maker: MakerRef,
+  tx: Tx,
+  input: { provider: ProviderId; name: string; who: "team" | "people" },
+  except: string | null,
+): Promise<void> {
+  const label = PROVIDER_LABELS[input.provider];
+  const others = except === null ? {} : { id: { not: except } };
+  const named = await tx.providerKey.findFirst({
+    where: {
+      makerId: maker.id,
+      provider: input.provider,
+      name: input.name,
+      ...others,
+    },
+    select: { id: true },
+  });
+  if (named) {
+    throw new KeyRefusal(`Another ${label} key has that name.`, "name");
+  }
+  if (input.who !== "team") return;
+  const team = await tx.providerKey.findFirst({
+    where: {
+      makerId: maker.id,
+      provider: input.provider,
+      forTeam: true,
+      ...others,
+    },
+    select: { id: true },
+  });
+  if (team) {
+    throw new KeyRefusal(
+      `The team has ${article(label)} ${label} key already: replace that one.`,
+    );
+  }
+}
+
+// Give the key to exactly these people. A person holds one given key per
+// provider: one on another key of the provider moves to this one.
+async function giveKey(
+  maker: MakerRef,
+  tx: Tx,
+  key: { id: string; provider: ProviderId },
+  people: string[],
+): Promise<void> {
+  await tx.providerKeyAccess.deleteMany({
+    where: { makerId: maker.id, keyId: key.id },
+  });
+  if (people.length === 0) return;
+  await tx.providerKeyAccess.deleteMany({
+    where: {
+      makerId: maker.id,
+      provider: key.provider,
+      memberId: { in: people },
+    },
+  });
+  await tx.providerKeyAccess.createMany({
+    data: people.map((memberId) => ({
+      makerId: maker.id,
+      keyId: key.id,
+      provider: key.provider,
+      memberId,
+    })),
+  });
+}
+
+// The key, read under its studio; another studio's id reads as gone.
+async function keyOf(
+  maker: MakerRef,
+  tx: Tx,
+  keyId: string,
+): Promise<{ id: string; provider: ProviderId }> {
+  const key = await tx.providerKey.findFirst({
+    where: { id: keyId, makerId: maker.id },
+    select: { id: true, provider: true },
+  });
+  if (!key || !PROVIDERS.includes(key.provider as ProviderId)) {
+    throw new KeyRefusal(KEY_GONE);
+  }
+  return { id: key.id, provider: key.provider as ProviderId };
+}
+
+// A new key, named, for the whole team or given to people.
+export async function addProviderKey(
+  maker: MakerRef,
+  input: KeyAudience & { provider: ProviderId; key: string },
+): Promise<{ id: string }> {
+  assertDatabaseUrl();
+  const name = input.name.trim();
+  const data = sealedKey(input.provider, input.key);
+  const added = await db.$transaction(async (tx) => {
+    await refuseTaken(maker, tx, { ...input, name }, null);
+    const people = await chosenPeople(maker, tx, input);
+    const row = await tx.providerKey.create({
+      data: {
+        makerId: maker.id,
+        provider: input.provider,
+        name,
+        forTeam: input.who === "team",
+        ...data,
+      },
+      select: { id: true },
+    });
+    await giveKey(maker, tx, { id: row.id, provider: input.provider }, people);
+    return row;
+  });
+  forget(maker.id);
+  return added;
+}
+
+// A key's name, and whom it is for. Switching it to the whole team drops its
+// people.
+export async function editProviderKey(
+  maker: MakerRef,
+  input: KeyAudience & { keyId: string },
+): Promise<void> {
+  assertDatabaseUrl();
+  const name = input.name.trim();
+  await db.$transaction(async (tx) => {
+    const key = await keyOf(maker, tx, input.keyId);
+    await refuseTaken(
+      maker,
+      tx,
+      { provider: key.provider, name, who: input.who },
+      key.id,
+    );
+    const people = await chosenPeople(maker, tx, input);
+    await tx.providerKey.update({
+      where: { id: key.id, makerId: maker.id },
+      data: { name, forTeam: input.who === "team" },
+    });
+    await giveKey(maker, tx, key, people);
+  });
+  forget(maker.id);
+}
+
+// A new secret on the same key: its id, name and people stay. A key that
+// cannot be read can be replaced; that is the fix.
+export async function replaceProviderKey(
+  maker: MakerRef,
+  input: { keyId: string; key: string },
+): Promise<void> {
+  assertDatabaseUrl();
+  await db.$transaction(async (tx) => {
+    const key = await keyOf(maker, tx, input.keyId);
+    await tx.providerKey.update({
+      where: { id: key.id, makerId: maker.id },
+      data: sealedKey(key.provider, input.key),
+    });
+  });
+  forget(maker.id);
+}
+
+// Remove a key; who it was given to goes with it (the database's cascade).
+export async function removeProviderKeyById(
+  maker: MakerRef,
+  keyId: string,
+): Promise<void> {
+  assertDatabaseUrl();
+  await db.$transaction(async (tx) => {
+    const key = await keyOf(maker, tx, keyId);
+    await tx.providerKey.delete({
+      where: { id: key.id, makerId: maker.id },
+    });
+  });
+  forget(maker.id);
+}
+
+export interface ProviderKeyListing {
+  id: string;
+  provider: ProviderId;
+  name: string;
+  forTeam: boolean;
+  hint: string;
+  // Whether KILN_SECRET_KEY can open it.
+  readable: boolean;
+  // Whom it is given to, named only from the studio's own team.
+  people: { memberId: string; name: string; email: string }[];
+}
+
+// Every key of the studio with its people, for the owner's list: never the
+// key itself, only its last four.
+export async function listProviderKeys(
+  maker: MakerRef,
+): Promise<ProviderKeyListing[]> {
+  if (!hasDatabase()) return [];
+  const rows = await db.providerKey.findMany({
+    where: { makerId: maker.id },
+    orderBy: [{ provider: "asc" }, { createdAt: "asc" }],
+  });
+  const access = await db.providerKeyAccess.findMany({
+    where: { makerId: maker.id },
+    orderBy: { createdAt: "asc" },
+  });
+  const team = await db.member.findMany({
+    where: { organization: { maker: { is: { id: maker.id } } } },
+    select: { id: true, user: { select: { name: true, email: true } } },
+  });
+  return rows.flatMap((row) => {
+    const provider = row.provider as ProviderId;
+    if (!PROVIDERS.includes(provider)) return [];
+    return [
+      {
+        id: row.id,
+        provider,
+        name: row.name,
+        forTeam: row.forTeam,
+        hint: row.hint,
+        readable: unsealed(row.sealed, provider) !== null,
+        people: access
+          .filter((a) => a.keyId === row.id)
+          .flatMap((a) => {
+            const person = team.find((p) => p.id === a.memberId);
+            return person
+              ? [
+                  {
+                    memberId: person.id,
+                    name: person.user.name,
+                    email: person.user.email,
+                  },
+                ]
+              : [];
+          }),
+      },
+    ];
+  });
 }

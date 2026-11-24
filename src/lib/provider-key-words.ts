@@ -16,7 +16,8 @@ type KeyState = {
 
 const ENV_NAME = { openai: "OPENAI_API_KEY", google: "GOOGLE_API_KEY" };
 
-const article = (label: string) => (/^[aeiou]/i.test(label) ? "an" : "a");
+export const article = (label: string) =>
+  /^[aeiou]/i.test(label) ? "an" : "a";
 
 const noAccess = (label: string) =>
   `You have no access to ${article(label)} ${label} key`;
