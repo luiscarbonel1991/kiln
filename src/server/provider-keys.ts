@@ -1,4 +1,5 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
 import { keyProblem } from "@/lib/provider-key-forms";
@@ -266,6 +267,53 @@ export class KeyRefusal extends Error {
 
 const KEY_GONE = "That key was removed already.";
 
+const nameTaken = (label: string) =>
+  new KeyRefusal(`Another ${label} key has that name.`, "name");
+const teamTaken = (label: string) =>
+  new KeyRefusal(
+    `The team has ${article(label)} ${label} key already: replace that one.`,
+  );
+
+// The unique index a refused write broke, as the driver adapter reports it.
+const UniqueIndex = z.object({
+  driverAdapterError: z.object({
+    cause: z.object({ constraint: z.object({ index: z.string() }) }),
+  }),
+});
+
+// A write that lost a race to another: the database's unique index refused
+// what the check before it passed (the other's row was not yet committed),
+// and the owner reads what the check would have said.
+async function orRefused<T>(
+  provider: ProviderId,
+  write: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== "P2002"
+    ) {
+      throw error;
+    }
+    const label = PROVIDER_LABELS[provider];
+    const index = UniqueIndex.safeParse(error.meta).data?.driverAdapterError
+      .cause.constraint.index;
+    if (index === "ProviderKey_makerId_provider_name_key") {
+      throw nameTaken(label);
+    }
+    if (index === "ProviderKey_one_team_key") throw teamTaken(label);
+    if (index === "ProviderKeyAccess_makerId_memberId_provider_key") {
+      throw new KeyRefusal(
+        `Someone you chose was just given another ${label} key: try again.`,
+        "memberIds",
+      );
+    }
+    throw error;
+  }
+}
+
 // A pasted key, sealed under its provider's purpose, with its last four.
 function sealedKey(provider: ProviderId, raw: string) {
   const key = raw.trim();
@@ -286,26 +334,25 @@ export async function saveProviderKey(
 ): Promise<void> {
   assertDatabaseUrl();
   const data = sealedKey(provider, raw);
-  // The form writes the provider's team key: replaced in place, or made.
-  await db.$transaction(async (tx) => {
-    const team = await tx.providerKey.findFirst({
-      where: { makerId: maker.id, provider, forTeam: true },
-      select: { id: true },
-    });
-    if (team) {
-      await tx.providerKey.update({ where: { id: team.id }, data });
-    } else {
-      await tx.providerKey.create({
-        data: {
-          makerId: maker.id,
-          provider,
-          name: "Team key",
-          forTeam: true,
-          ...data,
-        },
+  // The form writes the provider's team key: replaced in place, or made,
+  // named "Team key" unless another key has that name.
+  await orRefused(provider, () =>
+    db.$transaction(async (tx) => {
+      const team = await tx.providerKey.findFirst({
+        where: { makerId: maker.id, provider, forTeam: true },
+        select: { id: true },
       });
-    }
-  });
+      if (team) {
+        await tx.providerKey.update({ where: { id: team.id }, data });
+        return;
+      }
+      const name = "Team key";
+      await refuseTaken(maker, tx, { provider, name, who: "team" }, null);
+      await tx.providerKey.create({
+        data: { makerId: maker.id, provider, name, forTeam: true, ...data },
+      });
+    }),
+  );
   forget(maker.id);
 }
 
@@ -376,9 +423,7 @@ async function refuseTaken(
     },
     select: { id: true },
   });
-  if (named) {
-    throw new KeyRefusal(`Another ${label} key has that name.`, "name");
-  }
+  if (named) throw nameTaken(label);
   if (input.who !== "team") return;
   const team = await tx.providerKey.findFirst({
     where: {
@@ -389,11 +434,7 @@ async function refuseTaken(
     },
     select: { id: true },
   });
-  if (team) {
-    throw new KeyRefusal(
-      `The team has ${article(label)} ${label} key already: replace that one.`,
-    );
-  }
+  if (team) throw teamTaken(label);
 }
 
 // Give the key to exactly these people. A person holds one given key per
@@ -449,22 +490,29 @@ export async function addProviderKey(
   assertDatabaseUrl();
   const name = input.name.trim();
   const data = sealedKey(input.provider, input.key);
-  const added = await db.$transaction(async (tx) => {
-    await refuseTaken(maker, tx, { ...input, name }, null);
-    const people = await chosenPeople(maker, tx, input);
-    const row = await tx.providerKey.create({
-      data: {
-        makerId: maker.id,
-        provider: input.provider,
-        name,
-        forTeam: input.who === "team",
-        ...data,
-      },
-      select: { id: true },
-    });
-    await giveKey(maker, tx, { id: row.id, provider: input.provider }, people);
-    return row;
-  });
+  const added = await orRefused(input.provider, () =>
+    db.$transaction(async (tx) => {
+      await refuseTaken(maker, tx, { ...input, name }, null);
+      const people = await chosenPeople(maker, tx, input);
+      const row = await tx.providerKey.create({
+        data: {
+          makerId: maker.id,
+          provider: input.provider,
+          name,
+          forTeam: input.who === "team",
+          ...data,
+        },
+        select: { id: true },
+      });
+      await giveKey(
+        maker,
+        tx,
+        { id: row.id, provider: input.provider },
+        people,
+      );
+      return row;
+    }),
+  );
   forget(maker.id);
   return added;
 }
@@ -486,11 +534,13 @@ export async function editProviderKey(
       key.id,
     );
     const people = await chosenPeople(maker, tx, input);
-    await tx.providerKey.update({
-      where: { id: key.id, makerId: maker.id },
-      data: { name, forTeam: input.who === "team" },
+    await orRefused(key.provider, async () => {
+      await tx.providerKey.update({
+        where: { id: key.id, makerId: maker.id },
+        data: { name, forTeam: input.who === "team" },
+      });
+      await giveKey(maker, tx, key, people);
     });
-    await giveKey(maker, tx, key, people);
   });
   forget(maker.id);
 }

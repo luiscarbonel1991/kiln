@@ -310,6 +310,173 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
     }
   });
 
+  it("the old form's team key, when another key is already named Team key, is refused in words and nothing is written", async () => {
+    const studio = await open("writes-team-name");
+    await fx.writeKey(studio, {
+      provider: "openai",
+      name: "Team key",
+      secret: secret(),
+      people: [studio.bob],
+    });
+    const before = await rowsOf(studio);
+    await expect(
+      keys.saveProviderKey(owner(studio), "openai", secret()),
+    ).rejects.toMatchObject({
+      name: "KeyRefusal",
+      message: "Another OpenAI key has that name.",
+    });
+    expect(await rowsOf(studio)).toEqual(before);
+  });
+
+  // A write that loses a race: another write's row, not yet committed, is
+  // invisible to this one's check, so its insert waits on the unique index
+  // and fails when the other commits. The owner reads what the check would
+  // have said, never the database's text.
+  type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+  const race = async (
+    rival: (tx: Tx) => Promise<unknown>,
+    write: () => Promise<unknown>,
+  ): Promise<unknown> => {
+    let release = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    let ready = () => {};
+    const written = new Promise<void>((r) => {
+      ready = r;
+    });
+    const rivalDone = db.$transaction(
+      async (tx) => {
+        await rival(tx);
+        ready();
+        await held;
+      },
+      { timeout: 10_000 },
+    );
+    await written;
+    const outcome = write().then(
+      () => null,
+      (error: unknown) => error,
+    );
+    // Long enough for the write to pass its check and wait on the index.
+    await new Promise((r) => setTimeout(r, 300));
+    release();
+    await rivalDone;
+    return outcome;
+  };
+  const rivalKey = (
+    studio: Studio,
+    tx: Tx,
+    key: { name: string; forTeam?: boolean; person?: string },
+  ) =>
+    tx.providerKey
+      .create({
+        data: {
+          makerId: studio.makerId,
+          provider: "openai",
+          name: key.name,
+          forTeam: key.forTeam ?? false,
+          sealed: "rival",
+          hint: "ival",
+        },
+        select: { id: true },
+      })
+      .then(async (row) => {
+        if (!key.person) return;
+        await tx.providerKeyAccess.create({
+          data: {
+            makerId: studio.makerId,
+            keyId: row.id,
+            provider: "openai",
+            memberId: key.person,
+          },
+        });
+      });
+
+  it("a write that loses a race to another reads the check's refusal, not the database's text", async () => {
+    const studio = await open("writes-race");
+    const teamTaken = "The team has an OpenAI key already: replace that one.";
+
+    const named = await race(
+      (tx) => rivalKey(studio, tx, { name: "Raced" }),
+      () =>
+        keys.addProviderKey(owner(studio), {
+          provider: "openai",
+          name: "Raced",
+          who: "people",
+          memberIds: [studio.bob.memberId],
+          key: secret(),
+        }),
+    );
+    expect(named).toBeInstanceOf(keys.KeyRefusal);
+    expect(named).toMatchObject({
+      message: "Another OpenAI key has that name.",
+      field: "name",
+    });
+
+    const given = await race(
+      (tx) =>
+        rivalKey(studio, tx, {
+          name: "Carla's other key",
+          person: studio.carla.memberId,
+        }),
+      () =>
+        keys.addProviderKey(owner(studio), {
+          provider: "openai",
+          name: "Carla's key",
+          who: "people",
+          memberIds: [studio.carla.memberId],
+          key: secret(),
+        }),
+    );
+    expect(given).toBeInstanceOf(keys.KeyRefusal);
+    expect(given).toMatchObject({
+      message:
+        "Someone you chose was just given another OpenAI key: try again.",
+      field: "memberIds",
+    });
+
+    const bobs = await keyNamed(studio, "Raced");
+    const renamed = await race(
+      (tx) => rivalKey(studio, tx, { name: "Renamed" }),
+      () =>
+        keys.editProviderKey(owner(studio), {
+          keyId: bobs?.id ?? "",
+          name: "Renamed",
+          who: "people",
+          memberIds: [studio.bob.memberId],
+        }),
+    );
+    expect(renamed).toBeInstanceOf(keys.KeyRefusal);
+    expect(renamed).toMatchObject({
+      message: "Another OpenAI key has that name.",
+      field: "name",
+    });
+
+    const team = await race(
+      (tx) => rivalKey(studio, tx, { name: "Rival team", forTeam: true }),
+      () =>
+        keys.addProviderKey(owner(studio), {
+          provider: "openai",
+          name: "Our team key",
+          who: "team",
+          memberIds: [],
+          key: secret(),
+        }),
+    );
+    expect(team).toBeInstanceOf(keys.KeyRefusal);
+    expect(team).toMatchObject({ message: teamTaken });
+
+    // The old form's team key, against a team key made meanwhile.
+    const other = await open("writes-race-old-form");
+    const saved = await race(
+      (tx) => rivalKey(other, tx, { name: "Rival team", forTeam: true }),
+      () => keys.saveProviderKey(owner(other), "openai", secret()),
+    );
+    expect(saved).toBeInstanceOf(keys.KeyRefusal);
+    expect(saved).toMatchObject({ message: teamTaken });
+  });
+
   // Every write drops the studio's cached keys before it returns, and only
   // that studio's.
   it("after a key is given to Bob his next work runs on it; after it is taken away, on the team's; another studio's cache is untouched", async () => {
