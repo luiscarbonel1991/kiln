@@ -16,9 +16,13 @@ describe.skipIf(!enabled)(
   async () => {
     const { db } = await import("@/lib/db");
     const fx = await import("@/server/__tests__/fixtures/studio-keys");
+    const { projectGenerationState } = await import(
+      "@/server/generation-repository"
+    );
     type Studio = Awaited<ReturnType<typeof fx.openStudio>>;
 
     const MODE = `worker-keys-${randomUUID().slice(0, 8)}`;
+    const MOCK_MODE = `worker-keys-mock-${randomUUID().slice(0, 8)}`;
     const LEFT =
       "Not run: the person who queued it is no longer on the team, so nothing was spent.";
 
@@ -175,6 +179,108 @@ describe.skipIf(!enabled)(
         actualMicros: null,
       });
       expect(job.finishedAt).not.toBeNull();
+    });
+
+    // Each live call records the key it ran on; the id is never sent to a
+    // reader.
+    it("each live call records the key it ran on: Bob's his, Carla's and a token's the team's", async () => {
+      const queue = (cardId: string, memberId: string | null) =>
+        fx.queueJob(a, { mode: MODE, projectId: projectA, cardId, memberId });
+      const bob = await queue("a.bob-2", a.bob.memberId);
+      const carla = await queue("a.carla-2", a.carla.memberId);
+      const token = await queue("a.token-2", null);
+      await run();
+      expect((await row(bob)).providerKeyId).toBe(ids.aBob);
+      expect((await row(carla)).providerKeyId).toBe(ids.aTeam);
+      expect((await row(token)).providerKeyId).toBe(ids.aTeam);
+    });
+
+    it("a mock job and a job refused before its call record no key", async () => {
+      const mock = await fx.queueJob(a, {
+        mode: MOCK_MODE,
+        projectId: projectA,
+        cardId: "a.mock-bob",
+        memberId: a.bob.memberId,
+      });
+      await run({ mode: MOCK_MODE, workerMode: "mock" });
+      expect(await row(mock)).toMatchObject({
+        status: "done",
+        providerKeyId: null,
+      });
+      // Studio A has no Google key for Carla: refused before the call.
+      const refused = await fx.queueJob(a, {
+        mode: MODE,
+        projectId: projectA,
+        cardId: "a.carla-google",
+        memberId: a.carla.memberId,
+        provider: "google",
+      });
+      const seen = await run();
+      expect(keyOf(seen, "a.carla-google")).toEqual([]);
+      expect(await row(refused)).toMatchObject({
+        status: "failed",
+        error:
+          "Not run: the person who queued it has no Google key they can use now, so nothing was spent.",
+        callStartedAt: null,
+        providerKeyId: null,
+      });
+    });
+
+    it("a move along a route records the key of the provider it left, and none when none was in reach", async () => {
+      const flash = { provider: "google", model: "gemini-3.1-flash-image" };
+      const image = { provider: "openai", model: "gpt-image-2" };
+      // Bob's OpenAI call answered with an error: it moves to Google.
+      const moved = await fx.queueJob(a, {
+        mode: MODE,
+        projectId: projectA,
+        cardId: "a.bob-moves",
+        memberId: a.bob.memberId,
+        route: { next: [flash], switched: [] },
+      });
+      // Carla has no Google key: her job moves to OpenAI before any call.
+      const keyless = await fx.queueJob(a, {
+        mode: MODE,
+        projectId: projectA,
+        cardId: "a.carla-moves",
+        memberId: a.carla.memberId,
+        provider: "google",
+        route: { next: [image], switched: [] },
+      });
+      await run({
+        fail: (card) =>
+          card === "a.bob-moves"
+            ? Object.assign(new Error("OpenAI is busy"), { status: 503 })
+            : undefined,
+      });
+      const switchedOf = async (id: string) =>
+        ((await row(id)).route as { switched: Record<string, unknown>[] })
+          .switched;
+      const [left] = await switchedOf(moved);
+      expect(left).toMatchObject({
+        from: { provider: "openai" },
+        keyId: ids.aBob,
+      });
+      const [none] = await switchedOf(keyless);
+      expect(none).toMatchObject({
+        from: { provider: "google" },
+        reason: "Google has no API key",
+      });
+      expect(none).toHaveProperty("keyId", null);
+      expect(await row(keyless)).toMatchObject({
+        status: "done",
+        providerKeyId: ids.aTeam,
+      });
+    });
+
+    it("the state a reader polls carries no key id", async () => {
+      for (const reader of [a.as(a.ana), a.as(a.bob), a.as(a.carla), a.as()]) {
+        const text = JSON.stringify(
+          await projectGenerationState(reader.id, projectA),
+        );
+        expect(text).toContain("a.bob-2");
+        for (const id of Object.values(ids)) expect(text).not.toContain(id);
+        expect(text).not.toMatch(/providerKeyId|keyId/);
+      }
     });
   },
 );

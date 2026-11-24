@@ -36,7 +36,7 @@ import {
 } from "@/domain/understanding";
 import type { VariantDirection } from "@/domain/variant-direction";
 import type { TextCallOptions, TextResult } from "@/providers/interfaces";
-import { hasProviderKey } from "@/providers/keys";
+import { hasProviderKey, providerKeyId } from "@/providers/keys";
 import { fallbackVariants } from "@/providers/mock/art-director";
 import { providerMode } from "@/providers/mode";
 import { getArtDirector, getVisionProvider } from "@/providers/registry";
@@ -177,7 +177,9 @@ async function runText<T>(
   let rest = candidates.slice(1);
   const tried: TextModel[] = [];
   let first: { from: TextModel; reason: string } | undefined;
-  let move: { from: RouteEntry; reason: string } | undefined;
+  let move:
+    | { from: RouteEntry; reason: string; keyId: string | null }
+    | undefined;
   for (;;) {
     tried.push(current);
     let callStarted = false;
@@ -199,6 +201,7 @@ async function runText<T>(
                       to: model,
                       reason: move.reason,
                       at: new Date().toISOString(),
+                      keyId: move.keyId,
                     },
                   ],
                 },
@@ -236,7 +239,13 @@ async function runText<T>(
         `[kiln] ${kind} moved from ${model.model} to ${picked.entry.model}: ${failure.reason}`,
       );
       first ??= { from: model, reason: failure.reason };
-      move = { from: model, reason: failure.reason };
+      // The key the move left, from the caller's scope; null when none was
+      // in reach.
+      move = {
+        from: model,
+        reason: failure.reason,
+        keyId: providerKeyId(model.provider) ?? null,
+      };
       current = picked.entry;
       rest = picked.rest;
     }

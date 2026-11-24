@@ -44,7 +44,7 @@ import { env } from "@/lib/env";
 import { queueNoKeyLine } from "@/lib/provider-key-words";
 import { CATALOG, findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { storeAsset } from "@/providers/asset-bytes";
-import { hasProviderKey } from "@/providers/keys";
+import { hasProviderKey, providerKeyId } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
 import {
   getImageProvider,
@@ -587,6 +587,7 @@ export function ensureGenerationWorker(): Worker | null {
       mode: providerMode(),
       asMaker: withStarterKeys,
       keyInReach: hasProviderKey,
+      keyId: providerKeyId,
       concurrency: env.KILN_GENERATION_CONCURRENCY,
       leaseSec: 120,
       renewMs: 30_000,

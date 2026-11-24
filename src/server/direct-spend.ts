@@ -22,7 +22,7 @@ import { hasDatabase } from "@/lib/db";
 import { directNoKeyLine } from "@/lib/provider-key-words";
 import { ProviderKeyMissing } from "@/providers/errors";
 import type { TextResult } from "@/providers/interfaces";
-import { hasProviderKey } from "@/providers/keys";
+import { hasProviderKey, providerKeyId } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
 import type { GenerationResult } from "@/providers/types";
 import {
@@ -186,6 +186,8 @@ export async function openDirectCall<T extends { usage?: unknown }>(
     ...(priced.sessionId ? { sessionId: priced.sessionId } : {}),
     ...(priced.route ? { route: priced.route } : {}),
     memberId: maker.member?.id ?? null,
+    // The key it is reserved on, from the caller's scope.
+    providerKeyId: provider.success ? providerKeyId(provider.data) : undefined,
   }).catch(async (error) => {
     throw await inMembersWords(maker, error);
   });

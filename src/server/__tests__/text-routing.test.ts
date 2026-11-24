@@ -26,6 +26,7 @@ vi.mock("@/server/maker-repository", () => ({
 }));
 vi.mock("@/providers/keys", () => ({
   hasProviderKey: (provider: "openai" | "google") => keys[provider],
+  providerKeyId: () => undefined,
 }));
 vi.mock("@/providers/mode", () => ({ providerMode: () => "live" }));
 vi.mock("@/server/direct-spend", async (original) => ({

@@ -71,7 +71,12 @@ export interface WorkerDeps {
     leaseSec: number,
   ): Promise<ClaimedJob[]>;
   renewLease(id: string, token: string, leaseSec: number): Promise<boolean>;
-  markCallStarted(id: string, token: string): Promise<boolean>;
+  // Marks the call, with the key it goes out on (null in mock mode).
+  markCallStarted(
+    id: string,
+    token: string,
+    keyId: string | null,
+  ): Promise<boolean>;
   recordCost(
     id: string,
     usage: unknown,
@@ -102,6 +107,9 @@ export interface WorkerDeps {
   // Whether the job's starter (or, with none, the team) has a key of this
   // provider they can use now, in the scope asMaker set. Live mode only.
   keyInReach?(provider: ProviderId): boolean;
+  // The id of the key in use for a provider, in the same scope (never from
+  // the job's request). Live mode only.
+  keyId?(provider: ProviderId): string | undefined;
   overCap(makerId: string): Promise<boolean>;
   provider(id: "google" | "openai"): ImageProvider;
   videoProvider(id: "google" | "openai"): VideoProvider | undefined;
@@ -368,6 +376,10 @@ async function callVideo(
   return clip;
 }
 
+// The key a live call of this provider goes out on; none in mock mode.
+const keyIdOf = (deps: WorkerDeps, provider: ProviderId): string | null =>
+  deps.mode === "live" ? (deps.keyId?.(provider) ?? null) : null;
+
 // Move the job down its route when the failure allows and a model may run it;
 // true when it moved (it is queued again on that model).
 async function moveDown(
@@ -441,7 +453,13 @@ export async function runJob(
       throw new ProviderKeyMissing(provider);
     }
     const beforeCall = async () => {
-      if (!(await deps.markCallStarted(job.id, job.leaseToken))) {
+      if (
+        !(await deps.markCallStarted(
+          job.id,
+          job.leaseToken,
+          keyIdOf(deps, parsed.model.provider),
+        ))
+      ) {
         throw new CallNotStarted();
       }
       callStarted = true;

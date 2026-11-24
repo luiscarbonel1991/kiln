@@ -1041,3 +1041,23 @@ describe("a job with no key in reach when it runs", () => {
     expect(d.completeJob).toHaveBeenCalledTimes(1);
   });
 });
+
+// The call's mark carries the key it goes out on, from the scope the job
+// runs in; a mock call goes out on none.
+describe("the key a job's call ran on", () => {
+  it("a live call is marked with the key in use for its provider", async () => {
+    const keyId = vi.fn((provider: "openai" | "google") =>
+      provider === "openai" ? "key-bob" : undefined,
+    );
+    const { d } = deps({ keyId } as Partial<WorkerDeps>);
+    await runJob(d, { ...claimed("a"), memberId: "m-bob" });
+    expect(d.markCallStarted).toHaveBeenCalledWith("a", "t-a", "key-bob");
+  });
+
+  it("a mock call is marked with no key", async () => {
+    const keyId = vi.fn(() => "key-bob");
+    const { d } = deps({ mode: "mock", keyId } as Partial<WorkerDeps>);
+    await runJob(d, { ...claimed("a"), memberId: "m-bob" });
+    expect(d.markCallStarted).toHaveBeenCalledWith("a", "t-a", null);
+  });
+});

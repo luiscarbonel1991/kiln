@@ -15,6 +15,7 @@ import {
   type RouteEntry,
   ranOn,
   readAgentRoutes,
+  readJobRoute,
   readMakerModels,
   readRoutes,
   routeCandidates,
@@ -548,6 +549,42 @@ describe("ranOn", () => {
       reason: "OpenAI answered 503",
     });
     expect(ranOn({ next: [], switched: [] })).toBeUndefined();
+  });
+});
+
+// A move records the key of the provider it left: an id, or null when no
+// key was in reach. A move from before keys were recorded has no keyId at
+// all, and still reads.
+describe("readJobRoute and the key a move left", () => {
+  const move = (extra: object) => ({
+    from: GPT_IMAGE,
+    to: FLASH_IMAGE,
+    reason: "OpenAI answered 503",
+    at: "t1",
+    ...extra,
+  });
+
+  it("keeps the id of the key a move left", () => {
+    const [read] = readJobRoute({
+      next: [],
+      switched: [move({ keyId: "key-bob" })],
+    }).switched;
+    expect(read).toMatchObject({ keyId: "key-bob" });
+  });
+
+  it("keeps an explicit null: the move was made with no key in reach", () => {
+    const [read] = readJobRoute({
+      next: [],
+      switched: [move({ keyId: null })],
+    }).switched;
+    expect(read).toHaveProperty("keyId", null);
+  });
+
+  it("a move from before keys were recorded still reads, with no keyId", () => {
+    const route = readJobRoute({ next: [], switched: [move({})] });
+    expect(route.switched).toHaveLength(1);
+    expect(route.switched[0]).not.toHaveProperty("keyId");
+    expect(ranOn(route)).toMatchObject({ reason: "OpenAI answered 503" });
   });
 });
 

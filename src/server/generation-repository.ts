@@ -27,6 +27,7 @@ import {
   readableFailure,
 } from "@/domain/queue";
 import { assertDatabaseUrl, db } from "@/lib/db";
+import { currentProviderKeyIds, inProviderKeyScope } from "@/providers/keys";
 import { noteBatchEnd } from "@/server/batch-end";
 import type { MakerRef } from "@/server/maker-repository";
 
@@ -385,15 +386,18 @@ export async function renewLease(
   return count === 1;
 }
 
-// Mark that the paid call is going out, right before it. Guarded by the lease,
-// the project and the batch: false = the lease was lost, the project deleted
-// or the batch canceled, and the caller must not make the call.
+// Mark that the paid call is going out, right before it, with the key it goes
+// out on (the scope's; none in mock mode). Guarded by the lease, the project
+// and the batch: false = the lease was lost, the project deleted or the batch
+// canceled, and the caller must not make the call.
 export async function markCallStarted(
   id: string,
   token: string,
+  keyId: string | null = null,
 ): Promise<boolean> {
   const count = await db.$executeRaw`
-    UPDATE "GenerationJob" AS j SET "callStartedAt" = now()
+    UPDATE "GenerationJob" AS j
+    SET "callStartedAt" = now(), "providerKeyId" = ${keyId}
     WHERE j."id" = ${id} AND j."leaseToken" = ${token} AND j."status" = 'running'
       AND j."projectId" IS NOT NULL AND NOT ${STOPPED}`;
   return count === 1;
@@ -504,22 +508,28 @@ export async function failJob(
 // same on the new model, its route records the move, and it goes back to the
 // queue at once, its attempts counted afresh for the new model. Its batch's
 // jobs still queued on the same model move with it, so a batch stays on one
-// model (another model changes the look); each records why. false = the lease
-// was lost or the batch canceled: the caller fails the job as usual.
+// model (another model changes the look); each records why, and the key the
+// move left: the id the worker's scope holds for the provider it left (the
+// starter's, never the request's), null when none was in reach or the job is
+// a mock one. Outside a scope nothing is recorded. false = the lease was lost
+// or the batch canceled: the caller fails the job as usual.
 export async function fallBackJob(
   job: { id: string; leaseToken: string },
   move: { to: RouteEntry; rest: RouteEntry[]; reason: string },
   runnable: (entry: RouteEntry, request: GenerationRequest) => boolean,
 ): Promise<boolean> {
+  // The ids of the keys in use, from the caller's scope (the worker's).
+  const keyIds = inProviderKeyScope() ? currentProviderKeyIds() : null;
   return db.$transaction(async (tx) => {
     const [row] = await tx.$queryRaw<
       {
         batchId: string | null;
+        mode: string;
         request: unknown;
         route: unknown;
       }[]
     >`
-      SELECT j."batchId", j."request", j."route"
+      SELECT j."batchId", j."mode", j."request", j."route"
       FROM "GenerationJob" j
       WHERE j."id" = ${job.id} AND j."leaseToken" = ${job.leaseToken}
         AND j."status" = 'running' AND NOT ${STOPPED}
@@ -528,6 +538,12 @@ export async function fallBackJob(
     const request = GenerationRequest.parse(row.request);
     const at = new Date().toISOString();
     const from = modelOf(request);
+    const keyId =
+      keyIds === null
+        ? undefined
+        : row.mode === "mock"
+          ? null
+          : (keyIds[from.provider] ?? null);
     const moved = (
       current: GenerationRequest,
       route: JobRoute,
@@ -542,7 +558,13 @@ export async function fallBackJob(
         next: rest,
         switched: [
           ...route.switched,
-          { from: modelOf(current), to: move.to, reason, at },
+          {
+            from: modelOf(current),
+            to: move.to,
+            reason,
+            at,
+            ...(keyId === undefined ? {} : { keyId }),
+          },
         ],
       } satisfies JobRoute as unknown as Prisma.InputJsonValue,
     });
@@ -678,6 +700,8 @@ export async function reserveDirectCall(input: {
   sessionId?: string;
   // The person who made it; none for a token or a script.
   memberId?: string | null;
+  // The key it is made on, from the caller's scope.
+  providerKeyId?: string | null;
 }): Promise<string> {
   assertDatabaseUrl();
   return db.$transaction(async (tx) => {
@@ -702,6 +726,7 @@ export async function reserveDirectCall(input: {
         projectId: input.projectId ?? null,
         sessionId: input.sessionId ?? null,
         memberId: input.memberId ?? null,
+        providerKeyId: input.providerKeyId ?? null,
         cardId: "direct",
         mode: "live",
         status: "running",
