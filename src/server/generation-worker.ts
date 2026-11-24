@@ -51,8 +51,13 @@ import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 
 export interface WorkerDeps {
   mode: ProviderMode;
-  // Runs a job as its maker: with that maker's provider keys, no other's.
-  asMaker?<T>(makerId: string, work: () => Promise<T>): Promise<T>;
+  // Runs a claimed job as whoever queued it (its maker, for a job with no
+  // person): with their provider keys, no one else's. `work` hears whether
+  // that person is still on the team. Without it a job runs as "here".
+  asMaker?<T>(
+    job: ClaimedJob,
+    work: (starter: "here" | "left") => Promise<T>,
+  ): Promise<T>;
   concurrency: number;
   leaseSec: number;
   renewMs: number;
@@ -234,6 +239,8 @@ async function lookLanding(
 export const CAP_REACHED = "This month's spending cap was reached.";
 export const NOT_STARTED =
   "The job was canceled, or lost its lease or its project, before the paid call; nothing was spent.";
+export const STARTER_LEFT =
+  "Not run: the person who queued it is no longer on the team, so nothing was spent.";
 
 class CallNotStarted extends Error {
   constructor() {
@@ -379,7 +386,22 @@ async function moveDown(
     });
 }
 
-export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
+export async function runJob(
+  deps: WorkerDeps,
+  job: ClaimedJob,
+  starter: "here" | "left" = "here",
+): Promise<void> {
+  // Whoever queued it left the team: it ends before anything else, in both
+  // modes, with nothing spent.
+  if (starter === "left") {
+    await deps
+      .failJob(job.id, job.leaseToken, STARTER_LEFT, {
+        retry: false,
+        mayBeCharged: false,
+      })
+      .catch((e) => deps.log(`could not record the failure of ${job.id}`, e));
+    return;
+  }
   let callStarted = false;
   let paid = false;
   let provider: "google" | "openai" | undefined;
@@ -498,8 +520,9 @@ export function createWorker(deps: WorkerDeps): Worker {
           if (jobs.length === 0) break;
           for (const job of jobs) {
             running++;
-            const run = () => runJob(deps, job);
-            void (deps.asMaker ? deps.asMaker(job.makerId, run) : run())
+            const run = (starter: "here" | "left") =>
+              runJob(deps, job, starter);
+            void (deps.asMaker ? deps.asMaker(job, run) : run("here"))
               .catch((error) => deps.log("a job could not start", error))
               .finally(() => {
                 running--;

@@ -14,6 +14,7 @@ import {
   withProviderKeys,
 } from "@/providers/keys";
 import type { MakerRef } from "@/server/maker-repository";
+import { roleOf } from "@/server/organization";
 import { hasSecretKey, seal, unseal } from "@/server/secret-box";
 
 // The provider keys each maker saved in Settings → Providers: sealed in the
@@ -150,6 +151,39 @@ export async function withMakerKeys<T>(
     ids[provider as ProviderId] = pick.key.id;
   }
   return withProviderKeys(keys, work, ids);
+}
+
+// Run a queued job on the keys of whoever queued it, picked now, not when it
+// was queued. The person is read for each job, uncached, and only on the
+// job's studio's team; one no longer on it gets no key at all, and `work`
+// hears they left. A job with no person runs on the team's key. The ids come
+// from a claimed row (claimJobs, under a lease), never from a client.
+export async function withStarterKeys<T>(
+  job: { makerId: string; memberId: string | null },
+  work: (starter: "here" | "left") => Promise<T>,
+): Promise<T> {
+  if (!job.memberId || !hasDatabase()) {
+    return withMakerKeys({ id: job.makerId }, () => work("here"));
+  }
+  const member = await db.member.findFirst({
+    where: {
+      id: job.memberId,
+      organization: { maker: { is: { id: job.makerId } } },
+    },
+    select: { id: true, userId: true, role: true },
+  });
+  if (!member) return withProviderKeys({}, () => work("left"));
+  return withMakerKeys(
+    {
+      id: job.makerId,
+      member: {
+        id: member.id,
+        userId: member.userId,
+        role: roleOf(member.role),
+      },
+    },
+    () => work("here"),
+  );
 }
 
 // Whether each provider has a key this caller can use, and whose it is: no

@@ -77,7 +77,7 @@ export interface ClaimedJob {
   request: unknown;
   route: unknown;
   estimateMicros: number;
-  // Who queued it; the worker still runs it as its maker.
+  // Who queued it; the worker runs it as that person, read when it runs.
   memberId: string | null;
 }
 

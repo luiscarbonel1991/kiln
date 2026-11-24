@@ -185,3 +185,70 @@ describe.skipIf(!enabled)("provider health (database)", async () => {
     expect(await readUnlisted(makerId)).toEqual({});
   });
 });
+
+// Kiln's own refusals of a queued job are not the provider's: a job whose
+// starter left, or who had no key they could use, never reached it.
+describe.skipIf(!enabled)(
+  "provider health skips Kiln's own refusals (database)",
+  async () => {
+    const { db } = await import("@/lib/db");
+    const { providerHealth } = await import("@/server/provider-health");
+    const makers: string[] = [];
+
+    afterAll(async () => {
+      await db.generationJob.deleteMany({ where: { makerId: { in: makers } } });
+      await db.maker.deleteMany({ where: { id: { in: makers } } });
+    });
+
+    const studioWith = async (errors: string[]) => {
+      const maker = await db.maker.create({
+        data: {
+          slug: `health-refusals-${Date.now()}-${makers.length}`,
+          name: "Health",
+        },
+      });
+      makers.push(maker.id);
+      const request = {
+        kind: "image",
+        model: { provider: "openai", model: "gpt-image-2" },
+      };
+      await db.generationJob.create({
+        data: {
+          makerId: maker.id,
+          cardId: "q.ok",
+          mode: "live",
+          status: "done",
+          maxAttempts: 2,
+          estimateMicros: 1,
+          request,
+          finishedAt: new Date(Date.now() - 30 * 60_000),
+        },
+      });
+      for (const [i, error] of errors.entries()) {
+        await db.generationJob.create({
+          data: {
+            makerId: maker.id,
+            cardId: `q.refused-${i}`,
+            mode: "live",
+            status: "failed",
+            maxAttempts: 2,
+            estimateMicros: 1,
+            request,
+            error,
+            finishedAt: new Date(Date.now() - (5 - i) * 60_000),
+          },
+        });
+      }
+      return maker.id;
+    };
+
+    it("a job whose starter left the team is not the provider's error", async () => {
+      const makerId = await studioWith([
+        "Not run: the person who queued it is no longer on the team, so nothing was spent.",
+      ]);
+      const [openai] = await providerHealth(makerId);
+      expect(openai.lastError).toBeNull();
+      expect(openai.keyRejected).toBe(false);
+    });
+  },
+);

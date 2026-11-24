@@ -878,3 +878,73 @@ describe("video jobs", () => {
     });
   });
 });
+
+// A queued job runs as whoever queued it, read when it runs: the worker
+// hands each claimed job to `asMaker`, which says whether its starter is
+// still on the team. One who left has the job ended before anything else,
+// at no cost, in both modes.
+describe("a job whose starter is no longer on the team", () => {
+  const LEFT =
+    "Not run: the person who queued it is no longer on the team, so nothing was spent.";
+  const flash = {
+    provider: "google" as const,
+    model: "gemini-3.1-flash-image",
+  };
+
+  const runOnce = async (
+    mode: "live" | "mock",
+    job: ClaimedJob,
+    starter: "here" | "left",
+  ) => {
+    const queue = [job];
+    const asMaker = vi.fn(
+      async (
+        _job: ClaimedJob,
+        work: (starter: "here" | "left") => Promise<unknown>,
+      ) => work(starter),
+    );
+    const made = deps({
+      mode,
+      claimJobs: vi.fn(async (_mode, limit) => queue.splice(0, limit)),
+      asMaker: asMaker as unknown as WorkerDeps["asMaker"],
+    });
+    const worker = createWorker(made.d);
+    workers.push(worker);
+    worker.wake();
+    await worker.idle();
+    return { ...made, asMaker };
+  };
+
+  it("the worker hands the claimed job itself to run as its starter", async () => {
+    const job = { ...claimed("a"), memberId: "m-bob" };
+    const { asMaker, d } = await runOnce("live", job, "here");
+    expect(asMaker).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "a", makerId: "maker", memberId: "m-bob" }),
+      expect.any(Function),
+    );
+    expect(d.completeJob).toHaveBeenCalledTimes(1);
+  });
+
+  for (const mode of ["live", "mock"] as const) {
+    it(`in ${mode} mode it never reaches the provider, and ends once, unretried, with nothing spent`, async () => {
+      const job = {
+        ...claimed("a", 1, { next: [flash], switched: [] }),
+        memberId: "m-bob",
+      };
+      const { d, editBytes, calls } = await runOnce(mode, job, "left");
+      expect(editBytes).not.toHaveBeenCalled();
+      expect(calls).not.toContain("mark");
+      expect(d.markCallStarted).not.toHaveBeenCalled();
+      expect(d.overCap).not.toHaveBeenCalled();
+      expect(d.fallBack).not.toHaveBeenCalled();
+      expect(d.completeJob).not.toHaveBeenCalled();
+      expect(d.failJob).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(d.failJob).mock.calls[0].slice(0, 4)).toEqual([
+        "a",
+        "t-a",
+        LEFT,
+        { retry: false, mayBeCharged: false },
+      ]);
+    });
+  }
+});

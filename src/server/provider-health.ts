@@ -8,7 +8,11 @@ import { db, hasDatabase } from "@/lib/db";
 import { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 import { hasProviderKey } from "@/providers/keys";
 import { readUnlisted, recordKeyCheck } from "@/server/generation-repository";
-import { CAP_REACHED, NOT_STARTED } from "@/server/generation-worker";
+import {
+  CAP_REACHED,
+  NOT_STARTED,
+  STARTER_LEFT,
+} from "@/server/generation-worker";
 import type { MakerRef } from "@/server/maker-repository";
 
 // Each provider's health, free to read (no ping, no paid call): whether its
@@ -16,7 +20,8 @@ import type { MakerRef } from "@/server/maker-repository";
 // direct calls (vision, art direction, the studio) all leave a row. The last
 // error shows until a later call succeeds. A move down a route counts as a
 // failure of the provider it left. Kiln's own refusals (the month's cap, a
-// canceled job) are not the provider's and are skipped.
+// canceled job, a job whose starter left the team) are not the provider's
+// and are skipped.
 
 export interface ProviderHealth {
   provider: ProviderId;
@@ -59,7 +64,7 @@ export async function providerHealth(
           AND "finishedAt" IS NOT NULL
           AND ("status" = 'done'
                OR ("status" = 'failed' AND "error" IS NOT NULL
-                   AND "error" NOT IN (${CAP_REACHED}, ${NOT_STARTED})))
+                   AND "error" NOT IN (${CAP_REACHED}, ${NOT_STARTED}, ${STARTER_LEFT})))
         UNION ALL
         SELECT s #>> '{from,provider}', 'failed', (s ->> 'at')::timestamptz,
                s ->> 'reason'
