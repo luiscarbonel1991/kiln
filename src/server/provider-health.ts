@@ -206,6 +206,9 @@ export async function checkKey(
 export async function checkKeyById(
   maker: MakerRef,
   keyId: string,
-): Promise<KeyCheck & { unlisted?: string[] }> {
-  return withKey(maker, keyId, (provider) => checkKey(maker, provider));
+): Promise<KeyCheck & { unlisted?: string[]; provider: ProviderId }> {
+  return withKey(maker, keyId, async (provider) => ({
+    ...(await checkKey(maker, provider)),
+    provider,
+  }));
 }

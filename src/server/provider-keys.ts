@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
+import { keyProblem } from "@/lib/provider-key-forms";
 import {
   type AccessRow,
   type KeyRow,
@@ -249,16 +250,6 @@ export async function providerKeyStates(
       };
     }),
   );
-}
-
-// What a pasted key must look like before it is kept: one line, no spaces,
-// long enough to be a key. Whether the provider takes it is the free check's
-// answer, right after.
-export function keyProblem(key: string): string | null {
-  if (key.length < 20) return "That is too short to be an API key.";
-  if (key.length > 400) return "That is too long to be an API key.";
-  if (/\s/.test(key)) return "An API key has no spaces or line breaks.";
-  return null;
 }
 
 // A refusal of a write of the studio's keys, in the owner's words; `field`
