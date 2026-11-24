@@ -1,6 +1,6 @@
 import {
   PROVIDER_LABELS,
-  type ProviderId,
+  ProviderId,
   unlistedModels,
 } from "@/domain/model-defaults";
 import { isKeyRejectedText, readableFailure } from "@/domain/queue";
@@ -160,8 +160,9 @@ export async function keyHealth(maker: MakerRef): Promise<KeyHealth[]> {
   });
   const outcomes = await lastOutcomes(maker);
   return keys.flatMap((key) => {
-    const provider = key.provider as ProviderId;
-    if (!PROVIDERS.includes(provider)) return [];
+    const known = ProviderId.safeParse(key.provider);
+    if (!known.success) return [];
+    const provider = known.data;
     return [
       {
         keyId: key.id,

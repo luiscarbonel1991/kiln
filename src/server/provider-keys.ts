@@ -1,8 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
+import { PROVIDER_LABELS, ProviderId } from "@/domain/model-defaults";
 import { assertDatabaseUrl, db, hasDatabase } from "@/lib/db";
-import { keyProblem } from "@/lib/provider-key-forms";
+import { type AddKeyForm, keyProblem } from "@/lib/provider-key-forms";
 import {
   type AccessRow,
   type KeyRow,
@@ -102,24 +102,24 @@ async function read(maker: MakerRef): Promise<StudioKeys> {
         });
   const keys: KeyRow[] = [];
   for (const row of rows) {
-    const provider = row.provider as ProviderId;
-    if (!PROVIDERS.includes(provider)) continue;
-    const secret = unsealed(row.sealed, provider);
-    keys.push({ id: row.id, provider, forTeam: row.forTeam, secret });
+    const provider = ProviderId.safeParse(row.provider);
+    if (!provider.success) continue;
+    const secret = unsealed(row.sealed, provider.data);
+    keys.push({
+      id: row.id,
+      provider: provider.data,
+      forTeam: row.forTeam,
+      secret,
+    });
   }
   return {
     keys,
-    access: access.flatMap((a) =>
-      PROVIDERS.includes(a.provider as ProviderId)
-        ? [
-            {
-              keyId: a.keyId,
-              memberId: a.memberId,
-              provider: a.provider as ProviderId,
-            },
-          ]
-        : [],
-    ),
+    access: access.flatMap((a) => {
+      const provider = ProviderId.safeParse(a.provider);
+      return provider.success
+        ? [{ keyId: a.keyId, memberId: a.memberId, provider: provider.data }]
+        : [];
+    }),
     people: people.map((p) => p.id),
   };
 }
@@ -374,12 +374,12 @@ export async function removeProviderKey(
 }
 
 // Who uses a key: the whole team, or the people chosen (member ids from the
-// client, checked against the studio's team before anything is written).
-export interface KeyAudience {
-  name: string;
-  who: "team" | "people";
-  memberIds: string[];
-}
+// client, checked against the studio's team before anything is written). The
+// form's own shape, so the two cannot drift.
+export type KeyAudience = Pick<
+  z.infer<typeof AddKeyForm>,
+  "name" | "who" | "memberIds"
+>;
 
 type Tx = Prisma.TransactionClient;
 
@@ -482,10 +482,9 @@ async function keyOf(
     where: { id: keyId, makerId: maker.id },
     select: { id: true, provider: true },
   });
-  if (!key || !PROVIDERS.includes(key.provider as ProviderId)) {
-    throw new KeyRefusal(KEY_GONE);
-  }
-  return { id: key.id, provider: key.provider as ProviderId };
+  const provider = ProviderId.safeParse(key?.provider);
+  if (!key || !provider.success) throw new KeyRefusal(KEY_GONE);
+  return { id: key.id, provider: provider.data };
 }
 
 // A new key, named, for the whole team or given to people.
@@ -614,8 +613,9 @@ export async function listProviderKeys(
     select: { id: true, user: { select: { name: true, email: true } } },
   });
   return rows.flatMap((row) => {
-    const provider = row.provider as ProviderId;
-    if (!PROVIDERS.includes(provider)) return [];
+    const known = ProviderId.safeParse(row.provider);
+    if (!known.success) return [];
+    const provider = known.data;
     return [
       {
         id: row.id,
