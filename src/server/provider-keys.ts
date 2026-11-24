@@ -40,7 +40,9 @@ const loaded = () => {
 };
 
 async function read(makerId: string): Promise<ProviderKeys> {
-  const rows = await db.providerKey.findMany({ where: { makerId } });
+  const rows = await db.providerKey.findMany({
+    where: { makerId, forTeam: true },
+  });
   const keys: ProviderKeys = {};
   for (const row of rows) {
     const provider = row.provider as ProviderId;
@@ -82,7 +84,7 @@ export async function providerKeyStates(
   makerId: string,
 ): Promise<ProviderKeyState[]> {
   const rows = hasDatabase()
-    ? await db.providerKey.findMany({ where: { makerId } })
+    ? await db.providerKey.findMany({ where: { makerId, forTeam: true } })
     : [];
   const keys = await makerProviderKeys(makerId);
   return withProviderKeys(keys, () =>
@@ -125,10 +127,19 @@ export async function saveProviderKey(
     );
   }
   const data = { sealed: seal(key, purpose(provider)), hint: key.slice(-4) };
-  await db.providerKey.upsert({
-    where: { makerId_provider: { makerId, provider } },
-    create: { makerId, provider, ...data },
-    update: data,
+  // The form writes the provider's team key: replaced in place, or made.
+  await db.$transaction(async (tx) => {
+    const team = await tx.providerKey.findFirst({
+      where: { makerId, provider, forTeam: true },
+      select: { id: true },
+    });
+    if (team) {
+      await tx.providerKey.update({ where: { id: team.id }, data });
+    } else {
+      await tx.providerKey.create({
+        data: { makerId, provider, name: "Team key", forTeam: true, ...data },
+      });
+    }
   });
   forget(makerId);
 }
@@ -138,6 +149,8 @@ export async function removeProviderKey(
   provider: ProviderId,
 ): Promise<void> {
   assertDatabaseUrl();
-  await db.providerKey.deleteMany({ where: { makerId, provider } });
+  await db.providerKey.deleteMany({
+    where: { makerId, provider, forTeam: true },
+  });
   forget(makerId);
 }

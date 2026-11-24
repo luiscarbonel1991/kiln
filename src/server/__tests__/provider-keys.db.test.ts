@@ -10,7 +10,6 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
   const { db } = await import("@/lib/db");
   const { providerKey } = await import("@/providers/keys");
   const {
-    makerProviderKeys,
     providerKeyStates,
     removeProviderKey,
     saveProviderKey,
@@ -50,6 +49,18 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
     });
   });
 
+  it("a key saved from today's form is the studio's team key, named, and its secret unseals", async () => {
+    const row = await db.providerKey.findFirstOrThrow({
+      where: { makerId: a.id, provider: "openai" },
+    });
+    expect(row).toMatchObject({ name: "Team key", forTeam: true });
+    expect(typeof row.id).toBe("string");
+    expect(row.id.length).toBeGreaterThan(0);
+    expect(await withMakerKeys(a.id, async () => providerKey("openai"))).toBe(
+      "sk-test-abcdefghijklmnop1234",
+    );
+  });
+
   it("another maker on the same instance never sees that key", async () => {
     await saveProviderKey(b.id, "openai", "sk-test-bbbbbbbbbbbbbbbb5678");
     const [seenByA, seenByB] = await Promise.all([
@@ -63,11 +74,29 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
   });
 
   it("a replaced key is used from the next piece of work", async () => {
-    await makerProviderKeys(a.id);
+    await withMakerKeys(a.id, async () => providerKey("openai"));
     await saveProviderKey(a.id, "openai", "sk-test-replacedreplaced9999");
     expect(await withMakerKeys(a.id, async () => providerKey("openai"))).toBe(
       "sk-test-replacedreplaced9999",
     );
+  });
+
+  it("saving the team key again keeps its one row and its id", async () => {
+    const before = await db.providerKey.findMany({
+      where: { makerId: a.id, provider: "openai" },
+    });
+    expect(before).toHaveLength(1);
+    await saveProviderKey(a.id, "openai", "sk-test-againagainagain7777");
+    const after = await db.providerKey.findMany({
+      where: { makerId: a.id, provider: "openai" },
+    });
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatchObject({
+      id: before[0].id,
+      name: "Team key",
+      forTeam: true,
+      hint: "7777",
+    });
   });
 
   it("refuses what cannot be a key, and removing one leaves no row", async () => {
