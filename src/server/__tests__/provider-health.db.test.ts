@@ -498,3 +498,89 @@ describe.skipIf(!enabled)(
     });
   },
 );
+
+// A move made because no key was in reach is nobody's key failure: Bob's
+// given OpenAI key cannot be read, so his job moves to Google with `keyId`
+// null, and Carla, on the team's OpenAI key, reads no error from it.
+describe.skipIf(!enabled)(
+  "provider health and a move with no key in reach (database)",
+  async () => {
+    const { randomUUID } = await import("node:crypto");
+    const { db } = await import("@/lib/db");
+    const { providerHealth } = await import("@/server/provider-health");
+    const { withMakerKeys } = await import("@/server/provider-keys");
+    const fx = await import("@/server/__tests__/fixtures/studio-keys");
+    type Studio = Awaited<ReturnType<typeof fx.openStudio>>;
+
+    const MODE = `health-keyless-${randomUUID().slice(0, 8)}`;
+    let s: Studio;
+
+    beforeAll(async () => {
+      s = await fx.openStudio("health-keyless");
+      await fx.writeKey(s, {
+        provider: "openai",
+        name: "Team key",
+        forTeam: true,
+        secret: "sk-fixture-health-keyless-team-01",
+      });
+      await fx.writeKey(s, {
+        provider: "openai",
+        name: "Bob's key",
+        secret: "sk-fixture-health-keyless-bob-002",
+        people: [s.bob],
+        unreadable: true,
+      });
+      await fx.writeKey(s, {
+        provider: "google",
+        name: "Team key",
+        forTeam: true,
+        secret: "sk-fixture-health-keyless-google-3",
+      });
+    });
+
+    afterAll(async () => {
+      await fx.closeStudio(s);
+    });
+
+    it("Bob's job moving off his unreadable key is not the team key's failure", async () => {
+      const projectId = await fx.bareProject(s);
+      const id = await fx.queueJob(s, {
+        mode: MODE,
+        projectId,
+        cardId: "keyless.bob",
+        memberId: s.bob.memberId,
+        route: {
+          next: [{ provider: "google", model: "gemini-3.1-flash-image" }],
+          switched: [],
+        },
+      });
+      const worker = await fx.keysWorker({ mode: MODE, seen: [] });
+      worker.wake();
+      await worker.idle();
+      worker.stop();
+      const job = await db.generationJob.findFirstOrThrow({
+        where: { id, makerId: s.makerId },
+      });
+      const [move] = (job.route as { switched: Record<string, unknown>[] })
+        .switched;
+      expect(move).toMatchObject({ from: { provider: "openai" } });
+      expect(move).toHaveProperty("keyId", null);
+      // It ran in a mode of this file's own, so no other worker claimed it;
+      // health reads live rows, as a live worker leaves them.
+      await db.generationJob.updateMany({
+        where: { id, makerId: s.makerId },
+        data: { mode: "live" },
+      });
+
+      const carla = s.as(s.carla);
+      const [openai] = await withMakerKeys(carla, () => providerHealth(carla));
+      expect(openai.lastError).toBeNull();
+      expect(openai.keyRejected).toBe(false);
+      // Nor is it the owner's or a token's, on the same team key.
+      for (const reader of [s.as(s.ana), s.as()]) {
+        const [o] = await withMakerKeys(reader, () => providerHealth(reader));
+        expect(o.lastError).toBeNull();
+      }
+    });
+  },
+);
