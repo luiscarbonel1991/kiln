@@ -7,7 +7,7 @@ import { ProjectsHeader } from "@/components/projects/projects-header";
 import { fromMicros } from "@/domain/generation-cost";
 import { buyerSizeLabel, type Product } from "@/domain/product";
 import { hasDatabase } from "@/lib/db";
-import { homeKeysLine } from "@/lib/provider-key-words";
+import { HOME_KEYS_LINK, homeKeysLine } from "@/lib/provider-key-words";
 import { hasProviderKey } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
 import { makerPage } from "@/server/guarded";
@@ -21,6 +21,7 @@ import type { CurrentMaker } from "@/server/maker-repository";
 import { memberAsk } from "@/server/month-limit";
 import { listProducts } from "@/server/product-repository";
 import { listProjects } from "@/server/project-repository";
+import { providerReach } from "@/server/provider-keys";
 
 const money = (micros: number) => `$${fromMicros(micros).toFixed(2)}`;
 
@@ -72,8 +73,17 @@ export default makerPage(async function ProjectsPage(maker: CurrentMaker) {
   const mock = providerMode() === "mock";
   const keyless =
     !mock && !hasProviderKey("openai") && !hasProviderKey("google");
-  // Whom a member asks for a key; the owner is sent to Settings instead.
+  // Whom a member asks for a key; the owner is sent to Settings instead, and
+  // reads whether the studio has keys, none of them theirs or the team's.
   const ask = keyless ? await memberAsk(maker) : null;
+  const reach =
+    keyless && ask === null ? await providerReach(maker) : undefined;
+  const keysLine = keyless
+    ? homeKeysLine(
+        ask,
+        reach && { openai: reach.openai.reach, google: reach.google.reach },
+      )
+    : null;
   const details = Object.fromEntries(
     projects.flatMap((p) => {
       const s = stats.projects.get(p.id);
@@ -127,7 +137,7 @@ export default makerPage(async function ProjectsPage(maker: CurrentMaker) {
           maker={maker.name}
           next={next}
           returning={returning}
-          keyless={keyless}
+          keysLine={keysLine}
           ask={ask}
         />
 
@@ -237,13 +247,14 @@ function Opening({
   maker,
   next,
   returning,
-  keyless,
+  keysLine,
   ask,
 }: {
   maker: string;
   next: { href: string; label: string } | null;
   returning: boolean;
-  keyless: boolean;
+  // Why no scene can run for this reader, when none can (homeKeysLine).
+  keysLine: string | null;
   ask: string | null;
 }) {
   return (
@@ -287,22 +298,21 @@ function Opening({
           {returning ? "New project" : "Add a product"}
         </Link>
       </div>
-      {keyless ? (
+      {keysLine ? (
         <p
           data-testid="home-keys"
           className="max-w-[520px] font-sans text-[0.875rem] leading-relaxed text-on-surface-mid"
         >
           {ask !== null ? (
-            homeKeysLine(ask)
+            keysLine
           ) : (
             <>
-              Exact frames, vectors and the plan need no key. Scenes, video and
-              written text run on your own OpenAI or Google key:{" "}
+              {keysLine.split(HOME_KEYS_LINK)[0]}
               <Link
                 href="/settings#providers"
                 className="font-semibold text-foreground underline underline-offset-2"
               >
-                add one in Settings
+                {HOME_KEYS_LINK}
               </Link>
               .
             </>
