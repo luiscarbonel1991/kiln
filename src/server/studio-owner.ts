@@ -10,18 +10,37 @@ import { roleOf } from "@/server/organization";
 export const readsStudioAmounts = (maker: MakerRef): boolean =>
   !maker.member || maker.member.role === "owner";
 
-// The studio owner's first name, or "the studio's owner" when Kiln cannot
-// name them (no team yet, no name).
-export async function whomToAsk(maker: MakerRef): Promise<string> {
+export interface OwnerContact {
+  name: string;
+  firstName: string;
+  email: string;
+}
+
+// The studio's owner as a person the team can reach: their name and email,
+// read through the studio handed down; null when the studio has no team.
+export async function ownerContact(
+  maker: MakerRef,
+): Promise<OwnerContact | null> {
   const people = await db.member.findMany({
     where: { organization: { maker: { is: { id: maker.id } } } },
     orderBy: { createdAt: "asc" },
-    select: { role: true, user: { select: { name: true } } },
+    select: { role: true, user: { select: { name: true, email: true } } },
   });
   // The role exactly, as one of its comma-separated parts (roleOf).
   const owner = people.find((p) => roleOf(p.role) === "owner");
-  const first = owner?.user.name.trim().split(/\s+/)[0];
-  return first || "the studio's owner";
+  if (!owner) return null;
+  const name = owner.user.name.trim();
+  return {
+    name,
+    firstName: name.split(/\s+/)[0] ?? "",
+    email: owner.user.email,
+  };
+}
+
+// The studio owner's first name, or "the studio's owner" when Kiln cannot
+// name them (no team yet, no name).
+export async function whomToAsk(maker: MakerRef): Promise<string> {
+  return (await ownerContact(maker))?.firstName || "the studio's owner";
 }
 
 // Whom a member asks, or null for the owner and for work with no person
