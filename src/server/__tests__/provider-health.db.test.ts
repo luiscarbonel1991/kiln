@@ -584,3 +584,77 @@ describe.skipIf(!enabled)(
     });
   },
 );
+
+// Each provider's health also says, for its reader, whether a key is in
+// reach (and why not) and whether it was given to them: what the refusals
+// and the member's line are built from. Studio S: a team OpenAI key and Bob's
+// own; a Google key given to Bob only.
+describe.skipIf(!enabled)(
+  "provider health says the reader's reach (database)",
+  async () => {
+    const { providerHealth } = await import("@/server/provider-health");
+    const { withMakerKeys } = await import("@/server/provider-keys");
+    const fx = await import("@/server/__tests__/fixtures/studio-keys");
+    type Studio = Awaited<ReturnType<typeof fx.openStudio>>;
+    type Ref = Parameters<typeof withMakerKeys>[0];
+
+    let s: Studio;
+
+    beforeAll(async () => {
+      s = await fx.openStudio("health-reach");
+      await fx.writeKey(s, {
+        provider: "openai",
+        name: "Team key",
+        forTeam: true,
+        secret: "sk-fixture-health-reach-team-01",
+      });
+      await fx.writeKey(s, {
+        provider: "openai",
+        name: "Bob's key",
+        secret: "sk-fixture-health-reach-bob-002",
+        people: [s.bob],
+      });
+      await fx.writeKey(s, {
+        provider: "google",
+        name: "Bob's key",
+        secret: "AIza-fixture-health-reach-bob-03",
+        people: [s.bob],
+      });
+    });
+
+    afterAll(async () => {
+      await fx.closeStudio(s);
+    });
+
+    const read = (maker: Ref) =>
+      withMakerKeys(maker, async () =>
+        Object.fromEntries(
+          (await providerHealth(maker)).map((h) => [
+            h.provider,
+            { keyPresent: h.keyPresent, reach: h.reach, given: h.given },
+          ]),
+        ),
+      );
+
+    it("Bob runs on keys given to him for both providers", async () => {
+      expect(await read(s.as(s.bob))).toEqual({
+        openai: { keyPresent: true, reach: "in-reach", given: true },
+        google: { keyPresent: true, reach: "in-reach", given: true },
+      });
+    });
+
+    it("Carla runs on the team's OpenAI key, and Google's only key is someone else's", async () => {
+      expect(await read(s.as(s.carla))).toEqual({
+        openai: { keyPresent: true, reach: "in-reach", given: false },
+        google: { keyPresent: false, reach: "not-yours", given: false },
+      });
+    });
+
+    it("a token reads the team's reach, never a person's key", async () => {
+      expect(await read(s.as())).toEqual({
+        openai: { keyPresent: true, reach: "in-reach", given: false },
+        google: { keyPresent: false, reach: "not-yours", given: false },
+      });
+    });
+  },
+);

@@ -170,6 +170,9 @@ const inMembersWords = (
       ? `${label}'s last call failed; ask ${ask}.`
       : message;
 
+// A health as its reader may read it: the reach only for the owner.
+export type ReadersHealth<T> = Omit<T, "reach"> & { reach?: KeyReach };
+
 // A provider's health in its reader's words, for a page and for what it hands
 // the browser: a member reads whom to ask where the stored failure says what
 // only the owner can do, and keeps whether their key was given to them, but
@@ -183,10 +186,7 @@ export function healthForReader<
     reach?: KeyReach;
     given?: boolean;
   },
->(
-  health: T[],
-  ask: string | null,
-): (Omit<T, "reach"> & { reach?: KeyReach })[] {
+>(health: T[], ask: string | null): ReadersHealth<T>[] {
   if (ask === null) return health;
   return health.map(({ reach: _reach, ...h }) => {
     if (!h.lastError) return h;

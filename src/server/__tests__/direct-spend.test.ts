@@ -27,6 +27,23 @@ vi.mock("@/providers/keys", async (original) => ({
   ...(await original<typeof import("@/providers/keys")>()),
   hasProviderKey: (provider: "openai" | "google") => keys[provider],
 }));
+// The reader's reach for each provider, as the server works it out from the
+// studio's key rows: read only when a call is refused.
+type Reach = "none" | "not-yours" | "unreadable" | "in-reach";
+const reach = vi.hoisted(() => ({
+  of: { openai: "none", google: "none" } as Record<string, Reach>,
+  read: vi.fn(),
+}));
+vi.mock("@/server/provider-keys", async (original) => ({
+  ...(await original<typeof import("@/server/provider-keys")>()),
+  providerReach: async (maker: unknown) => {
+    reach.read(maker);
+    return {
+      openai: { reach: reach.of.openai, whose: null },
+      google: { reach: reach.of.google, whose: null },
+    };
+  },
+}));
 const { QueueRefusal } = vi.hoisted(() => ({
   QueueRefusal: class QueueRefusal extends Error {
     constructor(
@@ -66,6 +83,7 @@ afterEach(() => {
   vi.clearAllMocks();
   keys.openai = true;
   keys.google = true;
+  reach.of = { openai: "none", google: "none" };
   mode.current = "live";
 });
 
@@ -469,5 +487,158 @@ describe("a direct call with no key in reach", () => {
     );
     expect(result).toBe(video);
     nothingHappened();
+  });
+});
+
+// A studio with several keys: the refusal says which case it is, by the
+// reader's reach (keys only for others, or the reader's key unreadable). The
+// owner and a token, which runs on the team's key only, read their own
+// sentence; a member's is unchanged. Still the engine's missing-key error,
+// still refused before anything is read or reserved.
+describe("a direct call refused by the reader's reach", () => {
+  const LUNA = { provider: "openai" as const, model: "gpt-6-luna" };
+  const member = {
+    id: "maker-1",
+    member: { id: "m1", userId: "u1", role: "member" as const },
+  };
+  const owner = {
+    id: "maker-1",
+    member: { id: "o1", userId: "u0", role: "owner" as const },
+  };
+  const token = { id: "maker-1" };
+  const refusal = (
+    reader: typeof member | typeof owner | typeof token,
+    provider: "openai" | "google" = "openai",
+  ) =>
+    withProviderKeys({}, () =>
+      provider === "openai"
+        ? openDirectCall(reader, textCall<string>(LUNA, "chatTurn"))
+        : openDirectCall<{ usage?: unknown }>(reader, videoCall(OMNI, 8)),
+    ).catch((e: unknown) => e);
+  const nothingReserved = () => {
+    expect(readUnlisted).not.toHaveBeenCalled();
+    expect(reserveDirectCall).not.toHaveBeenCalled();
+  };
+
+  const CASES = [
+    {
+      reach: "not-yours",
+      owner: {
+        openai:
+          "No OpenAI key is yours or the team's: add one in Settings → Providers.",
+        google:
+          "No Google key is yours or the team's: add one in Settings → Providers.",
+      },
+      token: {
+        openai:
+          "OpenAI has no key for the whole team, the only one a token runs on: add one in Settings → Providers.",
+        google:
+          "Google has no key for the whole team, the only one a token runs on: add one in Settings → Providers.",
+      },
+    },
+    {
+      reach: "unreadable",
+      owner: {
+        openai:
+          "The OpenAI key your calls run on cannot be read: replace it in Settings → Providers.",
+        google:
+          "The Google key your calls run on cannot be read: replace it in Settings → Providers.",
+      },
+      token: {
+        openai:
+          "The team's OpenAI key cannot be read: replace it in Settings → Providers.",
+        google:
+          "The team's Google key cannot be read: replace it in Settings → Providers.",
+      },
+    },
+  ] as const;
+
+  it("the owner reads which case it is, as the engine's missing-key error", async () => {
+    for (const c of CASES) {
+      for (const provider of ["openai", "google"] as const) {
+        keys[provider] = false;
+        reach.of = {
+          openai: "in-reach",
+          google: "in-reach",
+          [provider]: c.reach,
+        };
+        const error = await refusal(owner, provider);
+        expect(error).toBeInstanceOf(ProviderKeyMissing);
+        expect(error).toMatchObject({
+          name: "ProviderKeyMissing",
+          provider,
+          message: c.owner[provider],
+        });
+        nothingReserved();
+        keys[provider] = true;
+      }
+    }
+  });
+
+  it("a token reads that the team's key, the only one it runs on, is missing or unreadable", async () => {
+    for (const c of CASES) {
+      for (const provider of ["openai", "google"] as const) {
+        keys[provider] = false;
+        reach.of = {
+          openai: "in-reach",
+          google: "in-reach",
+          [provider]: c.reach,
+        };
+        const error = await refusal(token, provider);
+        expect(error).toBeInstanceOf(ProviderKeyMissing);
+        expect(error).toMatchObject({ provider, message: c.token[provider] });
+        nothingReserved();
+        keys[provider] = true;
+      }
+    }
+  });
+
+  it("a member reads whom to ask, whatever the reach", async () => {
+    keys.openai = false;
+    for (const r of ["none", "not-yours", "unreadable"] as const) {
+      reach.of = { openai: r, google: "in-reach" };
+      const error = await refusal(member);
+      expect(error).toBeInstanceOf(ProviderKeyMissing);
+      expect(error).toMatchObject({
+        message: "You have no access to an OpenAI key; ask Ana.",
+      });
+    }
+    nothingReserved();
+  });
+
+  it("with no key in the studio the owner and a token read the line of before, byte for byte", async () => {
+    keys.openai = false;
+    reach.of = { openai: "none", google: "in-reach" };
+    for (const reader of [owner, token]) {
+      expect(await refusal(reader)).toMatchObject({
+        message: "OpenAI has no API key: add one in Settings → Providers.",
+      });
+    }
+    nothingReserved();
+  });
+
+  it("a saved route still moves past each of these refusals", async () => {
+    keys.openai = false;
+    for (const r of ["not-yours", "unreadable"] as const) {
+      reach.of = { openai: r, google: "in-reach" };
+      for (const reader of [owner, token, member]) {
+        const error = await refusal(reader);
+        expect(fallbackAfter("openai", error, { callStarted: false })).toEqual({
+          move: "provider",
+          reason: "OpenAI has no API key",
+        });
+      }
+    }
+  });
+
+  it("the reach is read only for a call that is refused", async () => {
+    reach.read.mockClear();
+    await openDirectCall(owner, textCall<string>(LUNA, "chatTurn"));
+    expect(reserveDirectCall).toHaveBeenCalledTimes(1);
+    expect(reach.read).not.toHaveBeenCalled();
+    keys.openai = false;
+    reach.of = { openai: "not-yours", google: "in-reach" };
+    await refusal(owner);
+    expect(reach.read).toHaveBeenCalledWith(owner);
   });
 });

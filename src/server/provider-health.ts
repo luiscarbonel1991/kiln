@@ -5,6 +5,7 @@ import {
 } from "@/domain/model-defaults";
 import { isKeyRejectedText, readableFailure } from "@/domain/queue";
 import { db, hasDatabase } from "@/lib/db";
+import type { KeyReach } from "@/lib/provider-key-pick";
 import { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 import { hasProviderKey, providerKeyId } from "@/providers/keys";
 import {
@@ -35,6 +36,11 @@ export interface ProviderHealth {
   lastOkAt: string | null;
   // The offered models its latest key check found it no longer lists.
   unlisted: { models: string[]; at: string } | null;
+  // Whether a key is in reach for the reader, and why not: the owner's words
+  // only (healthForReader drops it for a member).
+  reach: KeyReach;
+  // The reader's key was given to them, not the team's.
+  given: boolean;
 }
 
 const PROVIDERS: ProviderId[] = ["openai", "google"];
@@ -140,6 +146,8 @@ export async function providerHealth(
         (key) => key === id || (team && key === ""),
       ),
       unlisted: unlisted[provider] ?? null,
+      reach: reach[provider].reach,
+      given: reach[provider].whose === "given",
     };
   });
 }

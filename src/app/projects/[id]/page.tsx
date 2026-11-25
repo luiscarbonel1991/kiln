@@ -15,7 +15,7 @@ import { type ProjectPlan, parseSlotCardId } from "@/domain/plan";
 import { projectCost } from "@/domain/project-cost";
 import { cardsWithOwnPrompt } from "@/lib/project-refresh";
 import { providerBlock } from "@/lib/provider-block";
-import { healthForReader } from "@/lib/provider-key-words";
+import { healthForReader, type ReadersHealth } from "@/lib/provider-key-words";
 import { providerMode } from "@/providers/mode";
 import { chatPanelData } from "@/server/chat/chat-view";
 import { projectDrafts } from "@/server/etsy-drafts";
@@ -47,7 +47,7 @@ async function batchEstimate(
   cardIds: string[],
   plan: ProjectPlan,
   // The providers' health, already in its reader's words (healthForReader).
-  health: ProviderHealth[],
+  health: ReadersHealth<ProviderHealth>[],
   // Whom a member asks about a key; null for the owner.
   ask: string | null,
 ): Promise<BatchEstimate | { refusal: string } | null> {
