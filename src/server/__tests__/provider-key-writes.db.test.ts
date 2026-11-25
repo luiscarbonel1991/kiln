@@ -310,24 +310,6 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
     }
   });
 
-  it("the old form's team key, when another key is already named Team key, is refused in words and nothing is written", async () => {
-    const studio = await open("writes-team-name");
-    await fx.writeKey(studio, {
-      provider: "openai",
-      name: "Team key",
-      secret: secret(),
-      people: [studio.bob],
-    });
-    const before = await rowsOf(studio);
-    await expect(
-      keys.saveProviderKey(owner(studio), "openai", secret()),
-    ).rejects.toMatchObject({
-      name: "KeyRefusal",
-      message: "Another OpenAI key has that name.",
-    });
-    expect(await rowsOf(studio)).toEqual(before);
-  });
-
   // A write that loses a race: another write's row, not yet committed, is
   // invisible to this one's check, so its insert waits on the unique index
   // and fails when the other commits. The owner reads what the check would
@@ -466,15 +448,6 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
     );
     expect(team).toBeInstanceOf(keys.KeyRefusal);
     expect(team).toMatchObject({ message: teamTaken });
-
-    // The old form's team key, against a team key made meanwhile.
-    const other = await open("writes-race-old-form");
-    const saved = await race(
-      (tx) => rivalKey(other, tx, { name: "Rival team", forTeam: true }),
-      () => keys.saveProviderKey(owner(other), "openai", secret()),
-    );
-    expect(saved).toBeInstanceOf(keys.KeyRefusal);
-    expect(saved).toMatchObject({ message: teamTaken });
   });
 
   // Every write drops the studio's cached keys before it returns, and only

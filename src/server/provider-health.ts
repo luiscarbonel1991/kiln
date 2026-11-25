@@ -271,39 +271,32 @@ export async function providerKeyList(
   });
 }
 
-// Check a provider's key now, for free, and keep the answer as the latest
-// call of the key in use (the scope's): a replaced key clears the error it
-// left, and a key the provider rejects says so before any paid call. The models it lists are
+// Check one key of the studio's now, for free, whoever it is given to, and
+// keep the answer as that key's latest call: a replaced key clears the error
+// it left, and a key the provider rejects says so before any paid call. A key
+// of another studio is refused before any request. The models it lists are
 // compared with the catalog: an offered model it no longer names is kept with
 // the answer, so Settings names it and the queue refuses it before paying.
-export async function checkKey(
-  maker: MakerRef,
-  provider: ProviderId,
-): Promise<KeyCheck & { unlisted?: string[] }> {
-  const result = await checkProviderKey(provider);
-  const unlisted = result.ok ? unlistedModels(provider, result.models) : [];
-  if (result.called && hasDatabase()) {
-    await recordKeyCheck({
-      makerId: maker.id,
-      provider,
-      error: result.ok ? null : result.message,
-      ...(result.ok ? { unlisted } : {}),
-      memberId: maker.member?.id ?? null,
-      providerKeyId: providerKeyId(provider),
-    });
-  }
-  return result.ok ? { ...result, unlisted } : result;
-}
-
-// Check one key of the studio's, for free, whoever it is given to, and keep
-// the answer on that key. A key of another studio is refused before any
-// request.
 export async function checkKeyById(
   maker: MakerRef,
   keyId: string,
 ): Promise<KeyCheck & { unlisted?: string[]; provider: ProviderId }> {
-  return withKey(maker, keyId, async (provider) => ({
-    ...(await checkKey(maker, provider)),
-    provider,
-  }));
+  return withKey(maker, keyId, async (provider) => {
+    const result = await checkProviderKey(provider);
+    const unlisted = result.ok ? unlistedModels(provider, result.models) : [];
+    if (result.called && hasDatabase()) {
+      await recordKeyCheck({
+        makerId: maker.id,
+        provider,
+        error: result.ok ? null : result.message,
+        ...(result.ok ? { unlisted } : {}),
+        memberId: maker.member?.id ?? null,
+        // The scope withKey made holds this one key.
+        providerKeyId: providerKeyId(provider),
+      });
+    }
+    return result.ok
+      ? { ...result, unlisted, provider }
+      : { ...result, provider };
+  });
 }

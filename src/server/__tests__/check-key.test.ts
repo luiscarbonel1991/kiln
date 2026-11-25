@@ -66,8 +66,7 @@ vi.mock("@/server/generation-repository", async (original) => ({
   recordKeyCheck,
 }));
 
-const { checkKey, checkKeyById } = await import("@/server/provider-health");
-const { withProviderKeys } = await import("@/providers/keys");
+const { checkKeyById } = await import("@/server/provider-health");
 const { seal } = await import("@/server/secret-box");
 
 const offered = (provider: "openai" | "google") =>
@@ -75,46 +74,6 @@ const offered = (provider: "openai" | "google") =>
     .flatMap((kind) => catalogFor(kind))
     .filter((m) => m.provider === provider)
     .map((m) => m.id);
-
-describe("checkKey", () => {
-  it("names the offered models the provider no longer lists", async () => {
-    listed.models = offered("google").filter(
-      (id) => id !== "gemini-omni-1.1-flash",
-    );
-    expect(await checkKey({ id: "test" }, "google")).toMatchObject({
-      ok: true,
-      unlisted: ["gemini-omni-1.1-flash"],
-    });
-    listed.models = offered("google");
-    expect(await checkKey({ id: "test" }, "google")).toMatchObject({
-      unlisted: [],
-    });
-  });
-
-  // The check is recorded in the name of the person who ran it,
-  // or no one's.
-  it("records the check with the person who ran it, or none", async () => {
-    store.on = true;
-    onTestFinished(() => {
-      store.on = false;
-    });
-    listed.models = offered("google");
-    await checkKey(
-      {
-        id: "test",
-        member: { id: "m1", userId: "u1", role: "owner" as const },
-      },
-      "google",
-    );
-    expect(recordKeyCheck).toHaveBeenLastCalledWith(
-      expect.objectContaining({ makerId: "test", memberId: "m1" }),
-    );
-    await checkKey({ id: "test" }, "google");
-    expect(recordKeyCheck).toHaveBeenLastCalledWith(
-      expect.objectContaining({ makerId: "test", memberId: null }),
-    );
-  });
-});
 
 // One key of the studio is checked for free on its own, whoever it is
 // given to, and the answer is kept on that key.
@@ -135,8 +94,8 @@ describe("checking one key", () => {
 
   const on = () => {
     store.on = true;
-    // The checks of the describe above were recorded too.
     listed.seen.length = 0;
+    recordKeyCheck.mockClear();
     onTestFinished(() => {
       store.on = false;
       listed.seen.length = 0;
@@ -147,6 +106,11 @@ describe("checking one key", () => {
   rows.keys.push(
     key("studio-a", "a-team", true),
     key("studio-a", "a-bob", false),
+    {
+      ...key("studio-a", "a-google", true),
+      provider: "google",
+      sealed: seal("sk-fixture-a-google", "provider-key:google"),
+    },
     key("studio-b", "b-team", true),
   );
   rows.access.push({
@@ -184,16 +148,33 @@ describe("checking one key", () => {
     expect(recordKeyCheck).not.toHaveBeenCalled();
   });
 
-  it("today's check of a provider records the key in use", async () => {
+  it("names the offered models the provider no longer lists", async () => {
+    on();
+    listed.models = offered("google").filter(
+      (id) => id !== "gemini-omni-1.1-flash",
+    );
+    expect(await checkKeyById(ana, "a-google")).toMatchObject({
+      ok: true,
+      provider: "google",
+      unlisted: ["gemini-omni-1.1-flash"],
+    });
+    listed.models = offered("google");
+    expect(await checkKeyById(ana, "a-google")).toMatchObject({
+      unlisted: [],
+    });
+  });
+
+  // The check is recorded in the name of the person who ran it, or no one's.
+  it("records the check with the person who ran it, or none", async () => {
     on();
     listed.models = offered("openai");
-    await withProviderKeys(
-      { openai: "sk-fixture-a-team" },
-      () => checkKey(ana, "openai"),
-      { openai: "a-team" },
-    );
+    await checkKeyById(ana, "a-team");
     expect(recordKeyCheck).toHaveBeenLastCalledWith(
-      expect.objectContaining({ makerId: "studio-a", providerKeyId: "a-team" }),
+      expect.objectContaining({ makerId: "studio-a", memberId: "ana" }),
+    );
+    await checkKeyById({ id: "studio-a" }, "a-team");
+    expect(recordKeyCheck).toHaveBeenLastCalledWith(
+      expect.objectContaining({ makerId: "studio-a", memberId: null }),
     );
   });
 });

@@ -5,7 +5,7 @@ import { z } from "zod";
 import {
   modelLabel,
   PROVIDER_LABELS,
-  ProviderId,
+  type ProviderId,
 } from "@/domain/model-defaults";
 import { AgentRoutes, MakerRoutes } from "@/domain/model-routing";
 import {
@@ -23,15 +23,13 @@ import {
   saveMakerRoutes,
   setSceneLook,
 } from "@/server/maker-repository";
-import { checkKey, checkKeyById } from "@/server/provider-health";
+import { checkKeyById } from "@/server/provider-health";
 import {
   addProviderKey,
   editProviderKey,
   KeyRefusal,
-  removeProviderKey,
   removeProviderKeyById,
   replaceProviderKey,
-  saveProviderKey,
 } from "@/server/provider-keys";
 
 const SavedRoutes = z.object({ routes: MakerRoutes, agents: AgentRoutes });
@@ -60,18 +58,6 @@ export const saveMakerRoutesAction = makerAction(
   },
 );
 
-// Settings → Providers: a key checked for free, the answer kept as the
-// provider's latest call. The keys are the owner's to manage, the check too.
-export const checkProviderKeyAction = ownerAction(
-  async (maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
-    const parsed = ProviderId.safeParse(input);
-    if (!parsed.success) return { ok: false, message: "Which provider?" };
-    const result = await checkKey(maker, parsed.data);
-    if (result.called) refresh();
-    return checkedWords(parsed.data, result);
-  },
-);
-
 // The free check's answer, in the provider's own words.
 function checkedWords(
   provider: ProviderId,
@@ -90,57 +76,8 @@ function checkedWords(
   };
 }
 
-const SavedKey = z.object({
-  provider: ProviderId,
-  key: z.string().min(1).max(400),
-});
-
-// Settings → Providers: keep a provider's key (sealed, never sent back), then
-// check it for free, so the answer the maker reads is the provider's own.
-export const saveProviderKeyAction = ownerAction(
-  async (maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
-    const parsed = SavedKey.safeParse(input);
-    if (!parsed.success) return { ok: false, message: "Paste the key first." };
-    if (providerMode() === "mock") {
-      return {
-        ok: false,
-        message: "Mock mode calls no provider: add keys in a live run.",
-      };
-    }
-    try {
-      await saveProviderKey(maker, parsed.data.provider, parsed.data.key);
-    } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : String(error),
-      };
-    }
-    const checked = await checkProviderKeyAction(parsed.data.provider);
-    refresh();
-    return checked.ok
-      ? { ok: true, message: `Saved. ${checked.message}` }
-      : { ok: false, message: `Saved, but: ${checked.message}` };
-  },
-);
-
-export const removeProviderKeyAction = ownerAction(
-  async (maker, input: unknown): Promise<{ ok: boolean; message: string }> => {
-    const parsed = ProviderId.safeParse(input);
-    if (!parsed.success) return { ok: false, message: "Which provider?" };
-    try {
-      await removeProviderKey(maker, parsed.data);
-    } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : String(error),
-      };
-    }
-    refresh();
-    return { ok: true, message: "Removed." };
-  },
-);
-
-// Settings → Providers, a studio's several keys. What the client sends is
+// Settings → Providers, a studio's several keys: the owner's to manage, and
+// to check. What the client sends is
 // what the form holds (a key id, a name, whom it is for, member ids, a key),
 // never who is asking; the functions read the key and the people again under
 // this studio. An answer names the form field it belongs under, if one.

@@ -11,10 +11,8 @@ import {
 } from "@/lib/provider-key-pick";
 import { article } from "@/lib/provider-key-words";
 import {
-  hasEnvironmentKey,
   type ProviderKeyIds,
   type ProviderKeys,
-  providerKeySource,
   withProviderKeys,
 } from "@/providers/keys";
 import type { MakerRef } from "@/server/maker-repository";
@@ -26,21 +24,7 @@ import { hasSecretKey, seal, unseal } from "@/server/secret-box";
 // sent back to the browser. They are the only keys the app uses; the
 // environment's (OPENAI_API_KEY, GOOGLE_API_KEY) serve scripts and the CLI.
 
-const PROVIDERS: ProviderId[] = ["openai", "google"];
 const purpose = (provider: ProviderId) => `provider-key:${provider}`;
-
-export interface ProviderKeyState {
-  provider: ProviderId;
-  // Where the key in use comes from; null when there is none.
-  source: "saved" | "env" | null;
-  // The saved key's last four characters.
-  hint: string | null;
-  // A key is saved but cannot be read (KILN_SECRET_KEY is missing or changed).
-  unreadable: boolean;
-  // The environment holds a key for this provider, which the app does not
-  // use: it has to be saved here.
-  inEnvironment: boolean;
-}
 
 // A studio's keys as the lookup reads them: every key row unsealed (null when
 // it cannot be read), who each key is given to, and which of those people
@@ -229,36 +213,6 @@ export async function providerReach(
   };
 }
 
-export async function providerKeyStates(
-  maker: MakerRef,
-): Promise<ProviderKeyState[]> {
-  const rows = hasDatabase()
-    ? await db.providerKey.findMany({
-        where: { makerId: maker.id, forTeam: true },
-      })
-    : [];
-  // Today's form manages each provider's team key: the one a token runs on.
-  const team = await picked({ id: maker.id });
-  const keys: ProviderKeys = {};
-  for (const provider of PROVIDERS) {
-    const key = team[provider].key;
-    if (key) keys[provider] = key.secret;
-  }
-  return withProviderKeys(keys, () =>
-    PROVIDERS.map((provider) => {
-      const row = rows.find((r) => r.provider === provider);
-      const source = providerKeySource(provider);
-      return {
-        provider,
-        source,
-        hint: row?.hint ?? null,
-        unreadable: Boolean(row) && source !== "saved",
-        inEnvironment: hasEnvironmentKey(provider),
-      };
-    }),
-  );
-}
-
 // A refusal of a write of the studio's keys, in the owner's words; `field`
 // is the form's field it belongs under, if one.
 export class KeyRefusal extends Error {
@@ -331,46 +285,6 @@ function sealedKey(provider: ProviderId, raw: string) {
     );
   }
   return { sealed: seal(key, purpose(provider)), hint: key.slice(-4) };
-}
-
-export async function saveProviderKey(
-  maker: MakerRef,
-  provider: ProviderId,
-  raw: string,
-): Promise<void> {
-  assertDatabaseUrl();
-  const data = sealedKey(provider, raw);
-  // The form writes the provider's team key: replaced in place, or made,
-  // named "Team key" unless another key has that name.
-  await orRefused(provider, () =>
-    db.$transaction(async (tx) => {
-      const team = await tx.providerKey.findFirst({
-        where: { makerId: maker.id, provider, forTeam: true },
-        select: { id: true },
-      });
-      if (team) {
-        await tx.providerKey.update({ where: { id: team.id }, data });
-        return;
-      }
-      const name = "Team key";
-      await refuseTaken(maker, tx, { provider, name, who: "team" }, null);
-      await tx.providerKey.create({
-        data: { makerId: maker.id, provider, name, forTeam: true, ...data },
-      });
-    }),
-  );
-  forget(maker.id);
-}
-
-export async function removeProviderKey(
-  maker: MakerRef,
-  provider: ProviderId,
-): Promise<void> {
-  assertDatabaseUrl();
-  await db.providerKey.deleteMany({
-    where: { makerId: maker.id, provider, forTeam: true },
-  });
-  forget(maker.id);
 }
 
 // Who uses a key: the whole team, or the people chosen (member ids from the
