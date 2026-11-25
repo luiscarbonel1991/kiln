@@ -5,6 +5,7 @@ import { AccessTokens } from "@/components/settings/access-tokens";
 import { KeyCheck } from "@/components/settings/key-check";
 import { Lessons } from "@/components/settings/lessons";
 import { MonthSpend } from "@/components/settings/month-spend";
+import { OwnerContact } from "@/components/settings/owner-contact";
 import { ProviderKey } from "@/components/settings/provider-key";
 import { RoutesForm } from "@/components/settings/routes-form";
 import { SceneLookSwitch } from "@/components/settings/scene-look-switch";
@@ -34,6 +35,7 @@ import { providerHealth } from "@/server/provider-health";
 import { providerKeyStates } from "@/server/provider-keys";
 import { sceneLookSetup } from "@/server/scene-look";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
+import { ownerContact } from "@/server/studio-owner";
 import { listTeam, monthSpend } from "@/server/team";
 import { recentToolCalls } from "@/server/tool-calls";
 
@@ -75,6 +77,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
     lessons,
     team,
     ask,
+    contact,
   ] = await Promise.all([
     getMakerModelSetup(current),
     providerHealth(current),
@@ -90,6 +93,8 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
     maker && owner ? listTeam(maker) : Promise.resolve(null),
     // Whom a member asks about a key; null for the owner.
     maker ? memberAsk(maker) : Promise.resolve(null),
+    // The owner as a person a member can write to; the owner reads no one.
+    maker && !owner ? ownerContact(maker) : Promise.resolve(null),
   ]);
   // The health as this reader may read it: a member gets no owner's to-do.
   const health = healthForReader(stored, ask);
@@ -137,6 +142,12 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
               ? "Mock mode: nothing is called or paid."
               : providersIntro(ask)}
           </p>
+          {/* Only an owner Kiln can name, the one the intro names. */}
+          {ask !== null && mode !== "mock" && contact?.firstName ? (
+            <div className="-mt-2 mb-5">
+              <OwnerContact owner={contact} />
+            </div>
+          ) : null}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {health.map((h) => (
               <div
@@ -157,6 +168,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
                       owner,
                       keyInReach: h.keyPresent,
                       keyRejected: h.keyRejected,
+                      given: h.given,
                       ask,
                       label: h.label,
                     })}
