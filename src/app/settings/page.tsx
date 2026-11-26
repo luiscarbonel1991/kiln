@@ -1,11 +1,12 @@
-import { CircleAlert, CircleCheck, KeyRound } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { connection } from "next/server";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { AccessTokens } from "@/components/settings/access-tokens";
-import { KeyCheck } from "@/components/settings/key-check";
 import { Lessons } from "@/components/settings/lessons";
 import { MonthSpend } from "@/components/settings/month-spend";
-import { ProviderKey } from "@/components/settings/provider-key";
+import { OwnerContact } from "@/components/settings/owner-contact";
+import { ProviderKeys } from "@/components/settings/provider-keys";
+import { ProviderLines } from "@/components/settings/provider-lines";
 import { RoutesForm } from "@/components/settings/routes-form";
 import { SceneLookSwitch } from "@/components/settings/scene-look-switch";
 import { Team } from "@/components/settings/team";
@@ -18,7 +19,6 @@ import { hasDatabase } from "@/lib/db";
 import {
   healthErrorLine,
   healthForReader,
-  keyLine,
   providersIntro,
 } from "@/lib/provider-key-words";
 import { providerMode } from "@/providers/mode";
@@ -29,11 +29,10 @@ import { makerPage } from "@/server/guarded";
 import { listLessons } from "@/server/lessons";
 import type { CurrentMaker } from "@/server/maker-repository";
 import { getMakerModelSetup } from "@/server/maker-repository";
-import { memberAsk } from "@/server/month-limit";
-import { providerHealth } from "@/server/provider-health";
-import { providerKeyStates } from "@/server/provider-keys";
+import { providerHealth, providerKeyList } from "@/server/provider-health";
 import { sceneLookSetup } from "@/server/scene-look";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
+import { ownerContact, UNNAMED_OWNER } from "@/server/studio-owner";
 import { listTeam, monthSpend } from "@/server/team";
 import { recentToolCalls } from "@/server/tool-calls";
 
@@ -50,10 +49,10 @@ const when = (iso: string) =>
 
 // Settings (per request: it reads the maker's routes and the providers'
 // health). Models: a route per role, Kiln's proposal until saved. Providers:
-// each key and its last calls, read for free, and a free key check on a click
-// (the provider lists its models; no paid call); a member reads only whether
-// each provider is in reach and whom to ask, never a key or a control, and
-// their request unseals no key. The month's cap, read only: the owner sees
+// the owner manages every key of the studio (who uses it, its last calls, a
+// free check on a click: the provider lists its models, no paid call); a
+// member reads only whether each provider is in reach, on whose key, and the
+// owner to write to, never a key, a person on it or a control. The month's cap, read only: the owner sees
 // the studio's total and each person's spend, a member only their own.
 // Lessons: what Kiln proposes it learned of the maker's taste, and what they
 // kept. Shops: the Etsy connection. Access tokens: for the HTTP API (README
@@ -66,7 +65,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
   const [
     setup,
     stored,
-    keyStates,
+    cards,
     month,
     spenders,
     tokens,
@@ -74,11 +73,12 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
     calls,
     lessons,
     team,
-    ask,
+    contact,
   ] = await Promise.all([
     getMakerModelSetup(current),
     providerHealth(current),
-    maker && owner ? providerKeyStates(maker) : Promise.resolve([]),
+    // Every key of the studio and its people: the owner's only.
+    maker && owner ? providerKeyList(maker) : Promise.resolve(null),
     maker && owner ? budget(maker.id) : Promise.resolve(null),
     maker ? monthSpend(maker) : Promise.resolve([]),
     maker && owner ? listAccessTokens(maker) : Promise.resolve(null),
@@ -88,9 +88,13 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
       ? listLessons(maker, { status: ["proposed", "kept"] })
       : Promise.resolve(null),
     maker && owner ? listTeam(maker) : Promise.resolve(null),
-    // Whom a member asks about a key; null for the owner.
-    maker ? memberAsk(maker) : Promise.resolve(null),
+    // The owner as a person a member can write to; the owner reads no one.
+    maker && !owner ? ownerContact(maker) : Promise.resolve(null),
   ]);
+  // Whom a member asks about a key; null for the owner. Decided by the role,
+  // as `owner` is, so whoever is not the owner reads in a member's words and
+  // never receives `reach` (healthForReader), with a database or without.
+  const ask = owner ? null : contact?.firstName || UNNAMED_OWNER;
   // The health as this reader may read it: a member gets no owner's to-do.
   const health = healthForReader(stored, ask);
   // A member's key row already says a rejected key: no second line (null).
@@ -104,6 +108,15 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
         })
       : null;
   const mode = providerMode();
+  // Each key's dates in words, written here so the browser shows the same.
+  const keyCards = cards?.map((card) => ({
+    ...card,
+    keys: card.keys.map((key) => ({
+      ...key,
+      lastOkWhen: key.lastOkAt ? when(key.lastOkAt) : null,
+      errorWhen: key.lastError ? when(key.lastError.at) : null,
+    })),
+  }));
   const look = maker ? await sceneLookSetup(maker) : null;
   // A mock run calls nothing, so every provider counts as keyed.
   const keys = {
@@ -137,89 +150,64 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
               ? "Mock mode: nothing is called or paid."
               : providersIntro(ask)}
           </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {health.map((h) => (
-              <div
-                key={h.provider}
-                className="flex min-w-0 flex-col gap-2 rounded-render border border-border-soft bg-surface-soft p-4"
-              >
-                <div className="font-sans text-sm font-semibold text-foreground">
-                  {h.label}
+          {/* The owner to write to, whenever the studio has one. */}
+          {ask !== null && mode !== "mock" && contact ? (
+            <div className="-mt-2 mb-5">
+              <OwnerContact owner={contact} />
+            </div>
+          ) : null}
+          <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+            {health.map((h) => {
+              // The owner's keys of this provider; none for a member.
+              const keyCard = keyCards?.find((c) => c.provider === h.provider);
+              return (
+                <div
+                  key={h.provider}
+                  className="flex min-w-0 flex-col gap-2 rounded-render border border-border-soft bg-surface-soft p-4"
+                >
+                  <div className="font-sans text-sm font-semibold text-foreground">
+                    {h.label}
+                  </div>
+                  {keyCard ? (
+                    <ProviderKeys
+                      card={keyCard}
+                      team={team?.members ?? []}
+                      mock={mode === "mock"}
+                    />
+                  ) : (
+                    <ProviderLines
+                      health={h}
+                      ask={ask}
+                      mock={mode === "mock"}
+                      errorLine={errorLine(h)}
+                      errorWhen={h.lastError ? when(h.lastError.at) : null}
+                      lastOkWhen={h.lastOkAt ? when(h.lastOkAt) : null}
+                    />
+                  )}
+                  {h.unlisted && mode !== "mock" ? (
+                    <div
+                      className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
+                      data-testid={`provider-${h.provider}-unlisted`}
+                    >
+                      <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
+                      <span className="min-w-0 [overflow-wrap:anywhere]">
+                        No longer offered by {h.label}:{" "}
+                        {h.unlisted.models
+                          .map((model) =>
+                            modelLabel({ provider: h.provider, model }),
+                          )
+                          .join(", ")}
+                        . Kiln will not run{" "}
+                        {h.unlisted.models.length === 1 ? "it" : "them"}.{" "}
+                        <span className="font-mono text-[0.65rem] text-on-surface-dim">
+                          {when(h.unlisted.at)}
+                        </span>
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
-                {ask !== null && mode === "mock" ? null : (
-                  <div
-                    className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
-                    data-testid={`provider-${h.provider}-key`}
-                  >
-                    <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
-                    {keyLine({
-                      state: keyStates.find((k) => k.provider === h.provider),
-                      owner,
-                      keyInReach: h.keyPresent,
-                      keyRejected: h.keyRejected,
-                      ask,
-                      label: h.label,
-                    })}
-                  </div>
-                )}
-                {h.lastError && errorLine(h) !== null ? (
-                  <div
-                    className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
-                    data-testid={`provider-${h.provider}-error`}
-                  >
-                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
-                    <span className="min-w-0 [overflow-wrap:anywhere]">
-                      {errorLine(h)}{" "}
-                      <span className="font-mono text-[0.65rem] text-on-surface-dim">
-                        {when(h.lastError.at)}
-                      </span>
-                    </span>
-                  </div>
-                ) : null}
-                {/* A member with no key in reach has made no call to speak of. */}
-                {h.lastOkAt || ask === null || h.keyPresent ? (
-                  <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
-                    <CircleCheck className="size-3.5 text-prov-recipe" />
-                    {h.lastOkAt
-                      ? `Last call that worked: ${when(h.lastOkAt)}`
-                      : "No call that worked yet"}
-                  </div>
-                ) : null}
-                {h.unlisted ? (
-                  <div
-                    className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
-                    data-testid={`provider-${h.provider}-unlisted`}
-                  >
-                    <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
-                    <span className="min-w-0 [overflow-wrap:anywhere]">
-                      No longer offered by {h.label}:{" "}
-                      {h.unlisted.models
-                        .map((model) =>
-                          modelLabel({ provider: h.provider, model }),
-                        )
-                        .join(", ")}
-                      . Kiln will not run{" "}
-                      {h.unlisted.models.length === 1 ? "it" : "them"}.{" "}
-                      <span className="font-mono text-[0.65rem] text-on-surface-dim">
-                        {when(h.unlisted.at)}
-                      </span>
-                    </span>
-                  </div>
-                ) : null}
-                {h.keyPresent && mode !== "mock" && owner ? (
-                  <KeyCheck provider={h.provider} label={h.label} />
-                ) : null}
-                {maker && mode !== "mock" && owner ? (
-                  <ProviderKey
-                    provider={h.provider}
-                    label={h.label}
-                    saved={keyStates.some(
-                      (k) => k.provider === h.provider && k.hint !== null,
-                    )}
-                  />
-                ) : null}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 

@@ -23,7 +23,6 @@ export {
   type ProviderKeys,
   providerKey,
   providerKeyId,
-  providerKeySource,
   withProviderKeys,
 } from "@/providers/keys";
 export { mockArtDirector } from "@/providers/mock/art-director";

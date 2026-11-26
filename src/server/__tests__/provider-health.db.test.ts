@@ -289,7 +289,7 @@ describe.skipIf(!enabled)(
   "provider health by the reader's key (database)",
   async () => {
     const { db } = await import("@/lib/db");
-    const { providerHealth, checkKeyById } = await import(
+    const { providerHealth, checkKey } = await import(
       "@/server/provider-health"
     );
     const { withMakerKeys } = await import("@/server/provider-keys");
@@ -479,7 +479,7 @@ describe.skipIf(!enabled)(
     it("checking Bob's key, which the provider rejects, is kept on Bob's key and leaves the team key clean", async () => {
       // Bob's key is checked by the owner, and answers rejected.
       const before = await healthOf(s.as(s.carla));
-      const checked = await checkKeyById(s.as(s.ana), ids.bob);
+      const checked = await checkKey(s.as(s.ana), ids.bob);
       expect(checked).toMatchObject({ ok: false });
       const recorded = await db.generationJob.findFirstOrThrow({
         where: {
@@ -584,3 +584,256 @@ describe.skipIf(!enabled)(
     });
   },
 );
+
+// Each provider's health also says, for its reader, whether a key is in
+// reach (and why not) and whether it was given to them: what the refusals
+// and the member's line are built from. Studio S: a team OpenAI key and Bob's
+// own; a Google key given to Bob only.
+describe.skipIf(!enabled)(
+  "provider health says the reader's reach (database)",
+  async () => {
+    const { providerHealth } = await import("@/server/provider-health");
+    const { withMakerKeys } = await import("@/server/provider-keys");
+    const fx = await import("@/server/__tests__/fixtures/studio-keys");
+    type Studio = Awaited<ReturnType<typeof fx.openStudio>>;
+    type Ref = Parameters<typeof withMakerKeys>[0];
+
+    let s: Studio;
+
+    beforeAll(async () => {
+      s = await fx.openStudio("health-reach");
+      await fx.writeKey(s, {
+        provider: "openai",
+        name: "Team key",
+        forTeam: true,
+        secret: "sk-fixture-health-reach-team-01",
+      });
+      await fx.writeKey(s, {
+        provider: "openai",
+        name: "Bob's key",
+        secret: "sk-fixture-health-reach-bob-002",
+        people: [s.bob],
+      });
+      await fx.writeKey(s, {
+        provider: "google",
+        name: "Bob's key",
+        secret: "AIza-fixture-health-reach-bob-03",
+        people: [s.bob],
+      });
+    });
+
+    afterAll(async () => {
+      await fx.closeStudio(s);
+    });
+
+    const read = (maker: Ref) =>
+      withMakerKeys(maker, async () =>
+        Object.fromEntries(
+          (await providerHealth(maker)).map((h) => [
+            h.provider,
+            { keyPresent: h.keyPresent, reach: h.reach, given: h.given },
+          ]),
+        ),
+      );
+
+    it("Bob runs on keys given to him for both providers", async () => {
+      expect(await read(s.as(s.bob))).toEqual({
+        openai: { keyPresent: true, reach: "in-reach", given: true },
+        google: { keyPresent: true, reach: "in-reach", given: true },
+      });
+    });
+
+    it("Carla runs on the team's OpenAI key, and Google's only key is someone else's", async () => {
+      expect(await read(s.as(s.carla))).toEqual({
+        openai: { keyPresent: true, reach: "in-reach", given: false },
+        google: { keyPresent: false, reach: "not-yours", given: false },
+      });
+    });
+
+    it("a token reads the team's reach, never a person's key", async () => {
+      expect(await read(s.as())).toEqual({
+        openai: { keyPresent: true, reach: "in-reach", given: false },
+        google: { keyPresent: false, reach: "not-yours", given: false },
+      });
+    });
+  },
+);
+
+// The owner's list of keys: every key of the studio, its people named only
+// from the studio's own team, and the line on the owner's own calls. Never
+// a secret, a sealed value or anything of another studio's, even when an
+// access row of this studio names a person of the other one.
+describe.skipIf(!enabled)("the owner's list of keys (database)", async () => {
+  const { db } = await import("@/lib/db");
+  const { providerKeyList } = await import("@/server/provider-health");
+  const { withMakerKeys } = await import("@/server/provider-keys");
+  const fx = await import("@/server/__tests__/fixtures/studio-keys");
+  type Studio = Awaited<ReturnType<typeof fx.openStudio>>;
+  type Ref = Parameters<typeof withMakerKeys>[0];
+
+  let p: Studio;
+  let q: Studio;
+  let own: Studio;
+  let others: Studio;
+  const ids: Record<string, string> = {};
+  const SECRETS = {
+    pTeam: "sk-fixture-list-p-team-0000p1a1",
+    pBob: "sk-fixture-list-p-bob-00000p2b2",
+    pNobody: "sk-fixture-list-p-nobody-00p3c3",
+    pGoogle: "AIza-fixture-list-p-google-0p4d4",
+    qTeam: "sk-fixture-list-q-team-0000q5e5",
+    qBob: "sk-fixture-list-q-bob-00000q6f6",
+    ownTeam: "sk-fixture-list-own-team-00o7g7",
+    ownAna: "sk-fixture-list-own-ana-000o8h8",
+    othersCarla: "sk-fixture-list-others-carl9i9",
+  };
+
+  const list = (maker: Ref) =>
+    withMakerKeys(maker, () => providerKeyList(maker));
+
+  beforeAll(async () => {
+    p = await fx.openStudio("list-p");
+    q = await fx.openStudio("list-q");
+    ids.pTeam = await fx.writeKey(p, {
+      provider: "openai",
+      name: "Team key",
+      forTeam: true,
+      secret: SECRETS.pTeam,
+    });
+    ids.pBob = await fx.writeKey(p, {
+      provider: "openai",
+      name: "Bob's key",
+      secret: SECRETS.pBob,
+      people: [p.bob],
+    });
+    // Given to studio Q's Carla, who is not on P's team: the database lets
+    // the row be; the list must not name her.
+    ids.pNobody = await fx.writeKey(p, {
+      provider: "openai",
+      name: "Left key",
+      secret: SECRETS.pNobody,
+      people: [q.carla],
+    });
+    ids.pGoogle = await fx.writeKey(p, {
+      provider: "google",
+      name: "Team key",
+      forTeam: true,
+      secret: SECRETS.pGoogle,
+      unreadable: true,
+    });
+    ids.qTeam = await fx.writeKey(q, {
+      provider: "openai",
+      name: "Q team key",
+      forTeam: true,
+      secret: SECRETS.qTeam,
+    });
+    ids.qBob = await fx.writeKey(q, {
+      provider: "openai",
+      name: "Q Bob key",
+      secret: SECRETS.qBob,
+      people: [q.bob],
+    });
+    // The owner with a key of her own beside the team's.
+    own = await fx.openStudio("list-own");
+    await fx.writeKey(own, {
+      provider: "openai",
+      name: "Team key",
+      forTeam: true,
+      secret: SECRETS.ownTeam,
+    });
+    await fx.writeKey(own, {
+      provider: "openai",
+      name: "Ana's key",
+      secret: SECRETS.ownAna,
+      people: [own.ana],
+    });
+    // Every key is for someone else.
+    others = await fx.openStudio("list-others");
+    await fx.writeKey(others, {
+      provider: "openai",
+      name: "Carla's key",
+      secret: SECRETS.othersCarla,
+      people: [others.carla],
+    });
+  });
+
+  afterAll(async () => {
+    for (const studio of [p, q, own, others]) await fx.closeStudio(studio);
+  });
+
+  it("lists every key of the studio with its last four and its people", async () => {
+    const text = JSON.stringify(await list(p.as(p.ana)));
+    for (const id of [ids.pTeam, ids.pBob, ids.pNobody, ids.pGoogle]) {
+      expect(text).toContain(id);
+    }
+    for (const name of ["Team key", "Bob's key", "Left key"]) {
+      expect(text).toContain(name);
+    }
+    for (const secret of [SECRETS.pTeam, SECRETS.pBob, SECRETS.pNobody]) {
+      expect(text).toContain(secret.slice(-4));
+    }
+    expect(text).toContain("Bob Ruiz");
+    expect(text).toContain(p.bob.email);
+  });
+
+  it("holds no key, no person and nothing else of another studio's", async () => {
+    const text = JSON.stringify(await list(p.as(p.ana)));
+    for (const leak of [
+      ids.qTeam,
+      ids.qBob,
+      "Q team key",
+      "Q Bob key",
+      SECRETS.qTeam.slice(-4),
+      SECRETS.qBob.slice(-4),
+      q.makerId,
+      q.ana.email,
+      q.bob.email,
+      q.carla.email,
+      q.ana.memberId,
+      q.bob.memberId,
+      q.carla.memberId,
+    ]) {
+      expect(text).not.toContain(leak);
+    }
+  });
+
+  it("holds no secret and no sealed value", async () => {
+    const text = JSON.stringify(await list(p.as(p.ana)));
+    for (const secret of Object.values(SECRETS)) {
+      expect(text).not.toContain(secret);
+    }
+    const sealed = await db.providerKey.findMany({
+      where: { makerId: p.makerId },
+      select: { sealed: true },
+    });
+    for (const row of sealed) expect(text).not.toContain(row.sealed);
+    expect(text).not.toContain("v1.");
+  });
+
+  it("says which key the owner's own calls run on", async () => {
+    expect(JSON.stringify(await list(p.as(p.ana)))).toContain(
+      "Your calls run on Team key.",
+    );
+    expect(JSON.stringify(await list(own.as(own.ana)))).toContain(
+      "Your calls run on Ana's key.",
+    );
+  });
+
+  it("says when the key the owner's calls run on cannot be read", async () => {
+    // P's only Google key is the team's, and it cannot be read.
+    expect(JSON.stringify(await list(p.as(p.ana)))).toContain(
+      "Your calls run on Team key, which cannot be read now.",
+    );
+  });
+
+  it("gives someone who is not the owner nothing", async () => {
+    expect(await list(p.as(p.bob))).toEqual([]);
+    expect(await list(own.as(own.bob))).toEqual([]);
+  });
+
+  it("says when every key is for others", async () => {
+    expect(JSON.stringify(await list(others.as(others.ana)))).toContain(
+      "No OpenAI key is yours or the team's, so your calls cannot use OpenAI.",
+    );
+  });
+});

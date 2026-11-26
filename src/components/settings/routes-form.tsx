@@ -411,9 +411,18 @@ function RouteEditor({
                   <X />
                 </Button>
               </div>
+              {/* A member cannot fix it, so their row is not an alarm. */}
               {keyed(entry.provider) ? null : (
-                <span className="pl-10 font-mono text-[0.6rem] text-fail">
-                  {routeKeyLine(PROVIDER_LABELS[entry.provider], ask)}
+                <span
+                  className={cn(
+                    "pl-10 font-mono text-[0.6rem]",
+                    ask === null ? "text-fail" : "text-on-surface-mid",
+                  )}
+                >
+                  {routeKeyLine(PROVIDER_LABELS[entry.provider], ask, {
+                    reach: notes.find((n) => n.provider === entry.provider)
+                      ?.reach,
+                  })}
                 </span>
               )}
             </li>

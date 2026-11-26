@@ -47,7 +47,7 @@ describe("adding a key", () => {
 
   it("a key with no name asks for one", () => {
     expect(under(AddKeyForm.safeParse(add({ name: "" })), "name")).toEqual([
-      "Name it, like Bob's key.",
+      "Name it, like Team key, or Studio key.",
     ]);
   });
 
@@ -103,7 +103,7 @@ describe("changing a key's name or people", () => {
       EditKeyForm.safeParse(edit({ who: "team", memberIds: [] })).success,
     ).toBe(true);
     expect(under(EditKeyForm.safeParse(edit({ name: "" })), "name")).toEqual([
-      "Name it, like Bob's key.",
+      "Name it, like Team key, or Studio key.",
     ]);
     expect(
       under(EditKeyForm.safeParse(edit({ memberIds: [] })), "who", "memberIds"),

@@ -235,3 +235,158 @@ describe("providerBlock", () => {
     expect(providerBlock([], "openai", "live")).toBeNull();
   });
 });
+
+// Several keys per provider: the owner's block says which case it is (no key
+// in the studio, keys only for others, theirs unreadable), from the reach the
+// server put on the note; a member's reads as before, and names the key the
+// owner gave them when that is the one rejected.
+describe("providerBlock by the reader's reach", () => {
+  const LABEL = { openai: "OpenAI", google: "Google" } as const;
+  const PICK = {
+    openai: ", or pick a Google model.",
+    google: ", or pick an OpenAI model.",
+  };
+  const blocked = (
+    provider: "openai" | "google",
+    reach: "none" | "not-yours" | "unreadable",
+  ) => key(provider, { keyPresent: false, reach });
+  // The other provider, usable or not.
+  const others = (provider: "openai" | "google") => [
+    { usable: true, notes: [key(OTHER[provider])] },
+    ...unusable(OTHER[provider]).map((notes) => ({ usable: false, notes })),
+  ];
+
+  it("the owner with no key in the studio reads the line of before, byte for byte", () => {
+    for (const provider of ["openai", "google"] as const) {
+      for (const { usable, notes } of others(provider)) {
+        const end = usable ? PICK[provider] : ".";
+        expect(
+          providerBlock(
+            [blocked(provider, "none"), ...notes],
+            provider,
+            "live",
+            null,
+          ),
+        ).toBe(
+          `${LABEL[provider]} has no API key: add one in Settings → Providers${end}`,
+        );
+      }
+    }
+  });
+
+  it("the owner whose keys are all for others reads that none is theirs or the team's", () => {
+    for (const provider of ["openai", "google"] as const) {
+      for (const { usable, notes } of others(provider)) {
+        const end = usable ? PICK[provider] : ".";
+        expect(
+          providerBlock(
+            [blocked(provider, "not-yours"), ...notes],
+            provider,
+            "live",
+            null,
+          ),
+        ).toBe(
+          `No ${LABEL[provider]} key is yours or the team's: add one in Settings → Providers${end}`,
+        );
+      }
+    }
+  });
+
+  it("the owner whose key cannot be read reads that, and to replace it", () => {
+    for (const provider of ["openai", "google"] as const) {
+      for (const { usable, notes } of others(provider)) {
+        const end = usable ? PICK[provider] : ".";
+        expect(
+          providerBlock(
+            [blocked(provider, "unreadable"), ...notes],
+            provider,
+            "live",
+            null,
+          ),
+        ).toBe(
+          `The ${LABEL[provider]} key your calls run on cannot be read: replace it in Settings → Providers${end}`,
+        );
+      }
+    }
+  });
+
+  it("the owner's rejected key reads the line of before, given to them or the team's", () => {
+    for (const provider of ["openai", "google"] as const) {
+      for (const { usable, notes } of others(provider)) {
+        const end = usable ? PICK[provider] : ".";
+        for (const given of [true, false]) {
+          expect(
+            providerBlock(
+              [
+                key(provider, { ...REJECTED, reach: "in-reach", given }),
+                ...notes,
+              ],
+              provider,
+              "live",
+              null,
+            ),
+          ).toBe(
+            `${LABEL[provider]} rejected the API key on its last call: replace it in Settings → Providers${end}`,
+          );
+        }
+      }
+    }
+  });
+
+  it("a member with no key in reach reads the line of before, whatever the reach", () => {
+    for (const provider of ["openai", "google"] as const) {
+      const a = provider === "openai" ? "an OpenAI" : "a Google";
+      for (const { usable, notes } of others(provider)) {
+        const end = usable ? PICK[provider] : ".";
+        for (const reach of ["none", "not-yours", "unreadable"] as const) {
+          expect(
+            providerBlock(
+              [blocked(provider, reach), ...notes],
+              provider,
+              "live",
+              "Ana",
+            ),
+          ).toBe(`You have no access to ${a} key; ask Ana${end}`);
+        }
+      }
+    }
+  });
+
+  it("a member whose given key was rejected reads that the key the owner gave them was", () => {
+    for (const provider of ["openai", "google"] as const) {
+      for (const { usable, notes } of others(provider)) {
+        const end = usable ? PICK[provider] : ".";
+        expect(
+          providerBlock(
+            [key(provider, { ...REJECTED, given: true }), ...notes],
+            provider,
+            "live",
+            "Ana",
+          ),
+        ).toBe(
+          `${LABEL[provider]} rejected the key Ana gave you on its last call; ask Ana${end}`,
+        );
+        expect(
+          providerBlock(
+            [key(provider, { ...REJECTED, given: false }), ...notes],
+            provider,
+            "live",
+            "Ana",
+          ),
+        ).toBe(
+          `${LABEL[provider]} rejected the studio's key on its last call; ask Ana${end}`,
+        );
+      }
+    }
+  });
+
+  it("in a mock run no reach blocks anyone", () => {
+    for (const reach of ["none", "not-yours", "unreadable"] as const) {
+      for (const ask of [null, "Ana"]) {
+        expect(
+          providerBlock([blocked("openai", reach)], "openai", "mock", ask),
+        ).toBeNull();
+      }
+    }
+  });
+});

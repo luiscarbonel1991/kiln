@@ -7,13 +7,12 @@ import { JoinForm } from "@/components/account/join-form";
 import { SwitchAccountButton } from "@/components/account/switch-account-button";
 import { Button } from "@/components/ui/button";
 import { hasDatabase } from "@/lib/db";
+import { firstName } from "@/lib/first-name";
 import { getAuth, hasAuthSecret } from "@/server/auth";
 import { readInvitation } from "@/server/team";
 
 export const metadata: Metadata = { title: "Join a studio · Kiln" };
 export const dynamic = "force-dynamic";
-
-const first = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 function SignInButton({ next }: { next?: string }) {
   return (
@@ -64,13 +63,13 @@ export default async function InvitePage({
     );
   }
   const invitation = read.open;
-  const eyebrow = `${first(read.inviter)} invited you`;
+  const eyebrow = `${firstName(read.inviter)} invited you`;
   if (!invitation) {
     return (
       <AuthCard
         eyebrow={eyebrow}
         title="This link was already used"
-        lead={`Or it was cancelled, or its 7 days ran out. Ask ${first(read.inviter)} for a new one. If you already joined ${read.studio}, sign in.`}
+        lead={`Or it was cancelled, or its 7 days ran out. Ask ${firstName(read.inviter)} for a new one. If you already joined ${read.studio}, sign in.`}
       >
         <SignInButton />
       </AuthCard>
