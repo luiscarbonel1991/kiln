@@ -150,8 +150,8 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
               ? "Mock mode: nothing is called or paid."
               : providersIntro(ask)}
           </p>
-          {/* Only an owner Kiln can name, the one the intro names. */}
-          {ask !== null && mode !== "mock" && contact?.firstName ? (
+          {/* The owner to write to, whenever the studio has one. */}
+          {ask !== null && mode !== "mock" && contact ? (
             <div className="-mt-2 mb-5">
               <OwnerContact owner={contact} />
             </div>
