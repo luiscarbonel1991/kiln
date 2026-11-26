@@ -49,6 +49,10 @@ const ITEM =
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
+// Whether a person on a key is the one reading the page.
+const isYou = (team: TeamMemberView[], memberId: string) =>
+  team.some((m) => m.id === memberId && m.you);
+
 const choiceOf = (row: KeyRow): KeyChoice => ({
   id: row.id,
   name: row.name,
@@ -66,8 +70,6 @@ function Who({ row, team }: { row: KeyRow; team: TeamMemberView[] }) {
     );
   }
   if (row.people.length === 0) return null;
-  const you = (memberId: string) =>
-    team.some((m) => m.id === memberId && m.you);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <span className="flex gap-1">
@@ -76,7 +78,9 @@ function Who({ row, team }: { row: KeyRow; team: TeamMemberView[] }) {
         ))}
       </span>
       <span className="font-sans text-[0.78rem] text-on-surface-mid">
-        {row.people.map((p) => (you(p.memberId) ? "You" : p.name)).join(", ")}
+        {row.people
+          .map((p) => (isYou(team, p.memberId) ? "You" : p.name))
+          .join(", ")}
       </span>
     </div>
   );
@@ -124,13 +128,11 @@ export function ProviderKeys({
   const forms = { provider, label, keys: card.keys.map(choiceOf), team };
 
   const removeLine = (row: KeyRow) => {
-    const isYou = (memberId: string) =>
-      team.some((m) => m.id === memberId && m.you);
     const others = row.people
-      .filter((p) => !isYou(p.memberId))
+      .filter((p) => !isYou(team, p.memberId))
       .map((p) => firstName(p.name));
     // The owner reads themself as "You" alone, or last: "Bob and you".
-    const people = row.people.some((p) => isYou(p.memberId))
+    const people = row.people.some((p) => isYou(team, p.memberId))
       ? others.length === 0
         ? ["You"]
         : [...others, "you"]
@@ -144,7 +146,8 @@ export function ProviderKeys({
     });
   };
 
-  const answer = (at: string) =>
+  // The last answer, shown where it belongs.
+  const saidLine = (at: string) =>
     said?.at === at ? (
       <p
         className={`font-sans text-xs leading-snug [overflow-wrap:anywhere] ${
@@ -292,7 +295,7 @@ export function ProviderKeys({
                   ? `Last call that worked: ${row.lastOkWhen}`
                   : "No call that worked yet"}
               </div>
-              {answer(row.id)}
+              {saidLine(row.id)}
 
               {confirming === row.id ? (
                 <div className="flex flex-col gap-2 rounded-render bg-secondary p-3">
@@ -349,7 +352,7 @@ export function ProviderKeys({
         </ul>
       ) : null}
 
-      {answer("card")}
+      {saidLine("card")}
       {mock ? null : open?.form === "add" ? (
         <AddKeyFormView
           {...forms}
