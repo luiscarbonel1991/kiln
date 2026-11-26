@@ -826,6 +826,11 @@ describe.skipIf(!enabled)("the owner's list of keys (database)", async () => {
     );
   });
 
+  it("gives someone who is not the owner nothing", async () => {
+    expect(await list(p.as(p.bob))).toEqual([]);
+    expect(await list(own.as(own.bob))).toEqual([]);
+  });
+
   it("says when every key is for others", async () => {
     expect(JSON.stringify(await list(others.as(others.ana)))).toContain(
       "No OpenAI key is yours or the team's, so your calls cannot use OpenAI.",

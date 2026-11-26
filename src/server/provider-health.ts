@@ -26,6 +26,7 @@ import {
   providerReach,
   withKey,
 } from "@/server/provider-keys";
+import { readsStudioAmounts } from "@/server/studio-owner";
 
 // Each provider's health, free to read (no ping, no paid call): whether the
 // reader has a key, and what the last live calls on it did — the queue's jobs and the
@@ -216,10 +217,11 @@ export interface ProviderKeyCard {
 // Settings → Providers, the owner's: every key of the studio by provider,
 // its people named only from the studio's own team (listProviderKeys), and
 // which of them the owner's own calls run on. Owner-only: a member's page
-// never calls it.
+// never calls it, and a member's maker gets nothing.
 export async function providerKeyList(
   maker: MakerRef,
 ): Promise<ProviderKeyCard[]> {
+  if (!readsStudioAmounts(maker)) return [];
   const [listed, health, reach] = await Promise.all([
     listProviderKeys(maker),
     keyHealth(maker),
