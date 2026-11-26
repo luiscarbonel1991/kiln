@@ -152,15 +152,60 @@ describe("checking one key, as the owner", () => {
       message:
         "Google accepts the key, but no longer lists Gemini 3 Pro Image: Kiln will not run it.",
     });
+  });
+
+  // A failed check reads in Settings' own words: no status code, and no
+  // other provider to move to (it may have no key). A key the provider
+  // rejected is said by its row's line, so the answer is "Checked." alone.
+  it("says a failed check in Settings' words, and a rejected key only once", async () => {
+    const answer = async (provider: string, message: string) => {
+      checked.result = { ok: false, called: true, message, provider };
+      return checkProviderKeyAction({ keyId: "k1" });
+    };
+    expect(
+      await answer(
+        "openai",
+        "OpenAI rejected the API key (401) — replace the key or use Google.",
+      ),
+    ).toEqual({ ok: false, saved: false, message: "Checked." });
+    expect(
+      await answer("google", "API key not valid. Please pass a valid API key."),
+    ).toEqual({ ok: false, saved: false, message: "Checked." });
+    const words = [
+      await answer(
+        "openai",
+        "OpenAI is rate-limiting requests — try again in a minute or use Google.",
+      ),
+      await answer(
+        "google",
+        "Google is at its spend cap — raise it at ai.studio/spend or use OpenAI.",
+      ),
+      await answer(
+        "openai",
+        "OpenAI is out of quota — check billing at platform.openai.com or use Google.",
+      ),
+      await answer("openai", "500 The server had an error (500)"),
+    ].map((a) => a.message);
+    expect(words).toEqual([
+      "OpenAI is busy; check the key again in a minute.",
+      "Google is at its spend cap: raise it at ai.studio/spend, then check the key again.",
+      "OpenAI is out of quota: see its billing at platform.openai.com, then check the key again.",
+      "Kiln could not check the key with OpenAI; check it again in a minute.",
+    ]);
+    for (const said of words) {
+      expect(said).not.toMatch(/\d{3}|or use/);
+    }
+    // A key that could not be read made no call.
     checked.result = {
       ok: false,
-      called: true,
-      message: "rejected",
-      provider: "google",
+      called: false,
+      message: "No API key: add one in Settings → Providers.",
+      provider: "openai",
     };
-    expect(await checkProviderKeyAction({ keyId: "k1" })).toMatchObject({
+    expect(await checkProviderKeyAction({ keyId: "k1" })).toEqual({
       ok: false,
-      message: "rejected",
+      saved: false,
+      message: "Kiln could not read the key: replace it.",
     });
   });
 });
@@ -228,21 +273,39 @@ describe("a key of the studio's, as the owner", () => {
       memberIds: [],
       key: KEY,
     };
+    // Rejected by the provider: "Saved." alone, as the key's row says the
+    // rest.
     checked.result = {
       ok: false,
       called: true,
-      message: "OpenAI rejected the API key.",
+      message:
+        "OpenAI rejected the API key (401) — replace the key or use Google.",
       provider: "openai",
     };
     expect(await addProviderKeyAction(add)).toEqual({
       ok: false,
       saved: true,
-      message: "Saved, but: OpenAI rejected the API key.",
+      message: "Saved.",
       keyId: "k-new",
     });
-    expect(
-      await replaceProviderKeyAction({ keyId: "k1", key: KEY }),
-    ).toMatchObject({ ok: false, saved: true });
+    expect(await replaceProviderKeyAction({ keyId: "k1", key: KEY })).toEqual({
+      ok: false,
+      saved: true,
+      message: "Saved.",
+    });
+    // Any other failure of the check, in Settings' words.
+    checked.result = {
+      ok: false,
+      called: true,
+      message:
+        "OpenAI is rate-limiting requests — try again in a minute or use Google.",
+      provider: "openai",
+    };
+    expect(await replaceProviderKeyAction({ keyId: "k1", key: KEY })).toEqual({
+      ok: false,
+      saved: true,
+      message: "Saved, but: OpenAI is busy; check the key again in a minute.",
+    });
     checkKey.mockRejectedValueOnce(
       new KeyRefusal("That key was removed already."),
     );

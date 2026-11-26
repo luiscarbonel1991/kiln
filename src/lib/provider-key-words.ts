@@ -23,6 +23,9 @@ export const noAccessLine = (label: string, ask: string) =>
 const rejected = (label: string, ask: string, given?: boolean) =>
   `${label} rejected ${given ? `the key ${ask} gave you` : "the studio's key"} on its last call; ask ${ask}`;
 
+// What a mock run says of a provider: nothing is called.
+export const MOCK_CALLS_LINE = "Mock mode calls no provider.";
+
 export const providersIntro = (ask: string | null) =>
   ask === null
     ? "Kiln runs on your own keys: paste one and it is kept sealed on this machine, then checked for free (the provider lists its models, nothing is generated). One provider is enough to start. The rest is read from the last calls Kiln made."

@@ -52,6 +52,10 @@ const ITEM =
 const isYou = (team: TeamMemberView[], memberId: string) =>
   team.some((m) => m.id === memberId && m.you);
 
+// Whether a row carries a line on what is wrong with its key.
+const hasAlarm = (row: KeyRow) =>
+  row.line !== null || (row.lastError !== null && !row.keyRejected);
+
 const choiceOf = (row: KeyRow): KeyChoice => ({
   id: row.id,
   name: row.name,
@@ -146,12 +150,13 @@ export function ProviderKeys({
     });
   };
 
-  // The last answer, shown where it belongs.
-  const saidLine = (at: string) =>
+  // The last answer, shown where it belongs; plain on a row whose own line
+  // already says what failed ("Saved." or "Checked." on a rejected key).
+  const saidLine = (at: string, alarm = false) =>
     said?.at === at ? (
       <p
         className={`font-sans text-xs leading-snug [overflow-wrap:anywhere] ${
-          said.ok ? "text-on-surface-mid" : "text-fail"
+          said.ok || alarm ? "text-on-surface-mid" : "text-fail"
         }`}
         data-testid={
           at === "card"
@@ -295,7 +300,7 @@ export function ProviderKeys({
                   ? `Last call that worked: ${row.lastOkWhen}`
                   : "No call that worked yet"}
               </div>
-              {saidLine(row.id)}
+              {saidLine(row.id, hasAlarm(row))}
 
               {confirming === row.id ? (
                 <div className="flex flex-col gap-2 rounded-render bg-secondary p-3">

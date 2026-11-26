@@ -8,6 +8,7 @@ import {
   type ProviderId,
 } from "@/domain/model-defaults";
 import { AgentRoutes, MakerRoutes } from "@/domain/model-routing";
+import { isKeyRejectedText } from "@/domain/queue";
 import {
   AddKeyForm,
   EditKeyForm,
@@ -16,6 +17,7 @@ import {
   KeyOfStudio,
   ReplaceKeyForm,
 } from "@/lib/provider-key-forms";
+import { MOCK_CALLS_LINE } from "@/lib/provider-key-words";
 import type { KeyCheck } from "@/providers/key-check";
 import { providerMode } from "@/providers/mode";
 import { agentRoutesProblem } from "@/server/chat/agent-route";
@@ -60,19 +62,48 @@ export const saveMakerRoutesAction = makerAction(
   },
 );
 
-// The free check's answer, in the provider's own words.
+// A failed free check in Settings' own words: no status code, and no other
+// provider to move to (that one may have no key). A key the provider
+// rejected is said once, by its row's refreshed line: null here.
+function failedCheckWords(
+  provider: ProviderId,
+  result: Extract<KeyCheck, { ok: false }>,
+): string | null {
+  const label = PROVIDER_LABELS[provider];
+  const said = result.message;
+  if (!result.called) {
+    return providerMode() === "mock"
+      ? MOCK_CALLS_LINE
+      : "Kiln could not read the key: replace it.";
+  }
+  if (isKeyRejectedText(said)) return null;
+  if (provider === "google" && /spend cap/i.test(said)) {
+    return "Google is at its spend cap: raise it at ai.studio/spend, then check the key again.";
+  }
+  if (provider === "openai" && /out of quota/i.test(said)) {
+    return "OpenAI is out of quota: see its billing at platform.openai.com, then check the key again.";
+  }
+  if (/rate-limiting/i.test(said)) {
+    return `${label} is busy; check the key again in a minute.`;
+  }
+  return `Kiln could not check the key with ${label}; check it again in a minute.`;
+}
+
+// The free check's answer: the models the provider no longer lists, or why
+// the check failed (null message: the row says it).
 function checkedWords(
   provider: ProviderId,
   result: KeyCheck & { unlisted?: string[] },
-): KeyAnswer {
-  if (!result.ok) return { ok: false, saved: false, message: result.message };
+): { ok: boolean; message: string | null } {
+  if (!result.ok) {
+    return { ok: false, message: failedCheckWords(provider, result) };
+  }
   const label = PROVIDER_LABELS[provider];
   const gone = (result.unlisted ?? []).map((model) =>
     modelLabel({ provider, model }),
   );
   return {
     ok: true,
-    saved: false,
     message: gone.length
       ? `${label} accepts the key, but no longer lists ${gone.join(", ")}: Kiln will not run ${gone.length === 1 ? "it" : "them"}.`
       : `${label} accepts the key.`,
@@ -138,18 +169,19 @@ function refused(what: keyof typeof COULD_NOT, error: unknown): KeyAnswer {
   return { ok: false, saved: false, message: COULD_NOT[what] };
 }
 
-// A key just saved, checked for free so the owner reads the provider's own
-// answer.
+// A key just saved, checked for free so the owner reads the provider's
+// answer; a key it rejects is "Saved." alone, as the row says the rest.
 async function savedAndChecked(
   maker: MakerRef,
   keyId: string,
 ): Promise<KeyAnswer> {
   try {
     const result = await checkKey(maker, keyId);
-    const checked = checkedWords(result.provider, result);
-    return checked.ok
-      ? { ok: true, saved: true, message: `Saved. ${checked.message}` }
-      : { ok: false, saved: true, message: `Saved, but: ${checked.message}` };
+    const { ok, message } = checkedWords(result.provider, result);
+    if (message === null) return { ok, saved: true, message: "Saved." };
+    return ok
+      ? { ok, saved: true, message: `Saved. ${message}` }
+      : { ok, saved: true, message: `Saved, but: ${message}` };
   } catch (error) {
     return {
       ok: false,
@@ -221,7 +253,9 @@ export const checkProviderKeyAction = ownerAction(
       return refused("check", error);
     }
     if (result.called) refresh();
-    return checkedWords(result.provider, result);
+    // A key the provider rejected: the row's refreshed line says so.
+    const { ok, message } = checkedWords(result.provider, result);
+    return { ok, saved: false, message: message ?? "Checked." };
   },
 );
 
