@@ -303,7 +303,7 @@ export function ProviderKeys({
               {saidLine(row.id, hasAlarm(row))}
 
               {confirming === row.id ? (
-                <div className="flex flex-col gap-2 rounded-render bg-secondary p-3">
+                <div className="flex flex-col gap-2 rounded-render border border-border-soft bg-card p-3">
                   <p className="font-sans text-[0.78rem] leading-snug text-foreground">
                     {removeLine(row)}
                   </p>
