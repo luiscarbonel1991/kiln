@@ -22,6 +22,7 @@ import {
 } from "@/components/settings/provider-key-form";
 import { Button } from "@/components/ui/button";
 import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
+import { firstName } from "@/lib/first-name";
 import type { KeyAnswer } from "@/lib/provider-key-forms";
 import { article, keyRowTitle, removeKeyLine } from "@/lib/provider-key-words";
 import type {
@@ -46,8 +47,6 @@ type Open =
 
 const ITEM =
   "cursor-pointer rounded-[9px] px-2.5 py-1.5 font-sans text-sm text-foreground outline-none data-[disabled]:cursor-default data-[disabled]:text-on-surface-dim data-[highlighted]:bg-secondary";
-
-const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 // Whether a person on a key is the one reading the page.
 const isYou = (team: TeamMemberView[], memberId: string) =>

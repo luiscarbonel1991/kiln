@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { firstName } from "@/lib/first-name";
 import type { MakerRef } from "@/server/maker-repository";
 import { roleOf } from "@/server/organization";
 
@@ -32,7 +33,7 @@ export async function ownerContact(
   const name = owner.user.name.trim();
   return {
     name,
-    firstName: name.split(/\s+/)[0] ?? "",
+    firstName: firstName(name),
     email: owner.user.email,
   };
 }
