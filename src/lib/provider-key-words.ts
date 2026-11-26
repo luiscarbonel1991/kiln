@@ -72,9 +72,12 @@ export function ownCallsLine(input: {
 export const envKeyLine = (provider: ProviderId) =>
   `${ENV_NAME[provider]} is in .env, but the app uses only keys saved here: add it below.`;
 
-// One key in the owner's list: its name and last four, on one line.
+// One key in the owner's list: its name and last four, on one line; the
+// last four never apart from "ends in".
+export const keyEnding = (hint: string) => `ends in ${hint}`;
+
 export const keyRowTitle = (name: string, hint: string) =>
-  `${name} · ends in ${hint}`;
+  `${name} · ${keyEnding(hint)}`;
 
 // What the owner must know of one key under its title, or null when it
 // works: it cannot be read, the provider rejected it, or nobody is left on it.

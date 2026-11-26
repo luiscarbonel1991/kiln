@@ -27,7 +27,7 @@ import { firstName } from "@/lib/first-name";
 import type { KeyAnswer } from "@/lib/provider-key-forms";
 import {
   article,
-  keyRowTitle,
+  keyEnding,
   MOCK_CALLS_LINE,
   removeKeyLine,
 } from "@/lib/provider-key-words";
@@ -258,7 +258,10 @@ export function ProviderKeys({
               <div className="flex items-start gap-2">
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="font-sans text-[0.875rem] font-semibold text-foreground [overflow-wrap:anywhere]">
-                    {keyRowTitle(row.name, row.hint)}
+                    {row.name} ·{" "}
+                    <span className="whitespace-nowrap">
+                      {keyEnding(row.hint)}
+                    </span>
                   </span>
                   <Who row={row} team={team} />
                 </div>

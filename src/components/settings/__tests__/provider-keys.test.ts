@@ -22,6 +22,7 @@ type Card = Parameters<typeof ProviderKeys>[0]["card"];
 type Row = Card["keys"][number];
 const { ProviderLines } = await import("@/components/settings/provider-lines");
 type Lines = Parameters<typeof ProviderLines>[0];
+const { keyRowTitle } = await import("@/lib/provider-key-words");
 
 const team = [
   {
@@ -109,6 +110,20 @@ const lines = (over: Partial<Lines> = {}) =>
   );
 
 const text = (html: string) => html.replace(/<[^>]+>/g, "");
+
+describe("a key's row", () => {
+  // Its name and last four on one line, the last four never wrapped away
+  // from "ends in".
+  it('keeps the last four with "ends in"', () => {
+    const html = owners([row({ name: "A long name for the team key" })]);
+    expect(html).toContain(
+      '<span class="whitespace-nowrap">ends in 1234</span>',
+    );
+    expect(text(html)).toContain(
+      keyRowTitle("A long name for the team key", "1234"),
+    );
+  });
+});
 
 describe("Settings → Providers in a mock run", () => {
   // Mock mode calls nothing: every card, the owner's and a member's, says so
