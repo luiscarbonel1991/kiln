@@ -20,8 +20,8 @@ const checked = vi.hoisted(() => ({
     provider: "openai",
   } as Record<string, unknown>,
 }));
-const checkKeyById = vi.hoisted(() => vi.fn());
-vi.mock("@/server/provider-health", () => ({ checkKeyById }));
+const checkKey = vi.hoisted(() => vi.fn());
+vi.mock("@/server/provider-health", () => ({ checkKey }));
 // The free check itself: never reached from these tests.
 const checkProviderKey = vi.hoisted(() => vi.fn());
 vi.mock("@/providers/key-check", () => ({ checkProviderKey }));
@@ -43,7 +43,7 @@ const writes = vi.hoisted(() => ({
   addProviderKey: vi.fn(async () => ({ id: "k-new" })),
   editProviderKey: vi.fn(async () => {}),
   replaceProviderKey: vi.fn(async () => {}),
-  removeProviderKeyById: vi.fn(async () => {}),
+  removeProviderKey: vi.fn(async () => {}),
 }));
 vi.mock("@/server/provider-keys", async (original) => ({
   ...(await original<typeof import("@/server/provider-keys")>()),
@@ -59,9 +59,9 @@ const actions = await import("@/app/actions/settings");
 const { KeyRefusal } = await import("@/server/provider-keys");
 const {
   addProviderKeyAction,
-  checkProviderKeyByIdAction,
+  checkProviderKeyAction,
   editProviderKeyAction,
-  removeProviderKeyByIdAction,
+  removeProviderKeyAction,
   replaceProviderKeyAction,
   saveMakerRoutesAction,
 } = actions;
@@ -73,7 +73,7 @@ const routes = proposeRoutes(DEFAULT_MAKER_MODELS, {
 const astra = { provider: "openai", model: "gpt-6-astra" };
 
 beforeEach(() => {
-  checkKeyById.mockImplementation(async () => checked.result);
+  checkKey.mockImplementation(async () => checked.result);
 });
 
 afterEach(() => {
@@ -130,12 +130,12 @@ describe("checking one key, as the owner", () => {
       unlisted: [],
       provider: "google",
     };
-    expect(await checkProviderKeyByIdAction({ keyId: "k1" })).toEqual({
+    expect(await checkProviderKeyAction({ keyId: "k1" })).toEqual({
       ok: true,
       saved: false,
       message: "Google accepts the key.",
     });
-    expect(checkKeyById).toHaveBeenCalledWith(
+    expect(checkKey).toHaveBeenCalledWith(
       expect.objectContaining({ id: "test" }),
       "k1",
     );
@@ -146,7 +146,7 @@ describe("checking one key, as the owner", () => {
       unlisted: ["gemini-3-pro-image"],
       provider: "google",
     };
-    expect(await checkProviderKeyByIdAction({ keyId: "k1" })).toEqual({
+    expect(await checkProviderKeyAction({ keyId: "k1" })).toEqual({
       ok: true,
       saved: false,
       message:
@@ -158,7 +158,7 @@ describe("checking one key, as the owner", () => {
       message: "rejected",
       provider: "google",
     };
-    expect(await checkProviderKeyByIdAction({ keyId: "k1" })).toMatchObject({
+    expect(await checkProviderKeyAction({ keyId: "k1" })).toMatchObject({
       ok: false,
       message: "rejected",
     });
@@ -195,20 +195,20 @@ describe("a key of the studio's, as the owner", () => {
         key: "sk-fixture-not-a-real-key-0000",
       }),
     );
-    expect(checkKeyById).toHaveBeenCalledTimes(1);
-    expect(checkKeyById).toHaveBeenCalledWith(
+    expect(checkKey).toHaveBeenCalledTimes(1);
+    expect(checkKey).toHaveBeenCalledWith(
       expect.objectContaining({ id: "test" }),
       "k-new",
     );
   });
 
   it("a key is removed for the studio, by its id", async () => {
-    expect(await removeProviderKeyByIdAction({ keyId: "k1" })).toEqual({
+    expect(await removeProviderKeyAction({ keyId: "k1" })).toEqual({
       ok: true,
       saved: false,
       message: "Removed.",
     });
-    expect(writes.removeProviderKeyById).toHaveBeenCalledWith(
+    expect(writes.removeProviderKey).toHaveBeenCalledWith(
       expect.objectContaining({ id: "test" }),
       "k1",
     );
@@ -240,7 +240,7 @@ describe("a key of the studio's, as the owner", () => {
     expect(
       await replaceProviderKeyAction({ keyId: "k1", key: KEY }),
     ).toMatchObject({ ok: false, saved: true });
-    checkKeyById.mockRejectedValueOnce(
+    checkKey.mockRejectedValueOnce(
       new KeyRefusal("That key was removed already."),
     );
     expect(await replaceProviderKeyAction({ keyId: "k1", key: KEY })).toEqual({
@@ -274,15 +274,24 @@ describe("a key of the studio's, as the owner", () => {
   });
 
   // Every key is managed by its id: no action is left that writes, checks
-  // or removes "the provider's key" for the whole studio.
-  it("no action takes a provider in place of a key", () => {
-    for (const gone of [
-      "saveProviderKeyAction",
-      "removeProviderKeyAction",
-      "checkProviderKeyAction",
-    ]) {
-      expect(actions).not.toHaveProperty(gone);
+  // or removes "the provider's key" for the whole studio. The check and the
+  // removal kept their names and take a key id; handed a provider, they
+  // refuse and touch nothing.
+  it("no action takes a provider in place of a key", async () => {
+    expect(actions).not.toHaveProperty("saveProviderKeyAction");
+    for (const action of [checkProviderKeyAction, removeProviderKeyAction]) {
+      for (const input of [{ provider: "openai" }, "openai", {}]) {
+        expect(await action(input)).toEqual({
+          ok: false,
+          saved: false,
+          message: "Which key?",
+        });
+      }
     }
+    for (const write of Object.values(writes)) {
+      expect(write).not.toHaveBeenCalled();
+    }
+    expect(checkKey).not.toHaveBeenCalled();
   });
 });
 
@@ -303,7 +312,7 @@ describe("a key action that fails for a reason not Kiln's own", () => {
     writes.addProviderKey.mockRejectedValueOnce(raw);
     writes.editProviderKey.mockRejectedValueOnce(raw);
     writes.replaceProviderKey.mockRejectedValueOnce(raw);
-    writes.removeProviderKeyById.mockRejectedValueOnce(raw);
+    writes.removeProviderKey.mockRejectedValueOnce(raw);
     const answers = [
       await addProviderKeyAction({
         provider: "openai",
@@ -319,7 +328,7 @@ describe("a key action that fails for a reason not Kiln's own", () => {
         memberIds: [],
       }),
       await replaceProviderKeyAction({ keyId: "k1", key: KEY }),
-      await removeProviderKeyByIdAction({ keyId: "k1" }),
+      await removeProviderKeyAction({ keyId: "k1" }),
     ];
     expect(answers).toEqual([
       {
@@ -343,8 +352,8 @@ describe("a key action that fails for a reason not Kiln's own", () => {
         message: "Kiln could not remove the key; try again.",
       },
     ]);
-    checkKeyById.mockRejectedValueOnce(raw);
-    expect(await checkProviderKeyByIdAction({ keyId: "k1" })).toEqual({
+    checkKey.mockRejectedValueOnce(raw);
+    expect(await checkProviderKeyAction({ keyId: "k1" })).toEqual({
       ok: false,
       saved: false,
       message: "Kiln could not check the key; try again.",
@@ -358,7 +367,7 @@ describe("a key action that fails for a reason not Kiln's own", () => {
 
   it("a key saved whose check then fails so reads as saved, in the fixed sentence", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    checkKeyById.mockRejectedValueOnce(raw);
+    checkKey.mockRejectedValueOnce(raw);
     expect(await replaceProviderKeyAction({ keyId: "k1", key: KEY })).toEqual({
       ok: false,
       saved: true,
@@ -404,15 +413,15 @@ describe("a key of the studio's, as someone who is not the owner", () => {
       "replacing a key",
       () => replaceProviderKeyAction({ keyId: "k1", key: KEY }),
     ],
-    ["checking a key", () => checkProviderKeyByIdAction({ keyId: "k1" })],
-    ["removing a key", () => removeProviderKeyByIdAction({ keyId: "k1" })],
+    ["checking a key", () => checkProviderKeyAction({ keyId: "k1" })],
+    ["removing a key", () => removeProviderKeyAction({ keyId: "k1" })],
   ] as const;
 
   const nothingHappened = () => {
     for (const write of Object.values(writes)) {
       expect(write).not.toHaveBeenCalled();
     }
-    expect(checkKeyById).not.toHaveBeenCalled();
+    expect(checkKey).not.toHaveBeenCalled();
     expect(checkProviderKey).not.toHaveBeenCalled();
   };
 

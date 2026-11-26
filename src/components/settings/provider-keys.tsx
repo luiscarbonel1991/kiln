@@ -10,8 +10,8 @@ import {
 import { DropdownMenu } from "radix-ui";
 import { useState, useTransition } from "react";
 import {
-  checkProviderKeyByIdAction,
-  removeProviderKeyByIdAction,
+  checkProviderKeyAction,
+  removeProviderKeyAction,
 } from "@/app/actions/settings";
 import { PersonMark } from "@/components/settings/person-mark";
 import {
@@ -226,7 +226,7 @@ export function ProviderKeys({
                           className={ITEM}
                           onSelect={() =>
                             run(row.id, () =>
-                              checkProviderKeyByIdAction({ keyId: row.id }),
+                              checkProviderKeyAction({ keyId: row.id }),
                             )
                           }
                         >
@@ -310,7 +310,7 @@ export function ProviderKeys({
                       data-testid={`provider-key-remove-confirm-${row.id}`}
                       onClick={() =>
                         run("card", () =>
-                          removeProviderKeyByIdAction({ keyId: row.id }),
+                          removeProviderKeyAction({ keyId: row.id }),
                         )
                       }
                     >

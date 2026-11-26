@@ -289,7 +289,7 @@ describe.skipIf(!enabled)(
   "provider health by the reader's key (database)",
   async () => {
     const { db } = await import("@/lib/db");
-    const { providerHealth, checkKeyById } = await import(
+    const { providerHealth, checkKey } = await import(
       "@/server/provider-health"
     );
     const { withMakerKeys } = await import("@/server/provider-keys");
@@ -479,7 +479,7 @@ describe.skipIf(!enabled)(
     it("checking Bob's key, which the provider rejects, is kept on Bob's key and leaves the team key clean", async () => {
       // Bob's key is checked by the owner, and answers rejected.
       const before = await healthOf(s.as(s.carla));
-      const checked = await checkKeyById(s.as(s.ana), ids.bob);
+      const checked = await checkKey(s.as(s.ana), ids.bob);
       expect(checked).toMatchObject({ ok: false });
       const recorded = await db.generationJob.findFirstOrThrow({
         where: {

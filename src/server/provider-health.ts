@@ -279,7 +279,7 @@ export async function providerKeyList(
 // of another studio is refused before any request. The models it lists are
 // compared with the catalog: an offered model it no longer names is kept with
 // the answer, so Settings names it and the queue refuses it before paying.
-export async function checkKeyById(
+export async function checkKey(
   maker: MakerRef,
   keyId: string,
 ): Promise<KeyCheck & { unlisted?: string[]; provider: ProviderId }> {

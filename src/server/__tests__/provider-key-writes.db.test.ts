@@ -116,7 +116,7 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
         }),
       () =>
         keys.replaceProviderKey(owner(a), { keyId: ids.bBob, key: secret() }),
-      () => keys.removeProviderKeyById(owner(a), ids.bTeam),
+      () => keys.removeProviderKey(owner(a), ids.bTeam),
       () =>
         keys.addProviderKey(owner(a), {
           provider: "google",
@@ -239,10 +239,10 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
       secret: secret(),
       people: [studio.bob],
     });
-    await keys.removeProviderKeyById(owner(studio), id);
+    await keys.removeProviderKey(owner(studio), id);
     expect(await db.providerKey.findUnique({ where: { id } })).toBeNull();
     const gone = "That key was removed already.";
-    await expect(keys.removeProviderKeyById(owner(studio), id)).rejects.toThrow(
+    await expect(keys.removeProviderKey(owner(studio), id)).rejects.toThrow(
       gone,
     );
     await expect(
@@ -492,7 +492,7 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
     });
     expect(await bobs()).toBe(given);
     const bobsKey = await keyNamed(studio, "Bob's key");
-    await keys.removeProviderKeyById(owner(studio), bobsKey?.id ?? "");
+    await keys.removeProviderKey(owner(studio), bobsKey?.id ?? "");
     expect(await bobs()).toBe(team);
     expect(await others()).toBe(otherTeam);
   });

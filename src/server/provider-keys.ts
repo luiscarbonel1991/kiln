@@ -482,7 +482,7 @@ export async function replaceProviderKey(
 }
 
 // Remove a key; who it was given to goes with it (the database's cascade).
-export async function removeProviderKeyById(
+export async function removeProviderKey(
   maker: MakerRef,
   keyId: string,
 ): Promise<void> {

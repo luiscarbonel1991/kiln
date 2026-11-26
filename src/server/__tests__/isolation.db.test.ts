@@ -951,13 +951,13 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
       // stay as they were.
       expect(
         await changesNothing(
-          (id) => keys.removeProviderKeyById(a.maker, id),
+          (id) => keys.removeProviderKey(a.maker, id),
           theirs,
         ),
       ).toMatchObject({ refused: "That key was removed already." });
       const before = await rowsOf(b);
       for (const id of await idsOf(a)) {
-        await keys.removeProviderKeyById(a.maker, id);
+        await keys.removeProviderKey(a.maker, id);
       }
       expect(await rowsOf(b)).toEqual(before);
       expect(

@@ -26,12 +26,12 @@ import {
   saveMakerRoutes,
   setSceneLook,
 } from "@/server/maker-repository";
-import { checkKeyById } from "@/server/provider-health";
+import { checkKey } from "@/server/provider-health";
 import {
   addProviderKey,
   editProviderKey,
   KeyRefusal,
-  removeProviderKeyById,
+  removeProviderKey,
   replaceProviderKey,
 } from "@/server/provider-keys";
 
@@ -144,7 +144,7 @@ async function savedAndChecked(
   keyId: string,
 ): Promise<KeyAnswer> {
   try {
-    const result = await checkKeyById(maker, keyId);
+    const result = await checkKey(maker, keyId);
     const checked = checkedWords(result.provider, result);
     return checked.ok
       ? { ok: true, saved: true, message: `Saved. ${checked.message}` }
@@ -207,15 +207,15 @@ export const replaceProviderKeyAction = ownerAction(
   },
 );
 
-export const checkProviderKeyByIdAction = ownerAction(
+export const checkProviderKeyAction = ownerAction(
   async (maker, input: unknown): Promise<KeyAnswer> => {
     const parsed = KeyOfStudio.safeParse(input);
     if (!parsed.success) {
       return { ok: false, saved: false, message: "Which key?" };
     }
-    let result: Awaited<ReturnType<typeof checkKeyById>>;
+    let result: Awaited<ReturnType<typeof checkKey>>;
     try {
-      result = await checkKeyById(maker, parsed.data.keyId);
+      result = await checkKey(maker, parsed.data.keyId);
     } catch (error) {
       return refused("check", error);
     }
@@ -224,14 +224,14 @@ export const checkProviderKeyByIdAction = ownerAction(
   },
 );
 
-export const removeProviderKeyByIdAction = ownerAction(
+export const removeProviderKeyAction = ownerAction(
   async (maker, input: unknown): Promise<KeyAnswer> => {
     const parsed = KeyOfStudio.safeParse(input);
     if (!parsed.success) {
       return { ok: false, saved: false, message: "Which key?" };
     }
     try {
-      await removeProviderKeyById(maker, parsed.data.keyId);
+      await removeProviderKey(maker, parsed.data.keyId);
     } catch (error) {
       return refused("remove", error);
     }

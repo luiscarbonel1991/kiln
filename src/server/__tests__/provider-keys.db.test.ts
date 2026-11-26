@@ -12,7 +12,7 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
   const {
     addProviderKey,
     listProviderKeys,
-    removeProviderKeyById,
+    removeProviderKey,
     replaceProviderKey,
     withMakerKeys,
   } = await import("@/server/provider-keys");
@@ -126,7 +126,7 @@ describe.skipIf(!enabled)("provider keys (database)", async () => {
       teamKey(a, "google", "two words that are long enough"),
     ).rejects.toThrow(/no spaces/);
     const { id } = await teamKeyOf(a);
-    await removeProviderKeyById(a, id);
+    await removeProviderKey(a, id);
     expect(
       await withMakerKeys(a, async () => providerKey("openai")),
     ).toBeUndefined();

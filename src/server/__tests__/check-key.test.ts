@@ -66,7 +66,7 @@ vi.mock("@/server/generation-repository", async (original) => ({
   recordKeyCheck,
 }));
 
-const { checkKeyById } = await import("@/server/provider-health");
+const { checkKey } = await import("@/server/provider-health");
 const { seal } = await import("@/server/secret-box");
 
 const offered = (provider: "openai" | "google") =>
@@ -125,7 +125,7 @@ describe("checking one key", () => {
     listed.models = offered("openai");
     // The owner's own calls run on the team key; Bob's key is checked all
     // the same.
-    expect(await checkKeyById(ana, "a-bob")).toMatchObject({ ok: true });
+    expect(await checkKey(ana, "a-bob")).toMatchObject({ ok: true });
     expect(listed.seen).toEqual([
       { keys: { openai: "sk-fixture-a-bob" }, id: "a-bob" },
     ]);
@@ -141,7 +141,7 @@ describe("checking one key", () => {
 
   it("a key of another studio is refused before any request, and nothing is recorded", async () => {
     on();
-    await expect(checkKeyById(ana, "b-team")).rejects.toThrow(
+    await expect(checkKey(ana, "b-team")).rejects.toThrow(
       "That key was removed already.",
     );
     expect(listed.seen).toEqual([]);
@@ -153,13 +153,13 @@ describe("checking one key", () => {
     listed.models = offered("google").filter(
       (id) => id !== "gemini-omni-1.1-flash",
     );
-    expect(await checkKeyById(ana, "a-google")).toMatchObject({
+    expect(await checkKey(ana, "a-google")).toMatchObject({
       ok: true,
       provider: "google",
       unlisted: ["gemini-omni-1.1-flash"],
     });
     listed.models = offered("google");
-    expect(await checkKeyById(ana, "a-google")).toMatchObject({
+    expect(await checkKey(ana, "a-google")).toMatchObject({
       unlisted: [],
     });
   });
@@ -168,11 +168,11 @@ describe("checking one key", () => {
   it("records the check with the person who ran it, or none", async () => {
     on();
     listed.models = offered("openai");
-    await checkKeyById(ana, "a-team");
+    await checkKey(ana, "a-team");
     expect(recordKeyCheck).toHaveBeenLastCalledWith(
       expect.objectContaining({ makerId: "studio-a", memberId: "ana" }),
     );
-    await checkKeyById({ id: "studio-a" }, "a-team");
+    await checkKey({ id: "studio-a" }, "a-team");
     expect(recordKeyCheck).toHaveBeenLastCalledWith(
       expect.objectContaining({ makerId: "studio-a", memberId: null }),
     );
