@@ -146,9 +146,13 @@ function WhoField({
               id={`${id}-team`}
               data-testid={`${id}-team`}
               disabled={teamKey !== undefined}
+              className="disabled:border-border disabled:bg-secondary disabled:opacity-100"
             />
             <FieldContent>
-              <FieldTitle>The whole team</FieldTitle>
+              {/* Greyed but legible: why it cannot be picked is read under it. */}
+              <FieldTitle className="group-data-[disabled=true]/field:text-on-surface-mid group-data-[disabled=true]/field:opacity-100">
+                The whole team
+              </FieldTitle>
               {teamKey ? (
                 <FieldDescription>
                   The team has one already: {teamKey.name}. Replace that one
