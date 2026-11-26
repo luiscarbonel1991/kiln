@@ -24,7 +24,12 @@ import { Button } from "@/components/ui/button";
 import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
 import { firstName } from "@/lib/first-name";
 import type { KeyAnswer } from "@/lib/provider-key-forms";
-import { article, keyRowTitle, removeKeyLine } from "@/lib/provider-key-words";
+import {
+  article,
+  keyRowTitle,
+  MOCK_CALLS_LINE,
+  removeKeyLine,
+} from "@/lib/provider-key-words";
 import type {
   ProviderKeyCard,
   ProviderKeyView,
@@ -93,7 +98,8 @@ function Who({ row, team }: { row: KeyRow; team: TeamMemberView[] }) {
 // own last calls, and what can be done with it (check, change, replace,
 // remove), with the line on the owner's own calls above and "Add" under. The
 // forms and the remove confirmation open in the card, as the team list's
-// invite and "Remove" do. A mock run shows the rows only.
+// invite and "Remove" do. A mock run shows the rows and the mock line only,
+// as a member's card does.
 export function ProviderKeys({
   card,
   team,
@@ -171,15 +177,13 @@ export function ProviderKeys({
 
   return (
     <div className="flex flex-col gap-2">
-      {mock ? null : (
-        <div
-          className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
-          data-testid={`provider-${provider}-key`}
-        >
-          <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
-          {card.ownCalls}
-        </div>
-      )}
+      <div
+        className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
+        data-testid={`provider-${provider}-key`}
+      >
+        <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
+        {mock ? MOCK_CALLS_LINE : card.ownCalls}
+      </div>
       {!mock && card.envNote ? (
         <p className="font-sans text-[0.78rem] leading-snug text-on-surface-mid [overflow-wrap:anywhere]">
           {card.envNote}
@@ -274,7 +278,8 @@ export function ProviderKeys({
                 )}
               </div>
 
-              {row.line ? (
+              {/* A mock run calls nothing: no call to speak of, no alarm. */}
+              {mock ? null : row.line ? (
                 <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
                   <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
                   <span className="min-w-0 [overflow-wrap:anywhere]">
@@ -283,7 +288,7 @@ export function ProviderKeys({
                 </div>
               ) : null}
               {/* A rejected key is said by the row's line, once. */}
-              {row.lastError && !row.keyRejected ? (
+              {!mock && row.lastError && !row.keyRejected ? (
                 <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
                   <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
                   <span className="min-w-0 [overflow-wrap:anywhere]">
@@ -294,12 +299,14 @@ export function ProviderKeys({
                   </span>
                 </div>
               ) : null}
-              <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
-                <CircleCheck className="size-3.5 flex-shrink-0 text-prov-recipe" />
-                {row.lastOkWhen
-                  ? `Last call that worked: ${row.lastOkWhen}`
-                  : "No call that worked yet"}
-              </div>
+              {mock ? null : (
+                <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
+                  <CircleCheck className="size-3.5 flex-shrink-0 text-prov-recipe" />
+                  {row.lastOkWhen
+                    ? `Last call that worked: ${row.lastOkWhen}`
+                    : "No call that worked yet"}
+                </div>
+              )}
               {saidLine(row.id, hasAlarm(row))}
 
               {confirming === row.id ? (

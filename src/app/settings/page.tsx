@@ -184,7 +184,7 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
                       lastOkWhen={h.lastOkAt ? when(h.lastOkAt) : null}
                     />
                   )}
-                  {h.unlisted ? (
+                  {h.unlisted && mode !== "mock" ? (
                     <div
                       className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
                       data-testid={`provider-${h.provider}-unlisted`}

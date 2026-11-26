@@ -1,5 +1,5 @@
 import { CircleAlert, CircleCheck, KeyRound } from "lucide-react";
-import { keyLine } from "@/lib/provider-key-words";
+import { keyLine, MOCK_CALLS_LINE } from "@/lib/provider-key-words";
 import type { ProviderHealth } from "@/server/provider-health";
 
 // Settings → Providers, a provider's card for whoever reads no key list: a
@@ -30,23 +30,26 @@ export function ProviderLines({
   const h = health;
   return (
     <>
-      {/* The member's one line; the owner reads the key list. */}
-      {ask === null || mock ? null : (
+      {/* The member's one line; the owner reads the key list. A mock run
+          calls nothing: one line, the owner's too, and no call to speak of. */}
+      {mock || ask !== null ? (
         <div
           className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
           data-testid={`provider-${h.provider}-key`}
         >
           <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
-          {keyLine({
-            keyInReach: h.keyPresent,
-            keyRejected: h.keyRejected,
-            given: h.given,
-            ask,
-            label: h.label,
-          })}
+          {mock || ask === null
+            ? MOCK_CALLS_LINE
+            : keyLine({
+                keyInReach: h.keyPresent,
+                keyRejected: h.keyRejected,
+                given: h.given,
+                ask,
+                label: h.label,
+              })}
         </div>
-      )}
-      {errorLine !== null ? (
+      ) : null}
+      {mock ? null : errorLine !== null ? (
         <div
           className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
           data-testid={`provider-${h.provider}-error`}
@@ -61,7 +64,7 @@ export function ProviderLines({
         </div>
       ) : null}
       {/* A member with no key in reach has made no call to speak of. */}
-      {lastOkWhen || ask === null || h.keyPresent ? (
+      {!mock && (lastOkWhen || ask === null || h.keyPresent) ? (
         <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
           <CircleCheck className="size-3.5 text-prov-recipe" />
           {lastOkWhen
