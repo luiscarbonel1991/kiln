@@ -180,6 +180,13 @@ describe("the key forms", () => {
     expect(text(html)).not.toContain("Cy Lane · you");
   });
 
+  // The name's example names no one.
+  it("offers a neutral example for the key's name", () => {
+    expect(form("openai")).toContain(
+      'placeholder="Like Team key, or Studio key"',
+    );
+  });
+
   // Where to make a key is a control an agent can find by its id.
   it("names where to make a key by a link with its own test id", () => {
     expect(form("openai")).toMatch(

@@ -103,7 +103,7 @@ function NameField({
         id={id}
         data-testid={id}
         autoComplete="off"
-        placeholder="Like Team key, or Bob's key"
+        placeholder="Like Team key, or Studio key"
         aria-invalid={fieldState.invalid}
         className={FIELD}
       />

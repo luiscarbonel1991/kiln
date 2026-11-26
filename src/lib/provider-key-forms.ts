@@ -19,7 +19,7 @@ export function keyProblem(key: string): string | null {
 const name = z
   .string()
   .trim()
-  .min(1, "Name it, like Bob's key.")
+  .min(1, "Name it, like Team key, or Studio key.")
   .max(40, "At most 40 characters.");
 
 const key = z
