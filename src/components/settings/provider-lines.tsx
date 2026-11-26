@@ -1,6 +1,20 @@
-import { CircleAlert, CircleCheck, KeyRound } from "lucide-react";
+import { Circle, CircleAlert, CircleCheck, KeyRound } from "lucide-react";
 import { keyLine, MOCK_CALLS_LINE } from "@/lib/provider-key-words";
 import type { ProviderHealth } from "@/server/provider-health";
+
+// When a call on a key last worked: the pine tick only once one has.
+export function LastCall({ when }: { when: string | null }) {
+  return (
+    <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
+      {when ? (
+        <CircleCheck className="size-3.5 flex-shrink-0 text-prov-recipe" />
+      ) : (
+        <Circle className="size-3.5 flex-shrink-0 text-on-surface-dim" />
+      )}
+      {when ? `Last call that worked: ${when}` : "No call that worked yet"}
+    </div>
+  );
+}
 
 // Settings → Providers, a provider's card for whoever reads no key list: a
 // member, whose one line says whether they can generate and whom to ask,
@@ -63,14 +77,13 @@ export function ProviderLines({
           </span>
         </div>
       ) : null}
-      {/* A member with no key in reach has made no call to speak of. */}
-      {!mock && (lastOkWhen || ask === null || h.keyPresent) ? (
-        <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
-          <CircleCheck className="size-3.5 text-prov-recipe" />
-          {lastOkWhen
-            ? `Last call that worked: ${lastOkWhen}`
-            : "No call that worked yet"}
-        </div>
+      {/* A member with no key in reach has made no call to speak of, and a
+          card with an alarm says what is wrong, not when a call last worked. */}
+      {!mock &&
+      errorLine === null &&
+      !(ask !== null && h.keyRejected) &&
+      (lastOkWhen || ask === null || h.keyPresent) ? (
+        <LastCall when={lastOkWhen} />
       ) : null}
     </>
   );

@@ -248,3 +248,54 @@ describe("the line under a key's row", () => {
     ).not.toContain("text-fail");
   });
 });
+
+describe("when a call last worked", () => {
+  // The pine tick only once a call has worked; until then a neutral mark.
+  // A row or card with an alarm says what is wrong, not when a call worked.
+  const tick = "lucide-circle-check";
+  it("ticks only a call that worked, on the owner's rows", () => {
+    const worked = owners([row()]);
+    expect(worked).toContain(tick);
+    expect(text(worked)).toContain("Last call that worked: Nov 20, 10:00 AM");
+    const never = owners([row({ lastOkAt: null, lastOkWhen: null })]);
+    expect(never).not.toContain(tick);
+    expect(never).toContain("text-on-surface-dim");
+    expect(text(never)).toContain("No call that worked yet");
+    const alarmed = text(owners([rejected]));
+    expect(alarmed).toContain("replace it");
+    expect(alarmed).not.toMatch(/Last call that worked|No call that worked/);
+    const failing = text(
+      owners([
+        row({
+          lastError: { at: "2026-11-21T10:00:00.000Z", message: "Busy." },
+          errorWhen: "Nov 21, 10:00 AM",
+        }),
+      ]),
+    );
+    expect(failing).toContain("Busy.");
+    expect(failing).not.toContain("Last call that worked");
+  });
+
+  it("ticks only a call that worked, on a member's card", () => {
+    expect(lines()).toContain(tick);
+    const never = lines({ lastOkWhen: null });
+    expect(never).not.toContain(tick);
+    expect(text(never)).toContain("No call that worked yet");
+    for (const alarmed of [
+      lines({ errorLine: "Google's last call failed; ask Ana." }),
+      lines({
+        health: {
+          provider: "google",
+          label: "Google",
+          keyPresent: true,
+          keyRejected: true,
+          given: false,
+        },
+      }),
+    ]) {
+      expect(text(alarmed)).not.toMatch(
+        /Last call that worked|No call that worked/,
+      );
+    }
+  });
+});

@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  CircleAlert,
-  CircleCheck,
-  Ellipsis,
-  KeyRound,
-  Loader2,
-  Plus,
-} from "lucide-react";
+import { CircleAlert, Ellipsis, KeyRound, Loader2, Plus } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { useState, useTransition } from "react";
 import {
@@ -21,6 +14,7 @@ import {
   type KeyChoice,
   ReplaceKeyFormView,
 } from "@/components/settings/provider-key-form";
+import { LastCall } from "@/components/settings/provider-lines";
 import { Button } from "@/components/ui/button";
 import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
 import { firstName } from "@/lib/first-name";
@@ -359,13 +353,10 @@ export function ProviderKeys({
                   </span>
                 </div>
               ) : null}
-              {mock ? null : (
-                <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
-                  <CircleCheck className="size-3.5 flex-shrink-0 text-prov-recipe" />
-                  {row.lastOkWhen
-                    ? `Last call that worked: ${row.lastOkWhen}`
-                    : "No call that worked yet"}
-                </div>
+              {/* A row with an alarm says what is wrong, not when a call
+                  last worked. */}
+              {mock || hasAlarm(row) ? null : (
+                <LastCall when={row.lastOkWhen} />
               )}
               {saidLine(row.id, hasAlarm(row))}
 
