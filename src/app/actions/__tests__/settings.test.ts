@@ -286,6 +286,89 @@ describe("a key of the studio's, as the owner", () => {
   });
 });
 
+// A failure that is not Kiln's own refusal (a database error, a person
+// removed mid-save) reads as a fixed sentence; its detail goes to the
+// server's log, with anything long enough to be a key masked.
+describe("a key action that fails for a reason not Kiln's own", () => {
+  const KEY = "sk-fixture-not-a-real-key-0000";
+  const raw = Object.assign(
+    new Error(
+      `Foreign key constraint violated on ProviderKeyAccess_memberId_fkey, key ${KEY}`,
+    ),
+    { code: "P2003" },
+  );
+
+  it("the owner reads a fixed sentence, never the raw text, and the log holds no key", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    writes.addProviderKey.mockRejectedValueOnce(raw);
+    writes.editProviderKey.mockRejectedValueOnce(raw);
+    writes.replaceProviderKey.mockRejectedValueOnce(raw);
+    writes.removeProviderKeyById.mockRejectedValueOnce(raw);
+    const answers = [
+      await addProviderKeyAction({
+        provider: "openai",
+        name: "Team key",
+        who: "team",
+        memberIds: [],
+        key: KEY,
+      }),
+      await editProviderKeyAction({
+        keyId: "k1",
+        name: "Bob's key",
+        who: "team",
+        memberIds: [],
+      }),
+      await replaceProviderKeyAction({ keyId: "k1", key: KEY }),
+      await removeProviderKeyByIdAction({ keyId: "k1" }),
+    ];
+    expect(answers).toEqual([
+      {
+        ok: false,
+        saved: false,
+        message: "Kiln could not save the key; try again.",
+      },
+      {
+        ok: false,
+        saved: false,
+        message: "Kiln could not save the change; try again.",
+      },
+      {
+        ok: false,
+        saved: false,
+        message: "Kiln could not save the key; try again.",
+      },
+      {
+        ok: false,
+        saved: false,
+        message: "Kiln could not remove the key; try again.",
+      },
+    ]);
+    checkKeyById.mockRejectedValueOnce(raw);
+    expect(await checkProviderKeyByIdAction({ keyId: "k1" })).toEqual({
+      ok: false,
+      saved: false,
+      message: "Kiln could not check the key; try again.",
+    });
+    expect(warn).toHaveBeenCalledTimes(5);
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).toContain("P2003");
+    expect(logged).not.toContain(KEY);
+    warn.mockRestore();
+  });
+
+  it("a key saved whose check then fails so reads as saved, in the fixed sentence", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    checkKeyById.mockRejectedValueOnce(raw);
+    expect(await replaceProviderKeyAction({ keyId: "k1", key: KEY })).toEqual({
+      ok: false,
+      saved: true,
+      message: "Saved, but: Kiln could not check the key; try again.",
+    });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(KEY);
+    warn.mockRestore();
+  });
+});
+
 // A studio's several keys: adding one, changing its name or its people,
 // replacing its secret, checking it and removing it are the owner's alone.
 // What the client sends is only what the form holds: never who is asking.

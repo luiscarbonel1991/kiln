@@ -8,6 +8,7 @@ import {
   type ProviderId,
 } from "@/domain/model-defaults";
 import { AgentRoutes, MakerRoutes } from "@/domain/model-routing";
+import { errorMessage } from "@/domain/queue";
 import {
   AddKeyForm,
   EditKeyForm,
@@ -101,15 +102,39 @@ function formProblem(
   };
 }
 
-function refused(error: unknown): KeyAnswer {
-  return {
-    ok: false,
-    saved: false,
-    message: error instanceof Error ? error.message : String(error),
-    ...(error instanceof KeyRefusal && error.field
-      ? { field: error.field }
-      : {}),
-  };
+// What the owner reads when a key action fails for a reason that is not
+// Kiln's own refusal (a database error, say): a fixed sentence, never the
+// raw text.
+const COULD_NOT = {
+  save: "Kiln could not save the key; try again.",
+  change: "Kiln could not save the change; try again.",
+  check: "Kiln could not check the key; try again.",
+  remove: "Kiln could not remove the key; try again.",
+};
+
+// The detail of such a failure, for the server's log only: its kind, its
+// code and its words, with anything long enough to be a key masked.
+function logFailure(what: keyof typeof COULD_NOT, error: unknown) {
+  const code = (error as { code?: unknown } | null)?.code;
+  console.warn(
+    `[kiln] a key action (${what}) failed:`,
+    error instanceof Error ? error.name : typeof error,
+    typeof code === "string" ? code : "",
+    errorMessage(error).replace(/\S{20,}/g, "[masked]"),
+  );
+}
+
+function refused(what: keyof typeof COULD_NOT, error: unknown): KeyAnswer {
+  if (error instanceof KeyRefusal) {
+    return {
+      ok: false,
+      saved: false,
+      message: error.message,
+      ...(error.field ? { field: error.field } : {}),
+    };
+  }
+  logFailure(what, error);
+  return { ok: false, saved: false, message: COULD_NOT[what] };
 }
 
 // A key just saved, checked for free so the owner reads the provider's own
@@ -128,7 +153,7 @@ async function savedAndChecked(
     return {
       ok: false,
       saved: true,
-      message: `Saved, but: ${refused(error).message}`,
+      message: `Saved, but: ${refused("check", error).message}`,
     };
   }
 }
@@ -143,7 +168,7 @@ export const addProviderKeyAction = ownerAction(
     try {
       added = await addProviderKey(maker, parsed.data);
     } catch (error) {
-      return refused(error);
+      return refused("save", error);
     }
     const answer = await savedAndChecked(maker, added.id);
     refresh();
@@ -158,7 +183,7 @@ export const editProviderKeyAction = ownerAction(
     try {
       await editProviderKey(maker, parsed.data);
     } catch (error) {
-      return refused(error);
+      return refused("change", error);
     }
     refresh();
     return { ok: true, saved: true, message: "Saved." };
@@ -174,7 +199,7 @@ export const replaceProviderKeyAction = ownerAction(
     try {
       await replaceProviderKey(maker, parsed.data);
     } catch (error) {
-      return refused(error);
+      return refused("save", error);
     }
     const answer = await savedAndChecked(maker, parsed.data.keyId);
     refresh();
@@ -192,7 +217,7 @@ export const checkProviderKeyByIdAction = ownerAction(
     try {
       result = await checkKeyById(maker, parsed.data.keyId);
     } catch (error) {
-      return refused(error);
+      return refused("check", error);
     }
     if (result.called) refresh();
     return checkedWords(result.provider, result);
@@ -208,7 +233,7 @@ export const removeProviderKeyByIdAction = ownerAction(
     try {
       await removeProviderKeyById(maker, parsed.data.keyId);
     } catch (error) {
-      return refused(error);
+      return refused("remove", error);
     }
     refresh();
     return { ok: true, saved: false, message: "Removed." };
