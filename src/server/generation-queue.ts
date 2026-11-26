@@ -185,10 +185,11 @@ async function assertRunnable(
     );
   }
   if (providerMode() === "live" && !hasProviderKey(model.provider)) {
-    // Why no key is in reach is read only when refusing.
+    // Why no key is in reach is read only when refusing; if it cannot be
+    // read, the refusal still stands, in the words of before.
     const [ask, reach] = await Promise.all([
       memberAsk(maker),
-      providerReach(maker),
+      providerReach(maker).catch(() => null),
     ]);
     throw new QueueRefusal(
       "provider",
@@ -197,7 +198,7 @@ async function assertRunnable(
         check.entry.label,
         PROVIDER_LABELS[model.provider],
         ask,
-        { reach: reach[model.provider].reach, token: !maker.member },
+        { reach: reach?.[model.provider].reach, token: !maker.member },
       ),
     );
   }

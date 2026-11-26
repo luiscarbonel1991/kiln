@@ -20,6 +20,18 @@ vi.mock("@/providers/mode", async (original) => ({
   ...(await original<typeof import("@/providers/mode")>()),
   providerMode: () => mode.current,
 }));
+// Why no key is in reach, read only when refusing; a case makes it fail.
+const reach = vi.hoisted(() => ({ fails: false }));
+vi.mock("@/server/provider-keys", async (original) => {
+  const real = await original<typeof import("@/server/provider-keys")>();
+  return {
+    ...real,
+    providerReach: (...args: Parameters<typeof real.providerReach>) =>
+      reach.fails
+        ? Promise.reject(new Error("connection lost"))
+        : real.providerReach(...args),
+  };
+});
 vi.mock("@/server/generation-worker", async (original) => ({
   ...(await original<typeof import("@/server/generation-worker")>()),
   createWorker: () => ({
@@ -202,6 +214,42 @@ describe.skipIf(!enabled)("a batch queued by a person (database)", async () => {
       mode.current = "queue-member";
     }
     expect(await made()).toEqual(before);
+  });
+
+  // The reach is read only to word the refusal: when it cannot be read, the
+  // batch is refused all the same, in the words of before, never a raw error.
+  it("a batch with no key in reach is refused in the words of before when its reach cannot be read", async () => {
+    const card = "recipe-line-art-2";
+    const owner = {
+      id: makerId,
+      member: { id: "o1", userId: "u0", role: "owner" as const },
+    };
+    const ownersWords = {
+      reason: "provider",
+      message: `${card} uses GPT Image 2, but OpenAI has no API key: add one in Settings → Providers.`,
+    };
+    const before = await db.generationJob.count({
+      where: { makerId, projectId, cardId: card },
+    });
+    mode.current = "live";
+    keys.present = false;
+    reach.fails = true;
+    try {
+      for (const reader of [owner, { id: makerId }]) {
+        await expect(
+          enqueueProjectCards(reader, { projectId, cardIds: [card] }),
+        ).rejects.toMatchObject(ownersWords);
+      }
+    } finally {
+      reach.fails = false;
+      keys.present = true;
+      mode.current = "queue-member";
+    }
+    expect(
+      await db.generationJob.count({
+        where: { makerId, projectId, cardId: card },
+      }),
+    ).toBe(before);
   });
 
   // A token, a script or the worker hands down { id } alone.
