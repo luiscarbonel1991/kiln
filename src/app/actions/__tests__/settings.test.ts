@@ -365,6 +365,19 @@ describe("a key action that fails for a reason not Kiln's own", () => {
     warn.mockRestore();
   });
 
+  // Masked first, then cut: a key across the log's 500th character leaves
+  // no unmasked start behind.
+  it("the log masks a key that the cut to 500 characters would split", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const long = new Error(`${"a ".repeat(243)}${KEY} after`);
+    writes.removeProviderKey.mockRejectedValueOnce(long);
+    await removeProviderKeyAction({ keyId: "k1" });
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).toContain("[masked]");
+    expect(logged).not.toContain(KEY.slice(0, 14));
+    warn.mockRestore();
+  });
+
   it("a key saved whose check then fails so reads as saved, in the fixed sentence", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     checkKey.mockRejectedValueOnce(raw);

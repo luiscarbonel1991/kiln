@@ -8,7 +8,6 @@ import {
   type ProviderId,
 } from "@/domain/model-defaults";
 import { AgentRoutes, MakerRoutes } from "@/domain/model-routing";
-import { errorMessage } from "@/domain/queue";
 import {
   AddKeyForm,
   EditKeyForm,
@@ -113,14 +112,16 @@ const COULD_NOT = {
 };
 
 // The detail of such a failure, for the server's log only: its kind, its
-// code and its words, with anything long enough to be a key masked.
+// code and its words, with anything long enough to be a key masked before
+// the words are cut short (a cut first could leave a key's start unmasked).
 function logFailure(what: keyof typeof COULD_NOT, error: unknown) {
   const code = (error as { code?: unknown } | null)?.code;
+  const said = error instanceof Error ? error.message : String(error);
   console.warn(
     `[kiln] a key action (${what}) failed:`,
     error instanceof Error ? error.name : typeof error,
     typeof code === "string" ? code : "",
-    errorMessage(error).replace(/\S{20,}/g, "[masked]"),
+    said.replace(/\S{20,}/g, "[masked]").slice(0, 500),
   );
 }
 
