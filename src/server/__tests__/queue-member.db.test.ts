@@ -32,6 +32,18 @@ vi.mock("@/server/provider-keys", async (original) => {
         : real.providerReach(...args),
   };
 });
+// Whom a member asks, read only when refusing; a case makes it fail.
+const ask = vi.hoisted(() => ({ fails: false }));
+vi.mock("@/server/month-limit", async (original) => {
+  const real = await original<typeof import("@/server/month-limit")>();
+  return {
+    ...real,
+    memberAsk: (...args: Parameters<typeof real.memberAsk>) =>
+      ask.fails
+        ? Promise.reject(new Error("connection lost"))
+        : real.memberAsk(...args),
+  };
+});
 vi.mock("@/server/generation-worker", async (original) => ({
   ...(await original<typeof import("@/server/generation-worker")>()),
   createWorker: () => ({
@@ -242,6 +254,40 @@ describe.skipIf(!enabled)("a batch queued by a person (database)", async () => {
       }
     } finally {
       reach.fails = false;
+      keys.present = true;
+      mode.current = "queue-member";
+    }
+    expect(
+      await db.generationJob.count({
+        where: { makerId, projectId, cardId: card },
+      }),
+    ).toBe(before);
+  });
+
+  // Whom a member asks is read only to word the refusal: when it cannot be
+  // read, the batch is refused all the same, in the words of before, never a
+  // raw error.
+  it("a batch with no key in reach is refused in the words of before when whom to ask cannot be read", async () => {
+    const card = "recipe-line-art-2";
+    const member = {
+      id: makerId,
+      member: { id: "m1", userId: "u1", role: "member" as const },
+    };
+    const before = await db.generationJob.count({
+      where: { makerId, projectId, cardId: card },
+    });
+    mode.current = "live";
+    keys.present = false;
+    ask.fails = true;
+    try {
+      await expect(
+        enqueueProjectCards(member, { projectId, cardIds: [card] }),
+      ).rejects.toMatchObject({
+        reason: "provider",
+        message: `${card} uses GPT Image 2, but OpenAI has no API key: add one in Settings → Providers.`,
+      });
+    } finally {
+      ask.fails = false;
       keys.present = true;
       mode.current = "queue-member";
     }

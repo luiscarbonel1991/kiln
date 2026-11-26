@@ -185,10 +185,11 @@ async function assertRunnable(
     );
   }
   if (providerMode() === "live" && !hasProviderKey(model.provider)) {
-    // Why no key is in reach is read only when refusing; if it cannot be
-    // read, the refusal still stands, in the words of before.
+    // Whom to ask and why no key is in reach are read only when refusing;
+    // if either cannot be read, the refusal still stands, in the words of
+    // before (as openDirectCall in direct-spend.ts).
     const [ask, reach] = await Promise.all([
-      memberAsk(maker),
+      memberAsk(maker).catch(() => null),
       providerReach(maker).catch(() => null),
     ]);
     throw new QueueRefusal(
