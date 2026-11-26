@@ -275,7 +275,7 @@ export function ProviderKeys({
                         aria-label={`Manage ${row.name}`}
                         data-testid={`provider-key-manage-${row.id}`}
                         disabled={pending}
-                        className="shrink-0 text-on-surface-mid"
+                        className="relative shrink-0 text-on-surface-mid after:absolute after:-inset-2"
                       >
                         <Ellipsis />
                       </Button>
