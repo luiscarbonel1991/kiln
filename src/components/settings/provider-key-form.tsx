@@ -36,6 +36,7 @@ import type { ProviderId } from "@/domain/model-defaults";
 import {
   AddKeyForm,
   EditKeyForm,
+  type KeyAnswer,
   ReplaceKeyForm,
 } from "@/lib/provider-key-forms";
 import { article } from "@/lib/provider-key-words";
@@ -50,15 +51,9 @@ export interface KeyChoice {
   people: { memberId: string }[];
 }
 
-export type KeyAnswer = { ok: boolean; message: string };
-
-type ServerAnswer = KeyAnswer & {
-  field?: "name" | "who" | "memberIds" | "key";
-};
-
 // A key is kept even when its free check right after fails ("Saved, but:
 // ..."): the form's work is done, and the row says the rest.
-const kept = (answer: ServerAnswer) =>
+const kept = (answer: KeyAnswer) =>
   answer.ok || answer.message.startsWith("Saved");
 
 const WHERE: Record<ProviderId, { href: string; site: string }> = {
@@ -396,7 +391,7 @@ export function AddKeyFormView({
   const who = useWatch({ control: form.control, name: "who" });
   const teamKey = keys.find((k) => k.forTeam);
   const submit = form.handleSubmit(async (values) => {
-    const answer: ServerAnswer = await addProviderKeyAction(values);
+    const answer = await addProviderKeyAction(values);
     if (kept(answer)) return onSaved(answer);
     form.setError(answer.field ?? "root", { message: answer.message });
   });
@@ -472,7 +467,7 @@ export function EditKeyFormView({
   const who = useWatch({ control: form.control, name: "who" });
   const teamKey = keys.find((k) => k.forTeam && k.id !== target.id);
   const submit = form.handleSubmit(async (values) => {
-    const answer: ServerAnswer = await editProviderKeyAction(values);
+    const answer = await editProviderKeyAction(values);
     if (kept(answer)) return onSaved(answer);
     const field =
       answer.field === "name" || answer.field === "memberIds"
@@ -540,7 +535,7 @@ export function ReplaceKeyFormView({
   );
   const { isSubmitting, errors } = form.formState;
   const submit = form.handleSubmit(async (values) => {
-    const answer: ServerAnswer = await replaceProviderKeyAction(values);
+    const answer = await replaceProviderKeyAction(values);
     if (kept(answer)) return onSaved(answer);
     form.setError(answer.field === "key" ? "key" : "root", {
       message: answer.message,

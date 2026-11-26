@@ -11,6 +11,8 @@ import { AgentRoutes, MakerRoutes } from "@/domain/model-routing";
 import {
   AddKeyForm,
   EditKeyForm,
+  type KeyAnswer,
+  type KeyField,
   KeyOfStudio,
   ReplaceKeyForm,
 } from "@/lib/provider-key-forms";
@@ -81,8 +83,6 @@ function checkedWords(
 // what the form holds (a key id, a name, whom it is for, member ids, a key),
 // never who is asking; the functions read the key and the people again under
 // this studio. An answer names the form field it belongs under, if one.
-type KeyField = "name" | "who" | "memberIds" | "key";
-type KeyAnswer = { ok: boolean; message: string; field?: KeyField };
 
 const KEY_FIELDS: readonly string[] = ["name", "who", "memberIds", "key"];
 const MOCK_KEYS = "Mock mode calls no provider: add keys in a live run.";

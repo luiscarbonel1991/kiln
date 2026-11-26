@@ -17,12 +17,12 @@ import { PersonMark } from "@/components/settings/person-mark";
 import {
   AddKeyFormView,
   EditKeyFormView,
-  type KeyAnswer,
   type KeyChoice,
   ReplaceKeyFormView,
 } from "@/components/settings/provider-key-form";
 import { Button } from "@/components/ui/button";
 import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
+import type { KeyAnswer } from "@/lib/provider-key-forms";
 import { article, keyRowTitle, removeKeyLine } from "@/lib/provider-key-words";
 import type {
   ProviderKeyCard,

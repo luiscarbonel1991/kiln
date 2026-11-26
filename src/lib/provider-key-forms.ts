@@ -65,3 +65,14 @@ export const ReplaceKeyForm = z.object({ keyId, key });
 
 // A key named by its id, to check or remove.
 export const KeyOfStudio = z.object({ keyId });
+
+// The form fields a server answer can belong under.
+export type KeyField = "name" | "who" | "memberIds" | "key";
+
+// What every key action answers: whether it worked, in words, and the field
+// a refusal shows under, if one.
+export interface KeyAnswer {
+  ok: boolean;
+  message: string;
+  field?: KeyField;
+}
