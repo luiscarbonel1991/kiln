@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, KeyRound } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { connection } from "next/server";
 import { ProjectsHeader } from "@/components/projects/projects-header";
 import { AccessTokens } from "@/components/settings/access-tokens";
@@ -6,6 +6,7 @@ import { Lessons } from "@/components/settings/lessons";
 import { MonthSpend } from "@/components/settings/month-spend";
 import { OwnerContact } from "@/components/settings/owner-contact";
 import { ProviderKeys } from "@/components/settings/provider-keys";
+import { ProviderLines } from "@/components/settings/provider-lines";
 import { RoutesForm } from "@/components/settings/routes-form";
 import { SceneLookSwitch } from "@/components/settings/scene-look-switch";
 import { Team } from "@/components/settings/team";
@@ -18,7 +19,6 @@ import { hasDatabase } from "@/lib/db";
 import {
   healthErrorLine,
   healthForReader,
-  keyLine,
   providersIntro,
 } from "@/lib/provider-key-words";
 import { providerMode } from "@/providers/mode";
@@ -175,47 +175,14 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
                       mock={mode === "mock"}
                     />
                   ) : (
-                    <>
-                      {/* The member's one line; the owner reads the key list. */}
-                      {ask === null || mode === "mock" ? null : (
-                        <div
-                          className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
-                          data-testid={`provider-${h.provider}-key`}
-                        >
-                          <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
-                          {keyLine({
-                            keyInReach: h.keyPresent,
-                            keyRejected: h.keyRejected,
-                            given: h.given,
-                            ask,
-                            label: h.label,
-                          })}
-                        </div>
-                      )}
-                      {h.lastError && errorLine(h) !== null ? (
-                        <div
-                          className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground"
-                          data-testid={`provider-${h.provider}-error`}
-                        >
-                          <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
-                          <span className="min-w-0 [overflow-wrap:anywhere]">
-                            {errorLine(h)}{" "}
-                            <span className="font-mono text-[0.65rem] text-on-surface-dim">
-                              {when(h.lastError.at)}
-                            </span>
-                          </span>
-                        </div>
-                      ) : null}
-                      {/* A member with no key in reach has made no call to speak of. */}
-                      {h.lastOkAt || ask === null || h.keyPresent ? (
-                        <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
-                          <CircleCheck className="size-3.5 text-prov-recipe" />
-                          {h.lastOkAt
-                            ? `Last call that worked: ${when(h.lastOkAt)}`
-                            : "No call that worked yet"}
-                        </div>
-                      ) : null}
-                    </>
+                    <ProviderLines
+                      health={h}
+                      ask={ask}
+                      mock={mode === "mock"}
+                      errorLine={errorLine(h)}
+                      errorWhen={h.lastError ? when(h.lastError.at) : null}
+                      lastOkWhen={h.lastOkAt ? when(h.lastOkAt) : null}
+                    />
                   )}
                   {h.unlisted ? (
                     <div
