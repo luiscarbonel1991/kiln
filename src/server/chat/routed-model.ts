@@ -18,6 +18,7 @@ import {
   type RouteEntry,
 } from "@/domain/model-routing";
 import { describeProviderError, hadResponse } from "@/domain/queue";
+import { providerKeyId } from "@/providers/keys";
 import { getChatModels } from "@/providers/registry";
 import {
   type DirectCall,
@@ -138,7 +139,9 @@ export function routedChatModel(
   ): Promise<R> {
     let [current] = candidates;
     let rest = candidates.slice(1);
-    let move: { from: RouteEntry; reason: string } | undefined;
+    let move:
+      | { from: RouteEntry; reason: string; keyId: string | null }
+      | undefined;
     for (;;) {
       const entry = current;
       // Opened inside the try: a call refused at opening (no key in reach, a
@@ -160,6 +163,7 @@ export function routedChatModel(
                       to: entry,
                       reason: move.reason,
                       at: new Date().toISOString(),
+                      keyId: move.keyId,
                     },
                   ],
                 },
@@ -186,7 +190,13 @@ export function routedChatModel(
           to: modelLabel(picked.entry),
           reason: failure.reason,
         });
-        move = { from: entry, reason: failure.reason };
+        // The key the move left, from the turn's scope; null when none was
+        // in reach.
+        move = {
+          from: entry,
+          reason: failure.reason,
+          keyId: providerKeyId(entry.provider) ?? null,
+        };
         current = picked.entry;
         rest = picked.rest;
       }

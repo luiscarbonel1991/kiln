@@ -584,6 +584,10 @@ export const RouteSwitch = z.object({
   to: RouteEntry,
   reason: z.string(),
   at: z.string(),
+  // The id of the maker's key the move left (its provider's, in the scope it
+  // ran in), or null when no key was in reach. A move from before keys were
+  // recorded has none at all.
+  keyId: z.string().nullable().optional(),
 });
 export type RouteSwitch = z.infer<typeof RouteSwitch>;
 

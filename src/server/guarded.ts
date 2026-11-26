@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
-import { currentProviderKeys, withProviderKeys } from "@/providers/keys";
+import {
+  currentProviderKeyIds,
+  currentProviderKeys,
+  withProviderKeys,
+} from "@/providers/keys";
 import { apiError, authorizeToken } from "@/server/http-api";
 import type { CurrentMaker, MakerRef } from "@/server/maker-repository";
 import { withMakerKeys } from "@/server/provider-keys";
@@ -7,23 +11,30 @@ import { denyWithoutSession, requireMaker } from "@/server/session";
 
 // The shapes everything a person or a token can reach is written in. Each
 // checks who is calling before the code inside runs, hands it the maker (or
-// the token) it runs for, and runs it with that maker's provider keys, so
-// there is no line to remember and no other maker's key is ever in reach.
+// the token) it runs for, and runs it with that caller's provider keys (a
+// person's own or the team's; a token's, the team's), so there is no line to
+// remember and no other maker's key is ever in reach.
 
 // A response body is read after the handler returns, by whoever sends it:
-// the work its reads start (a chat's next step) keeps the handler's keys.
+// the work its reads start (a chat's next step) keeps the handler's keys,
+// and the ids of those keys.
 function keepingKeys(response: Response): Response {
   const body = response.body;
   if (!body) return response;
   const keys = currentProviderKeys();
+  const ids = currentProviderKeyIds();
   const reader = body.getReader();
   const stream = new ReadableStream<Uint8Array>({
     pull: (controller) =>
-      withProviderKeys(keys, async () => {
-        const { done, value } = await reader.read();
-        if (done) controller.close();
-        else controller.enqueue(value);
-      }),
+      withProviderKeys(
+        keys,
+        async () => {
+          const { done, value } = await reader.read();
+          if (done) controller.close();
+          else controller.enqueue(value);
+        },
+        ids,
+      ),
     cancel: (reason) => reader.cancel(reason),
   });
   return new Response(stream, {
@@ -40,7 +51,7 @@ export function makerPage<Props extends unknown[]>(
 ): (...props: Props) => Promise<ReactNode> {
   return async (...props) => {
     const maker = await requireMaker();
-    return withMakerKeys(maker.id, () => render(maker, ...props));
+    return withMakerKeys(maker, () => render(maker, ...props));
   };
 }
 
@@ -51,7 +62,7 @@ export function makerAction<Args extends unknown[], Result>(
 ): (...args: Args) => Promise<Result> {
   return async (...args) => {
     const maker = await requireMaker();
-    return withMakerKeys(maker.id, () => run(maker, ...args));
+    return withMakerKeys(maker, () => run(maker, ...args));
   };
 }
 
@@ -81,7 +92,7 @@ export function sessionRoute<Args extends unknown[]>(
     const denied = await denyWithoutSession();
     if (denied) return denied;
     const maker = await requireMaker();
-    return withMakerKeys(maker.id, async () =>
+    return withMakerKeys(maker, async () =>
       keepingKeys(await run(maker, ...args)),
     );
   };
@@ -94,7 +105,7 @@ export function signedInRoute<Args extends unknown[]>(
 ): (...args: Args) => Promise<Response> {
   return async (...args) => {
     const maker = await requireMaker();
-    return withMakerKeys(maker.id, async () =>
+    return withMakerKeys(maker, async () =>
       keepingKeys(await run(maker, ...args)),
     );
   };
@@ -118,7 +129,7 @@ export function tokenRoute<Rest extends unknown[]>(
   return async (request, ...rest) => {
     const caller = await authorizeToken(request);
     if (caller instanceof Response) return caller;
-    return withMakerKeys(caller.maker.id, async () =>
+    return withMakerKeys(caller.maker, async () =>
       keepingKeys(await run(caller, request, ...rest)),
     );
   };

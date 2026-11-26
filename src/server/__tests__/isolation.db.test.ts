@@ -397,7 +397,7 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
     });
     const keyHint = label === "a" ? "AAAA" : "BBBB";
     await keys.saveProviderKey(
-      maker.id,
+      maker,
       "openai",
       `sk-isolation-test-key-${keyHint}`,
     );
@@ -469,11 +469,7 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
     a = await openStudio("a", 61_000, 50_000);
     b = await openStudio("b", 97_000, 30_000);
     // A second key only studio B holds.
-    await keys.saveProviderKey(
-      b.maker.id,
-      "google",
-      "AIza-isolation-test-GGGG",
-    );
+    await keys.saveProviderKey(b.maker, "google", "AIza-isolation-test-GGGG");
   });
 
   afterAll(async () => {
@@ -678,7 +674,7 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
     });
 
     it("provider keys and the team", async () => {
-      const states = await keys.providerKeyStates(a.maker.id);
+      const states = await keys.providerKeyStates(a.maker);
       expect(states.find((s) => s.provider === "openai")?.hint).toBe("AAAA");
       // B saved a second key; A has none of that provider.
       expect(states.find((s) => s.provider === "google")?.hint).toBeNull();
@@ -759,7 +755,7 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
         await asUnknown((id) => designs.designView(a.maker, id), b.designId),
       ).toEqual({ answered: null });
       const state = await asUnknown(
-        (id) => generation.projectGenerationState(a.maker.id, id),
+        (id) => generation.projectGenerationState(a.maker, id),
         b.projectId,
       );
       expect(state.answered).toMatchObject({
@@ -774,10 +770,7 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
       expect((await designs.designView(a.maker, a.designId))?.project.id).toBe(
         a.designId,
       );
-      const own = await generation.projectGenerationState(
-        a.maker.id,
-        a.projectId,
-      );
+      const own = await generation.projectGenerationState(a.maker, a.projectId);
       expect(own.jobs["etsy.hero"]).toMatchObject({ status: "done" });
       expect(own.batch?.batchId).toBe(a.batchId);
     });
@@ -943,18 +936,18 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
     it("removing a provider's key removes the studio's own and leaves the other's", async () => {
       const before = await rowsOf(b);
       // A provider only B has a key for.
-      await keys.removeProviderKey(a.maker.id, "google");
+      await keys.removeProviderKey(a.maker, "google");
       // A provider both have a key for.
-      await keys.removeProviderKey(a.maker.id, "openai");
+      await keys.removeProviderKey(a.maker, "openai");
       expect(await rowsOf(b)).toEqual(before);
       expect(
-        (await keys.providerKeyStates(b.maker.id)).map((s) => s.hint).sort(),
+        (await keys.providerKeyStates(b.maker)).map((s) => s.hint).sort(),
       ).toEqual(["BBBB", "GGGG"]);
       expect(
-        (await keys.providerKeyStates(a.maker.id)).map((s) => s.hint),
+        (await keys.providerKeyStates(a.maker)).map((s) => s.hint),
       ).toEqual([null, null]);
       await keys.saveProviderKey(
-        a.maker.id,
+        a.maker,
         "openai",
         "sk-isolation-test-key-AAAA",
       );

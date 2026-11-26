@@ -2,11 +2,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { canAfford } from "@/domain/generation-cost";
 import { GenerationRequest } from "@/domain/generation-request";
-import {
-  modelEntry,
-  modelLabel,
-  type ProviderId,
-} from "@/domain/model-defaults";
+import { modelEntry, modelLabel, ProviderId } from "@/domain/model-defaults";
 import {
   type JobRoute,
   type RouteEntry,
@@ -27,8 +23,11 @@ import {
   readableFailure,
 } from "@/domain/queue";
 import { assertDatabaseUrl, db } from "@/lib/db";
+import { failureForReader } from "@/lib/provider-key-words";
+import { currentProviderKeyIds, inProviderKeyScope } from "@/providers/keys";
 import { noteBatchEnd } from "@/server/batch-end";
 import type { MakerRef } from "@/server/maker-repository";
+import { memberAsk } from "@/server/studio-owner";
 
 // Persistence for the background generation queue. Every closing write on a
 // job is guarded by its lease token, so a worker that lost its lease (another
@@ -77,7 +76,7 @@ export interface ClaimedJob {
   request: unknown;
   route: unknown;
   estimateMicros: number;
-  // Who queued it; the worker still runs it as its maker.
+  // Who queued it; the worker runs it as that person, read when it runs.
   memberId: string | null;
 }
 
@@ -385,15 +384,18 @@ export async function renewLease(
   return count === 1;
 }
 
-// Mark that the paid call is going out, right before it. Guarded by the lease,
-// the project and the batch: false = the lease was lost, the project deleted
-// or the batch canceled, and the caller must not make the call.
+// Mark that the paid call is going out, right before it, with the key it goes
+// out on (the scope's; none in mock mode). Guarded by the lease, the project
+// and the batch: false = the lease was lost, the project deleted or the batch
+// canceled, and the caller must not make the call.
 export async function markCallStarted(
   id: string,
   token: string,
+  keyId: string | null = null,
 ): Promise<boolean> {
   const count = await db.$executeRaw`
-    UPDATE "GenerationJob" AS j SET "callStartedAt" = now()
+    UPDATE "GenerationJob" AS j
+    SET "callStartedAt" = now(), "providerKeyId" = ${keyId}
     WHERE j."id" = ${id} AND j."leaseToken" = ${token} AND j."status" = 'running'
       AND j."projectId" IS NOT NULL AND NOT ${STOPPED}`;
   return count === 1;
@@ -504,22 +506,28 @@ export async function failJob(
 // same on the new model, its route records the move, and it goes back to the
 // queue at once, its attempts counted afresh for the new model. Its batch's
 // jobs still queued on the same model move with it, so a batch stays on one
-// model (another model changes the look); each records why. false = the lease
-// was lost or the batch canceled: the caller fails the job as usual.
+// model (another model changes the look); each records why, and the key the
+// move left: the id the worker's scope holds for the provider it left (the
+// starter's, never the request's), null when none was in reach or the job is
+// a mock one. Outside a scope nothing is recorded. false = the lease was lost
+// or the batch canceled: the caller fails the job as usual.
 export async function fallBackJob(
   job: { id: string; leaseToken: string },
   move: { to: RouteEntry; rest: RouteEntry[]; reason: string },
   runnable: (entry: RouteEntry, request: GenerationRequest) => boolean,
 ): Promise<boolean> {
+  // The ids of the keys in use, from the caller's scope (the worker's).
+  const keyIds = inProviderKeyScope() ? currentProviderKeyIds() : null;
   return db.$transaction(async (tx) => {
     const [row] = await tx.$queryRaw<
       {
         batchId: string | null;
+        mode: string;
         request: unknown;
         route: unknown;
       }[]
     >`
-      SELECT j."batchId", j."request", j."route"
+      SELECT j."batchId", j."mode", j."request", j."route"
       FROM "GenerationJob" j
       WHERE j."id" = ${job.id} AND j."leaseToken" = ${job.leaseToken}
         AND j."status" = 'running' AND NOT ${STOPPED}
@@ -528,6 +536,12 @@ export async function fallBackJob(
     const request = GenerationRequest.parse(row.request);
     const at = new Date().toISOString();
     const from = modelOf(request);
+    const keyId =
+      keyIds === null
+        ? undefined
+        : row.mode === "mock"
+          ? null
+          : (keyIds[from.provider] ?? null);
     const moved = (
       current: GenerationRequest,
       route: JobRoute,
@@ -542,7 +556,13 @@ export async function fallBackJob(
         next: rest,
         switched: [
           ...route.switched,
-          { from: modelOf(current), to: move.to, reason, at },
+          {
+            from: modelOf(current),
+            to: move.to,
+            reason,
+            at,
+            ...(keyId === undefined ? {} : { keyId }),
+          },
         ],
       } satisfies JobRoute as unknown as Prisma.InputJsonValue,
     });
@@ -678,6 +698,8 @@ export async function reserveDirectCall(input: {
   sessionId?: string;
   // The person who made it; none for a token or a script.
   memberId?: string | null;
+  // The key it is made on, from the caller's scope.
+  providerKeyId?: string | null;
 }): Promise<string> {
   assertDatabaseUrl();
   return db.$transaction(async (tx) => {
@@ -702,6 +724,7 @@ export async function reserveDirectCall(input: {
         projectId: input.projectId ?? null,
         sessionId: input.sessionId ?? null,
         memberId: input.memberId ?? null,
+        providerKeyId: input.providerKeyId ?? null,
         cardId: "direct",
         mode: "live",
         status: "running",
@@ -734,6 +757,8 @@ export async function recordKeyCheck(input: {
   unlisted?: string[];
   // The person who ran the check.
   memberId?: string | null;
+  // The key it checked.
+  providerKeyId?: string | null;
 }): Promise<void> {
   assertDatabaseUrl();
   const now = new Date();
@@ -741,6 +766,7 @@ export async function recordKeyCheck(input: {
     data: {
       makerId: input.makerId,
       memberId: input.memberId ?? null,
+      providerKeyId: input.providerKeyId ?? null,
       cardId: "key-check",
       mode: "live",
       status: input.error === null ? "done" : "failed",
@@ -862,7 +888,7 @@ const withRanOn = (route: unknown) => {
 };
 
 export async function projectGenerationState(
-  makerId: string,
+  maker: MakerRef,
   projectId: string,
 ): Promise<GenerationState> {
   assertDatabaseUrl();
@@ -872,22 +898,37 @@ export async function projectGenerationState(
       status: JobStatus;
       attempt: number;
       error: string | null;
+      provider: string | null;
       route: unknown;
       test: boolean | null;
     }[]
   >`
     SELECT DISTINCT ON ("cardId") "cardId", "status", "attempt", "error", "route",
+           "request" #>> '{model,provider}' AS "provider",
            ("request" ->> 'test') = 'true' AS "test"
     FROM "GenerationJob"
-    WHERE "projectId" = ${projectId} AND "makerId" = ${makerId}
+    WHERE "projectId" = ${projectId} AND "makerId" = ${maker.id}
       AND "batchId" IS NOT NULL
     ORDER BY "cardId", "createdAt" DESC`;
+  // A member reads a failure in their words; the owner and a token as stored.
+  const ask = await memberAsk(maker);
+  const failure = (error: string, provider: string | null) => {
+    const readable = readableFailure(error);
+    const known = ProviderId.safeParse(provider);
+    return known.success
+      ? failureForReader(readable, known.data, ask)
+      : readable;
+  };
   const cards = await db.card.findMany({
-    where: { projectId, project: { makerId } },
+    where: { projectId, project: { makerId: maker.id } },
     select: { cardId: true, status: true, outputs: true, vectorUrl: true },
   });
   const active = await db.generationJob.findFirst({
-    where: { projectId, makerId, status: { in: ACTIVE_JOB_STATUSES } },
+    where: {
+      projectId,
+      makerId: maker.id,
+      status: { in: ACTIVE_JOB_STATUSES },
+    },
     orderBy: { createdAt: "desc" },
     select: { batchId: true },
   });
@@ -916,7 +957,7 @@ export async function projectGenerationState(
         {
           status: j.status,
           attempt: j.attempt,
-          ...(j.error ? { error: readableFailure(j.error) } : {}),
+          ...(j.error ? { error: failure(j.error, j.provider) } : {}),
           ...withRanOn(j.route),
           // Its take is a test take (low quality, never approved).
           ...(j.test && j.status === "done" ? { test: true } : {}),

@@ -129,13 +129,14 @@ model Organization {
 }
 
 model Member {
-  id             String       @id
+  id             String              @id
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role           String       @default("member")
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String              @default("member")
   createdAt      DateTime
+  keyAccess      ProviderKeyAccess[]
 
   @@index([organizationId])
   @@index([userId])
@@ -340,17 +341,43 @@ model ShopConnection {
 
 // A provider's API key the maker saved in Settings → Providers, sealed under
 // KILN_SECRET_KEY (secret-box.ts) and never sent back to the browser. `hint`
-// is its last four characters, so Settings can name the key it holds.
-// Removing the key deletes the row; the environment's key, if any, takes over.
+// is its last four characters, so Settings can name the key it holds. A key
+// is for the whole team (`forTeam`, at most one per provider) or given to
+// people (ProviderKeyAccess); `name` tells a provider's keys apart.
 model ProviderKey {
+  id        String              @id @default(cuid())
   makerId   String
-  maker     Maker    @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  maker     Maker               @relation(fields: [makerId], references: [id], onDelete: Cascade)
   provider  String
+  name      String
+  forTeam   Boolean             @default(false)
   sealed    String
   hint      String
-  updatedAt DateTime @updatedAt
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  access    ProviderKeyAccess[]
 
-  @@id([makerId, provider])
+  // What an access row points at, so its maker and provider are the key's.
+  @@unique([makerId, id, provider])
+  @@unique([makerId, provider, name])
+  @@unique([makerId, provider], map: "ProviderKey_one_team_key", where: raw("\"forTeam\""))
+}
+
+// Who a key is given to: one row per person. Its maker and provider are its
+// key's (a composite foreign key), so a row can never join another studio's
+// key; a person holds one given key per provider. Deleting the Member row, by
+// any path (Better Auth's remove or leave), deletes the person's rows.
+model ProviderKeyAccess {
+  makerId   String
+  keyId     String
+  provider  String
+  key       ProviderKey @relation(fields: [makerId, keyId, provider], references: [makerId, id, provider], onDelete: Cascade)
+  memberId  String
+  member    Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+
+  @@id([keyId, memberId])
+  @@unique([makerId, memberId, provider])
 }
 
 // Everything Kiln sent to a shop (Etsy drafts), one row per write: a draft
@@ -570,6 +597,10 @@ model GenerationJob {
   // Who started it (a Member id), null for a token, a script or the worker.
   // No foreign key: the spend and the log outlive a member who leaves.
   memberId       String?
+  // The ProviderKey a live call ran on, from the scope it ran in; null in
+  // mock mode and for a call refused before it went out. No foreign key: the
+  // ledger outlives a key.
+  providerKeyId  String?
   // What Kiln read in its image before it landed (domain TakeCheck): text,
   // letterforms and the scale asked for. Free and local; null for a video,
   // a direct call, or a take from before the check.

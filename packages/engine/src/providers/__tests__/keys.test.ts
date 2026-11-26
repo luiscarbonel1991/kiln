@@ -8,9 +8,11 @@ const env = vi.hoisted(() => ({
 vi.mock("../../env", () => ({ env }));
 
 const {
+  currentProviderKeyIds,
   currentProviderKeys,
   hasProviderKey,
   providerKey,
+  providerKeyId,
   providerKeySource,
   withProviderKeys,
 } = await import("@/providers/keys");
@@ -145,6 +147,71 @@ describe("provider keys", () => {
         expect(second).not.toBe(first);
         expect(second.apiKey).toBe("sk-two-1234567890");
       });
+    });
+  });
+
+  // The scope also says which of the studio's keys is in use, so a call can
+  // record the key it ran on; the id travels with the secret.
+  describe("the key in use", () => {
+    it("inside a scope with ids, each provider reads its own key's id", () => {
+      withProviderKeys(
+        { openai: "sk-bob", google: "g-team" },
+        () => {
+          expect(providerKeyId("openai")).toBe("key-bob");
+          expect(providerKeyId("google")).toBe("key-team");
+          expect(providerKey("openai")).toBe("sk-bob");
+        },
+        { openai: "key-bob", google: "key-team" },
+      );
+    });
+
+    it("a scope given no ids has none, and keeps its keys as before", () => {
+      withProviderKeys({ openai: "sk-saved" }, () => {
+        expect(providerKeyId("openai")).toBeUndefined();
+        expect(providerKeyId("google")).toBeUndefined();
+        expect(currentProviderKeyIds()).toEqual({});
+        expect(providerKey("openai")).toBe("sk-saved");
+      });
+    });
+
+    it("work carried later from elsewhere keeps both the keys and their ids", async () => {
+      const carried = withProviderKeys(
+        { openai: "sk-bob" },
+        () => ({ keys: currentProviderKeys(), ids: currentProviderKeyIds() }),
+        { openai: "key-bob" },
+      );
+      expect(carried.ids).toEqual({ openai: "key-bob" });
+      const later = await withProviderKeys(
+        carried.keys,
+        async () => {
+          await new Promise((r) => setTimeout(r, 1));
+          return [providerKey("openai"), providerKeyId("openai")];
+        },
+        carried.ids,
+      );
+      expect(later).toEqual(["sk-bob", "key-bob"]);
+    });
+
+    it("two pieces of work at once each read their own key's id", async () => {
+      const seen: string[] = [];
+      const work = (name: string, delay: number) =>
+        withProviderKeys(
+          { openai: `sk-${name}` },
+          async () => {
+            await new Promise((r) => setTimeout(r, delay));
+            seen.push(`${name}:${providerKeyId("openai")}`);
+          },
+          { openai: `key-${name}` },
+        );
+      await Promise.all([work("a", 15), work("b", 2)]);
+      expect(seen.sort()).toEqual(["a:key-a", "b:key-b"]);
+    });
+
+    it("outside any scope the environment's key is used and no key id is in use", () => {
+      expect(providerKey("google")).toBe("g-env");
+      expect(providerKeyId("google")).toBeUndefined();
+      expect(providerKeyId("openai")).toBeUndefined();
+      expect(currentProviderKeyIds()).toEqual({});
     });
   });
 });

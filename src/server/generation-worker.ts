@@ -9,6 +9,7 @@ import {
   type ImageGenerationRequest,
   type VideoGenerationRequest,
 } from "@/domain/generation-request";
+import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import {
   fallbackAfter,
   pickNext,
@@ -27,6 +28,7 @@ import {
   hadResponse,
   retryDecision,
 } from "@/domain/queue";
+import { ProviderKeyMissing } from "@/providers/errors";
 import type { ImageProvider, VideoProvider } from "@/providers/interfaces";
 import type { GenerationUsage } from "@/providers/types";
 import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
@@ -51,8 +53,13 @@ import type { ClaimedJob, ProviderMode } from "@/server/generation-repository";
 
 export interface WorkerDeps {
   mode: ProviderMode;
-  // Runs a job as its maker: with that maker's provider keys, no other's.
-  asMaker?<T>(makerId: string, work: () => Promise<T>): Promise<T>;
+  // Runs a claimed job as whoever queued it (its maker, for a job with no
+  // person): with their provider keys, no one else's. `work` hears whether
+  // that person is still on the team. Without it a job runs as "here".
+  asMaker?<T>(
+    job: ClaimedJob,
+    work: (starter: "here" | "left") => Promise<T>,
+  ): Promise<T>;
   concurrency: number;
   leaseSec: number;
   renewMs: number;
@@ -64,7 +71,12 @@ export interface WorkerDeps {
     leaseSec: number,
   ): Promise<ClaimedJob[]>;
   renewLease(id: string, token: string, leaseSec: number): Promise<boolean>;
-  markCallStarted(id: string, token: string): Promise<boolean>;
+  // Marks the call, with the key it goes out on (null in mock mode).
+  markCallStarted(
+    id: string,
+    token: string,
+    keyId: string | null,
+  ): Promise<boolean>;
   recordCost(
     id: string,
     usage: unknown,
@@ -92,6 +104,12 @@ export interface WorkerDeps {
   // Whether a model of the route may run this request now (key, price,
   // capability).
   runnable(entry: RouteEntry, request: GenerationRequest): boolean;
+  // Whether the job's starter (or, with none, the team) has a key of this
+  // provider they can use now, in the scope asMaker set. Live mode only.
+  keyInReach?(provider: ProviderId): boolean;
+  // The id of the key in use for a provider, in the same scope (never from
+  // the job's request). Live mode only.
+  keyId?(provider: ProviderId): string | undefined;
   overCap(makerId: string): Promise<boolean>;
   provider(id: "google" | "openai"): ImageProvider;
   videoProvider(id: "google" | "openai"): VideoProvider | undefined;
@@ -230,10 +248,20 @@ async function lookLanding(
 
 // The job lost its lease, its project was deleted or its batch canceled
 // before the paid call: nothing was spent, and there is nothing to retry.
-// Failures that are Kiln's, not a provider's (provider health skips them).
+// Failures that are Kiln's, not a provider's (provider health skips them,
+// and every "Not run: " sentence).
 export const CAP_REACHED = "This month's spending cap was reached.";
 export const NOT_STARTED =
   "The job was canceled, or lost its lease or its project, before the paid call; nothing was spent.";
+export const NOT_RUN = "Not run: ";
+export const STARTER_LEFT = `${NOT_RUN}the person who queued it is no longer on the team, so nothing was spent.`;
+
+// A job refused before its call for want of a key its starter (or, with no
+// starter, the team) can use: words that name no one and no key.
+const noKeyInReach = (provider: ProviderId, person: boolean) =>
+  person
+    ? `${NOT_RUN}the person who queued it has no ${PROVIDER_LABELS[provider]} key they can use now, so nothing was spent.`
+    : `${NOT_RUN}the studio has no ${PROVIDER_LABELS[provider]} key for the whole team it can use now, so nothing was spent.`;
 
 class CallNotStarted extends Error {
   constructor() {
@@ -348,6 +376,10 @@ async function callVideo(
   return clip;
 }
 
+// The key a live call of this provider goes out on; none in mock mode.
+const keyIdOf = (deps: WorkerDeps, provider: ProviderId): string | null =>
+  deps.mode === "live" ? (deps.keyId?.(provider) ?? null) : null;
+
 // Move the job down its route when the failure allows and a model may run it;
 // true when it moved (it is queued again on that model).
 async function moveDown(
@@ -379,9 +411,25 @@ async function moveDown(
     });
 }
 
-export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
+export async function runJob(
+  deps: WorkerDeps,
+  job: ClaimedJob,
+  starter: "here" | "left" = "here",
+): Promise<void> {
+  // Whoever queued it left the team: it ends before anything else, in both
+  // modes, with nothing spent.
+  if (starter === "left") {
+    await deps
+      .failJob(job.id, job.leaseToken, STARTER_LEFT, {
+        retry: false,
+        mayBeCharged: false,
+      })
+      .catch((e) => deps.log(`could not record the failure of ${job.id}`, e));
+    return;
+  }
   let callStarted = false;
   let paid = false;
+  let keyless = false;
   let provider: "google" | "openai" | undefined;
   let request: GenerationRequest | undefined;
   const renew = setInterval(() => {
@@ -398,8 +446,20 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
     const parsed = GenerationRequest.parse(job.request);
     request = parsed;
     provider = parsed.model.provider;
+    // No key in reach: refused before the call, as the adapter would, so a
+    // saved route moves it as it moves any missing key.
+    if (deps.mode === "live" && deps.keyInReach && !deps.keyInReach(provider)) {
+      keyless = true;
+      throw new ProviderKeyMissing(provider);
+    }
     const beforeCall = async () => {
-      if (!(await deps.markCallStarted(job.id, job.leaseToken))) {
+      if (
+        !(await deps.markCallStarted(
+          job.id,
+          job.leaseToken,
+          keyIdOf(deps, parsed.model.provider),
+        ))
+      ) {
         throw new CallNotStarted();
       }
       callStarted = true;
@@ -446,6 +506,7 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
     }
     const retry =
       !mayBeCharged &&
+      !keyless &&
       !(error instanceof CallNotStarted) &&
       retryDecision(job.attempt, error, job.maxAttempts).retry;
     // The provider's failure in words the maker can act on (Google's spend
@@ -453,9 +514,12 @@ export async function runJob(deps: WorkerDeps, job: ClaimedJob): Promise<void> {
     const said = provider
       ? describeProviderError(provider, error)
       : errorMessage(error);
-    const message = unanswered
-      ? `The call got no answer (${said}); it may have been charged, so it was not retried.`
-      : said;
+    const message =
+      keyless && provider
+        ? noKeyInReach(provider, job.memberId !== null)
+        : unanswered
+          ? `The call got no answer (${said}); it may have been charged, so it was not retried.`
+          : said;
     deps.log(`generation job ${job.id} failed (retry: ${retry})`, error);
     await deps
       .failJob(job.id, job.leaseToken, message, { retry, mayBeCharged })
@@ -498,8 +562,9 @@ export function createWorker(deps: WorkerDeps): Worker {
           if (jobs.length === 0) break;
           for (const job of jobs) {
             running++;
-            const run = () => runJob(deps, job);
-            void (deps.asMaker ? deps.asMaker(job.makerId, run) : run())
+            const run = (starter: "here" | "left") =>
+              runJob(deps, job, starter);
+            void (deps.asMaker ? deps.asMaker(job, run) : run("here"))
               .catch((error) => deps.log("a job could not start", error))
               .finally(() => {
                 running--;

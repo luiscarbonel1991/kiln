@@ -174,3 +174,76 @@ describe.skipIf(!enabled)(
     });
   },
 );
+
+// A direct call records the key it is reserved on, from the scope its maker's
+// work runs in: Bob's on his own key, Carla's and a token's on the team's.
+// Fixture keys; the call is a stub.
+describe.skipIf(!enabled)(
+  "the key a direct call runs on (database)",
+  async () => {
+    const { db } = await import("@/lib/db");
+    const { withMakerKeys } = await import("@/server/provider-keys");
+    const { textCall, withDirectSpend } = await import("@/server/direct-spend");
+    const fx = await import("@/server/__tests__/fixtures/studio-keys");
+
+    let studio: Awaited<ReturnType<typeof fx.openStudio>>;
+    const ids: Record<string, string> = {};
+    const LUNA = { provider: "openai" as const, model: "gpt-6-luna" };
+    const answer: TextResult<string> = { value: "", model: LUNA.model };
+
+    beforeAll(async () => {
+      studio = await fx.openStudio("direct-keys");
+      ids.team = await fx.writeKey(studio, {
+        provider: "openai",
+        name: "Team key",
+        forTeam: true,
+        secret: "sk-fixture-direct-team-00000001",
+      });
+      ids.bob = await fx.writeKey(studio, {
+        provider: "openai",
+        name: "Bob's key",
+        secret: "sk-fixture-direct-bob-000000002",
+        people: [studio.bob],
+      });
+    });
+
+    afterAll(async () => {
+      await fx.closeStudio(studio);
+    });
+
+    const callAs = async (maker: Parameters<typeof withMakerKeys>[0]) => {
+      const before = (
+        await db.generationJob.findMany({
+          where: { makerId: studio.makerId },
+          select: { id: true },
+        })
+      ).map((r) => r.id);
+      await withMakerKeys(maker, () =>
+        withDirectSpend(
+          maker,
+          textCall<string>(LUNA, "chatTurn"),
+          async () => answer,
+        ),
+      );
+      const made = await db.generationJob.findMany({
+        where: { makerId: studio.makerId, id: { notIn: before } },
+      });
+      expect(made).toHaveLength(1);
+      return made[0];
+    };
+
+    it("Bob's direct call carries his key's id", async () => {
+      expect(await callAs(studio.as(studio.bob))).toMatchObject({
+        memberId: studio.bob.memberId,
+        providerKeyId: ids.bob,
+      });
+    });
+
+    it("Carla's and a token's direct call carry the team key's id", async () => {
+      expect((await callAs(studio.as(studio.carla))).providerKeyId).toBe(
+        ids.team,
+      );
+      expect((await callAs(studio.as())).providerKeyId).toBe(ids.team);
+    });
+  },
+);

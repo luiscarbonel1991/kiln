@@ -161,7 +161,7 @@ export default makerPage(async function ProjectBoardPage(
   );
   const writeUsd = await textWorstCase(maker, "listingCopy");
   const listingPrice = writeUsd === null ? null : `≈ $${writeUsd.toFixed(2)}`;
-  const generation = await projectGenerationState(maker.id, board.id);
+  const generation = await projectGenerationState(maker, board.id);
   // This month's limit as this person may know it: a member reads no amount.
   const limit = await monthLimit(maker);
   const brand = await getMakerBrand(maker);
@@ -169,7 +169,7 @@ export default makerPage(async function ProjectBoardPage(
   // Whom a member asks about a key (null for the owner), and the providers'
   // health as that reader may read it: it goes to the browser.
   const ask = limit.whose === "member" ? limit.ask : null;
-  const health = healthForReader(await providerHealth(maker.id), ask);
+  const health = healthForReader(await providerHealth(maker), ask);
   const plan = board.plan;
   const spend = plan ? await projectSpend(maker, board.id) : null;
   const cost =

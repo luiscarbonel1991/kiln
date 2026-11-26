@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   directNoKeyLine,
+  failureForReader,
   healthErrorLine,
   healthForReader,
   homeKeysLine,
@@ -537,5 +538,88 @@ describe("a direct call refused for want of a key", () => {
     const line = directNoKeyLine("OpenAI", "Ana");
     expect(line).toBe("You have no access to an OpenAI key; ask Ana.");
     expectNoOwnersWords(line);
+  });
+});
+
+// A frame's failure, as each reader of the frame reads it: the owner and a
+// token as stored; a member in their words where it says what only the
+// owner can do. Kiln's own "Not run" sentences name no one and read the same
+// for everyone.
+describe("a frame's failure, by who reads it", () => {
+  const NOT_RUN = [
+    "Not run: the person who queued it is no longer on the team, so nothing was spent.",
+    "Not run: the person who queued it has no OpenAI key they can use now, so nothing was spent.",
+    "Not run: the studio has no OpenAI key for the whole team it can use now, so nothing was spent.",
+  ];
+  const STORED = {
+    rejected: {
+      openai: "OpenAI rejected the API key — replace the key or use Google.",
+      google: "Google rejected the API key — replace the key or use OpenAI.",
+    },
+    ownersToDo: {
+      openai:
+        "OpenAI is out of quota — check billing at platform.openai.com or use Google.",
+      google:
+        "Google is at its spend cap — raise it at ai.studio/spend or use OpenAI.",
+    },
+    other: {
+      openai:
+        "OpenAI is rate-limiting requests — try again in a minute or use Google.",
+      google: "The provider returned no image.",
+    },
+  };
+  const LABEL = { openai: "OpenAI", google: "Google" } as const;
+
+  it("the owner and a token read it as it was stored", () => {
+    for (const provider of ["openai", "google"] as const) {
+      for (const message of [
+        STORED.rejected[provider],
+        STORED.ownersToDo[provider],
+        STORED.other[provider],
+        ...NOT_RUN,
+      ]) {
+        expect(failureForReader(message, provider, null)).toBe(message);
+      }
+    }
+  });
+
+  it("a member reads a rejected key as the studio's, with whom to ask", () => {
+    for (const provider of ["openai", "google"] as const) {
+      expect(failureForReader(STORED.rejected[provider], provider, "Ana")).toBe(
+        `${LABEL[provider]} rejected the studio's key on its last call; ask Ana.`,
+      );
+    }
+  });
+
+  it("a member reads a failure only the owner can act on as one to ask about", () => {
+    for (const provider of ["openai", "google"] as const) {
+      expect(
+        failureForReader(STORED.ownersToDo[provider], provider, "Ana"),
+      ).toBe(`${LABEL[provider]}'s last call failed; ask Ana.`);
+    }
+  });
+
+  it("a member reads any other failure as it was stored", () => {
+    for (const provider of ["openai", "google"] as const) {
+      expect(failureForReader(STORED.other[provider], provider, "Ana")).toBe(
+        STORED.other[provider],
+      );
+    }
+  });
+
+  it("Kiln's own sentences for a job that did not run read the same for a member", () => {
+    for (const message of NOT_RUN) {
+      expect(failureForReader(message, "openai", "Ana")).toBe(message);
+    }
+  });
+
+  it("nothing a member reads of a frame says what only the owner can do", () => {
+    for (const provider of ["openai", "google"] as const) {
+      for (const message of Object.values(STORED).map((m) => m[provider])) {
+        expect(failureForReader(message, provider, "Ana")).not.toMatch(
+          /replace|Settings|billing|spend cap|ai\.studio|platform\.openai\.com/,
+        );
+      }
+    }
   });
 });

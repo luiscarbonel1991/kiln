@@ -15,11 +15,14 @@ export type {
 } from "@/providers/interfaces";
 export { checkProviderKey, type KeyCheck } from "@/providers/key-check";
 export {
+  currentProviderKeyIds,
   currentProviderKeys,
   hasEnvironmentKey,
   hasProviderKey,
+  type ProviderKeyIds,
   type ProviderKeys,
   providerKey,
+  providerKeyId,
   providerKeySource,
   withProviderKeys,
 } from "@/providers/keys";

@@ -44,7 +44,7 @@ import { env } from "@/lib/env";
 import { queueNoKeyLine } from "@/lib/provider-key-words";
 import { CATALOG, findRecipe, SEED_RECIPES } from "@/lib/recipes";
 import { storeAsset } from "@/providers/asset-bytes";
-import { hasProviderKey } from "@/providers/keys";
+import { hasProviderKey, providerKeyId } from "@/providers/keys";
 import { providerMode } from "@/providers/mode";
 import {
   getImageProvider,
@@ -71,7 +71,7 @@ import type { MakerRef } from "@/server/maker-repository";
 import { getMakerRoutes } from "@/server/maker-repository";
 import { fitsThisMonth, inMembersWords, memberAsk } from "@/server/month-limit";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
-import { withMakerKeys } from "@/server/provider-keys";
+import { withStarterKeys } from "@/server/provider-keys";
 import { checkProjectTake } from "@/server/qc/project-take";
 import { sceneLookPlan } from "@/server/scene-look";
 
@@ -585,7 +585,9 @@ export function ensureGenerationWorker(): Worker | null {
   if (!globalForWorker.kilnGenerationWorker) {
     const worker = createWorker({
       mode: providerMode(),
-      asMaker: withMakerKeys,
+      asMaker: withStarterKeys,
+      keyInReach: hasProviderKey,
+      keyId: providerKeyId,
       concurrency: env.KILN_GENERATION_CONCURRENCY,
       leaseSec: 120,
       renewMs: 30_000,

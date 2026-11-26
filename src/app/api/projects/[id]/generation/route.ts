@@ -14,7 +14,7 @@ export const GET = sessionRoute(
     { params }: { params: Promise<{ id: string }> },
   ) => {
     const { id } = await params;
-    return Response.json(await projectGenerationState(maker.id, id), {
+    return Response.json(await projectGenerationState(maker, id), {
       headers: { "Cache-Control": "no-store" },
     });
   },

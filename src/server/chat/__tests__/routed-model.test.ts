@@ -411,4 +411,53 @@ describe("the chat's routed model", () => {
     );
     expect(opened[0].done).not.toHaveBeenCalled();
   });
+
+  // A step's move records the key of the provider it left, from the scope
+  // the turn runs in: its id, or null when no key was in reach.
+  it("a move off a refused step records the key it left", async () => {
+    const { withProviderKeys } = await import("@/providers/keys");
+    models.set(
+      LUNA.model,
+      new MockLanguageModelV4({
+        doStream: async () => {
+          throw Object.assign(new Error("OpenAI is down"), { status: 503 });
+        },
+      }),
+    );
+    models.set(FLASH.model, streaming(answer("Hola.")));
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
+      ...ROUTE,
+      ledger: newLedger(),
+    });
+    await withProviderKeys(
+      { openai: "sk-fixture-bob", google: "fixture-google-team" },
+      async () => read((await model.doStream(CALL)).stream),
+      { openai: "key-bob", google: "key-team-google" },
+    );
+    expect(openDirectCall.mock.calls[1][1]).toMatchObject({
+      route: { switched: [{ from: LUNA, to: FLASH, keyId: "key-bob" }] },
+    });
+  });
+
+  it("a move made because no key was in reach records none", async () => {
+    const { withProviderKeys } = await import("@/providers/keys");
+    openDirectCall.mockRejectedValueOnce(noKey(MEMBERS_NO_KEY));
+    models.set(FLASH.model, streaming(answer("Hola.")));
+    const model = routedChatModel({ id: "test" }, "chatTurn", {
+      ...ROUTE,
+      ledger: newLedger(),
+    });
+    await withProviderKeys(
+      { google: "fixture-google-team" },
+      async () => read((await model.doStream(CALL)).stream),
+      { google: "key-team-google" },
+    );
+    const [move] = (
+      openDirectCall.mock.calls[1][1] as unknown as {
+        route: { switched: Record<string, unknown>[] };
+      }
+    ).route.switched;
+    expect(move).toMatchObject({ from: LUNA, to: FLASH });
+    expect(move).toHaveProperty("keyId", null);
+  });
 });

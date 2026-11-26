@@ -17,7 +17,11 @@ const checked = vi.hoisted(() => ({
   >,
 }));
 const checkKey = vi.hoisted(() => vi.fn());
-vi.mock("@/server/provider-health", () => ({ checkKey }));
+const checkKeyById = vi.hoisted(() => vi.fn());
+vi.mock("@/server/provider-health", () => ({ checkKey, checkKeyById }));
+// The free check itself: never reached from these tests.
+const checkProviderKey = vi.hoisted(() => vi.fn());
+vi.mock("@/providers/key-check", () => ({ checkProviderKey }));
 
 // Who is signed in: the studio's owner, or someone who works with them.
 const who = vi.hoisted(() => ({ role: "owner" as "owner" | "member" }));
@@ -32,19 +36,34 @@ vi.mock("@/server/session", () => ({
 }));
 const saveProviderKey = vi.hoisted(() => vi.fn(async () => {}));
 const removeProviderKey = vi.hoisted(() => vi.fn(async () => {}));
+// The writes of a studio's keys: none may run for someone who is not the
+// owner, nor in mock mode.
+const writes = vi.hoisted(() => ({
+  addProviderKey: vi.fn(async () => ({ id: "k-new" })),
+  editProviderKey: vi.fn(async () => {}),
+  replaceProviderKey: vi.fn(async () => {}),
+  removeProviderKeyById: vi.fn(async () => {}),
+}));
 vi.mock("@/server/provider-keys", async (original) => ({
   ...(await original<typeof import("@/server/provider-keys")>()),
   saveProviderKey,
   removeProviderKey,
+  ...writes,
 }));
+const mode = vi.hoisted(() => ({ current: "live" as "live" | "mock" }));
 vi.mock("@/providers/mode", async (original) => ({
   ...(await original<typeof import("@/providers/mode")>()),
-  providerMode: () => "live",
+  providerMode: () => mode.current,
 }));
 
 const {
+  addProviderKeyAction,
   checkProviderKeyAction,
+  checkProviderKeyByIdAction,
+  editProviderKeyAction,
   removeProviderKeyAction,
+  removeProviderKeyByIdAction,
+  replaceProviderKeyAction,
   saveMakerRoutesAction,
   saveProviderKeyAction,
 } = await import("@/app/actions/settings");
@@ -62,6 +81,7 @@ beforeEach(() => {
 afterEach(() => {
   saved.length = 0;
   who.role = "owner";
+  mode.current = "live";
   vi.clearAllMocks();
 });
 
@@ -176,7 +196,7 @@ describe("a provider's key, as the owner", () => {
       }),
     ).toEqual({ ok: true, message: "Saved. OpenAI accepts the key." });
     expect(saveProviderKey).toHaveBeenCalledWith(
-      "test",
+      expect.objectContaining({ id: "test" }),
       "openai",
       "sk-fixture-0000",
     );
@@ -188,6 +208,110 @@ describe("a provider's key, as the owner", () => {
       ok: true,
       message: "Removed.",
     });
-    expect(removeProviderKey).toHaveBeenCalledWith("test", "google");
+    expect(removeProviderKey).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "test" }),
+      "google",
+    );
+  });
+});
+
+// A studio's several keys: adding one, changing its name or its people,
+// replacing its secret, checking it and removing it are the owner's alone.
+// What the client sends is only what the form holds: never who is asking.
+describe("a key of the studio's, as someone who is not the owner", () => {
+  const refusal = {
+    name: "OwnerOnly",
+    message: "Only the studio's owner can do that.",
+  };
+  const KEY = "sk-fixture-not-a-real-key-0000";
+  const calls = [
+    [
+      "adding a key",
+      () =>
+        addProviderKeyAction({
+          provider: "openai",
+          name: "Bob's key",
+          who: "people",
+          memberIds: ["m1"],
+          key: KEY,
+        }),
+    ],
+    [
+      "changing a key's name or people",
+      () =>
+        editProviderKeyAction({
+          keyId: "k1",
+          name: "Bob's key",
+          who: "team",
+          memberIds: [],
+        }),
+    ],
+    [
+      "replacing a key",
+      () => replaceProviderKeyAction({ keyId: "k1", key: KEY }),
+    ],
+    ["checking a key", () => checkProviderKeyByIdAction({ keyId: "k1" })],
+    ["removing a key", () => removeProviderKeyByIdAction({ keyId: "k1" })],
+  ] as const;
+
+  const nothingHappened = () => {
+    for (const write of Object.values(writes)) {
+      expect(write).not.toHaveBeenCalled();
+    }
+    expect(saveProviderKey).not.toHaveBeenCalled();
+    expect(removeProviderKey).not.toHaveBeenCalled();
+    expect(checkKey).not.toHaveBeenCalled();
+    expect(checkKeyById).not.toHaveBeenCalled();
+    expect(checkProviderKey).not.toHaveBeenCalled();
+  };
+
+  for (const [what, call] of calls) {
+    it(`${what} is refused: nothing is written and no provider is asked`, async () => {
+      who.role = "member";
+      await expect(call()).rejects.toMatchObject(refusal);
+      nothingHappened();
+    });
+  }
+
+  it("a member who says in the input that they are the owner is refused all the same", async () => {
+    who.role = "member";
+    await expect(
+      addProviderKeyAction({
+        provider: "openai",
+        name: "Mine",
+        who: "people",
+        memberIds: ["m1"],
+        key: KEY,
+        role: "owner",
+        member: { id: "m1", role: "owner" },
+      }),
+    ).rejects.toMatchObject(refusal);
+    nothingHappened();
+  });
+});
+
+describe("a key of the studio's, in mock mode", () => {
+  it("adding or replacing a key is refused, as no provider is called, and nothing is written", async () => {
+    mode.current = "mock";
+    const KEY = "sk-fixture-not-a-real-key-0000";
+    const words = {
+      ok: false,
+      message: "Mock mode calls no provider: add keys in a live run.",
+    };
+    expect(
+      await addProviderKeyAction({
+        provider: "openai",
+        name: "Team key",
+        who: "team",
+        memberIds: [],
+        key: KEY,
+      }),
+    ).toMatchObject(words);
+    expect(
+      await replaceProviderKeyAction({ keyId: "k1", key: KEY }),
+    ).toMatchObject(words);
+    expect(writes.addProviderKey).not.toHaveBeenCalled();
+    expect(writes.replaceProviderKey).not.toHaveBeenCalled();
+    expect(checkProviderKey).not.toHaveBeenCalled();
   });
 });

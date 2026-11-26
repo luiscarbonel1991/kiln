@@ -5,6 +5,7 @@
 // control or where a key is set.
 
 import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
+import { isKeyRejectedText } from "@/domain/queue";
 
 type KeyState = {
   provider: "openai" | "google";
@@ -16,7 +17,8 @@ type KeyState = {
 
 const ENV_NAME = { openai: "OPENAI_API_KEY", google: "GOOGLE_API_KEY" };
 
-const article = (label: string) => (/^[aeiou]/i.test(label) ? "an" : "a");
+export const article = (label: string) =>
+  /^[aeiou]/i.test(label) ? "an" : "a";
 
 const noAccess = (label: string) =>
   `You have no access to ${article(label)} ${label} key`;
@@ -75,6 +77,20 @@ export const healthErrorLine = (input: {
 const OWNERS_TO_DO =
   /replace the key|Settings|\.env|_API_KEY|billing|spend cap|AI Studio|ai\.studio|platform\.openai\.com/i;
 
+// One stored failure in a member's words: a rejected key is the studio's, and
+// what only the owner can do becomes whom to ask; anything else as stored.
+const inMembersWords = (
+  label: string,
+  message: string,
+  keyRejected: boolean | undefined,
+  ask: string,
+) =>
+  keyRejected
+    ? `${rejected(label, ask)}.`
+    : OWNERS_TO_DO.test(message)
+      ? `${label}'s last call failed; ask ${ask}.`
+      : message;
+
 // A provider's health in its reader's words, for a page and for what it hands
 // the browser: a member reads whom to ask where the stored failure says what
 // only the owner can do. The owner (null) gets the health as it was given.
@@ -88,15 +104,32 @@ export function healthForReader<
   if (ask === null) return health;
   return health.map((h) => {
     if (!h.lastError) return h;
-    const label = PROVIDER_LABELS[h.provider];
-    const message = h.keyRejected
-      ? `${rejected(label, ask)}.`
-      : OWNERS_TO_DO.test(h.lastError.message)
-        ? `${label}'s last call failed; ask ${ask}.`
-        : h.lastError.message;
+    const message = inMembersWords(
+      PROVIDER_LABELS[h.provider],
+      h.lastError.message,
+      h.keyRejected,
+      ask,
+    );
     return { ...h, lastError: { ...h.lastError, message } };
   });
 }
+
+// A frame's failure as its reader reads it, by the rule of healthForReader:
+// the owner and a token (null) as stored, a member in their words. Kiln's own
+// "Not run: " sentences name no one and read the same for everyone.
+export const failureForReader = (
+  message: string,
+  provider: ProviderId,
+  ask: string | null,
+): string =>
+  ask === null
+    ? message
+    : inMembersWords(
+        PROVIDER_LABELS[provider],
+        message,
+        isKeyRejectedText(message),
+        ask,
+      );
 
 // Home, for a member with no key in reach (the owner's line has a link to
 // Settings and stays in the page).
