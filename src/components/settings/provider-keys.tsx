@@ -107,7 +107,7 @@ export function ProviderKeys({
     startTransition(async () => {
       const answer = await work();
       setConfirming(null);
-      setSaid({ at, ok: answer.ok, message: answer.message });
+      setSaid({ at, ...answer });
     });
 
   const show = (next: Open) => {

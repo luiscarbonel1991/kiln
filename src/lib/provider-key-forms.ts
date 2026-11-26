@@ -69,10 +69,13 @@ export const KeyOfStudio = z.object({ keyId });
 // The form fields a server answer can belong under.
 export type KeyField = "name" | "who" | "memberIds" | "key";
 
-// What every key action answers: whether it worked, in words, and the field
-// a refusal shows under, if one.
+// What every key action answers: whether it worked, in words; whether the
+// form's key was written (`saved`, true also for "Saved, but: ..." when the
+// free check after it fails), so its form closes; and the field a refusal
+// shows under, if one.
 export interface KeyAnswer {
   ok: boolean;
   message: string;
+  saved: boolean;
   field?: KeyField;
 }

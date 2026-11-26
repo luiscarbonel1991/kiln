@@ -56,6 +56,7 @@ vi.mock("@/providers/mode", async (original) => ({
 }));
 
 const actions = await import("@/app/actions/settings");
+const { KeyRefusal } = await import("@/server/provider-keys");
 const {
   addProviderKeyAction,
   checkProviderKeyByIdAction,
@@ -131,6 +132,7 @@ describe("checking one key, as the owner", () => {
     };
     expect(await checkProviderKeyByIdAction({ keyId: "k1" })).toEqual({
       ok: true,
+      saved: false,
       message: "Google accepts the key.",
     });
     expect(checkKeyById).toHaveBeenCalledWith(
@@ -146,6 +148,7 @@ describe("checking one key, as the owner", () => {
     };
     expect(await checkProviderKeyByIdAction({ keyId: "k1" })).toEqual({
       ok: true,
+      saved: false,
       message:
         "Google accepts the key, but no longer lists Gemini 3 Pro Image: Kiln will not run it.",
     });
@@ -180,6 +183,7 @@ describe("a key of the studio's, as the owner", () => {
     };
     expect(await addProviderKeyAction(input)).toEqual({
       ok: true,
+      saved: true,
       message: "Saved. OpenAI accepts the key.",
     });
     expect(writes.addProviderKey).toHaveBeenCalledWith(
@@ -201,12 +205,72 @@ describe("a key of the studio's, as the owner", () => {
   it("a key is removed for the studio, by its id", async () => {
     expect(await removeProviderKeyByIdAction({ keyId: "k1" })).toEqual({
       ok: true,
+      saved: false,
       message: "Removed.",
     });
     expect(writes.removeProviderKeyById).toHaveBeenCalledWith(
       expect.objectContaining({ id: "test" }),
       "k1",
     );
+  });
+
+  // The form closes on `saved`: the key was written, even when the free
+  // check right after it fails ("Saved, but: ..."); a refusal writes nothing
+  // and keeps the form open.
+  it("an answer says whether the key was written, whatever the check said after", async () => {
+    const KEY = "sk-fixture-not-a-real-key-0000";
+    const add = {
+      provider: "openai",
+      name: "Team key",
+      who: "team",
+      memberIds: [],
+      key: KEY,
+    };
+    checked.result = {
+      ok: false,
+      called: true,
+      message: "OpenAI rejected the API key.",
+      provider: "openai",
+    };
+    expect(await addProviderKeyAction(add)).toEqual({
+      ok: false,
+      saved: true,
+      message: "Saved, but: OpenAI rejected the API key.",
+    });
+    expect(
+      await replaceProviderKeyAction({ keyId: "k1", key: KEY }),
+    ).toMatchObject({ ok: false, saved: true });
+    checkKeyById.mockRejectedValueOnce(
+      new KeyRefusal("That key was removed already."),
+    );
+    expect(await replaceProviderKeyAction({ keyId: "k1", key: KEY })).toEqual({
+      ok: false,
+      saved: true,
+      message: "Saved, but: That key was removed already.",
+    });
+    expect(
+      await editProviderKeyAction({
+        keyId: "k1",
+        name: "Bob's key",
+        who: "team",
+        memberIds: [],
+      }),
+    ).toEqual({ ok: true, saved: true, message: "Saved." });
+
+    writes.addProviderKey.mockRejectedValueOnce(
+      new KeyRefusal("Another OpenAI key has that name.", "name"),
+    );
+    expect(await addProviderKeyAction(add)).toEqual({
+      ok: false,
+      saved: false,
+      message: "Another OpenAI key has that name.",
+      field: "name",
+    });
+    expect(await addProviderKeyAction({ ...add, name: "" })).toMatchObject({
+      ok: false,
+      saved: false,
+      field: "name",
+    });
   });
 
   // Every key is managed by its id: no action is left that writes, checks

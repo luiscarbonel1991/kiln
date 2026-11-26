@@ -64,14 +64,15 @@ export const saveMakerRoutesAction = makerAction(
 function checkedWords(
   provider: ProviderId,
   result: KeyCheck & { unlisted?: string[] },
-): { ok: boolean; message: string } {
-  if (!result.ok) return { ok: false, message: result.message };
+): KeyAnswer {
+  if (!result.ok) return { ok: false, saved: false, message: result.message };
   const label = PROVIDER_LABELS[provider];
   const gone = (result.unlisted ?? []).map((model) =>
     modelLabel({ provider, model }),
   );
   return {
     ok: true,
+    saved: false,
     message: gone.length
       ? `${label} accepts the key, but no longer lists ${gone.join(", ")}: Kiln will not run ${gone.length === 1 ? "it" : "them"}.`
       : `${label} accepts the key.`,
@@ -87,11 +88,14 @@ function checkedWords(
 const KEY_FIELDS: readonly string[] = ["name", "who", "memberIds", "key"];
 const MOCK_KEYS = "Mock mode calls no provider: add keys in a live run.";
 
-function formProblem(issues: { path: PropertyKey[]; message: string }[]) {
+function formProblem(
+  issues: { path: PropertyKey[]; message: string }[],
+): KeyAnswer {
   const issue = issues[0];
   const field = String(issue?.path[0] ?? "");
   return {
     ok: false,
+    saved: false,
     message: issue?.message ?? "Fill in the form.",
     ...(KEY_FIELDS.includes(field) ? { field: field as KeyField } : {}),
   };
@@ -100,6 +104,7 @@ function formProblem(issues: { path: PropertyKey[]; message: string }[]) {
 function refused(error: unknown): KeyAnswer {
   return {
     ok: false,
+    saved: false,
     message: error instanceof Error ? error.message : String(error),
     ...(error instanceof KeyRefusal && error.field
       ? { field: error.field }
@@ -117,10 +122,14 @@ async function savedAndChecked(
     const result = await checkKeyById(maker, keyId);
     const checked = checkedWords(result.provider, result);
     return checked.ok
-      ? { ok: true, message: `Saved. ${checked.message}` }
-      : { ok: false, message: `Saved, but: ${checked.message}` };
+      ? { ok: true, saved: true, message: `Saved. ${checked.message}` }
+      : { ok: false, saved: true, message: `Saved, but: ${checked.message}` };
   } catch (error) {
-    return { ok: false, message: `Saved, but: ${refused(error).message}` };
+    return {
+      ok: false,
+      saved: true,
+      message: `Saved, but: ${refused(error).message}`,
+    };
   }
 }
 
@@ -128,7 +137,8 @@ export const addProviderKeyAction = ownerAction(
   async (maker, input: unknown): Promise<KeyAnswer> => {
     const parsed = AddKeyForm.safeParse(input);
     if (!parsed.success) return formProblem(parsed.error.issues);
-    if (providerMode() === "mock") return { ok: false, message: MOCK_KEYS };
+    if (providerMode() === "mock")
+      return { ok: false, saved: false, message: MOCK_KEYS };
     let added: { id: string };
     try {
       added = await addProviderKey(maker, parsed.data);
@@ -151,7 +161,7 @@ export const editProviderKeyAction = ownerAction(
       return refused(error);
     }
     refresh();
-    return { ok: true, message: "Saved." };
+    return { ok: true, saved: true, message: "Saved." };
   },
 );
 
@@ -159,7 +169,8 @@ export const replaceProviderKeyAction = ownerAction(
   async (maker, input: unknown): Promise<KeyAnswer> => {
     const parsed = ReplaceKeyForm.safeParse(input);
     if (!parsed.success) return formProblem(parsed.error.issues);
-    if (providerMode() === "mock") return { ok: false, message: MOCK_KEYS };
+    if (providerMode() === "mock")
+      return { ok: false, saved: false, message: MOCK_KEYS };
     try {
       await replaceProviderKey(maker, parsed.data);
     } catch (error) {
@@ -174,7 +185,9 @@ export const replaceProviderKeyAction = ownerAction(
 export const checkProviderKeyByIdAction = ownerAction(
   async (maker, input: unknown): Promise<KeyAnswer> => {
     const parsed = KeyOfStudio.safeParse(input);
-    if (!parsed.success) return { ok: false, message: "Which key?" };
+    if (!parsed.success) {
+      return { ok: false, saved: false, message: "Which key?" };
+    }
     let result: Awaited<ReturnType<typeof checkKeyById>>;
     try {
       result = await checkKeyById(maker, parsed.data.keyId);
@@ -189,14 +202,16 @@ export const checkProviderKeyByIdAction = ownerAction(
 export const removeProviderKeyByIdAction = ownerAction(
   async (maker, input: unknown): Promise<KeyAnswer> => {
     const parsed = KeyOfStudio.safeParse(input);
-    if (!parsed.success) return { ok: false, message: "Which key?" };
+    if (!parsed.success) {
+      return { ok: false, saved: false, message: "Which key?" };
+    }
     try {
       await removeProviderKeyById(maker, parsed.data.keyId);
     } catch (error) {
       return refused(error);
     }
     refresh();
-    return { ok: true, message: "Removed." };
+    return { ok: true, saved: false, message: "Removed." };
   },
 );
 

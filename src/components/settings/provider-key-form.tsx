@@ -51,11 +51,6 @@ export interface KeyChoice {
   people: { memberId: string }[];
 }
 
-// A key is kept even when its free check right after fails ("Saved, but:
-// ..."): the form's work is done, and the row says the rest.
-const kept = (answer: KeyAnswer) =>
-  answer.ok || answer.message.startsWith("Saved");
-
 const WHERE: Record<ProviderId, { href: string; site: string }> = {
   openai: {
     href: "https://platform.openai.com/api-keys",
@@ -392,7 +387,8 @@ export function AddKeyFormView({
   const teamKey = keys.find((k) => k.forTeam);
   const submit = form.handleSubmit(async (values) => {
     const answer = await addProviderKeyAction(values);
-    if (kept(answer)) return onSaved(answer);
+    // Written, even when its free check after fails: the row says the rest.
+    if (answer.saved) return onSaved(answer);
     form.setError(answer.field ?? "root", { message: answer.message });
   });
   return (
@@ -468,7 +464,7 @@ export function EditKeyFormView({
   const teamKey = keys.find((k) => k.forTeam && k.id !== target.id);
   const submit = form.handleSubmit(async (values) => {
     const answer = await editProviderKeyAction(values);
-    if (kept(answer)) return onSaved(answer);
+    if (answer.saved) return onSaved(answer);
     const field =
       answer.field === "name" || answer.field === "memberIds"
         ? answer.field
@@ -536,7 +532,7 @@ export function ReplaceKeyFormView({
   const { isSubmitting, errors } = form.formState;
   const submit = form.handleSubmit(async (values) => {
     const answer = await replaceProviderKeyAction(values);
-    if (kept(answer)) return onSaved(answer);
+    if (answer.saved) return onSaved(answer);
     form.setError(answer.field === "key" ? "key" : "root", {
       message: answer.message,
     });
