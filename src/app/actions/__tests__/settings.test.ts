@@ -181,10 +181,12 @@ describe("a key of the studio's, as the owner", () => {
       memberIds: [],
       key: "sk-fixture-not-a-real-key-0000",
     };
+    // The new key's id, so the answer shows on its row.
     expect(await addProviderKeyAction(input)).toEqual({
       ok: true,
       saved: true,
       message: "Saved. OpenAI accepts the key.",
+      keyId: "k-new",
     });
     expect(writes.addProviderKey).toHaveBeenCalledWith(
       expect.objectContaining({ id: "test" }),
@@ -236,6 +238,7 @@ describe("a key of the studio's, as the owner", () => {
       ok: false,
       saved: true,
       message: "Saved, but: OpenAI rejected the API key.",
+      keyId: "k-new",
     });
     expect(
       await replaceProviderKeyAction({ keyId: "k1", key: KEY }),

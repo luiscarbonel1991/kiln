@@ -173,7 +173,7 @@ export const addProviderKeyAction = ownerAction(
     }
     const answer = await savedAndChecked(maker, added.id);
     refresh();
-    return answer;
+    return { ...answer, keyId: added.id };
   },
 );
 

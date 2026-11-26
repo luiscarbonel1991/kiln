@@ -110,16 +110,22 @@ describe.skipIf(!enabled)("the owner's key actions (database)", async () => {
   it("adding a key saves it, checks it for free, and refuses a name or a team key already taken", async () => {
     const { studio } = await withTeamAndBob("actions-add");
     asOwner(studio);
-    expect(
-      await actions.addProviderKeyAction({
-        provider: "openai",
-        name: "Carla's key",
-        who: "people",
-        memberIds: [studio.carla.memberId],
-        key: secret(),
-      }),
-    ).toMatchObject({ ok: true, message: "Saved. OpenAI accepts the key." });
+    const added = await actions.addProviderKeyAction({
+      provider: "openai",
+      name: "Carla's key",
+      who: "people",
+      memberIds: [studio.carla.memberId],
+      key: secret(),
+    });
+    expect(added).toMatchObject({
+      ok: true,
+      message: "Saved. OpenAI accepts the key.",
+    });
     const before = await rowsOf(studio);
+    // The answer names the row it is about.
+    expect(before.keys.find((k) => k.id === added.keyId)?.name).toBe(
+      "Carla's key",
+    );
     expect(
       await actions.addProviderKeyAction({
         provider: "openai",

@@ -119,9 +119,10 @@ export function ProviderKeys({
     setOpen(next);
   };
 
+  // A new key's answer shows on its row, the others where they were asked.
   const saved = (at: string) => (answer: KeyAnswer) => {
     setOpen(null);
-    setSaid({ at, ...answer });
+    setSaid({ at: answer.keyId ?? at, ...answer });
   };
 
   const forms = { provider, label, keys: card.keys.map(choiceOf), team };
