@@ -53,6 +53,20 @@ type Open =
 const ITEM =
   "cursor-pointer rounded-[9px] px-2.5 py-1.5 font-sans text-sm text-foreground outline-none data-[disabled]:cursor-default data-[disabled]:text-on-surface-dim data-[highlighted]:bg-secondary";
 
+// Where an answer shows ("card" is the card's foot), and the key whose
+// remove confirmation is open, if any.
+export interface Landing {
+  at: string;
+  confirming: string | null;
+}
+
+// A removal that worked says so at the card's foot, its row being gone; one
+// that failed keeps its question open, with the answer on the row.
+export const afterRemove = (keyId: string, answer: KeyAnswer): Landing =>
+  answer.ok
+    ? { at: "card", confirming: null }
+    : { at: keyId, confirming: keyId };
+
 // Whether a person on a key is the one reading the page.
 const isYou = (team: TeamMemberView[], memberId: string) =>
   team.some((m) => m.id === memberId && m.you);
@@ -116,11 +130,17 @@ export function ProviderKeys({
   const [said, setSaid] = useState<(KeyAnswer & { at: string }) | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const run = (at: string, work: () => Promise<KeyAnswer>) =>
+  // An action from a row; `after` says where its answer goes and whether
+  // the remove confirmation stays open.
+  const run = (
+    work: () => Promise<KeyAnswer>,
+    after: (answer: KeyAnswer) => Landing,
+  ) =>
     startTransition(async () => {
       const answer = await work();
-      setConfirming(null);
-      setSaid({ at, ...answer });
+      const next = after(answer);
+      setConfirming(next.confirming);
+      setSaid({ at: next.at, ...answer });
     });
 
   const show = (next: Open) => {
@@ -235,8 +255,9 @@ export function ProviderKeys({
                           disabled={!row.readable}
                           className={ITEM}
                           onSelect={() =>
-                            run(row.id, () =>
-                              checkProviderKeyAction({ keyId: row.id }),
+                            run(
+                              () => checkProviderKeyAction({ keyId: row.id }),
+                              () => ({ at: row.id, confirming: null }),
                             )
                           }
                         >
@@ -322,8 +343,9 @@ export function ProviderKeys({
                       disabled={pending}
                       data-testid={`provider-key-remove-confirm-${row.id}`}
                       onClick={() =>
-                        run("card", () =>
-                          removeProviderKeyAction({ keyId: row.id }),
+                        run(
+                          () => removeProviderKeyAction({ keyId: row.id }),
+                          (answer) => afterRemove(row.id, answer),
                         )
                       }
                     >

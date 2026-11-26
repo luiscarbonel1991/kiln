@@ -11,7 +11,9 @@ vi.mock("@/app/actions/settings", () => ({
   removeProviderKeyAction: vi.fn(),
 }));
 
-const { ProviderKeys } = await import("@/components/settings/provider-keys");
+const { afterRemove, ProviderKeys } = await import(
+  "@/components/settings/provider-keys"
+);
 const { AddKeyFormView } = await import(
   "@/components/settings/provider-key-form"
 );
@@ -161,5 +163,22 @@ describe("the key forms", () => {
     expect(form("google")).toMatch(
       /<a href="https:\/\/aistudio\.google\.com\/apikey"[^>]*data-testid="google-key-where"/,
     );
+  });
+});
+
+describe("removing a key", () => {
+  // A removal that worked is said at the card's foot (its row is gone); one
+  // that failed keeps its question open and says why on the row.
+  it("keeps a failed removal's confirmation open, with the answer on its row", () => {
+    expect(
+      afterRemove("k-cy", { ok: true, saved: false, message: "Removed." }),
+    ).toEqual({ at: "card", confirming: null });
+    expect(
+      afterRemove("k-cy", {
+        ok: false,
+        saved: false,
+        message: "Kiln could not remove the key; try again.",
+      }),
+    ).toEqual({ at: "k-cy", confirming: "k-cy" });
   });
 });
