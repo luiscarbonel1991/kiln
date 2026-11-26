@@ -293,6 +293,7 @@ function KeyField({
           href={where.href}
           target="_blank"
           rel="noreferrer"
+          data-testid={`${provider}-key-where`}
           className="underline underline-offset-2"
         >
           {where.site}

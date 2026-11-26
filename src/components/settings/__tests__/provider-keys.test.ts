@@ -12,6 +12,10 @@ vi.mock("@/app/actions/settings", () => ({
 }));
 
 const { ProviderKeys } = await import("@/components/settings/provider-keys");
+const { AddKeyFormView } = await import(
+  "@/components/settings/provider-key-form"
+);
+type KeyChoice = Parameters<typeof AddKeyFormView>[0]["keys"][number];
 type Card = Parameters<typeof ProviderKeys>[0]["card"];
 type Row = Card["keys"][number];
 const { ProviderLines } = await import("@/components/settings/provider-lines");
@@ -60,7 +64,8 @@ const rejected = row({
   people: [{ memberId: "m-cy", name: "Cy Lane", email: "cy@example.test" }],
   lastError: {
     at: "2026-11-21T10:00:00.000Z",
-    message: "OpenAI rejected the API key (401) — replace the key or use Google.",
+    message:
+      "OpenAI rejected the API key (401) — replace the key or use Google.",
   },
   keyRejected: true,
   lastOkAt: null,
@@ -132,5 +137,29 @@ describe("Settings → Providers in a mock run", () => {
       "OpenAI rejected this key on its last call: replace it.",
     );
     expect(text(lines())).toContain("You can generate with Google");
+  });
+});
+
+describe("the key forms", () => {
+  const form = (provider: "openai" | "google", keys: KeyChoice[] = []) =>
+    renderToStaticMarkup(
+      createElement(AddKeyFormView, {
+        provider,
+        label: provider === "openai" ? "OpenAI" : "Google",
+        keys,
+        team,
+        onSaved: () => {},
+        onCancel: () => {},
+      }),
+    );
+
+  // Where to make a key is a control an agent can find by its id.
+  it("names where to make a key by a link with its own test id", () => {
+    expect(form("openai")).toMatch(
+      /<a href="https:\/\/platform\.openai\.com\/api-keys"[^>]*data-testid="openai-key-where"/,
+    );
+    expect(form("google")).toMatch(
+      /<a href="https:\/\/aistudio\.google\.com\/apikey"[^>]*data-testid="google-key-where"/,
+    );
   });
 });
