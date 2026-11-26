@@ -1,6 +1,12 @@
 "use client";
 
-import { CircleAlert, CircleCheck, Ellipsis, KeyRound } from "lucide-react";
+import {
+  CircleAlert,
+  CircleCheck,
+  Ellipsis,
+  KeyRound,
+  Plus,
+} from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { useState, useTransition } from "react";
 import {
@@ -8,9 +14,16 @@ import {
   removeProviderKeyByIdAction,
 } from "@/app/actions/settings";
 import { PersonMark } from "@/components/settings/person-mark";
+import {
+  AddKeyFormView,
+  EditKeyFormView,
+  type KeyAnswer,
+  type KeyChoice,
+  ReplaceKeyFormView,
+} from "@/components/settings/provider-key-form";
 import { Button } from "@/components/ui/button";
 import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
-import { keyRowTitle, removeKeyLine } from "@/lib/provider-key-words";
+import { article, keyRowTitle, removeKeyLine } from "@/lib/provider-key-words";
 import type {
   ProviderKeyCard,
   ProviderKeyView,
@@ -26,12 +39,22 @@ export type KeyRow = ProviderKeyView & {
 
 export type KeyCard = Omit<ProviderKeyCard, "keys"> & { keys: KeyRow[] };
 
-type KeyAnswer = { ok: boolean; message: string };
+type Open =
+  | { form: "add" }
+  | { form: "edit" | "replace"; keyId: string }
+  | null;
 
 const ITEM =
   "cursor-pointer rounded-[9px] px-2.5 py-1.5 font-sans text-sm text-foreground outline-none data-[disabled]:cursor-default data-[disabled]:text-on-surface-dim data-[highlighted]:bg-secondary";
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+
+const choiceOf = (row: KeyRow): KeyChoice => ({
+  id: row.id,
+  name: row.name,
+  forTeam: row.forTeam,
+  people: row.people.map((p) => ({ memberId: p.memberId })),
+});
 
 // Who uses a key: the whole team, or each person's mark and name.
 function Who({ row, team }: { row: KeyRow; team: TeamMemberView[] }) {
@@ -60,9 +83,10 @@ function Who({ row, team }: { row: KeyRow; team: TeamMemberView[] }) {
 }
 
 // Settings → Providers, the owner's: a provider's keys, who uses each, its
-// own last calls, and what can be done with it (check, remove), with the
-// line on the owner's own calls above. The remove confirmation opens in the
-// card, as the team list's "Remove" does. A mock run shows the rows only.
+// own last calls, and what can be done with it (check, change, replace,
+// remove), with the line on the owner's own calls above and "Add" under. The
+// forms and the remove confirmation open in the card, as the team list's
+// invite and "Remove" do. A mock run shows the rows only.
 export function ProviderKeys({
   card,
   team,
@@ -73,6 +97,7 @@ export function ProviderKeys({
   mock: boolean;
 }) {
   const { provider, label } = card;
+  const [open, setOpen] = useState<Open>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   // The last answer, on the row it is about, or the card's ("card").
   const [said, setSaid] = useState<(KeyAnswer & { at: string }) | null>(null);
@@ -84,6 +109,19 @@ export function ProviderKeys({
       setConfirming(null);
       setSaid({ at, ok: answer.ok, message: answer.message });
     });
+
+  const show = (next: Open) => {
+    setSaid(null);
+    setConfirming(null);
+    setOpen(next);
+  };
+
+  const saved = (at: string) => (answer: KeyAnswer) => {
+    setOpen(null);
+    setSaid({ at, ...answer });
+  };
+
+  const forms = { provider, label, keys: card.keys.map(choiceOf), team };
 
   const removeLine = (row: KeyRow) => {
     const isYou = (memberId: string) =>
@@ -192,13 +230,31 @@ export function ProviderKeys({
                         >
                           Check the key
                         </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          data-testid={`provider-key-edit-${row.id}`}
+                          aria-label={`Change the name or people of ${row.name}`}
+                          className={ITEM}
+                          onSelect={() => show({ form: "edit", keyId: row.id })}
+                        >
+                          Change name or people
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          data-testid={`provider-key-replace-${row.id}`}
+                          aria-label={`Replace ${row.name}`}
+                          className={ITEM}
+                          onSelect={() =>
+                            show({ form: "replace", keyId: row.id })
+                          }
+                        >
+                          Replace the key
+                        </DropdownMenu.Item>
                         <DropdownMenu.Separator className="my-1 h-px bg-border" />
                         <DropdownMenu.Item
                           data-testid={`provider-key-remove-${row.id}`}
                           aria-label={`Remove ${row.name}`}
                           className={`${ITEM} text-fail`}
                           onSelect={() => {
-                            setSaid(null);
+                            show(null);
                             setConfirming(row.id);
                           }}
                         >
@@ -271,12 +327,48 @@ export function ProviderKeys({
                   </div>
                 </div>
               ) : null}
+
+              {open?.form === "edit" && open.keyId === row.id ? (
+                <EditKeyFormView
+                  {...forms}
+                  target={choiceOf(row)}
+                  onSaved={saved(row.id)}
+                  onCancel={() => setOpen(null)}
+                />
+              ) : null}
+              {open?.form === "replace" && open.keyId === row.id ? (
+                <ReplaceKeyFormView
+                  provider={provider}
+                  target={choiceOf(row)}
+                  onSaved={saved(row.id)}
+                  onCancel={() => setOpen(null)}
+                />
+              ) : null}
             </li>
           ))}
         </ul>
       ) : null}
 
       {answer("card")}
+      {mock ? null : open?.form === "add" ? (
+        <AddKeyFormView
+          {...forms}
+          onSaved={saved("card")}
+          onCancel={() => setOpen(null)}
+        />
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="self-start"
+          data-testid={`provider-${provider}-add`}
+          onClick={() => show({ form: "add" })}
+        >
+          <Plus />
+          Add {article(label)} {label} key
+        </Button>
+      )}
     </div>
   );
 }
