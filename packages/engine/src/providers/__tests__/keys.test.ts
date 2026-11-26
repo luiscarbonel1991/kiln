@@ -13,7 +13,6 @@ const {
   hasProviderKey,
   providerKey,
   providerKeyId,
-  providerKeySource,
   withProviderKeys,
 } = await import("@/providers/keys");
 const { getOpenAI, hasOpenAIKey } = await import("@/providers/openai/client");
@@ -21,14 +20,13 @@ const { ProviderKeyMissing } = await import("@/providers/errors");
 
 describe("provider keys", () => {
   it("inside a maker's scope only its own keys count; outside, the environment's", () => {
-    expect(providerKeySource("google")).toBe("env");
+    expect(providerKey("google")).toBe("g-env");
     withProviderKeys({ google: "g-saved" }, () => {
       expect(providerKey("google")).toBe("g-saved");
-      expect(providerKeySource("google")).toBe("saved");
     });
     withProviderKeys({}, () => {
       expect(providerKey("google")).toBeUndefined();
-      expect(providerKeySource("google")).toBeNull();
+      expect(hasProviderKey("google")).toBe(false);
     });
     expect(providerKey("google")).toBe("g-env");
   });
@@ -56,7 +54,6 @@ describe("provider keys", () => {
 
   it("no key anywhere is no key, and the client refuses before any request", () => {
     expect(hasProviderKey("openai")).toBe(false);
-    expect(providerKeySource("openai")).toBeNull();
     expect(hasOpenAIKey()).toBe(false);
     expect(() => getOpenAI()).toThrow(/OpenAI has no API key/);
   });

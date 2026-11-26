@@ -61,16 +61,6 @@ export function providerKeyId(provider: ProviderId): string | undefined {
   return scope().getStore()?.ids[provider];
 }
 
-// Where the key in use comes from: saved by the maker, the environment (a
-// script or the CLI), or nowhere.
-export function providerKeySource(
-  provider: ProviderId,
-): "saved" | "env" | null {
-  const current = scope().getStore();
-  if (current) return current.keys[provider] ? "saved" : null;
-  return fromEnv(provider) ? "env" : null;
-}
-
 // Whether this runs inside a maker's keys (the app) or outside any (a script,
 // the CLI): only outside does the environment's key count.
 export function inProviderKeyScope(): boolean {
