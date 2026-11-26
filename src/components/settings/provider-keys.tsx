@@ -1,0 +1,282 @@
+"use client";
+
+import { CircleAlert, CircleCheck, Ellipsis, KeyRound } from "lucide-react";
+import { DropdownMenu } from "radix-ui";
+import { useState, useTransition } from "react";
+import {
+  checkProviderKeyByIdAction,
+  removeProviderKeyByIdAction,
+} from "@/app/actions/settings";
+import { PersonMark } from "@/components/settings/person-mark";
+import { Button } from "@/components/ui/button";
+import { MenuRoot, MenuTrigger } from "@/components/ui/menu";
+import { keyRowTitle, removeKeyLine } from "@/lib/provider-key-words";
+import type {
+  ProviderKeyCard,
+  ProviderKeyView,
+} from "@/server/provider-health";
+import type { TeamMemberView } from "@/server/team";
+
+// A key's row as the page hands it: its dates already in words, read on the
+// server so the browser renders the same text.
+export type KeyRow = ProviderKeyView & {
+  lastOkWhen: string | null;
+  errorWhen: string | null;
+};
+
+export type KeyCard = Omit<ProviderKeyCard, "keys"> & { keys: KeyRow[] };
+
+type KeyAnswer = { ok: boolean; message: string };
+
+const ITEM =
+  "cursor-pointer rounded-[9px] px-2.5 py-1.5 font-sans text-sm text-foreground outline-none data-[disabled]:cursor-default data-[disabled]:text-on-surface-dim data-[highlighted]:bg-secondary";
+
+const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+
+// Who uses a key: the whole team, or each person's mark and name.
+function Who({ row, team }: { row: KeyRow; team: TeamMemberView[] }) {
+  if (row.forTeam) {
+    return (
+      <span className="font-sans text-[0.78rem] text-on-surface-mid">
+        The whole team
+      </span>
+    );
+  }
+  if (row.people.length === 0) return null;
+  const you = (memberId: string) =>
+    team.some((m) => m.id === memberId && m.you);
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="flex gap-1">
+        {row.people.map((p) => (
+          <PersonMark key={p.memberId} name={p.name} small />
+        ))}
+      </span>
+      <span className="font-sans text-[0.78rem] text-on-surface-mid">
+        {row.people.map((p) => (you(p.memberId) ? "You" : p.name)).join(", ")}
+      </span>
+    </div>
+  );
+}
+
+// Settings → Providers, the owner's: a provider's keys, who uses each, its
+// own last calls, and what can be done with it (check, remove), with the
+// line on the owner's own calls above. The remove confirmation opens in the
+// card, as the team list's "Remove" does. A mock run shows the rows only.
+export function ProviderKeys({
+  card,
+  team,
+  mock,
+}: {
+  card: KeyCard;
+  team: TeamMemberView[];
+  mock: boolean;
+}) {
+  const { provider, label } = card;
+  const [confirming, setConfirming] = useState<string | null>(null);
+  // The last answer, on the row it is about, or the card's ("card").
+  const [said, setSaid] = useState<(KeyAnswer & { at: string }) | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const run = (at: string, work: () => Promise<KeyAnswer>) =>
+    startTransition(async () => {
+      const answer = await work();
+      setConfirming(null);
+      setSaid({ at, ok: answer.ok, message: answer.message });
+    });
+
+  const removeLine = (row: KeyRow) => {
+    const isYou = (memberId: string) =>
+      team.some((m) => m.id === memberId && m.you);
+    const others = row.people
+      .filter((p) => !isYou(p.memberId))
+      .map((p) => firstName(p.name));
+    // The owner reads themself as "You" alone, or last: "Bob and you".
+    const people = row.people.some((p) => isYou(p.memberId))
+      ? others.length === 0
+        ? ["You"]
+        : [...others, "you"]
+      : others;
+    return removeKeyLine({
+      label,
+      name: row.name,
+      forTeam: row.forTeam,
+      people,
+      teamKey: card.keys.some((k) => k.forTeam && k.id !== row.id),
+    });
+  };
+
+  const answer = (at: string) =>
+    said?.at === at ? (
+      <p
+        className={`font-sans text-xs leading-snug [overflow-wrap:anywhere] ${
+          said.ok ? "text-on-surface-mid" : "text-fail"
+        }`}
+        data-testid={
+          at === "card"
+            ? `provider-${provider}-said`
+            : `provider-key-said-${at}`
+        }
+        aria-live="polite"
+      >
+        {said.message}
+      </p>
+    ) : null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      {mock ? null : (
+        <div
+          className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
+          data-testid={`provider-${provider}-key`}
+        >
+          <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
+          {card.ownCalls}
+        </div>
+      )}
+      {!mock && card.envNote ? (
+        <p className="font-sans text-[0.78rem] leading-snug text-on-surface-mid [overflow-wrap:anywhere]">
+          {card.envNote}
+        </p>
+      ) : null}
+
+      {card.keys.length > 0 ? (
+        <ul
+          className="flex flex-col divide-y divide-border-soft"
+          data-testid={`provider-${provider}-keys`}
+        >
+          {card.keys.map((row) => (
+            <li
+              key={row.id}
+              className="flex flex-col gap-1.5 py-3"
+              data-testid={`provider-key-${row.id}`}
+            >
+              <div className="flex items-start gap-2">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="font-sans text-[0.875rem] font-semibold text-foreground [overflow-wrap:anywhere]">
+                    {keyRowTitle(row.name, row.hint)}
+                  </span>
+                  <Who row={row} team={team} />
+                </div>
+                {mock ? null : (
+                  <MenuRoot>
+                    <MenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={`Manage ${row.name}`}
+                        data-testid={`provider-key-manage-${row.id}`}
+                        disabled={pending}
+                        className="shrink-0 text-on-surface-mid"
+                      >
+                        <Ellipsis />
+                      </Button>
+                    </MenuTrigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content
+                        align="end"
+                        sideOffset={4}
+                        className="z-50 min-w-[12rem] rounded-field bg-card p-1 shadow-card ring-1 ring-border"
+                      >
+                        <DropdownMenu.Item
+                          data-testid={`provider-key-check-${row.id}`}
+                          aria-label={`Check ${row.name}`}
+                          disabled={!row.readable}
+                          className={ITEM}
+                          onSelect={() =>
+                            run(row.id, () =>
+                              checkProviderKeyByIdAction({ keyId: row.id }),
+                            )
+                          }
+                        >
+                          Check the key
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                        <DropdownMenu.Item
+                          data-testid={`provider-key-remove-${row.id}`}
+                          aria-label={`Remove ${row.name}`}
+                          className={`${ITEM} text-fail`}
+                          onSelect={() => {
+                            setSaid(null);
+                            setConfirming(row.id);
+                          }}
+                        >
+                          Remove
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </MenuRoot>
+                )}
+              </div>
+
+              {row.line ? (
+                <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
+                  <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    {row.line}
+                  </span>
+                </div>
+              ) : null}
+              {/* A rejected key is said by the row's line, once. */}
+              {row.lastError && !row.keyRejected ? (
+                <div className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-foreground">
+                  <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0 text-fail" />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    {row.lastError.message}{" "}
+                    <span className="font-mono text-[0.65rem] text-on-surface-dim">
+                      {row.errorWhen}
+                    </span>
+                  </span>
+                </div>
+              ) : null}
+              <div className="flex items-center gap-2 font-sans text-[0.8rem] text-on-surface-mid">
+                <CircleCheck className="size-3.5 flex-shrink-0 text-prov-recipe" />
+                {row.lastOkWhen
+                  ? `Last call that worked: ${row.lastOkWhen}`
+                  : "No call that worked yet"}
+              </div>
+              {answer(row.id)}
+
+              {confirming === row.id ? (
+                <div className="flex flex-col gap-2 rounded-render bg-secondary p-3">
+                  <p className="font-sans text-[0.78rem] leading-snug text-foreground">
+                    {removeLine(row)}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={pending}
+                      data-testid={`provider-key-remove-confirm-${row.id}`}
+                      onClick={() =>
+                        run("card", () =>
+                          removeProviderKeyByIdAction({ keyId: row.id }),
+                        )
+                      }
+                    >
+                      Remove {row.name}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Keep ${row.name}`}
+                      data-testid={`provider-key-remove-keep-${row.id}`}
+                      onClick={() => setConfirming(null)}
+                    >
+                      Keep
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {answer("card")}
+    </div>
+  );
+}
