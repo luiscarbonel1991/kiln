@@ -29,11 +29,10 @@ import { makerPage } from "@/server/guarded";
 import { listLessons } from "@/server/lessons";
 import type { CurrentMaker } from "@/server/maker-repository";
 import { getMakerModelSetup } from "@/server/maker-repository";
-import { memberAsk } from "@/server/month-limit";
 import { providerHealth, providerKeyList } from "@/server/provider-health";
 import { sceneLookSetup } from "@/server/scene-look";
 import { etsySetup, shopConnection } from "@/server/shop-connection";
-import { ownerContact } from "@/server/studio-owner";
+import { ownerContact, UNNAMED_OWNER } from "@/server/studio-owner";
 import { listTeam, monthSpend } from "@/server/team";
 import { recentToolCalls } from "@/server/tool-calls";
 
@@ -74,7 +73,6 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
     calls,
     lessons,
     team,
-    ask,
     contact,
   ] = await Promise.all([
     getMakerModelSetup(current),
@@ -90,11 +88,13 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
       ? listLessons(maker, { status: ["proposed", "kept"] })
       : Promise.resolve(null),
     maker && owner ? listTeam(maker) : Promise.resolve(null),
-    // Whom a member asks about a key; null for the owner.
-    maker ? memberAsk(maker) : Promise.resolve(null),
     // The owner as a person a member can write to; the owner reads no one.
     maker && !owner ? ownerContact(maker) : Promise.resolve(null),
   ]);
+  // Whom a member asks about a key; null for the owner. Decided by the role,
+  // as `owner` is, so whoever is not the owner reads in a member's words and
+  // never receives `reach` (healthForReader), with a database or without.
+  const ask = owner ? null : contact?.firstName || UNNAMED_OWNER;
   // The health as this reader may read it: a member gets no owner's to-do.
   const health = healthForReader(stored, ask);
   // A member's key row already says a rejected key: no second line (null).

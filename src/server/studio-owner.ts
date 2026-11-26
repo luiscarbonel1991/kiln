@@ -37,10 +37,12 @@ export async function ownerContact(
   };
 }
 
-// The studio owner's first name, or "the studio's owner" when Kiln cannot
-// name them (no team yet, no name).
+// Whom a member asks when Kiln cannot name the owner (no team yet, no name).
+export const UNNAMED_OWNER = "the studio's owner";
+
+// The studio owner's first name, or UNNAMED_OWNER.
 export async function whomToAsk(maker: MakerRef): Promise<string> {
-  return (await ownerContact(maker))?.firstName || "the studio's owner";
+  return (await ownerContact(maker))?.firstName || UNNAMED_OWNER;
 }
 
 // Whom a member asks, or null for the owner and for work with no person
