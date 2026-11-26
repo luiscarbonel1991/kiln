@@ -236,7 +236,9 @@ function PeopleField({
                 <span className="flex min-w-0 flex-col">
                   <span className="text-foreground">
                     {person.name}
-                    {person.you ? " (you)" : ""}
+                    {person.you ? (
+                      <span className="text-on-surface-mid"> · you</span>
+                    ) : null}
                   </span>
                   <span className="text-[0.75rem] text-on-surface-mid [overflow-wrap:anywhere]">
                     {person.email}

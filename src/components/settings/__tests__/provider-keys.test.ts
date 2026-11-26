@@ -155,6 +155,16 @@ describe("the key forms", () => {
       }),
     );
 
+  // The owner reads themself as Team does: "Ana Ruiz · you".
+  it("marks the reader in the people picker as Team does", () => {
+    const html = form("openai", [
+      { id: "k-team", name: "Team key", forTeam: true, people: [] },
+    ]);
+    expect(text(html)).toContain("Ana Ruiz · you");
+    expect(html).not.toContain("(you)");
+    expect(text(html)).not.toContain("Cy Lane · you");
+  });
+
   // Where to make a key is a control an agent can find by its id.
   it("names where to make a key by a link with its own test id", () => {
     expect(form("openai")).toMatch(
