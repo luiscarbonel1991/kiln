@@ -176,15 +176,14 @@ export default makerPage(async function SettingsPage(current: CurrentMaker) {
                     />
                   ) : (
                     <>
-                      {ask !== null && mode === "mock" ? null : (
+                      {/* The member's one line; the owner reads the key list. */}
+                      {ask === null || mode === "mock" ? null : (
                         <div
                           className="flex items-start gap-2 font-sans text-[0.8rem] leading-snug text-on-surface-mid"
                           data-testid={`provider-${h.provider}-key`}
                         >
                           <KeyRound className="mt-0.5 size-3.5 flex-shrink-0" />
                           {keyLine({
-                            state: undefined,
-                            owner,
                             keyInReach: h.keyPresent,
                             keyRejected: h.keyRejected,
                             given: h.given,

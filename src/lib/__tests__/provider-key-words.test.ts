@@ -23,17 +23,7 @@ import {
 // whom a member asks (the owner's first name); null is the owner, or work
 // with no person behind it (a token, a script), which reads as the owner.
 
-const state = (over = {}) => ({
-  provider: "openai" as const,
-  source: "saved" as "saved" | "env" | null,
-  hint: "1234" as string | null,
-  unreadable: false,
-  inEnvironment: false,
-  ...over,
-});
-
-const OWNER = { owner: true, ask: null, label: "OpenAI" };
-const MEMBER = { owner: false, ask: "Ana", label: "OpenAI" };
+const MEMBER = { ask: "Ana", label: "OpenAI" };
 
 // What only the owner may read or do: none of it in a member's line.
 const OWNERS_WORDS = [
@@ -51,66 +41,8 @@ const expectNoOwnersWords = (line: string) => {
 };
 
 describe("a provider's key line in Settings", () => {
-  it("the owner reads the saved key's last four", () => {
-    expect(keyLine({ ...OWNER, state: state(), keyInReach: true })).toBe(
-      "API key saved, ends in 1234",
-    );
-  });
-
-  it("the owner with no key reads that there is none yet", () => {
-    expect(keyLine({ ...OWNER, state: undefined, keyInReach: false })).toBe(
-      "No API key yet",
-    );
-    expect(
-      keyLine({
-        ...OWNER,
-        state: state({ source: null, hint: null }),
-        keyInReach: false,
-      }),
-    ).toBe("No API key yet");
-  });
-
-  it("the owner of a key that cannot be read is told why and to paste it again", () => {
-    expect(
-      keyLine({
-        ...OWNER,
-        state: state({ source: null, unreadable: true }),
-        keyInReach: false,
-      }),
-    ).toBe(
-      "A saved key (ends in 1234) cannot be read: KILN_SECRET_KEY is missing or changed. Paste the key again.",
-    );
-  });
-
-  it("the owner whose key is only in .env reads that the app does not use it", () => {
-    expect(
-      keyLine({
-        ...OWNER,
-        state: state({ source: null, hint: null, inEnvironment: true }),
-        keyInReach: false,
-      }),
-    ).toBe(
-      "No API key yet. OPENAI_API_KEY is in .env, but the app uses only keys saved here: paste it below.",
-    );
-    expect(
-      keyLine({
-        ...OWNER,
-        label: "Google",
-        state: state({
-          provider: "google",
-          source: null,
-          hint: null,
-          inEnvironment: true,
-        }),
-        keyInReach: false,
-      }),
-    ).toBe(
-      "No API key yet. GOOGLE_API_KEY is in .env, but the app uses only keys saved here: paste it below.",
-    );
-  });
-
   it("a member with a key in reach reads only that they can generate", () => {
-    const line = keyLine({ ...MEMBER, state: state(), keyInReach: true });
+    const line = keyLine({ ...MEMBER, keyInReach: true });
     expect(line).toBe("You can generate with OpenAI.");
     expectNoOwnersWords(line);
   });
@@ -120,7 +52,6 @@ describe("a provider's key line in Settings", () => {
   it("a member whose key in reach was rejected reads only that, and whom to ask", () => {
     const line = keyLine({
       ...MEMBER,
-      state: state(),
       keyInReach: true,
       keyRejected: true,
     });
@@ -133,7 +64,6 @@ describe("a provider's key line in Settings", () => {
       keyLine({
         ...MEMBER,
         label: "Google",
-        state: undefined,
         keyInReach: true,
         keyRejected: true,
       }),
@@ -148,7 +78,7 @@ describe("a provider's key line in Settings", () => {
       { keyInReach: false, keyRejected: true, can: false },
     ];
     for (const { can, ...key } of cases) {
-      const line = keyLine({ ...MEMBER, state: state(), ...key });
+      const line = keyLine({ ...MEMBER, ...key });
       expect(line === "You can generate with OpenAI.").toBe(can);
     }
   });
@@ -157,67 +87,39 @@ describe("a provider's key line in Settings", () => {
     expect(
       keyLine({
         ...MEMBER,
-        state: undefined,
         keyInReach: false,
         keyRejected: true,
       }),
     ).toBe("You have no access to an OpenAI key; ask Ana.");
   });
 
-  it("the owner's key line is the same whether or not the key was rejected", () => {
-    for (const keyRejected of [false, true]) {
-      expect(
-        keyLine({ ...OWNER, state: state(), keyInReach: true, keyRejected }),
-      ).toBe("API key saved, ends in 1234");
-      expect(
-        keyLine({
-          ...OWNER,
-          state: undefined,
-          keyInReach: false,
-          keyRejected,
-        }),
-      ).toBe("No API key yet");
-      expect(
-        keyLine({
-          ...OWNER,
-          state: state({ source: null, unreadable: true }),
-          keyInReach: false,
-          keyRejected,
-        }),
-      ).toBe(
-        "A saved key (ends in 1234) cannot be read: KILN_SECRET_KEY is missing or changed. Paste the key again.",
-      );
-    }
-  });
-
   it("a member with no key in reach is told whom to ask", () => {
-    const none = keyLine({ ...MEMBER, state: undefined, keyInReach: false });
+    const none = keyLine({ ...MEMBER, keyInReach: false });
     expect(none).toBe("You have no access to an OpenAI key; ask Ana.");
     expectNoOwnersWords(none);
     const google = keyLine({
       ...MEMBER,
       label: "Google",
-      state: undefined,
       keyInReach: false,
     });
     expect(google).toBe("You have no access to a Google key; ask Ana.");
   });
 
+  // A member's line takes no key state at all: a key only in .env, or one
+  // that cannot be read, is out of their reach and reads as no access.
   it("a member never reads of a key in .env or of one that cannot be read", () => {
-    const inEnv = keyLine({
-      ...MEMBER,
-      state: state({ source: null, hint: null, inEnvironment: true }),
-      keyInReach: false,
-    });
-    expect(inEnv).toBe("You have no access to an OpenAI key; ask Ana.");
-    expectNoOwnersWords(inEnv);
-    const unreadable = keyLine({
-      ...MEMBER,
-      state: state({ source: null, unreadable: true }),
-      keyInReach: false,
-    });
-    expect(unreadable).toBe("You have no access to an OpenAI key; ask Ana.");
-    expectNoOwnersWords(unreadable);
+    const out = keyLine({ ...MEMBER, keyInReach: false });
+    expect(out).toBe("You have no access to an OpenAI key; ask Ana.");
+    expectNoOwnersWords(out);
+    for (const keyInReach of [true, false]) {
+      for (const keyRejected of [true, false]) {
+        for (const given of [true, false, undefined]) {
+          expectNoOwnersWords(
+            keyLine({ ...MEMBER, keyInReach, keyRejected, given }),
+          );
+        }
+      }
+    }
   });
 
   it("a studio whose owner Kiln cannot name still says whom to ask", () => {
@@ -225,7 +127,6 @@ describe("a provider's key line in Settings", () => {
       keyLine({
         ...MEMBER,
         ask: "the studio's owner",
-        state: undefined,
         keyInReach: false,
       }),
     ).toBe("You have no access to an OpenAI key; ask the studio's owner.");
@@ -665,8 +566,6 @@ const expectMembersWords = (line: string | null) => {
 describe("Settings → Providers, a member's line when keys are given to people", () => {
   const member = (label: "OpenAI" | "Google", over = {}) =>
     keyLine({
-      state: undefined,
-      owner: false,
       ask: "Ana",
       label,
       keyInReach: true,
@@ -1170,8 +1069,6 @@ describe("nothing a member reads about a key names it or the owner's controls", 
           for (const keyRejected of [true, false]) {
             lines.push(
               keyLine({
-                state: undefined,
-                owner: false,
                 ask: "Ana",
                 label,
                 keyInReach: reach === "in-reach",

@@ -8,14 +8,6 @@ import { PROVIDER_LABELS, type ProviderId } from "@/domain/model-defaults";
 import { isKeyRejectedText } from "@/domain/queue";
 import type { KeyReach } from "@/lib/provider-key-pick";
 
-type KeyState = {
-  provider: "openai" | "google";
-  source: "saved" | "env" | null;
-  hint: string | null;
-  unreadable: boolean;
-  inEnvironment: boolean;
-};
-
 const ENV_NAME = { openai: "OPENAI_API_KEY", google: "GOOGLE_API_KEY" };
 
 export const article = (label: string) =>
@@ -36,35 +28,23 @@ export const providersIntro = (ask: string | null) =>
     ? "Kiln runs on your own keys: paste one and it is kept sealed on this machine, then checked for free (the provider lists its models, nothing is generated). One provider is enough to start. The rest is read from the last calls Kiln made."
     : `Kiln runs on the studio's keys, which ${ask} manages.`;
 
-// Settings → Providers, a provider's key line. A key in reach is one the
-// reader's calls would run on; a saved key that cannot be read is not. A
-// member reads one thing about the key, and whether it was given to them or
-// is the studio's (`given`), never its name or last four.
+// Settings → Providers, a member's key line (the owner reads the key list:
+// keyRowTitle, keyRowLine, ownCallsLine). A key in reach is one the member's
+// calls would run on; a saved key that cannot be read is not. A member reads
+// one thing about the key, and whether it was given to them or is the
+// studio's (`given`), never its name or last four.
 export function keyLine(input: {
-  state: KeyState | undefined;
-  owner: boolean;
   keyInReach: boolean;
   keyRejected?: boolean;
   given?: boolean;
-  ask: string | null;
+  ask: string;
   label: string;
 }): string {
-  const { state, owner, keyInReach, keyRejected, given, ask, label } = input;
-  if (ask !== null) {
-    if (!keyInReach) return noAccessLine(label, ask);
-    if (keyRejected) return `${rejected(label, ask, given)}.`;
-    if (given === undefined) return `You can generate with ${label}.`;
-    return `You can generate with ${label}, on ${given ? `a key ${ask} gave you` : "the studio's key"}.`;
-  }
-  if (!state) return "No API key yet";
-  if (state.unreadable) {
-    return `A saved key (ends in ${state.hint}) cannot be read: KILN_SECRET_KEY is missing or changed. Paste the key again.`;
-  }
-  if (state.source === "saved") return `API key saved, ends in ${state.hint}`;
-  if (state.inEnvironment && owner) {
-    return `No API key yet. ${ENV_NAME[state.provider]} is in .env, but the app uses only keys saved here: paste it below.`;
-  }
-  return "No API key yet";
+  const { keyInReach, keyRejected, given, ask, label } = input;
+  if (!keyInReach) return noAccessLine(label, ask);
+  if (keyRejected) return `${rejected(label, ask, given)}.`;
+  if (given === undefined) return `You can generate with ${label}.`;
+  return `You can generate with ${label}, on ${given ? `a key ${ask} gave you` : "the studio's key"}.`;
 }
 
 // The owner's line above a provider's keys: which key their own calls run
