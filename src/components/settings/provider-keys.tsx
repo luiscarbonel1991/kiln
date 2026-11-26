@@ -5,6 +5,7 @@ import {
   CircleCheck,
   Ellipsis,
   KeyRound,
+  Loader2,
   Plus,
 } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -67,6 +68,43 @@ export const afterRemove = (keyId: string, answer: KeyAnswer): Landing =>
     ? { at: "card", confirming: null }
     : { at: keyId, confirming: keyId };
 
+// The line of an answer, under a key's row or at the card's foot:
+// "Checking…" while that key's free check runs, then its answer, plain on a
+// row whose own line already says what failed ("Saved." or "Checked." on a
+// rejected key).
+export function KeySaid({
+  testId,
+  checking,
+  said,
+  alarm,
+}: {
+  testId: string;
+  checking: boolean;
+  said: KeyAnswer | null;
+  alarm: boolean;
+}) {
+  if (!checking && !said) return null;
+  const plain = checking || said?.ok || alarm;
+  return (
+    <p
+      className={`flex items-center gap-1.5 font-sans text-xs leading-snug [overflow-wrap:anywhere] ${
+        plain ? "text-on-surface-mid" : "text-fail"
+      }`}
+      data-testid={testId}
+      aria-live="polite"
+    >
+      {checking ? (
+        <>
+          <Loader2 className="size-3 flex-shrink-0 animate-spin" />
+          Checking…
+        </>
+      ) : (
+        said?.message
+      )}
+    </p>
+  );
+}
+
 // Whether a person on a key is the one reading the page.
 const isYou = (team: TeamMemberView[], memberId: string) =>
   team.some((m) => m.id === memberId && m.you);
@@ -128,6 +166,8 @@ export function ProviderKeys({
   const [confirming, setConfirming] = useState<string | null>(null);
   // The last answer, on the row it is about, or the card's ("card").
   const [said, setSaid] = useState<(KeyAnswer & { at: string }) | null>(null);
+  // The key whose free check is running.
+  const [checking, setChecking] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   // An action from a row; `after` says where its answer goes and whether
@@ -139,6 +179,7 @@ export function ProviderKeys({
     startTransition(async () => {
       const answer = await work();
       const next = after(answer);
+      setChecking(null);
       setConfirming(next.confirming);
       setSaid({ at: next.at, ...answer });
     });
@@ -176,24 +217,17 @@ export function ProviderKeys({
     });
   };
 
-  // The last answer, shown where it belongs; plain on a row whose own line
-  // already says what failed ("Saved." or "Checked." on a rejected key).
-  const saidLine = (at: string, alarm = false) =>
-    said?.at === at ? (
-      <p
-        className={`font-sans text-xs leading-snug [overflow-wrap:anywhere] ${
-          said.ok || alarm ? "text-on-surface-mid" : "text-fail"
-        }`}
-        data-testid={
-          at === "card"
-            ? `provider-${provider}-said`
-            : `provider-key-said-${at}`
-        }
-        aria-live="polite"
-      >
-        {said.message}
-      </p>
-    ) : null;
+  // The last answer, shown where it belongs, or the check running there.
+  const saidLine = (at: string, alarm = false) => (
+    <KeySaid
+      testId={
+        at === "card" ? `provider-${provider}-said` : `provider-key-said-${at}`
+      }
+      checking={pending && checking === at}
+      said={said?.at === at ? said : null}
+      alarm={alarm}
+    />
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -254,12 +288,14 @@ export function ProviderKeys({
                           aria-label={`Check ${row.name}`}
                           disabled={!row.readable}
                           className={ITEM}
-                          onSelect={() =>
+                          onSelect={() => {
+                            setSaid(null);
+                            setChecking(row.id);
                             run(
                               () => checkProviderKeyAction({ keyId: row.id }),
                               () => ({ at: row.id, confirming: null }),
-                            )
-                          }
+                            );
+                          }}
                         >
                           Check the key
                         </DropdownMenu.Item>

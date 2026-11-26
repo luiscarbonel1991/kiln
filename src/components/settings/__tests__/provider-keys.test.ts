@@ -11,7 +11,7 @@ vi.mock("@/app/actions/settings", () => ({
   removeProviderKeyAction: vi.fn(),
 }));
 
-const { afterRemove, ProviderKeys } = await import(
+const { afterRemove, KeySaid, ProviderKeys } = await import(
   "@/components/settings/provider-keys"
 );
 const { AddKeyFormView } = await import(
@@ -180,5 +180,39 @@ describe("removing a key", () => {
         message: "Kiln could not remove the key; try again.",
       }),
     ).toEqual({ at: "k-cy", confirming: "k-cy" });
+  });
+});
+
+describe("the line under a key's row", () => {
+  const said = (props: Parameters<typeof KeySaid>[0]) =>
+    renderToStaticMarkup(createElement(KeySaid, props));
+  const base = { testId: "provider-key-said-k-cy", alarm: false };
+
+  // "Check the key" shows on its row that it is running, as the forms'
+  // submit does, then its answer in the same place.
+  it("says the check is running on its row, then the answer", () => {
+    const running = said({ ...base, checking: true, said: null });
+    expect(running).toContain("Checking…");
+    expect(running).toContain("animate-spin");
+    expect(running).toContain('data-testid="provider-key-said-k-cy"');
+    const answered = said({
+      ...base,
+      checking: false,
+      said: { ok: true, saved: false, message: "OpenAI accepts the key." },
+    });
+    expect(answered).toContain("OpenAI accepts the key.");
+    expect(answered).not.toContain("Checking…");
+    expect(said({ ...base, checking: false, said: null })).toBe("");
+  });
+
+  // A failure in red, unless the row's own line already says it.
+  it("is plain where the row already carries the alarm", () => {
+    const failed = { ok: false, saved: false, message: "Checked." };
+    expect(said({ ...base, checking: false, said: failed })).toContain(
+      "text-fail",
+    );
+    expect(
+      said({ ...base, alarm: true, checking: false, said: failed }),
+    ).not.toContain("text-fail");
   });
 });
