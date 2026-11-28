@@ -110,16 +110,22 @@ describe.skipIf(!enabled)("the owner's key actions (database)", async () => {
   it("adding a key saves it, checks it for free, and refuses a name or a team key already taken", async () => {
     const { studio } = await withTeamAndBob("actions-add");
     asOwner(studio);
-    expect(
-      await actions.addProviderKeyAction({
-        provider: "openai",
-        name: "Carla's key",
-        who: "people",
-        memberIds: [studio.carla.memberId],
-        key: secret(),
-      }),
-    ).toMatchObject({ ok: true, message: "Saved. OpenAI accepts the key." });
+    const added = await actions.addProviderKeyAction({
+      provider: "openai",
+      name: "Carla's key",
+      who: "people",
+      memberIds: [studio.carla.memberId],
+      key: secret(),
+    });
+    expect(added).toMatchObject({
+      ok: true,
+      message: "Saved. OpenAI accepts the key.",
+    });
     const before = await rowsOf(studio);
+    // The answer names the row it is about.
+    expect(before.keys.find((k) => k.id === added.keyId)?.name).toBe(
+      "Carla's key",
+    );
     expect(
       await actions.addProviderKeyAction({
         provider: "openai",
@@ -154,7 +160,7 @@ describe.skipIf(!enabled)("the owner's key actions (database)", async () => {
     asOwner(mine.studio);
     const before = [await rowsOf(mine.studio), await rowsOf(theirs.studio)];
     const answers = [
-      await actions.removeProviderKeyByIdAction({ keyId: theirs.ids.bob }),
+      await actions.removeProviderKeyAction({ keyId: theirs.ids.bob }),
       await actions.replaceProviderKeyAction({
         keyId: theirs.ids.team,
         key: secret(),
@@ -165,7 +171,7 @@ describe.skipIf(!enabled)("the owner's key actions (database)", async () => {
         who: "people",
         memberIds: [mine.studio.carla.memberId],
       }),
-      await actions.checkProviderKeyByIdAction({ keyId: theirs.ids.team }),
+      await actions.checkProviderKeyAction({ keyId: theirs.ids.team }),
       await actions.addProviderKeyAction({
         provider: "google",
         name: "For their Bob",
@@ -206,7 +212,7 @@ describe.skipIf(!enabled)("the owner's key actions (database)", async () => {
     });
     asOwner(studio);
     expect(
-      await actions.removeProviderKeyByIdAction({ keyId: ids.bob }),
+      await actions.removeProviderKeyAction({ keyId: ids.bob }),
     ).toMatchObject({ ok: true });
     const seen: SeenCall[] = [];
     const worker = await fx.keysWorker({ mode: MODE, seen });
@@ -245,7 +251,7 @@ describe.skipIf(!enabled)("the owner's key actions (database)", async () => {
     await vi.waitFor(() => expect(seen).toHaveLength(1), { timeout: 5_000 });
     asOwner(studio);
     expect(
-      await actions.removeProviderKeyByIdAction({ keyId: ids.bob }),
+      await actions.removeProviderKeyAction({ keyId: ids.bob }),
     ).toMatchObject({ ok: true });
     release();
     await worker.idle();
@@ -264,11 +270,11 @@ describe.skipIf(!enabled)("the owner's key actions (database)", async () => {
     const { studio, ids } = await withTeamAndBob("actions-twice");
     asOwner(studio);
     expect(
-      await actions.removeProviderKeyByIdAction({ keyId: ids.bob }),
+      await actions.removeProviderKeyAction({ keyId: ids.bob }),
     ).toMatchObject({ ok: true });
     const before = await rowsOf(studio);
     expect(
-      await actions.removeProviderKeyByIdAction({ keyId: ids.bob }),
+      await actions.removeProviderKeyAction({ keyId: ids.bob }),
     ).toMatchObject({ ok: false, message: "That key was removed already." });
     expect(await rowsOf(studio)).toEqual(before);
   });
@@ -300,9 +306,9 @@ describe.skipIf(!enabled)("the owner's key actions (database)", async () => {
         })
       ).map((r) => r.memberId),
     ).toEqual([studio.bob.memberId]);
-    expect(
-      await actions.removeProviderKeyByIdAction({ keyId: id }),
-    ).toMatchObject({ ok: true });
+    expect(await actions.removeProviderKeyAction({ keyId: id })).toMatchObject({
+      ok: true,
+    });
     expect(await db.providerKey.findUnique({ where: { id } })).toBeNull();
   });
 
@@ -310,7 +316,7 @@ describe.skipIf(!enabled)("the owner's key actions (database)", async () => {
     const { studio, ids } = await withTeamAndBob("actions-check");
     asOwner(studio);
     expect(
-      await actions.checkProviderKeyByIdAction({ keyId: ids.bob }),
+      await actions.checkProviderKeyAction({ keyId: ids.bob }),
     ).toMatchObject({ ok: true });
     const checks = await db.generationJob.findMany({
       where: { makerId: studio.makerId, cardId: "key-check" },

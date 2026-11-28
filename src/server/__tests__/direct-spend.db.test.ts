@@ -247,3 +247,101 @@ describe.skipIf(!enabled)(
     });
   },
 );
+
+// A studio whose OpenAI keys are all for someone else, and one whose team key
+// cannot be read: each reader's direct call is refused, before any row is
+// reserved, in the sentence of their case. Run inside each reader's own keys,
+// as every entry point runs. Fixture keys; the call is a stub.
+describe.skipIf(!enabled)(
+  "a direct call refused by the reader's reach (database)",
+  async () => {
+    const { db } = await import("@/lib/db");
+    const { withMakerKeys } = await import("@/server/provider-keys");
+    const { textCall, withDirectSpend } = await import("@/server/direct-spend");
+    const fx = await import("@/server/__tests__/fixtures/studio-keys");
+    type Studio = Awaited<ReturnType<typeof fx.openStudio>>;
+    type Ref = Parameters<typeof withMakerKeys>[0];
+
+    let given: Studio;
+    let unreadable: Studio;
+    const LUNA = { provider: "openai" as const, model: "gpt-6-luna" };
+    const answer: TextResult<string> = { value: "", model: LUNA.model };
+
+    beforeAll(async () => {
+      // Only Bob holds an OpenAI key; the studio has no team key.
+      given = await fx.openStudio("direct-reach-given");
+      await fx.writeKey(given, {
+        provider: "openai",
+        name: "Bob's key",
+        secret: "sk-fixture-direct-reach-bob-0001",
+        people: [given.bob],
+      });
+      // The team key cannot be read.
+      unreadable = await fx.openStudio("direct-reach-unreadable");
+      await fx.writeKey(unreadable, {
+        provider: "openai",
+        name: "Team key",
+        forTeam: true,
+        secret: "sk-fixture-direct-reach-team-0002",
+        unreadable: true,
+      });
+    });
+
+    afterAll(async () => {
+      await fx.closeStudio(given);
+      await fx.closeStudio(unreadable);
+    });
+
+    const rows = (studio: Studio) =>
+      db.generationJob.findMany({ where: { makerId: studio.makerId } });
+
+    const refusedAs = async (studio: Studio, maker: Ref) => {
+      const before = await rows(studio);
+      const call = vi.fn(async () => answer);
+      const error = await withMakerKeys(maker, () =>
+        withDirectSpend(maker, textCall<string>(LUNA, "chatTurn"), call),
+      ).catch((e: unknown) => e);
+      expect(call).not.toHaveBeenCalled();
+      expect(await rows(studio)).toEqual(before);
+      return error;
+    };
+
+    it("when the only OpenAI key is Bob's, the owner, Carla and a token each read their case, and nothing is reserved", async () => {
+      expect(await refusedAs(given, given.as(given.ana))).toMatchObject({
+        name: "ProviderKeyMissing",
+        message:
+          "No OpenAI key is yours or the team's: add one in Settings → Providers.",
+      });
+      expect(await refusedAs(given, given.as(given.carla))).toMatchObject({
+        name: "ProviderKeyMissing",
+        message: "You have no access to an OpenAI key; ask Ana.",
+      });
+      expect(await refusedAs(given, given.as())).toMatchObject({
+        name: "ProviderKeyMissing",
+        message:
+          "OpenAI has no key for the whole team, the only one a token runs on: add one in Settings → Providers.",
+      });
+    });
+
+    it("when the team key cannot be read, the owner and a token read that it cannot, and a member whom to ask", async () => {
+      expect(
+        await refusedAs(unreadable, unreadable.as(unreadable.ana)),
+      ).toMatchObject({
+        name: "ProviderKeyMissing",
+        message:
+          "The OpenAI key your calls run on cannot be read: replace it in Settings → Providers.",
+      });
+      expect(await refusedAs(unreadable, unreadable.as())).toMatchObject({
+        name: "ProviderKeyMissing",
+        message:
+          "The team's OpenAI key cannot be read: replace it in Settings → Providers.",
+      });
+      expect(
+        await refusedAs(unreadable, unreadable.as(unreadable.bob)),
+      ).toMatchObject({
+        name: "ProviderKeyMissing",
+        message: "You have no access to an OpenAI key; ask Ana.",
+      });
+    });
+  },
+);

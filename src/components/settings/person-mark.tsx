@@ -9,7 +9,16 @@ const MARKS = [
   "bg-prov-brand/15 text-prov-brand",
 ];
 
-export function PersonMark({ name, faded }: { name: string; faded?: boolean }) {
+// `small` sits inline beside a name, as on a key's row.
+export function PersonMark({
+  name,
+  faded,
+  small,
+}: {
+  name: string;
+  faded?: boolean;
+  small?: boolean;
+}) {
   // An invitation has only an email: its first letter.
   const words = name.includes("@")
     ? [name]
@@ -27,7 +36,8 @@ export function PersonMark({ name, faded }: { name: string; faded?: boolean }) {
     <span
       aria-hidden
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-full font-serif text-[0.95rem]",
+        "flex shrink-0 items-center justify-center rounded-full font-serif",
+        small ? "size-6 text-[0.62rem]" : "size-10 text-[0.95rem]",
         faded
           ? "border border-dashed border-border bg-transparent text-on-surface-mid"
           : tone,

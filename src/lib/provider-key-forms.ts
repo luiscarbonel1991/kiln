@@ -19,7 +19,7 @@ export function keyProblem(key: string): string | null {
 const name = z
   .string()
   .trim()
-  .min(1, "Name it, like Bob's key.")
+  .min(1, "Name it, like Team key, or Studio key.")
   .max(40, "At most 40 characters.");
 
 const key = z
@@ -65,3 +65,19 @@ export const ReplaceKeyForm = z.object({ keyId, key });
 
 // A key named by its id, to check or remove.
 export const KeyOfStudio = z.object({ keyId });
+
+// The form fields a server answer can belong under.
+export type KeyField = "name" | "who" | "memberIds" | "key";
+
+// What every key action answers: whether it worked, in words; whether the
+// form's key was written (`saved`, true also for "Saved, but: ..." when the
+// free check after it fails), so its form closes; the field a refusal
+// shows under, if one; and the key a new one was written as (`keyId`), so
+// the answer shows on its row.
+export interface KeyAnswer {
+  ok: boolean;
+  message: string;
+  saved: boolean;
+  field?: KeyField;
+  keyId?: string;
+}

@@ -20,6 +20,30 @@ vi.mock("@/providers/mode", async (original) => ({
   ...(await original<typeof import("@/providers/mode")>()),
   providerMode: () => mode.current,
 }));
+// Why no key is in reach, read only when refusing; a case makes it fail.
+const reach = vi.hoisted(() => ({ fails: false }));
+vi.mock("@/server/provider-keys", async (original) => {
+  const real = await original<typeof import("@/server/provider-keys")>();
+  return {
+    ...real,
+    providerReach: (...args: Parameters<typeof real.providerReach>) =>
+      reach.fails
+        ? Promise.reject(new Error("connection lost"))
+        : real.providerReach(...args),
+  };
+});
+// Whom a member asks, read only when refusing; a case makes it fail.
+const ask = vi.hoisted(() => ({ fails: false }));
+vi.mock("@/server/month-limit", async (original) => {
+  const real = await original<typeof import("@/server/month-limit")>();
+  return {
+    ...real,
+    memberAsk: (...args: Parameters<typeof real.memberAsk>) =>
+      ask.fails
+        ? Promise.reject(new Error("connection lost"))
+        : real.memberAsk(...args),
+  };
+});
 vi.mock("@/server/generation-worker", async (original) => ({
   ...(await original<typeof import("@/server/generation-worker")>()),
   createWorker: () => ({
@@ -204,6 +228,76 @@ describe.skipIf(!enabled)("a batch queued by a person (database)", async () => {
     expect(await made()).toEqual(before);
   });
 
+  // The reach is read only to word the refusal: when it cannot be read, the
+  // batch is refused all the same, in the words of before, never a raw error.
+  it("a batch with no key in reach is refused in the words of before when its reach cannot be read", async () => {
+    const card = "recipe-line-art-2";
+    const owner = {
+      id: makerId,
+      member: { id: "o1", userId: "u0", role: "owner" as const },
+    };
+    const ownersWords = {
+      reason: "provider",
+      message: `${card} uses GPT Image 2, but OpenAI has no API key: add one in Settings → Providers.`,
+    };
+    const before = await db.generationJob.count({
+      where: { makerId, projectId, cardId: card },
+    });
+    mode.current = "live";
+    keys.present = false;
+    reach.fails = true;
+    try {
+      for (const reader of [owner, { id: makerId }]) {
+        await expect(
+          enqueueProjectCards(reader, { projectId, cardIds: [card] }),
+        ).rejects.toMatchObject(ownersWords);
+      }
+    } finally {
+      reach.fails = false;
+      keys.present = true;
+      mode.current = "queue-member";
+    }
+    expect(
+      await db.generationJob.count({
+        where: { makerId, projectId, cardId: card },
+      }),
+    ).toBe(before);
+  });
+
+  // Whom a member asks is read only to word the refusal: when it cannot be
+  // read, the batch is refused all the same, in the words of before, never a
+  // raw error.
+  it("a batch with no key in reach is refused in the words of before when whom to ask cannot be read", async () => {
+    const card = "recipe-line-art-2";
+    const member = {
+      id: makerId,
+      member: { id: "m1", userId: "u1", role: "member" as const },
+    };
+    const before = await db.generationJob.count({
+      where: { makerId, projectId, cardId: card },
+    });
+    mode.current = "live";
+    keys.present = false;
+    ask.fails = true;
+    try {
+      await expect(
+        enqueueProjectCards(member, { projectId, cardIds: [card] }),
+      ).rejects.toMatchObject({
+        reason: "provider",
+        message: `${card} uses GPT Image 2, but OpenAI has no API key: add one in Settings → Providers.`,
+      });
+    } finally {
+      ask.fails = false;
+      keys.present = true;
+      mode.current = "queue-member";
+    }
+    expect(
+      await db.generationJob.count({
+        where: { makerId, projectId, cardId: card },
+      }),
+    ).toBe(before);
+  });
+
   // A token, a script or the worker hands down { id } alone.
   it("a batch queued with the maker's id alone is queued, with no person", async () => {
     const queued = await enqueueProjectCards(
@@ -215,3 +309,154 @@ describe.skipIf(!enabled)("a batch queued by a person (database)", async () => {
     expect(jobs.map((j) => j.memberId)).toEqual([null]);
   });
 });
+
+// A studio with several keys: a live batch whose card's provider has no key
+// for the reader is refused in the sentence of the reader's case, and nothing
+// is queued. Three studios of the shared fixture (Ana owns, Bob and Carla
+// work with her): no OpenAI key at all; only Bob's; a team key that cannot be
+// read. The reach is read from each studio's own rows.
+describe.skipIf(!enabled)(
+  "a batch refused by the reader's reach (database)",
+  async () => {
+    const { db } = await import("@/lib/db");
+    const repo = await import("@/server/project-repository");
+    const { enqueueProjectCards, estimateProjectCards } = await import(
+      "@/server/generation-queue"
+    );
+    const fx = await import("@/server/__tests__/fixtures/studio-keys");
+    type Studio = Awaited<ReturnType<typeof fx.openStudio>>;
+    type Ref = Parameters<typeof enqueueProjectCards>[0];
+
+    const card = "recipe-line-art-0";
+    const editor = lineArtDesign("Queue reach design", [
+      lineArtDrawing(0, "Outline"),
+    ]);
+    const studios: { studio: Studio; projectId: string }[] = [];
+    let none: (typeof studios)[number];
+    let given: (typeof studios)[number];
+    let unreadable: (typeof studios)[number];
+
+    const open = async (label: string) => {
+      const studio = await fx.openStudio(label);
+      const projectId = await repo.saveProject({ id: studio.makerId }, editor);
+      const made = { studio, projectId };
+      studios.push(made);
+      return made;
+    };
+
+    beforeAll(async () => {
+      none = await open("queue-reach-none");
+      given = await open("queue-reach-given");
+      await fx.writeKey(given.studio, {
+        provider: "openai",
+        name: "Bob's key",
+        secret: "sk-fixture-queue-reach-bob-00001",
+        people: [given.studio.bob],
+      });
+      unreadable = await open("queue-reach-unreadable");
+      await fx.writeKey(unreadable.studio, {
+        provider: "openai",
+        name: "Team key",
+        forTeam: true,
+        secret: "sk-fixture-queue-reach-team-0002",
+        unreadable: true,
+      });
+    });
+
+    afterAll(async () => {
+      for (const { studio } of studios) await fx.closeStudio(studio);
+    });
+
+    // The reader is refused with `message` on the estimate and on the queue,
+    // and the studio gets no job and no batch.
+    const refusedWith = async (
+      { studio, projectId }: (typeof studios)[number],
+      reader: Ref,
+      message: string,
+    ) => {
+      const made = () =>
+        Promise.all([
+          db.generationJob.count({ where: { makerId: studio.makerId } }),
+          db.generationBatch.count({ where: { makerId: studio.makerId } }),
+        ]);
+      const before = await made();
+      mode.current = "live";
+      keys.present = false;
+      try {
+        const words = { reason: "provider", message };
+        await expect(
+          estimateProjectCards(reader, projectId, [card]),
+        ).rejects.toMatchObject(words);
+        await expect(
+          enqueueProjectCards(reader, { projectId, cardIds: [card] }),
+        ).rejects.toMatchObject(words);
+      } finally {
+        keys.present = true;
+        mode.current = "queue-member";
+      }
+      expect(await made()).toEqual(before);
+    };
+
+    it("with no OpenAI key in the studio, the owner, a token and a member read the sentences of before, byte for byte", async () => {
+      const { studio } = none;
+      for (const reader of [studio.as(studio.ana), studio.as()]) {
+        await refusedWith(
+          none,
+          reader,
+          `${card} uses GPT Image 2, but OpenAI has no API key: add one in Settings → Providers.`,
+        );
+      }
+      await refusedWith(
+        none,
+        studio.as(studio.carla),
+        `${card} uses GPT Image 2, but you have no access to an OpenAI key; ask Ana.`,
+      );
+    });
+
+    it("when the only OpenAI key is Bob's, the owner reads that none is hers or the team's", async () => {
+      const { studio } = given;
+      await refusedWith(
+        given,
+        studio.as(studio.ana),
+        `${card} uses GPT Image 2, but no OpenAI key is yours or the team's: add one in Settings → Providers.`,
+      );
+    });
+
+    it("when the only OpenAI key is Bob's, a token reads that the team has none, the only one it runs on", async () => {
+      const { studio } = given;
+      await refusedWith(
+        given,
+        studio.as(),
+        `${card} uses GPT Image 2, but OpenAI has no key for the whole team, the only one a token runs on: add one in Settings → Providers.`,
+      );
+    });
+
+    it("when the only OpenAI key is Bob's, Carla reads whom to ask, as before", async () => {
+      const { studio } = given;
+      await refusedWith(
+        given,
+        studio.as(studio.carla),
+        `${card} uses GPT Image 2, but you have no access to an OpenAI key; ask Ana.`,
+      );
+    });
+
+    it("when the team key cannot be read, the owner and a token read that, and a member whom to ask", async () => {
+      const { studio } = unreadable;
+      await refusedWith(
+        unreadable,
+        studio.as(studio.ana),
+        `${card} uses GPT Image 2, but the OpenAI key your calls run on cannot be read: replace it in Settings → Providers.`,
+      );
+      await refusedWith(
+        unreadable,
+        studio.as(),
+        `${card} uses GPT Image 2, but the team's OpenAI key cannot be read: replace it in Settings → Providers.`,
+      );
+      await refusedWith(
+        unreadable,
+        studio.as(studio.bob),
+        `${card} uses GPT Image 2, but you have no access to an OpenAI key; ask Ana.`,
+      );
+    });
+  },
+);

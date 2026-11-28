@@ -33,6 +33,7 @@ import {
 } from "@/server/generation-repository";
 import type { MakerRef } from "@/server/maker-repository";
 import { inMembersWords, memberAsk } from "@/server/month-limit";
+import { providerReach } from "@/server/provider-keys";
 
 // The monthly cap covers every paid call made from Kiln, not only the queue.
 // Mock runs neither reserve nor count. Without a database (tests) both are
@@ -156,14 +157,23 @@ export async function openDirectCall<T extends { usage?: unknown }>(
   const provider = ProviderId.safeParse(priced.provider);
   if (provider.success) {
     if (!hasProviderKey(provider.data)) {
-      // The engine's own error for everyone; a member's carries their
-      // words. If whom to ask cannot be read, the refusal still stands.
-      const ask = await memberAsk(maker).catch(() => null);
+      // The engine's own error for everyone, in the words of the reader's
+      // case: a member's say whom to ask; the owner's and a token's say why
+      // no key is in reach. If either cannot be read, the refusal still
+      // stands, in the words of before.
+      const [ask, reach] = await Promise.all([
+        memberAsk(maker).catch(() => null),
+        providerReach(maker).catch(() => null),
+      ]);
+      const why = reach?.[provider.data].reach;
       throw new ProviderKeyMissing(
         provider.data,
-        ask === null
+        ask === null && (why === undefined || why === "none")
           ? undefined
-          : directNoKeyLine(PROVIDER_LABELS[provider.data], ask),
+          : directNoKeyLine(PROVIDER_LABELS[provider.data], ask, {
+              reach: why,
+              token: !maker.member,
+            }),
       );
     }
     const gone = (await readUnlisted(maker.id))[provider.data];

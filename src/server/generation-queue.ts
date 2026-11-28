@@ -71,7 +71,7 @@ import type { MakerRef } from "@/server/maker-repository";
 import { getMakerRoutes } from "@/server/maker-repository";
 import { fitsThisMonth, inMembersWords, memberAsk } from "@/server/month-limit";
 import { loadProject, loadProjectBoard } from "@/server/project-repository";
-import { withStarterKeys } from "@/server/provider-keys";
+import { providerReach, withStarterKeys } from "@/server/provider-keys";
 import { checkProjectTake } from "@/server/qc/project-take";
 import { sceneLookPlan } from "@/server/scene-look";
 
@@ -185,13 +185,21 @@ async function assertRunnable(
     );
   }
   if (providerMode() === "live" && !hasProviderKey(model.provider)) {
+    // Whom to ask and why no key is in reach are read only when refusing;
+    // if either cannot be read, the refusal still stands, in the words of
+    // before (as openDirectCall in direct-spend.ts).
+    const [ask, reach] = await Promise.all([
+      memberAsk(maker).catch(() => null),
+      providerReach(maker).catch(() => null),
+    ]);
     throw new QueueRefusal(
       "provider",
       queueNoKeyLine(
         cardId,
         check.entry.label,
         PROVIDER_LABELS[model.provider],
-        await memberAsk(maker),
+        ask,
+        { reach: reach?.[model.provider].reach, token: !maker.member },
       ),
     );
   }

@@ -396,11 +396,13 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
       select: { id: true },
     });
     const keyHint = label === "a" ? "AAAA" : "BBBB";
-    await keys.saveProviderKey(
-      maker,
-      "openai",
-      `sk-isolation-test-key-${keyHint}`,
-    );
+    await keys.addProviderKey(maker, {
+      provider: "openai",
+      name: "Team key",
+      who: "team",
+      memberIds: [],
+      key: `sk-isolation-test-key-${keyHint}`,
+    });
     await pricing.saveMakerPricing(maker, {
       machineName: `Studio ${label} machine`,
       materialName: "Birch",
@@ -469,7 +471,13 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
     a = await openStudio("a", 61_000, 50_000);
     b = await openStudio("b", 97_000, 30_000);
     // A second key only studio B holds.
-    await keys.saveProviderKey(b.maker, "google", "AIza-isolation-test-GGGG");
+    await keys.addProviderKey(b.maker, {
+      provider: "google",
+      name: "Team key",
+      who: "team",
+      memberIds: [],
+      key: "AIza-isolation-test-GGGG",
+    });
   });
 
   afterAll(async () => {
@@ -674,10 +682,12 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
     });
 
     it("provider keys and the team", async () => {
-      const states = await keys.providerKeyStates(a.maker);
-      expect(states.find((s) => s.provider === "openai")?.hint).toBe("AAAA");
+      const listed = await keys.listProviderKeys(a.maker);
+      expect(listed.map((k) => [k.provider, k.hint])).toEqual([
+        ["openai", "AAAA"],
+      ]);
       // B saved a second key; A has none of that provider.
-      expect(states.find((s) => s.provider === "google")?.hint).toBeNull();
+      expect(JSON.stringify(listed)).not.toMatch(/BBBB|GGGG/);
       const team = await listTeam(a.maker);
       expect(team.members.map((m) => m.email)).toEqual([a.email]);
       expect(team.members[0]).toMatchObject({ role: "owner", you: true });
@@ -933,24 +943,34 @@ describe.skipIf(!enabled)("two studios on one database", async () => {
       );
     });
 
-    it("removing a provider's key removes the studio's own and leaves the other's", async () => {
+    it("removing a key removes the studio's own and leaves the other's", async () => {
+      const idsOf = async (s: Studio) =>
+        (await keys.listProviderKeys(s.maker)).map((k) => k.id);
+      const [theirs] = await idsOf(b);
+      // Another studio's key id is answered as an id nobody has, and B's rows
+      // stay as they were.
+      expect(
+        await changesNothing(
+          (id) => keys.removeProviderKey(a.maker, id),
+          theirs,
+        ),
+      ).toMatchObject({ refused: "That key was removed already." });
       const before = await rowsOf(b);
-      // A provider only B has a key for.
-      await keys.removeProviderKey(a.maker, "google");
-      // A provider both have a key for.
-      await keys.removeProviderKey(a.maker, "openai");
+      for (const id of await idsOf(a)) {
+        await keys.removeProviderKey(a.maker, id);
+      }
       expect(await rowsOf(b)).toEqual(before);
       expect(
-        (await keys.providerKeyStates(b.maker)).map((s) => s.hint).sort(),
+        (await keys.listProviderKeys(b.maker)).map((k) => k.hint).sort(),
       ).toEqual(["BBBB", "GGGG"]);
-      expect(
-        (await keys.providerKeyStates(a.maker)).map((s) => s.hint),
-      ).toEqual([null, null]);
-      await keys.saveProviderKey(
-        a.maker,
-        "openai",
-        "sk-isolation-test-key-AAAA",
-      );
+      expect(await keys.listProviderKeys(a.maker)).toEqual([]);
+      await keys.addProviderKey(a.maker, {
+        provider: "openai",
+        name: "Team key",
+        who: "team",
+        memberIds: [],
+        key: "sk-isolation-test-key-AAAA",
+      });
     });
 
     it("a change to a draft is logged for the studio that made it, never the other", async () => {

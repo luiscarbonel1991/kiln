@@ -14,6 +14,7 @@ import {
   type VideoResolution,
 } from "@/domain/model-defaults";
 import { priceHint } from "@/lib/model-prices";
+import type { KeyReach } from "@/lib/provider-key-pick";
 import { cn } from "@/lib/utils";
 
 export interface ModelValue {
@@ -32,6 +33,10 @@ export interface ProviderNote {
   // The last error was the provider rejecting the key.
   keyRejected?: boolean;
   unlisted?: { models: string[] } | null;
+  // Why no key is in reach, for the owner's words only (a member's notes
+  // never carry it), and whether the reader's key was given to them.
+  reach?: KeyReach;
+  given?: boolean;
 }
 
 const SELECT =

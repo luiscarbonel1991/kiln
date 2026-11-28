@@ -5,8 +5,14 @@ import {
 } from "@/domain/model-defaults";
 import { isKeyRejectedText, readableFailure } from "@/domain/queue";
 import { db, hasDatabase } from "@/lib/db";
+import type { KeyReach } from "@/lib/provider-key-pick";
+import { envKeyLine, keyRowLine, ownCallsLine } from "@/lib/provider-key-words";
 import { checkProviderKey, type KeyCheck } from "@/providers/key-check";
-import { hasProviderKey, providerKeyId } from "@/providers/keys";
+import {
+  hasEnvironmentKey,
+  hasProviderKey,
+  providerKeyId,
+} from "@/providers/keys";
 import {
   readUnlisted,
   recordKeyCheck,
@@ -14,7 +20,13 @@ import {
 } from "@/server/generation-repository";
 import { CAP_REACHED, NOT_RUN, NOT_STARTED } from "@/server/generation-worker";
 import type { MakerRef } from "@/server/maker-repository";
-import { providerReach, withKey } from "@/server/provider-keys";
+import {
+  listProviderKeys,
+  type ProviderKeyListing,
+  providerReach,
+  withKey,
+} from "@/server/provider-keys";
+import { readsStudioAmounts } from "@/server/studio-owner";
 
 // Each provider's health, free to read (no ping, no paid call): whether the
 // reader has a key, and what the last live calls on it did — the queue's jobs and the
@@ -35,6 +47,11 @@ export interface ProviderHealth {
   lastOkAt: string | null;
   // The offered models its latest key check found it no longer lists.
   unlisted: { models: string[]; at: string } | null;
+  // Whether a key is in reach for the reader, and why not: the owner's words
+  // only (healthForReader drops it for a member).
+  reach: KeyReach;
+  // The reader's key was given to them, not the team's.
+  given: boolean;
 }
 
 const PROVIDERS: ProviderId[] = ["openai", "google"];
@@ -140,6 +157,8 @@ export async function providerHealth(
         (key) => key === id || (team && key === ""),
       ),
       unlisted: unlisted[provider] ?? null,
+      reach: reach[provider].reach,
+      given: reach[provider].whose === "given",
     };
   });
 }
@@ -177,39 +196,109 @@ export async function keyHealth(maker: MakerRef): Promise<KeyHealth[]> {
   });
 }
 
-// Check a provider's key now, for free, and keep the answer as the latest
-// call of the key in use (the scope's): a replaced key clears the error it
-// left, and a key the provider rejects says so before any paid call. The models it lists are
+// One key in the owner's list: its people, its own last calls, and the one
+// thing to know about it (keyRowLine), never the key itself.
+export interface ProviderKeyView
+  extends Omit<ProviderKeyListing, "provider">,
+    Pick<ProviderHealth, "lastError" | "keyRejected" | "lastOkAt"> {
+  line: string | null;
+}
+
+// A provider's keys as the owner manages them, with the line on the owner's
+// own calls and, when the studio has none, the note on a key left in .env.
+export interface ProviderKeyCard {
+  provider: ProviderId;
+  label: string;
+  ownCalls: string;
+  envNote: string | null;
+  keys: ProviderKeyView[];
+}
+
+// Settings → Providers, the owner's: every key of the studio by provider,
+// its people named only from the studio's own team (listProviderKeys), and
+// which of them the owner's own calls run on. Owner-only: a member's page
+// never calls it, and a member's maker gets nothing.
+export async function providerKeyList(
+  maker: MakerRef,
+): Promise<ProviderKeyCard[]> {
+  if (!readsStudioAmounts(maker)) return [];
+  const [listed, health, reach] = await Promise.all([
+    listProviderKeys(maker),
+    keyHealth(maker),
+    providerReach(maker),
+  ]);
+  const me = maker.member?.id;
+  return PROVIDERS.map((provider) => {
+    const label = PROVIDER_LABELS[provider];
+    const keys = listed.filter((k) => k.provider === provider);
+    // The key the pick gave the owner: the one given to them, else the
+    // team's (none when no key is theirs or the team's).
+    const { whose } = reach[provider];
+    const mine =
+      whose === "given"
+        ? keys.find((k) => k.people.some((p) => p.memberId === me))
+        : whose === "team"
+          ? keys.find((k) => k.forTeam)
+          : undefined;
+    return {
+      provider,
+      label,
+      ownCalls: ownCallsLine({
+        label,
+        reach: reach[provider].reach,
+        keyName: mine?.name ?? null,
+      }),
+      envNote:
+        keys.length === 0 && hasEnvironmentKey(provider)
+          ? envKeyLine(provider)
+          : null,
+      keys: keys.map(({ provider: _provider, ...key }) => {
+        const calls = health.find((h) => h.keyId === key.id);
+        const keyRejected = calls?.keyRejected ?? false;
+        return {
+          ...key,
+          lastError: calls?.lastError ?? null,
+          keyRejected,
+          lastOkAt: calls?.lastOkAt ?? null,
+          line: keyRowLine({
+            label,
+            readable: key.readable,
+            keyRejected,
+            forTeam: key.forTeam,
+            people: key.people.length,
+          }),
+        };
+      }),
+    };
+  });
+}
+
+// Check one key of the studio's now, for free, whoever it is given to, and
+// keep the answer as that key's latest call: a replaced key clears the error
+// it left, and a key the provider rejects says so before any paid call. A key
+// of another studio is refused before any request. The models it lists are
 // compared with the catalog: an offered model it no longer names is kept with
 // the answer, so Settings names it and the queue refuses it before paying.
 export async function checkKey(
   maker: MakerRef,
-  provider: ProviderId,
-): Promise<KeyCheck & { unlisted?: string[] }> {
-  const result = await checkProviderKey(provider);
-  const unlisted = result.ok ? unlistedModels(provider, result.models) : [];
-  if (result.called && hasDatabase()) {
-    await recordKeyCheck({
-      makerId: maker.id,
-      provider,
-      error: result.ok ? null : result.message,
-      ...(result.ok ? { unlisted } : {}),
-      memberId: maker.member?.id ?? null,
-      providerKeyId: providerKeyId(provider),
-    });
-  }
-  return result.ok ? { ...result, unlisted } : result;
-}
-
-// Check one key of the studio's, for free, whoever it is given to, and keep
-// the answer on that key. A key of another studio is refused before any
-// request.
-export async function checkKeyById(
-  maker: MakerRef,
   keyId: string,
 ): Promise<KeyCheck & { unlisted?: string[]; provider: ProviderId }> {
-  return withKey(maker, keyId, async (provider) => ({
-    ...(await checkKey(maker, provider)),
-    provider,
-  }));
+  return withKey(maker, keyId, async (provider) => {
+    const result = await checkProviderKey(provider);
+    const unlisted = result.ok ? unlistedModels(provider, result.models) : [];
+    if (result.called && hasDatabase()) {
+      await recordKeyCheck({
+        makerId: maker.id,
+        provider,
+        error: result.ok ? null : result.message,
+        ...(result.ok ? { unlisted } : {}),
+        memberId: maker.member?.id ?? null,
+        // The scope withKey made holds this one key.
+        providerKeyId: providerKeyId(provider),
+      });
+    }
+    return result.ok
+      ? { ...result, unlisted, provider }
+      : { ...result, provider };
+  });
 }

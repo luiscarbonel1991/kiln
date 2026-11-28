@@ -116,7 +116,7 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
         }),
       () =>
         keys.replaceProviderKey(owner(a), { keyId: ids.bBob, key: secret() }),
-      () => keys.removeProviderKeyById(owner(a), ids.bTeam),
+      () => keys.removeProviderKey(owner(a), ids.bTeam),
       () =>
         keys.addProviderKey(owner(a), {
           provider: "google",
@@ -239,10 +239,10 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
       secret: secret(),
       people: [studio.bob],
     });
-    await keys.removeProviderKeyById(owner(studio), id);
+    await keys.removeProviderKey(owner(studio), id);
     expect(await db.providerKey.findUnique({ where: { id } })).toBeNull();
     const gone = "That key was removed already.";
-    await expect(keys.removeProviderKeyById(owner(studio), id)).rejects.toThrow(
+    await expect(keys.removeProviderKey(owner(studio), id)).rejects.toThrow(
       gone,
     );
     await expect(
@@ -308,24 +308,6 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
     for (const other of [ids.bTeam, ids.bBob, b.bob.email, a.bob.email]) {
       expect(text).not.toContain(other);
     }
-  });
-
-  it("the old form's team key, when another key is already named Team key, is refused in words and nothing is written", async () => {
-    const studio = await open("writes-team-name");
-    await fx.writeKey(studio, {
-      provider: "openai",
-      name: "Team key",
-      secret: secret(),
-      people: [studio.bob],
-    });
-    const before = await rowsOf(studio);
-    await expect(
-      keys.saveProviderKey(owner(studio), "openai", secret()),
-    ).rejects.toMatchObject({
-      name: "KeyRefusal",
-      message: "Another OpenAI key has that name.",
-    });
-    expect(await rowsOf(studio)).toEqual(before);
   });
 
   // A write that loses a race: another write's row, not yet committed, is
@@ -466,15 +448,6 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
     );
     expect(team).toBeInstanceOf(keys.KeyRefusal);
     expect(team).toMatchObject({ message: teamTaken });
-
-    // The old form's team key, against a team key made meanwhile.
-    const other = await open("writes-race-old-form");
-    const saved = await race(
-      (tx) => rivalKey(other, tx, { name: "Rival team", forTeam: true }),
-      () => keys.saveProviderKey(owner(other), "openai", secret()),
-    );
-    expect(saved).toBeInstanceOf(keys.KeyRefusal);
-    expect(saved).toMatchObject({ message: teamTaken });
   });
 
   // Every write drops the studio's cached keys before it returns, and only
@@ -519,7 +492,7 @@ describe.skipIf(!enabled)("writing a studio's keys (database)", async () => {
     });
     expect(await bobs()).toBe(given);
     const bobsKey = await keyNamed(studio, "Bob's key");
-    await keys.removeProviderKeyById(owner(studio), bobsKey?.id ?? "");
+    await keys.removeProviderKey(owner(studio), bobsKey?.id ?? "");
     expect(await bobs()).toBe(team);
     expect(await others()).toBe(otherTeam);
   });
